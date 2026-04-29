@@ -9,6 +9,5 @@ class DBSettings(BaseSettings):
     database_url: str
 
 
-
 db_settings = DBSettings()
 db_url = db_settings.database_url
