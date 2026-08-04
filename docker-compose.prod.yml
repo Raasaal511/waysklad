@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    environment:
+      # ICU-локаль: без неё lower()/ILIKE не работают с кириллицей (поиск товаров)
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=und"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    env_file: .env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    restart: unless-stopped
+    depends_on:
+      - db
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

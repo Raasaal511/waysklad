@@ -1,5 +1,6 @@
 README.md
 
+docs/
 # --- Python ---
 __pycache__/
 *.py[cod]
@@ -75,6 +76,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+
+# --- Backups ---
+backups/
 
 # --- Environment ---
 .env
