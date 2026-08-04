@@ -1,0 +1,59 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+
+from app.domain.common.exceptions import DomainError
+from app.domain.common.money import Money
+from app.domain.common.quantity import Quantity
+from app.domain.sales.payment import PaymentMethod
+
+
+@dataclass
+class SaleLine:
+    product_id: int
+    quantity: Quantity
+    price: Money  # цена на момент продажи
+    variant_id: int | None = None
+
+    @property
+    def total(self) -> Money:
+        return self.price * self.quantity.value
+
+
+@dataclass
+class Sale:
+    id: int | None
+    warehouse_id: int
+    seller_id: int
+    payment_method: PaymentMethod
+    lines: list[SaleLine] = field(default_factory=list)
+    discount: Money = field(default_factory=Money.zero)
+    client_id: int | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @property
+    def subtotal(self) -> Money:
+        total = Money.zero()
+        for line in self.lines:
+            total = total + line.total
+        return total
+
+    @property
+    def total(self) -> Money:
+        """Сумма чека после скидки."""
+        return self.subtotal - self.discount
+
+    def change_for(self, cash_received: Money) -> Money:
+        """Сдача."""
+        if cash_received < self.total:
+            raise DomainError("Получено меньше суммы чека")
+        return cash_received - self.total
+
+    def validate(self) -> None:
+        if not self.lines:
+            raise DomainError("Продажа без позиций")
+        if self.discount > self.subtotal:
+            raise DomainError("Скидка больше суммы чека")
+        if self.payment_method is PaymentMethod.CREDIT and self.client_id is None:
+            raise DomainError("Для продажи в долг нужно указать клиента")
