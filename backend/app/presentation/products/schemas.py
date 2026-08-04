@@ -1,0 +1,129 @@
+from decimal import Decimal
+
+from pydantic import BaseModel, Field
+
+from app.application.products.create_product import CreateProductCommand, VariantInput
+from app.application.products.update_product import (
+    UpdateProductCommand,
+    UpdateVariantInput,
+)
+from app.domain.catalog.entities import Product
+
+
+class VariantCreateRequest(BaseModel):
+    size: str = ""
+    color: str = ""
+    barcode: str | None = None
+
+
+class VariantUpdateRequest(BaseModel):
+    id: int | None = None  # None — новый вариант; отсутствующие в списке удаляются
+    size: str = ""
+    color: str = ""
+    barcode: str | None = None
+
+
+class ProductCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=300)
+    unit_code: str = "pcs"
+    purchase_price: Decimal = Decimal("0")
+    retail_price: Decimal = Decimal("0")
+    sku: str = ""
+    barcode: str | None = None
+    category_id: int | None = None
+    min_stock: Decimal = Decimal("0")
+    variants: list[VariantCreateRequest] = []
+
+    def to_command(self) -> CreateProductCommand:
+        return CreateProductCommand(
+            name=self.name,
+            unit_code=self.unit_code,
+            purchase_price=self.purchase_price,
+            retail_price=self.retail_price,
+            sku=self.sku,
+            barcode=self.barcode,
+            category_id=self.category_id,
+            min_stock=self.min_stock,
+            variants=[
+                VariantInput(size=v.size, color=v.color, barcode=v.barcode)
+                for v in self.variants
+            ],
+        )
+
+
+class ProductUpdateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=300)
+    unit_code: str = "pcs"
+    purchase_price: Decimal = Decimal("0")
+    retail_price: Decimal = Decimal("0")
+    sku: str = ""
+    barcode: str | None = None
+    category_id: int | None = None
+    min_stock: Decimal = Decimal("0")
+    photo: str = ""
+    variants: list[VariantUpdateRequest] = []
+
+    def to_command(self, product_id: int) -> UpdateProductCommand:
+        return UpdateProductCommand(
+            product_id=product_id,
+            name=self.name,
+            unit_code=self.unit_code,
+            purchase_price=self.purchase_price,
+            retail_price=self.retail_price,
+            sku=self.sku,
+            barcode=self.barcode,
+            category_id=self.category_id,
+            min_stock=self.min_stock,
+            photo=self.photo,
+            variants=[
+                UpdateVariantInput(id=v.id, size=v.size, color=v.color, barcode=v.barcode)
+                for v in self.variants
+            ],
+        )
+
+
+class VariantResponse(BaseModel):
+    id: int
+    size: str
+    color: str
+    barcode: str | None
+
+
+class ProductResponse(BaseModel):
+    id: int
+    name: str
+    unit_code: str
+    retail_price: Decimal
+    purchase_price: Decimal | None  # None — у роли нет права видеть закупочную
+    margin: Decimal | None
+    sku: str
+    barcode: str | None
+    category_id: int | None
+    min_stock: Decimal
+    photo: str
+    variants: list[VariantResponse]
+
+    @classmethod
+    def from_entity(cls, product: Product, show_purchase: bool) -> "ProductResponse":
+        return cls(
+            id=product.id,
+            name=product.name,
+            unit_code=product.unit.code,
+            retail_price=product.retail_price.amount,
+            purchase_price=product.purchase_price.amount if show_purchase else None,
+            margin=product.margin.amount if show_purchase else None,
+            sku=product.sku,
+            barcode=product.barcode.value if product.barcode else None,
+            category_id=product.category_id,
+            min_stock=product.min_stock,
+            photo=product.photo,
+            variants=[
+                VariantResponse(
+                    id=v.id,
+                    size=v.size,
+                    color=v.color,
+                    barcode=v.barcode.value if v.barcode else None,
+                )
+                for v in product.variants
+            ],
+        )
