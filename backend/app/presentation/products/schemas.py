@@ -3,11 +3,13 @@ from decimal import Decimal
 from pydantic import BaseModel, Field
 
 from app.application.products.create_product import CreateProductCommand, VariantInput
+from app.application.products.create_unit import CreateUnitCommand
 from app.application.products.update_product import (
     UpdateProductCommand,
     UpdateVariantInput,
 )
 from app.domain.catalog.entities import Product
+from app.domain.common.quantity import Unit
 
 
 class VariantCreateRequest(BaseModel):
@@ -80,6 +82,25 @@ class ProductUpdateRequest(BaseModel):
                 for v in self.variants
             ],
         )
+
+
+class UnitCreateRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=10)
+    name: str = Field(min_length=1, max_length=50)
+    fractional: bool = False
+
+    def to_command(self) -> CreateUnitCommand:
+        return CreateUnitCommand(code=self.code, name=self.name, fractional=self.fractional)
+
+
+class UnitResponse(BaseModel):
+    code: str
+    name: str
+    fractional: bool
+
+    @classmethod
+    def from_entity(cls, unit: Unit) -> "UnitResponse":
+        return cls(code=unit.code, name=unit.name, fractional=unit.fractional)
 
 
 class VariantResponse(BaseModel):

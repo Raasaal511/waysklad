@@ -1,14 +1,12 @@
-from typing import Annotated
-
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
 from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Product
-from app.domain.identity.permissions import Permission, has_permission
 from app.presentation.deps import (
     ActorDep,
     CreateProductDep,
-    CurrentUserDep,
+    CreateUnitDep,
+    ShowPurchaseDep,
     UowDep,
     UpdateProductDep,
 )
@@ -16,16 +14,11 @@ from app.presentation.products.schemas import (
     ProductCreateRequest,
     ProductResponse,
     ProductUpdateRequest,
+    UnitCreateRequest,
+    UnitResponse,
 )
 
 router = APIRouter(prefix="/products", tags=["products"])
-
-
-def _show_purchase(user: CurrentUserDep) -> bool:
-    return has_permission(user.role, Permission.PURCHASE_PRICES_VIEW)
-
-
-ShowPurchaseDep = Annotated[bool, Depends(_show_purchase)]
 
 
 def _maybe(product: Product | None, show_purchase: bool) -> ProductResponse | None:
@@ -53,6 +46,19 @@ async def update_product(
 ) -> ProductResponse:
     product = await use_case.execute(actor, body.to_command(product_id))
     return ProductResponse.from_entity(product, show_purchase)
+
+
+@router.post("/units", status_code=201)
+async def create_unit(
+    body: UnitCreateRequest, actor: ActorDep, use_case: CreateUnitDep
+) -> UnitResponse:
+    return UnitResponse.from_entity(await use_case.execute(actor, body.to_command()))
+
+
+@router.get("/units")
+async def list_units(uow: UowDep) -> list[UnitResponse]:
+    async with uow:
+        return [UnitResponse.from_entity(u) for u in await uow.units.list()]
 
 
 @router.get("")

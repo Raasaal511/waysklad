@@ -52,3 +52,10 @@ def require_permission(permission: Permission) -> Depends:
             raise AccessDeniedError(f"Роль «{user.role}» не имеет права «{permission}»")
 
     return Depends(checker)
+
+
+def get_show_purchase(user: CurrentUserDep) -> bool:
+    return has_permission(user.role, Permission.PURCHASE_PRICES_VIEW)
+
+
+ShowPurchaseDep = Annotated[bool, Depends(get_show_purchase)]
