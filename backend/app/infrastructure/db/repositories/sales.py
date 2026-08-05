@@ -33,6 +33,20 @@ class SqlAlchemySaleRepository(SqlAlchemyRepository, ISaleRepository):
         units = await self._product_unit_by_id({line.product_id for line in model.lines})
         return SaleMapper.to_entity(model, units)
 
+    async def get_by_client_op_id(self, client_op_id: str) -> Sale | None:
+        model = (
+            await self._session.execute(
+                select(SaleModel).where(
+                    SaleModel.tenant_id == self._tenant,
+                    SaleModel.client_op_id == client_op_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            return None
+        units = await self._product_unit_by_id({line.product_id for line in model.lines})
+        return SaleMapper.to_entity(model, units)
+
 
 class SqlAlchemySaleReturnRepository(SqlAlchemyRepository, ISaleReturnRepository):
     async def add(self, sale_return: SaleReturn) -> SaleReturn:

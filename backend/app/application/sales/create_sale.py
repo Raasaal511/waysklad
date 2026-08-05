@@ -29,6 +29,7 @@ class CreateSaleCommand:
     discount: Decimal = Decimal("0")
     client_id: int | None = None
     cash_received: Decimal | None = None  # для расчёта сдачи
+    client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,12 @@ class CreateSaleUseCase:
         require(actor, Permission.SALES_CREATE)
 
         async with self._uow as uow:
+            if cmd.client_op_id is not None:
+                existing = await uow.sales.get_by_client_op_id(cmd.client_op_id)
+                if existing is not None:
+                    # уже применено раньше — повторная отправка из офлайн-очереди
+                    return CreateSaleResult(sale=existing, change=None)
+
             lines = []
             names = {}
             for item in cmd.items:
@@ -70,6 +77,7 @@ class CreateSaleUseCase:
                 lines=lines,
                 discount=Money.of(cmd.discount),
                 client_id=cmd.client_id,
+                client_op_id=cmd.client_op_id,
             )
             sale.validate()
 

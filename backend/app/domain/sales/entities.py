@@ -37,6 +37,7 @@ class Sale:
     discount: Money = field(default_factory=Money.zero)
     client_id: int | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
 
     @property
     def subtotal(self) -> Money:

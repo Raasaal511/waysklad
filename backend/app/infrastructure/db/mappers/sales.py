@@ -21,6 +21,7 @@ class SaleMapper:
             payment_method=sale.payment_method,
             discount=sale.discount.amount,
             total=sale.total.amount,  # снимок суммы чека для аналитики
+            client_op_id=sale.client_op_id,
             lines=[
                 SaleLineModel(
                     tenant_id=tenant_id,
@@ -44,6 +45,7 @@ class SaleMapper:
             discount=Money(model.discount),
             client_id=model.client_id,
             created_at=model.created_at,
+            client_op_id=model.client_op_id,
             lines=[
                 SaleLine(
                     id=line.id,

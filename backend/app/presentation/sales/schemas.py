@@ -30,6 +30,7 @@ class SaleCreateRequest(BaseModel):
     discount: Decimal = Decimal("0")
     client_id: int | None = None
     cash_received: Decimal | None = None
+    client_op_id: str | None = None  # id операции с устройства — для повтора из офлайн-очереди
 
     def to_command(self) -> CreateSaleCommand:
         return CreateSaleCommand(
@@ -47,6 +48,7 @@ class SaleCreateRequest(BaseModel):
             discount=self.discount,
             client_id=self.client_id,
             cash_received=self.cash_received,
+            client_op_id=self.client_op_id,
         )
 
 
