@@ -21,6 +21,7 @@ from app.presentation.deps.uow import (  # noqa: F401
     get_uow,
 )
 from app.presentation.deps.use_cases import (  # noqa: F401
+    ApplyOfflineSalesDep,
     ChangeOrderStatusDep,
     CreateClientDep,
     CreateEmployeeDep,

@@ -30,6 +30,7 @@ from app.application.products.set_product_photo import SetProductPhotoUseCase
 from app.application.products.update_product import UpdateProductUseCase
 from app.application.sales.create_sale import CreateSaleUseCase
 from app.application.sales.return_sale import ReturnSaleUseCase
+from app.application.sync.apply_offline_ops import ApplyOfflineSalesUseCase
 from app.presentation.deps.security import FileStorageDep, HasherDep
 from app.presentation.deps.uow import PublicUowDep, UowDep
 
@@ -80,6 +81,7 @@ get_top_products = _with_uow(GetTopProductsUseCase)
 get_category_profit = _with_uow(GetCategoryProfitUseCase)
 get_dead_stock = _with_uow(GetDeadStockUseCase)
 get_stock_value = _with_uow(GetStockValueUseCase)
+get_apply_offline_sales = _with_uow(ApplyOfflineSalesUseCase)
 
 # готовые зависимости для сигнатур роутов
 RegisterShopDep = Annotated[RegisterShopUseCase, Depends(get_register_shop)]
@@ -111,4 +113,7 @@ GetTopProductsDep = Annotated[GetTopProductsUseCase, Depends(get_top_products)]
 GetCategoryProfitDep = Annotated[GetCategoryProfitUseCase, Depends(get_category_profit)]
 GetDeadStockDep = Annotated[GetDeadStockUseCase, Depends(get_dead_stock)]
 GetStockValueDep = Annotated[GetStockValueUseCase, Depends(get_stock_value)]
+ApplyOfflineSalesDep = Annotated[
+    ApplyOfflineSalesUseCase, Depends(get_apply_offline_sales)
+]
  
