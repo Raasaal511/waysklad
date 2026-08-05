@@ -19,7 +19,6 @@ class LoginUseCase:
         self._hasher = hasher
 
     async def execute(self, cmd: LoginCommand) -> User:
-        # одно сообщение для всех случаев — не раскрываем, что именно неверно
         try:
             phone = Phone(cmd.phone)
         except DomainError:
