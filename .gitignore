@@ -80,6 +80,9 @@ lerna-debug.log*
 # --- Backups ---
 backups/
 
+# --- Uploads (фото товаров) ---
+backend/uploads/
+
 # --- Environment ---
 .env
 .env.local
