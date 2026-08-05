@@ -8,7 +8,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "55432:5432"  # 5432 часто занят локальным Postgres.app на хосте
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -22,10 +22,24 @@ services:
     volumes:
       - ./backend:/app
     ports:
-      - "8000:8000"
+      - "18000:8000"  # 8000 часто занят другими локальными сервисами
     depends_on:
       db:
         condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    environment:
+      VITE_PROXY_TARGET: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
 
 volumes:
   pgdata:
