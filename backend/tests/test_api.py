@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
 
@@ -50,6 +51,41 @@ async def test_validation_error_returns_422(client, random_phone):
 async def test_not_found_returns_404(client, owner_headers):
     response = await client.get("/api/products/999999", headers=owner_headers)
     assert response.status_code == 404
+
+
+async def test_supplier_debt_and_due_debts_via_api(client, owner_headers):
+    response = await client.post(
+        "/api/counterparties/suppliers",
+        headers=owner_headers,
+        json={"name": "ООО СтройПоставка"},
+    )
+    assert response.status_code == 201, response.text
+    supplier_id = response.json()["id"]
+
+    today = date.today().isoformat()
+    response = await client.post(
+        "/api/debts/suppliers",
+        headers=owner_headers,
+        json={"supplier_id": supplier_id, "amount": "50000", "due_date": today, "note": "цемент"},
+    )
+    assert response.status_code == 201, response.text
+    debt = response.json()
+    assert debt["client_id"] is None
+    assert debt["supplier_id"] == supplier_id
+
+    response = await client.get(f"/api/debts/supplier/{supplier_id}", headers=owner_headers)
+    assert response.status_code == 200
+    summary = response.json()
+    assert summary["total_balance"] == "50000.00"
+    assert len(summary["debts"]) == 1
+
+    response = await client.get("/api/debts/due", headers=owner_headers)
+    assert response.status_code == 200
+    assert debt["id"] in [d["id"] for d in response.json()]
+
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    response = await client.get(f"/api/debts/due?on={tomorrow}", headers=owner_headers)
+    assert debt["id"] not in [d["id"] for d in response.json()]
 
 
 async def test_full_trading_flow(client, owner_headers):
@@ -115,12 +151,13 @@ async def test_full_trading_flow(client, owner_headers):
     assert response.status_code == 201
 
     response = await client.get(f"/api/debts/client/{client_id}", headers=owner_headers)
-    debts = response.json()
-    assert len(debts) == 1
-    assert debts[0]["balance"] == "750.00"
+    summary = response.json()
+    assert len(summary["debts"]) == 1
+    assert summary["total_balance"] == "750.00"
+    assert summary["debts"][0]["balance"] == "750.00"
 
     response = await client.post(
-        f"/api/debts/{debts[0]['id']}/repayments",
+        f"/api/debts/{summary['debts'][0]['id']}/repayments",
         headers=owner_headers,
         json={"amount": "250"},
     )

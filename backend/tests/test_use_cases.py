@@ -22,6 +22,10 @@ from app.application.debts.create_installment import (
     InstallmentInput,
 )
 from app.application.debts.issue_debt import IssueDebtCommand, IssueDebtUseCase
+from app.application.debts.issue_supplier_debt import (
+    IssueSupplierDebtCommand,
+    IssueSupplierDebtUseCase,
+)
 from app.application.debts.repay_debt import RepayDebtCommand, RepayDebtUseCase
 from app.application.inventory.common import LineInput
 from app.application.inventory.receive_goods import ReceiveGoodsCommand, ReceiveGoodsUseCase
@@ -61,6 +65,7 @@ from app.domain.common.exceptions import (
     InsufficientStockError,
 )
 from app.domain.common.money import Money
+from app.domain.debts.entities import Debt, total_balance
 from app.domain.identity.entities import Role, Warehouse
 from app.domain.identity.permissions import Actor
 from app.domain.inventory.entities import StockDocType
@@ -649,6 +654,65 @@ async def test_stocktake_detects_and_corrects_discrepancy(
 
     async with make_uow(tenant_id) as uow:
         assert await uow.stock.get(product.id, warehouse_id) == Decimal("46")
+
+
+def test_debt_requires_exactly_one_counterparty():
+    both = Debt(id=None, amount=Money.of("100"), issued_at=date.today(), client_id=1, supplier_id=2)
+    with pytest.raises(DomainError):
+        both.validate()
+
+    neither = Debt(id=None, amount=Money.of("100"), issued_at=date.today())
+    with pytest.raises(DomainError):
+        neither.validate()
+
+    Debt(id=None, amount=Money.of("100"), issued_at=date.today(), client_id=1).validate()
+    Debt(id=None, amount=Money.of("100"), issued_at=date.today(), supplier_id=1).validate()
+
+
+def test_total_balance_sums_debts():
+    debts = [
+        Debt(id=1, amount=Money.of("500"), issued_at=date.today(), client_id=1),
+        Debt(id=2, amount=Money.of("300"), issued_at=date.today(), client_id=1),
+    ]
+    assert total_balance(debts) == Money.of("800")
+    assert total_balance([]) == Money.zero()
+
+
+async def test_issue_supplier_debt_and_list_by_supplier(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    supplier = await CreateSupplierUseCase(make_uow(tenant_id)).execute(
+        owner, CreateSupplierCommand(name="ООО СтройПоставка")
+    )
+
+    debt = await IssueSupplierDebtUseCase(make_uow(tenant_id)).execute(
+        owner,
+        IssueSupplierDebtCommand(supplier_id=supplier.id, amount=Decimal("50000"), note="партия цемента"),
+    )
+    assert debt.supplier_id == supplier.id
+    assert debt.client_id is None
+    assert debt.balance == Money.of("50000")
+
+    async with make_uow(tenant_id) as uow:
+        debts = await uow.debts.list_by_supplier(supplier.id)
+        assert len(debts) == 1
+        assert total_balance(debts) == Money.of("50000")
+
+
+async def test_storekeeper_cannot_issue_supplier_debt(
+    make_uow, hasher, registered_shop, random_phone
+):
+    tenant_id, _, owner = registered_shop
+    supplier = await CreateSupplierUseCase(make_uow(tenant_id)).execute(
+        owner, CreateSupplierCommand(name="Поставщик")
+    )
+    storekeeper = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner, CreateEmployeeCommand("Руслан", random_phone(), "secret123", Role.STOREKEEPER)
+    )
+    with pytest.raises(AccessDeniedError):
+        await IssueSupplierDebtUseCase(make_uow(tenant_id)).execute(
+            Actor(id=storekeeper.id, role=storekeeper.role),
+            IssueSupplierDebtCommand(supplier_id=supplier.id, amount=Decimal("1000")),
+        )
 
 
 async def test_issue_debt_respects_debt_limit_without_sale(make_uow, registered_shop):
