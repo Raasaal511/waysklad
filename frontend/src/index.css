@@ -18,10 +18,10 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --text: #e5e5e5;
-    --text-muted: #9a9a9a;
-    --bg: #121212;
-    --bg-muted: #1c1c1c;
-    --border: #2e2e2e;
+    --text-muted: #a3a3a3;
+    --bg: #22262b;
+    --bg-muted: #2b3036;
+    --border: #3a3f45;
     --accent: #4ade9a;
     --accent-hover: #6ee8ab;
     --danger: #f87171;
@@ -182,5 +182,224 @@ button.secondary:hover:not(:disabled) {
 .stack {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.row.between {
+  justify-content: space-between;
+}
+
+.row.wrap {
+  flex-wrap: wrap;
+}
+
+/* App shell */
+
+.app-layout {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 10;
+}
+
+.app-title {
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.app-header-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-header-user button {
+  padding: 7px 12px;
+  font-size: 13px;
+}
+
+.app-content {
+  flex: 1;
+  padding: 16px;
+  padding-bottom: 88px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.app-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  padding: 4px 0 max(4px, env(safe-area-inset-bottom));
+  z-index: 10;
+  overflow-x: auto;
+}
+
+.app-nav-item {
+  flex: 1;
+  min-width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  text-decoration: none;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.app-nav-item.active {
+  color: var(--accent);
+}
+
+.app-nav-icon {
+  font-size: 20px;
+}
+
+/* Section */
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Table */
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+
+thead th {
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+tbody tr:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+/* Badge */
+
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+}
+
+.badge.accent {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+.badge.danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* Line item picker (sale/order/receive) */
+
+.line-item {
+  display: grid;
+  grid-template-columns: 1fr 90px 90px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.line-item input,
+.line-item select {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  width: 100%;
+}
+
+.icon-button {
+  background: transparent;
+  color: var(--danger);
+  border: none;
+  padding: 6px;
+  font-size: 16px;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--danger-bg);
+}
+
+.card-full {
+  max-width: none;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.grid-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
 }
