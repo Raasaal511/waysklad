@@ -37,6 +37,10 @@ from app.application.orders.create_order import (
 )
 from app.application.products.create_product import CreateProductCommand, CreateProductUseCase
 from app.application.products.create_unit import CreateUnitCommand, CreateUnitUseCase
+from app.application.products.set_product_photo import (
+    SetProductPhotoCommand,
+    SetProductPhotoUseCase,
+)
 from app.application.products.update_product import UpdateProductCommand, UpdateProductUseCase
 from app.application.sales.create_sale import (
     CreateSaleCommand,
@@ -54,6 +58,7 @@ from app.domain.identity.permissions import Actor
 from app.domain.inventory.entities import StockDocType
 from app.domain.orders.entities import OrderStatus
 from app.domain.sales.payment import PaymentMethod
+from app.infrastructure.files import LocalFileStorage
 
 
 async def test_register_login_and_wrong_password(make_uow, hasher, registered_shop):
@@ -214,6 +219,44 @@ async def test_create_product_rejects_unknown_unit_code(make_uow, registered_sho
                 name="Товар", unit_code="unknown",
                 purchase_price=Decimal("1"), retail_price=Decimal("2"),
             ),
+        )
+
+
+async def test_set_product_photo_updates_product(
+    make_uow, registered_shop, create_product, tmp_path
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Плитка")
+    storage = LocalFileStorage(tmp_path)
+
+    updated = await SetProductPhotoUseCase(make_uow(tenant_id), storage).execute(
+        owner, SetProductPhotoCommand(product.id, "photo.png", b"fake-png-bytes")
+    )
+    assert updated.photo.startswith("/uploads/") and updated.photo.endswith(".png")
+    assert (tmp_path / updated.photo.removeprefix("/uploads/")).read_bytes() == b"fake-png-bytes"
+
+
+async def test_set_product_photo_rejects_bad_extension(make_uow, registered_shop, create_product, tmp_path):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Плитка")
+    with pytest.raises(DomainError):
+        await SetProductPhotoUseCase(make_uow(tenant_id), LocalFileStorage(tmp_path)).execute(
+            owner, SetProductPhotoCommand(product.id, "virus.exe", b"data")
+        )
+
+
+async def test_seller_cannot_set_product_photo(
+    make_uow, hasher, registered_shop, create_product, random_phone, tmp_path
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Плитка")
+    seller = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner, CreateEmployeeCommand("Зара", random_phone(), "secret123", Role.SELLER)
+    )
+    with pytest.raises(AccessDeniedError):
+        await SetProductPhotoUseCase(make_uow(tenant_id), LocalFileStorage(tmp_path)).execute(
+            Actor(id=seller.id, role=seller.role),
+            SetProductPhotoCommand(product.id, "photo.jpg", b"data"),
         )
 
 

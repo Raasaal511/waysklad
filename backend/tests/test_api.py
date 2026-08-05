@@ -283,6 +283,57 @@ async def test_audit_log_records_actions_and_guards_access(client, owner_headers
     assert response.status_code == 403
 
 
+async def test_product_photo_upload_via_api(client, owner_headers, random_phone, tmp_path):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Платье летнее", "purchase_price": "1000", "retail_price": "2000"},
+    )
+    product_id = response.json()["id"]
+
+    response = await client.post(
+        f"/api/products/{product_id}/photo",
+        headers=owner_headers,
+        files={"file": ("photo.jpg", b"\xff\xd8\xff-fake-jpeg-bytes", "image/jpeg")},
+    )
+    assert response.status_code == 201, response.text
+    photo_url = response.json()["photo"]
+    assert photo_url.startswith("/uploads/") and photo_url.endswith(".jpg")
+    saved = list(tmp_path.iterdir())
+    assert len(saved) == 1 and saved[0].read_bytes() == b"\xff\xd8\xff-fake-jpeg-bytes"
+
+    response = await client.post(
+        f"/api/products/{product_id}/photo",
+        headers=owner_headers,
+        files={"file": ("virus.exe", b"not-an-image", "application/octet-stream")},
+    )
+    assert response.status_code == 400  # недопустимое расширение
+
+    response = await client.post(
+        f"/api/products/{product_id}/photo",
+        headers=owner_headers,
+        files={"file": ("big.jpg", b"x" * (5 * 1024 * 1024 + 1), "image/jpeg")},
+    )
+    assert response.status_code == 400  # превышен лимит 5 МБ
+
+    response = await client.post(
+        "/api/auth/employees",
+        headers=owner_headers,
+        json={"name": "Зара", "phone": random_phone(), "password": "secret123", "role": "seller"},
+    )
+    login = await client.post(
+        "/api/auth/login",
+        json={"phone": response.json()["phone"], "password": "secret123"},
+    )
+    seller_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    response = await client.post(
+        f"/api/products/{product_id}/photo",
+        headers=seller_headers,
+        files={"file": ("photo.jpg", b"\xff\xd8\xff-fake-jpeg-bytes", "image/jpeg")},
+    )
+    assert response.status_code == 403
+
+
 async def test_custom_unit_via_api(client, owner_headers):
     response = await client.post(
         "/api/products/units",

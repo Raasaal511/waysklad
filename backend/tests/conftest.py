@@ -17,8 +17,10 @@ from app.domain.identity.entities import Role, Tenant, User
 from app.domain.identity.permissions import Actor
 from app.infrastructure.db.models.base import Base
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
+from app.infrastructure.files import LocalFileStorage
 from app.infrastructure.security import BcryptPasswordHasher
 from app.main import app as fastapi_app
+from app.presentation.deps.security import get_file_storage
 from app.presentation.deps.uow import get_session_factory
 
 TEST_DB_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/waysklad_test"
@@ -131,9 +133,10 @@ def create_product(make_uow) -> Callable:
 
 
 @pytest.fixture
-async def client(db_session_factory) -> AsyncIterator[AsyncClient]:
-    """HTTP-клиент FastAPI-приложения с подменённой тестовой БД."""
+async def client(db_session_factory, tmp_path) -> AsyncIterator[AsyncClient]:
+    """HTTP-клиент FastAPI-приложения с подменённой тестовой БД и хранилищем файлов."""
     fastapi_app.dependency_overrides[get_session_factory] = lambda: db_session_factory
+    fastapi_app.dependency_overrides[get_file_storage] = lambda: LocalFileStorage(tmp_path)
     transport = ASGITransport(app=fastapi_app)
     async with AsyncClient(transport=transport, base_url="http://test") as http:
         yield http
