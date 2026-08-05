@@ -58,6 +58,7 @@ class CreateSaleUseCase:
                         variant_id=item.variant_id,
                         quantity=Quantity(item.quantity, product.unit),
                         price=Money.of(item.price),
+                        purchase_price=product.purchase_price,
                     )
                 )
 

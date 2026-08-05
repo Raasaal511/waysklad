@@ -28,7 +28,7 @@ class SaleMapper:
                     variant_id=line.variant_id,
                     quantity=line.quantity.value,
                     price=line.price.amount,
-                    # TODO (сессия 03): снимок закупочной цены для расчёта прибыли
+                    purchase_price=line.purchase_price.amount,
                 )
                 for line in sale.lines
             ],
@@ -51,6 +51,7 @@ class SaleMapper:
                     variant_id=line.variant_id,
                     quantity=Quantity(line.quantity, units_by_product[line.product_id]),
                     price=Money(line.price),
+                    purchase_price=Money(line.purchase_price),
                 )
                 for line in model.lines
             ],

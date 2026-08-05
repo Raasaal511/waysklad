@@ -14,12 +14,17 @@ class SaleLine:
     product_id: int
     quantity: Quantity
     price: Money  # цена на момент продажи
+    purchase_price: Money = field(default_factory=Money.zero)  # закупочная на момент продажи — для прибыли
     variant_id: int | None = None
     id: int | None = None
 
     @property
     def total(self) -> Money:
         return self.price * self.quantity.value
+
+    @property
+    def profit(self) -> Money:
+        return (self.price - self.purchase_price) * self.quantity.value
 
 
 @dataclass
