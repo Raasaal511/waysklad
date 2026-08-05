@@ -6,11 +6,20 @@ from app.infrastructure.db.models.identity import TenantModel, UserModel, Wareho
 class TenantMapper:
     @staticmethod
     def to_orm(tenant: Tenant) -> TenantModel:
-        return TenantModel(name=tenant.name, slug=tenant.slug)
+        return TenantModel(
+            name=tenant.name,
+            slug=tenant.slug,
+            owner_telegram_chat_id=tenant.owner_telegram_chat_id,
+        )
 
     @staticmethod
     def to_entity(model: TenantModel) -> Tenant:
-        return Tenant(id=model.id, name=model.name, slug=model.slug)
+        return Tenant(
+            id=model.id,
+            name=model.name,
+            slug=model.slug,
+            owner_telegram_chat_id=model.owner_telegram_chat_id,
+        )
 
 
 class UserMapper:

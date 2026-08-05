@@ -22,6 +22,7 @@ class Tenant:
     name: str
     # публичный URL витрины (waysklad.ru/<slug>); None — пока не сгенерирован
     slug: str | None = None
+    owner_telegram_chat_id: str | None = None
 
 
 @dataclass

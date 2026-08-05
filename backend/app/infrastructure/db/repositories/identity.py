@@ -47,6 +47,10 @@ class SqlAlchemyTenantRepository(SqlAlchemyRepository, ITenantRepository):
         ).scalar_one_or_none()
         return TenantMapper.to_entity(model) if model else None
 
+    async def list_all(self) -> list[Tenant]:
+        models = (await self._session.execute(select(TenantModel))).scalars()
+        return [TenantMapper.to_entity(m) for m in models]
+
 
 class SqlAlchemyUserRepository(SqlAlchemyRepository, IUserRepository):
     async def add(self, user: User) -> User:
