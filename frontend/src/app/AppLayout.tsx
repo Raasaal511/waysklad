@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 
 const NAV_ITEMS = [
@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: '/debts', label: 'Долги', icon: '💰' },
   { to: '/clients', label: 'Клиенты', icon: '👥' },
   { to: '/analytics', label: 'Аналитика', icon: '📊' },
+  { to: '/profile', label: 'Профиль', icon: '⚙️' },
 ]
 
 function NavItems({ variant }: { variant: 'sidebar' | 'bottom' }) {
@@ -44,7 +45,9 @@ export function AppLayout() {
           <NavItems variant="sidebar" />
         </nav>
         <div className="app-sidebar-user">
-          <span className="text-muted">{user?.name}</span>
+          <Link to="/profile" className="text-muted">
+            {user?.name}
+          </Link>
           <button type="button" className="secondary" onClick={logout}>
             Выйти
           </button>
@@ -55,7 +58,9 @@ export function AppLayout() {
         <header className="app-header">
           <span className="app-title">WaySklad</span>
           <div className="app-header-user">
-            <span className="text-muted">{user?.name}</span>
+            <Link to="/profile" className="text-muted">
+              {user?.name}
+            </Link>
             <button type="button" className="secondary" onClick={logout}>
               Выйти
             </button>
