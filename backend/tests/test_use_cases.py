@@ -83,6 +83,10 @@ from app.domain.identity.entities import Role, Warehouse
 from app.domain.identity.permissions import Actor
 from app.domain.inventory.entities import StockDocType
 from app.domain.orders.entities import OrderStatus
+from app.application.auth.connect_telegram import (
+    ConnectTelegramCommand,
+    ConnectTelegramUseCase,
+)
 from app.application.sync.apply_offline_ops import (
     ApplyOfflineSalesCommand,
     ApplyOfflineSalesUseCase,
@@ -1107,3 +1111,25 @@ async def test_apply_offline_sales_isolates_failures(
     assert len(result.applied) == 1
     assert len(result.errors) == 1
     assert result.errors[0].client_op_id == "op-fail"
+
+
+async def test_connect_telegram_owner_only(make_uow, registered_shop, hasher):
+    tenant_id, _, owner = registered_shop
+
+    tenant = await ConnectTelegramUseCase(make_uow(tenant_id)).execute(
+        owner, ConnectTelegramCommand(chat_id="98765")
+    )
+    assert tenant.owner_telegram_chat_id == "98765"
+
+    async with make_uow(tenant_id) as uow:
+        stored = await uow.tenants.get(tenant_id)
+    assert stored.owner_telegram_chat_id == "98765"
+
+    manager = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner, CreateEmployeeCommand(name="Управляющий", phone="+79280009911",
+                                      password="secret123", role=Role.MANAGER)
+    )
+    with pytest.raises(AccessDeniedError):
+        await ConnectTelegramUseCase(make_uow(tenant_id)).execute(
+            Actor(id=manager.id, role=manager.role), ConnectTelegramCommand(chat_id="11111")
+        )
