@@ -7,7 +7,12 @@ from app.presentation.deps.auth import (  # noqa: F401
     get_current_user,
     get_show_purchase,
 )
-from app.presentation.deps.security import HasherDep, get_password_hasher  # noqa: F401
+from app.presentation.deps.security import (  # noqa: F401
+    FileStorageDep,
+    HasherDep,
+    get_file_storage,
+    get_password_hasher,
+)
 from app.presentation.deps.uow import (  # noqa: F401
     PublicUowDep,
     UowDep,
@@ -30,6 +35,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     ReceiveGoodsDep,
     RegisterShopDep,
     RepayDebtDep,
+    SetProductPhotoDep,
     StocktakeDep,
     TransferDep,
     UpdateProductDep,

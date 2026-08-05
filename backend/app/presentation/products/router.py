@@ -1,11 +1,13 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, UploadFile
 
+from app.application.products.set_product_photo import SetProductPhotoCommand
 from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Product
 from app.presentation.deps import (
     ActorDep,
     CreateProductDep,
     CreateUnitDep,
+    SetProductPhotoDep,
     ShowPurchaseDep,
     UowDep,
     UpdateProductDep,
@@ -23,6 +25,10 @@ router = APIRouter(prefix="/products", tags=["products"])
 
 def _maybe(product: Product | None, show_purchase: bool) -> ProductResponse | None:
     return ProductResponse.from_entity(product, show_purchase) if product else None
+
+
+async def _photo_command(product_id: int, file: UploadFile) -> SetProductPhotoCommand:
+    return SetProductPhotoCommand(product_id, file.filename or "photo.jpg", await file.read())
 
 
 @router.post("", status_code=201)
@@ -45,6 +51,18 @@ async def update_product(
     use_case: UpdateProductDep,
 ) -> ProductResponse:
     product = await use_case.execute(actor, body.to_command(product_id))
+    return ProductResponse.from_entity(product, show_purchase)
+
+
+@router.post("/{product_id}/photo", status_code=201)
+async def set_product_photo(
+    product_id: int,
+    actor: ActorDep,
+    file: UploadFile,
+    show_purchase: ShowPurchaseDep,
+    use_case: SetProductPhotoDep,
+) -> ProductResponse:
+    product = await use_case.execute(actor, await _photo_command(product_id, file))
     return ProductResponse.from_entity(product, show_purchase)
 
 

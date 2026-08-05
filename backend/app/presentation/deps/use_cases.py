@@ -18,9 +18,10 @@ from app.application.orders.change_status import ChangeOrderStatusUseCase
 from app.application.orders.create_order import CreateOrderUseCase
 from app.application.products.create_product import CreateProductUseCase
 from app.application.products.create_unit import CreateUnitUseCase
+from app.application.products.set_product_photo import SetProductPhotoUseCase
 from app.application.products.update_product import UpdateProductUseCase
 from app.application.sales.create_sale import CreateSaleUseCase
-from app.presentation.deps.security import HasherDep
+from app.presentation.deps.security import FileStorageDep, HasherDep
 from app.presentation.deps.uow import PublicUowDep, UowDep
 
 
@@ -41,6 +42,10 @@ def get_login(uow: PublicUowDep, hasher: HasherDep) -> LoginUseCase:
 
 def get_create_employee(uow: UowDep, hasher: HasherDep) -> CreateEmployeeUseCase:
     return CreateEmployeeUseCase(uow, hasher)
+
+
+def get_set_product_photo(uow: UowDep, storage: FileStorageDep) -> SetProductPhotoUseCase:
+    return SetProductPhotoUseCase(uow, storage)
 
 
 get_create_product = _with_uow(CreateProductUseCase)
@@ -66,6 +71,7 @@ CreateEmployeeDep = Annotated[CreateEmployeeUseCase, Depends(get_create_employee
 CreateProductDep = Annotated[CreateProductUseCase, Depends(get_create_product)]
 UpdateProductDep = Annotated[UpdateProductUseCase, Depends(get_update_product)]
 CreateUnitDep = Annotated[CreateUnitUseCase, Depends(get_create_unit)]
+SetProductPhotoDep = Annotated[SetProductPhotoUseCase, Depends(get_set_product_photo)]
 ReceiveGoodsDep = Annotated[ReceiveGoodsUseCase, Depends(get_receive_goods)]
 WriteOffDep = Annotated[WriteOffUseCase, Depends(get_write_off)]
 TransferDep = Annotated[TransferUseCase, Depends(get_transfer)]
