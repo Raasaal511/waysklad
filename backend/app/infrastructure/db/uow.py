@@ -21,7 +21,10 @@ from app.infrastructure.db.repositories.inventory import (
     SqlAlchemyStockRepository,
 )
 from app.infrastructure.db.repositories.orders import SqlAlchemyOrderRepository
-from app.infrastructure.db.repositories.sales import SqlAlchemySaleRepository
+from app.infrastructure.db.repositories.sales import (
+    SqlAlchemySaleRepository,
+    SqlAlchemySaleReturnRepository,
+)
 from app.infrastructure.db.session import SessionLocal
 
 
@@ -48,6 +51,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.stock = SqlAlchemyStockRepository(self)
         self.stock_documents = SqlAlchemyStockDocumentRepository(self)
         self.sales = SqlAlchemySaleRepository(self)
+        self.sale_returns = SqlAlchemySaleReturnRepository(self)
         self.debts = SqlAlchemyDebtRepository(self)
         self.orders = SqlAlchemyOrderRepository(self)
         self.audit = SqlAlchemyAuditRepository(self)

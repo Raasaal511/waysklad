@@ -15,6 +15,7 @@ class SaleLine:
     quantity: Quantity
     price: Money  # цена на момент продажи
     variant_id: int | None = None
+    id: int | None = None
 
     @property
     def total(self) -> Money:
@@ -57,3 +58,26 @@ class Sale:
             raise DomainError("Скидка больше суммы чека")
         if self.payment_method is PaymentMethod.CREDIT and self.client_id is None:
             raise DomainError("Для продажи в долг нужно указать клиента")
+
+
+@dataclass
+class SaleReturnLine:
+    sale_line_id: int
+    quantity: Quantity
+    id: int | None = None
+
+
+@dataclass
+class SaleReturn:
+    """Возврат товара по продаже: остаток возвращается на склад, долг (если был) уменьшается."""
+
+    id: int | None
+    sale_id: int
+    author_id: int
+    lines: list[SaleReturnLine] = field(default_factory=list)
+    note: str = ""
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def validate(self) -> None:
+        if not self.lines:
+            raise DomainError("Возврат без позиций")

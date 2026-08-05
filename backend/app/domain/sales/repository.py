@@ -1,8 +1,13 @@
 from typing import Protocol
 
-from app.domain.sales.entities import Sale
+from app.domain.sales.entities import Sale, SaleReturn
 
 
 class ISaleRepository(Protocol):
     async def add(self, sale: Sale) -> Sale: ...
     async def get(self, sale_id: int) -> Sale: ...
+
+
+class ISaleReturnRepository(Protocol):
+    async def add(self, sale_return: SaleReturn) -> SaleReturn: ...
+    async def list_by_sale(self, sale_id: int) -> list[SaleReturn]: ...

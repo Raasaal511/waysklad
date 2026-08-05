@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     )
     from app.domain.inventory.repository import IStockDocumentRepository, IStockRepository
     from app.domain.orders.repository import IOrderRepository
-    from app.domain.sales.repository import ISaleRepository
+    from app.domain.sales.repository import ISaleRepository, ISaleReturnRepository
 
 
 class IUnitOfWork(ABC):
@@ -38,6 +38,7 @@ class IUnitOfWork(ABC):
     stock: IStockRepository
     stock_documents: IStockDocumentRepository
     sales: ISaleRepository
+    sale_returns: ISaleReturnRepository
     debts: IDebtRepository
     orders: IOrderRepository
     audit: IAuditRepository

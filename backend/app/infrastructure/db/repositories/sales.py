@@ -1,10 +1,11 @@
 from sqlalchemy import select
 
 from app.domain.common.exceptions import NotFoundError
-from app.domain.sales.entities import Sale
-from app.domain.sales.repository import ISaleRepository
-from app.infrastructure.db.mappers.sales import SaleMapper
-from app.infrastructure.db.models.sales import SaleModel
+from app.domain.common.quantity import Unit
+from app.domain.sales.entities import Sale, SaleReturn
+from app.domain.sales.repository import ISaleRepository, ISaleReturnRepository
+from app.infrastructure.db.mappers.sales import SaleMapper, SaleReturnMapper
+from app.infrastructure.db.models.sales import SaleLineModel, SaleModel, SaleReturnModel
 from app.infrastructure.db.repositories.base import SqlAlchemyRepository
 
 
@@ -15,6 +16,8 @@ class SqlAlchemySaleRepository(SqlAlchemyRepository, ISaleRepository):
         self._session.add(model)
         await self._session.flush()
         sale.id = model.id
+        for entity, line_model in zip(sale.lines, model.lines):
+            entity.id = line_model.id
         return sale
 
     async def get(self, sale_id: int) -> Sale:
@@ -29,3 +32,41 @@ class SqlAlchemySaleRepository(SqlAlchemyRepository, ISaleRepository):
             raise NotFoundError(f"Продажа {sale_id} не найдена")
         units = await self._product_unit_by_id({line.product_id for line in model.lines})
         return SaleMapper.to_entity(model, units)
+
+
+class SqlAlchemySaleReturnRepository(SqlAlchemyRepository, ISaleReturnRepository):
+    async def add(self, sale_return: SaleReturn) -> SaleReturn:
+        model = SaleReturnMapper.to_orm(sale_return, self._tenant)
+        self._session.add(model)
+        await self._session.flush()
+        sale_return.id = model.id
+        for entity, line_model in zip(sale_return.lines, model.lines):
+            entity.id = line_model.id
+        return sale_return
+
+    async def list_by_sale(self, sale_id: int) -> list[SaleReturn]:
+        models = (
+            await self._session.execute(
+                select(SaleReturnModel).where(
+                    SaleReturnModel.tenant_id == self._tenant,
+                    SaleReturnModel.sale_id == sale_id,
+                )
+            )
+        ).scalars().all()
+        sale_line_ids = {line.sale_line_id for model in models for line in model.lines}
+        units = await self._units_by_sale_line(sale_line_ids)
+        return [SaleReturnMapper.to_entity(m, units) for m in models]
+
+    async def _units_by_sale_line(self, sale_line_ids: set[int]):
+        if not sale_line_ids:
+            return {}
+        rows = (
+            await self._session.execute(
+                select(SaleLineModel.id, SaleLineModel.product_id).where(
+                    SaleLineModel.id.in_(sale_line_ids)
+                )
+            )
+        ).all()
+        product_units = await self._product_unit_by_id({product_id for _, product_id in rows})
+        fallback = Unit("pcs", "шт")
+        return {line_id: product_units.get(product_id, fallback) for line_id, product_id in rows}
