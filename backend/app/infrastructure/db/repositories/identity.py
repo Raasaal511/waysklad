@@ -78,6 +78,16 @@ class SqlAlchemyUserRepository(SqlAlchemyRepository, IUserRepository):
         ).scalar_one_or_none()
         return UserMapper.to_entity(model) if model else None
 
+    async def list_by_tenant(self) -> list[User]:
+        models = (
+            await self._session.execute(
+                select(UserModel)
+                .where(UserModel.tenant_id == self._tenant)
+                .order_by(UserModel.id)
+            )
+        ).scalars()
+        return [UserMapper.to_entity(m) for m in models]
+
 
 class SqlAlchemyWarehouseRepository(SqlAlchemyRepository, IWarehouseRepository):
     async def add(self, warehouse: Warehouse) -> Warehouse:

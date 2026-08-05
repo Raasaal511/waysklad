@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.domain.identity.entities import User
+from app.domain.identity.permissions import Permission
 from app.infrastructure.security import create_access_token
 from app.presentation.auth.schemas import (
     ConnectTelegramRequest,
@@ -17,7 +18,9 @@ from app.presentation.deps import (
     CreateEmployeeDep,
     LoginDep,
     RegisterShopDep,
+    UowDep,
 )
+from app.presentation.deps.auth import require_permission
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -45,6 +48,12 @@ async def create_employee(
     body: CreateEmployeeRequest, actor: ActorDep, use_case: CreateEmployeeDep
 ) -> UserResponse:
     return UserResponse.from_entity(await use_case.execute(actor, body.to_command()))
+
+
+@router.get("/employees", dependencies=[require_permission(Permission.USERS_MANAGE)])
+async def list_employees(uow: UowDep) -> list[UserResponse]:
+    async with uow:
+        return [UserResponse.from_entity(u) for u in await uow.users.list_by_tenant()]
 
 
 @router.post("/telegram")
