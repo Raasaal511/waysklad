@@ -199,12 +199,23 @@ button.secondary:hover:not(:disabled) {
   flex-wrap: wrap;
 }
 
-/* App shell */
+/* App shell — mobile first: header + bottom nav, sidebar hidden */
 
 .app-layout {
   min-height: 100svh;
   display: flex;
+}
+
+.app-sidebar {
+  display: none;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
+  min-height: 100svh;
 }
 
 .app-header {
@@ -281,6 +292,80 @@ button.secondary:hover:not(:disabled) {
 
 .app-nav-icon {
   font-size: 20px;
+}
+
+/* App shell — desktop: left sidebar, no header/bottom nav */
+
+@media (min-width: 900px) {
+  .app-sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 240px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    padding: 20px 12px;
+    gap: 24px;
+    position: sticky;
+    top: 0;
+    height: 100svh;
+  }
+
+  .app-sidebar .app-title {
+    padding: 0 8px;
+  }
+
+  .app-sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .app-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+
+  .app-sidebar-item:hover {
+    background: var(--bg-muted);
+  }
+
+  .app-sidebar-item.active {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .app-sidebar-icon {
+    font-size: 18px;
+  }
+
+  .app-sidebar-user {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 8px;
+  }
+
+  .app-header {
+    display: none;
+  }
+
+  .app-nav {
+    display: none;
+  }
+
+  .app-content {
+    max-width: 960px;
+    padding: 28px 32px;
+    padding-bottom: 32px;
+  }
 }
 
 /* Section */

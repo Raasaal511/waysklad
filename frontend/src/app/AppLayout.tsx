@@ -11,38 +11,65 @@ const NAV_ITEMS = [
   { to: '/analytics', label: 'Аналитика', icon: '📊' },
 ]
 
+function NavItems({ variant }: { variant: 'sidebar' | 'bottom' }) {
+  return (
+    <>
+      {NAV_ITEMS.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={item.to === '/'}
+          className={({ isActive }) =>
+            `${variant === 'sidebar' ? 'app-sidebar-item' : 'app-nav-item'}${isActive ? ' active' : ''}`
+          }
+        >
+          <span className={variant === 'sidebar' ? 'app-sidebar-icon' : 'app-nav-icon'}>
+            {item.icon}
+          </span>
+          <span>{item.label}</span>
+        </NavLink>
+      ))}
+    </>
+  )
+}
+
 export function AppLayout() {
   const { user, logout } = useAuth()
 
   return (
     <div className="app-layout">
-      <header className="app-header">
+      <aside className="app-sidebar">
         <span className="app-title">WaySklad</span>
-        <div className="app-header-user">
+        <nav className="app-sidebar-nav">
+          <NavItems variant="sidebar" />
+        </nav>
+        <div className="app-sidebar-user">
           <span className="text-muted">{user?.name}</span>
           <button type="button" className="secondary" onClick={logout}>
             Выйти
           </button>
         </div>
-      </header>
+      </aside>
 
-      <main className="app-content">
-        <Outlet />
-      </main>
+      <div className="app-main">
+        <header className="app-header">
+          <span className="app-title">WaySklad</span>
+          <div className="app-header-user">
+            <span className="text-muted">{user?.name}</span>
+            <button type="button" className="secondary" onClick={logout}>
+              Выйти
+            </button>
+          </div>
+        </header>
 
-      <nav className="app-nav">
-        {NAV_ITEMS.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === '/'}
-            className={({ isActive }) => `app-nav-item${isActive ? ' active' : ''}`}
-          >
-            <span className="app-nav-icon">{item.icon}</span>
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
-      </nav>
+        <main className="app-content">
+          <Outlet />
+        </main>
+
+        <nav className="app-nav">
+          <NavItems variant="bottom" />
+        </nav>
+      </div>
     </div>
   )
 }
