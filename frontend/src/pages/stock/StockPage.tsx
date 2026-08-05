@@ -4,11 +4,21 @@ import {
   listWarehouses,
   createWarehouse,
   receiveGoods,
+  writeOff,
+  transferStock,
   type StockItem,
   type Warehouse,
 } from '../../api/inventory'
 import { listProducts, type Product } from '../../api/products'
 import { ApiError } from '../../api/client'
+
+type MovementMode = 'receive' | 'write_off' | 'transfer'
+
+const MODE_LABELS: Record<MovementMode, string> = {
+  receive: 'Приёмка',
+  write_off: 'Списание',
+  transfer: 'Перемещение',
+}
 
 export function StockPage() {
   const [stock, setStock] = useState<StockItem[]>([])
@@ -16,7 +26,7 @@ export function StockPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showReceive, setShowReceive] = useState(false)
+  const [mode, setMode] = useState<MovementMode | null>(null)
   const [showWarehouseForm, setShowWarehouseForm] = useState(false)
 
   async function load() {
@@ -44,13 +54,20 @@ export function StockPage() {
     <div className="stack">
       <div className="section-title">
         <h2>Остатки</h2>
-        <div className="row">
+        <div className="row wrap">
           <button type="button" className="secondary" onClick={() => setShowWarehouseForm((v) => !v)}>
             + Склад
           </button>
-          <button type="button" onClick={() => setShowReceive((v) => !v)}>
-            + Приёмка
-          </button>
+          {(Object.keys(MODE_LABELS) as MovementMode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              className={mode === m ? '' : 'secondary'}
+              onClick={() => setMode((v) => (v === m ? null : m))}
+            >
+              {MODE_LABELS[m]}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -63,12 +80,13 @@ export function StockPage() {
         />
       )}
 
-      {showReceive && (
-        <ReceiveForm
+      {mode && (
+        <MovementForm
+          mode={mode}
           products={products}
           warehouses={warehouses}
           onDone={() => {
-            setShowReceive(false)
+            setMode(null)
             load()
           }}
         />
@@ -154,16 +172,19 @@ function NewWarehouseForm({ onCreated }: { onCreated: () => void }) {
   )
 }
 
-function ReceiveForm({
+function MovementForm({
+  mode,
   products,
   warehouses,
   onDone,
 }: {
+  mode: MovementMode
   products: Product[]
   warehouses: Warehouse[]
   onDone: () => void
 }) {
   const [warehouseId, setWarehouseId] = useState<number | null>(warehouses[0]?.id ?? null)
+  const [toWarehouseId, setToWarehouseId] = useState<number | null>(warehouses[1]?.id ?? null)
   const [productId, setProductId] = useState<number | null>(products[0]?.id ?? null)
   const [quantity, setQuantity] = useState('')
   const [cost, setCost] = useState('')
@@ -176,13 +197,24 @@ function ReceiveForm({
     setError(null)
     setSaving(true)
     try {
-      await receiveGoods({
-        warehouse_id: warehouseId,
-        lines: [{ product_id: productId, quantity, cost: cost || undefined }],
-      })
+      if (mode === 'receive') {
+        await receiveGoods({
+          warehouse_id: warehouseId,
+          lines: [{ product_id: productId, quantity, cost: cost || undefined }],
+        })
+      } else if (mode === 'write_off') {
+        await writeOff({ warehouse_id: warehouseId, lines: [{ product_id: productId, quantity }] })
+      } else {
+        if (!toWarehouseId) return
+        await transferStock({
+          warehouse_id: warehouseId,
+          to_warehouse_id: toWarehouseId,
+          lines: [{ product_id: productId, quantity }],
+        })
+      }
       onDone()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось провести приёмку')
+      setError(err instanceof ApiError ? err.message : 'Не удалось выполнить операцию')
     } finally {
       setSaving(false)
     }
@@ -191,7 +223,7 @@ function ReceiveForm({
   return (
     <form className="form card card-full" onSubmit={handleSubmit}>
       <label className="field">
-        Склад
+        {mode === 'transfer' ? 'Склад-отправитель' : 'Склад'}
         <select value={warehouseId ?? ''} onChange={(e) => setWarehouseId(Number(e.target.value))}>
           {warehouses.map((w) => (
             <option key={w.id} value={w.id}>
@@ -200,6 +232,21 @@ function ReceiveForm({
           ))}
         </select>
       </label>
+      {mode === 'transfer' && (
+        <label className="field">
+          Склад-получатель
+          <select
+            value={toWarehouseId ?? ''}
+            onChange={(e) => setToWarehouseId(Number(e.target.value))}
+          >
+            {warehouses.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="field">
         Товар
         <select value={productId ?? ''} onChange={(e) => setProductId(Number(e.target.value))}>
@@ -221,14 +268,19 @@ function ReceiveForm({
             required
           />
         </label>
-        <label className="field" style={{ flex: 1 }}>
-          Закупочная цена
-          <input type="number" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} />
-        </label>
+        {mode === 'receive' && (
+          <label className="field" style={{ flex: 1 }}>
+            Закупочная цена
+            <input type="number" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} />
+          </label>
+        )}
       </div>
       {error && <p className="error">{error}</p>}
-      <button type="submit" disabled={saving || !warehouseId || !productId}>
-        {saving ? 'Проведение…' : 'Оприходовать'}
+      <button
+        type="submit"
+        disabled={saving || !warehouseId || !productId || (mode === 'transfer' && !toWarehouseId)}
+      >
+        {saving ? 'Проведение…' : `Провести: ${MODE_LABELS[mode]}`}
       </button>
     </form>
   )

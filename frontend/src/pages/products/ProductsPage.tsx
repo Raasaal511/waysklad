@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { listProducts, createProduct, type Product } from '../../api/products'
+import { listProducts, createProduct, updateProduct, listUnits, type Product, type Unit } from '../../api/products'
 import { ApiError } from '../../api/client'
 
 export function ProductsPage() {
@@ -8,6 +8,7 @@ export function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<Product | null>(null)
 
   async function load(q = '') {
     setLoading(true)
@@ -29,20 +30,36 @@ export function ProductsPage() {
     load(query)
   }
 
+  function openCreate() {
+    setEditing(null)
+    setShowForm((v) => !v)
+  }
+
+  function openEdit(product: Product) {
+    setEditing(product)
+    setShowForm(true)
+  }
+
   return (
     <div className="stack">
       <div className="section-title">
         <h2>Товары</h2>
-        <button type="button" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? 'Отмена' : '+ Товар'}
+        <button type="button" onClick={openCreate}>
+          {showForm && !editing ? 'Отмена' : '+ Товар'}
         </button>
       </div>
 
       {showForm && (
-        <NewProductForm
-          onCreated={() => {
+        <ProductForm
+          product={editing}
+          onDone={() => {
             setShowForm(false)
+            setEditing(null)
             load(query)
+          }}
+          onCancel={() => {
+            setShowForm(false)
+            setEditing(null)
           }}
         />
       )}
@@ -79,7 +96,7 @@ export function ProductsPage() {
             </thead>
             <tbody>
               {products.map((p) => (
-                <tr key={p.id}>
+                <tr key={p.id} onClick={() => openEdit(p)} style={{ cursor: 'pointer' }}>
                   <td>{p.name}</td>
                   <td>{p.sku || '—'}</td>
                   <td>{p.unit_code}</td>
@@ -96,28 +113,50 @@ export function ProductsPage() {
   )
 }
 
-function NewProductForm({ onCreated }: { onCreated: () => void }) {
-  const [name, setName] = useState('')
-  const [sku, setSku] = useState('')
-  const [purchasePrice, setPurchasePrice] = useState('')
-  const [retailPrice, setRetailPrice] = useState('')
+function ProductForm({
+  product,
+  onDone,
+  onCancel,
+}: {
+  product: Product | null
+  onDone: () => void
+  onCancel: () => void
+}) {
+  const [name, setName] = useState(product?.name ?? '')
+  const [sku, setSku] = useState(product?.sku ?? '')
+  const [unitCode, setUnitCode] = useState(product?.unit_code ?? 'pcs')
+  const [units, setUnits] = useState<Unit[]>([])
+  const [purchasePrice, setPurchasePrice] = useState(product?.purchase_price ?? '')
+  const [retailPrice, setRetailPrice] = useState(product?.retail_price ?? '')
+  const [minStock, setMinStock] = useState(product?.min_stock ?? '')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    listUnits().then(setUnits).catch(() => {})
+  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setSaving(true)
     try {
-      await createProduct({
+      const payload = {
         name,
         sku,
+        unit_code: unitCode,
         purchase_price: purchasePrice || '0',
         retail_price: retailPrice || '0',
-      })
-      onCreated()
+        min_stock: minStock || '0',
+      }
+      if (product) {
+        await updateProduct(product.id, payload)
+      } else {
+        await createProduct(payload)
+      }
+      onDone()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось создать товар')
+      setError(err instanceof ApiError ? err.message : 'Не удалось сохранить товар')
     } finally {
       setSaving(false)
     }
@@ -125,6 +164,14 @@ function NewProductForm({ onCreated }: { onCreated: () => void }) {
 
   return (
     <form className="form card card-full" onSubmit={handleSubmit}>
+      <div className="row between">
+        <h3>{product ? `Товар: ${product.name}` : 'Новый товар'}</h3>
+        {product && (
+          <button type="button" className="secondary" onClick={onCancel}>
+            Отмена
+          </button>
+        )}
+      </div>
       <label className="field">
         Название
         <input value={name} onChange={(e) => setName(e.target.value)} required />
@@ -132,6 +179,20 @@ function NewProductForm({ onCreated }: { onCreated: () => void }) {
       <label className="field">
         Артикул
         <input value={sku} onChange={(e) => setSku(e.target.value)} />
+      </label>
+      <label className="field">
+        Единица измерения
+        <select value={unitCode} onChange={(e) => setUnitCode(e.target.value)}>
+          {units.length === 0 ? (
+            <option value={unitCode}>{unitCode}</option>
+          ) : (
+            units.map((u) => (
+              <option key={u.code} value={u.code}>
+                {u.name}
+              </option>
+            ))
+          )}
+        </select>
       </label>
       <div className="row">
         <label className="field" style={{ flex: 1 }}>
@@ -153,9 +214,18 @@ function NewProductForm({ onCreated }: { onCreated: () => void }) {
           />
         </label>
       </div>
+      <label className="field">
+        Минимальный остаток
+        <input
+          type="number"
+          step="0.001"
+          value={minStock}
+          onChange={(e) => setMinStock(e.target.value)}
+        />
+      </label>
       {error && <p className="error">{error}</p>}
       <button type="submit" disabled={saving}>
-        {saving ? 'Сохранение…' : 'Создать товар'}
+        {saving ? 'Сохранение…' : product ? 'Сохранить изменения' : 'Создать товар'}
       </button>
     </form>
   )

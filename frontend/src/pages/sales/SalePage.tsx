@@ -1,7 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { listProducts, type Product } from '../../api/products'
 import { listWarehouses, type Warehouse } from '../../api/inventory'
-import { createSale, type PaymentMethod, type SaleItemInput, type Sale } from '../../api/sales'
+import {
+  createSale,
+  returnSale,
+  type PaymentMethod,
+  type SaleItemInput,
+  type Sale,
+} from '../../api/sales'
 import { ApiError } from '../../api/client'
 
 interface CartLine {
@@ -197,12 +203,80 @@ export function SalePage() {
         </div>
       )}
 
-      {lastSale && (
-        <div className="card card-full">
-          <p>
-            Продажа №{lastSale.id} на сумму <strong>{lastSale.total} ₽</strong> проведена
-          </p>
-        </div>
+      {lastSale && <LastSaleCard sale={lastSale} />}
+    </div>
+  )
+}
+
+function LastSaleCard({ sale }: { sale: Sale }) {
+  const [showReturn, setShowReturn] = useState(false)
+  const [quantities, setQuantities] = useState<Record<number, string>>(() =>
+    Object.fromEntries(sale.lines.map((l) => [l.id, ''])),
+  )
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [done, setDone] = useState(false)
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    const items = sale.lines
+      .filter((l) => Number(quantities[l.id] || 0) > 0)
+      .map((l) => ({ sale_line_id: l.id, quantity: quantities[l.id] }))
+    if (items.length === 0) return
+    setError(null)
+    setSaving(true)
+    try {
+      await returnSale(sale.id, { items })
+      setDone(true)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось оформить возврат')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="card card-full">
+        <p>Возврат по продаже №{sale.id} оформлен, остаток восстановлен</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="stack card card-full">
+      <div className="row between">
+        <p>
+          Продажа №{sale.id} на сумму <strong>{sale.total} ₽</strong> проведена
+        </p>
+        <button type="button" className="secondary" onClick={() => setShowReturn((v) => !v)}>
+          {showReturn ? 'Отмена' : 'Оформить возврат'}
+        </button>
+      </div>
+
+      {showReturn && (
+        <form className="form" onSubmit={handleSubmit}>
+          {sale.lines.map((line) => (
+            <label className="field" key={line.id}>
+              Товар #{line.product_id} (продано {line.quantity})
+              <input
+                type="number"
+                step="0.001"
+                min="0"
+                max={line.quantity}
+                placeholder="0"
+                value={quantities[line.id]}
+                onChange={(e) =>
+                  setQuantities((prev) => ({ ...prev, [line.id]: e.target.value }))
+                }
+              />
+            </label>
+          ))}
+          {error && <p className="error">{error}</p>}
+          <button type="submit" disabled={saving}>
+            {saving ? 'Оформление…' : 'Вернуть товар'}
+          </button>
+        </form>
       )}
     </div>
   )

@@ -48,3 +48,18 @@ export function createProduct(input: {
 export function listUnits() {
   return api.get<Unit[]>('/products/units')
 }
+
+export function updateProduct(
+  id: number,
+  input: {
+    name: string
+    unit_code?: string
+    purchase_price?: string
+    retail_price?: string
+    sku?: string
+    barcode?: string | null
+    min_stock?: string
+  },
+) {
+  return api.put<Product>(`/products/${id}`, input)
+}

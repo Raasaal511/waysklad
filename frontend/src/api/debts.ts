@@ -48,3 +48,10 @@ export function listDueDebts(on?: string) {
   const q = on ? `?on=${on}` : ''
   return api.get<Debt[]>(`/debts/due${q}`)
 }
+
+export function createInstallment(
+  debtId: number,
+  schedule: { due_date: string; amount: string }[],
+) {
+  return api.post<Debt>(`/debts/${debtId}/installments`, { schedule })
+}

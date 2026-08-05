@@ -40,3 +40,19 @@ export function createSale(input: {
 }) {
   return api.post<Sale>('/sales', input)
 }
+
+export interface SaleReturn {
+  id: number
+  sale_id: number
+  note: string
+  refund: string
+  created_at: string
+  lines: { sale_line_id: number; quantity: string }[]
+}
+
+export function returnSale(
+  saleId: number,
+  input: { items: { sale_line_id: number; quantity: string }[]; note?: string },
+) {
+  return api.post<SaleReturn>(`/sales/${saleId}/returns`, input)
+}
