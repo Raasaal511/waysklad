@@ -283,6 +283,40 @@ async def test_audit_log_records_actions_and_guards_access(client, owner_headers
     assert response.status_code == 403
 
 
+async def test_custom_unit_via_api(client, owner_headers):
+    response = await client.post(
+        "/api/products/units",
+        headers=owner_headers,
+        json={"code": "box", "name": "коробка"},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json() == {"code": "box", "name": "коробка", "fractional": False}
+
+    response = await client.get("/api/products/units", headers=owner_headers)
+    codes = [u["code"] for u in response.json()]
+    assert "box" in codes and "pcs" in codes  # свои единицы соседствуют с предустановленными
+
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={
+            "name": "Плитка облицовочная",
+            "unit_code": "box",
+            "purchase_price": "500",
+            "retail_price": "800",
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["unit_code"] == "box"
+
+    response = await client.post(
+        "/api/products/units",
+        headers=owner_headers,
+        json={"code": "box", "name": "ещё коробка"},
+    )
+    assert response.status_code == 400  # код единицы уже занят
+
+
 async def test_seller_permissions_via_api(client, owner_headers, random_phone):
     seller_phone = random_phone()
     response = await client.post(

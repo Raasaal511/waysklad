@@ -36,6 +36,7 @@ from app.application.orders.create_order import (
     OrderItemInput,
 )
 from app.application.products.create_product import CreateProductCommand, CreateProductUseCase
+from app.application.products.create_unit import CreateUnitCommand, CreateUnitUseCase
 from app.application.products.update_product import UpdateProductCommand, UpdateProductUseCase
 from app.application.sales.create_sale import (
     CreateSaleCommand,
@@ -162,6 +163,56 @@ async def test_update_product_use_case_updates_and_seller_forbidden(
                 unit_code="pcs",
                 purchase_price=Decimal("1"),
                 retail_price=Decimal("2"),
+            ),
+        )
+
+
+async def test_create_custom_unit_and_use_it_in_product(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+
+    unit = await CreateUnitUseCase(make_uow(tenant_id)).execute(
+        owner, CreateUnitCommand(code="box", name="коробка")
+    )
+    assert unit.code == "box"
+
+    product = await CreateProductUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateProductCommand(
+            name="Плитка облицовочная", unit_code="box",
+            purchase_price=Decimal("500"), retail_price=Decimal("800"),
+        ),
+    )
+    assert product.unit.code == "box"
+    assert product.unit.name == "коробка"
+
+
+async def test_create_unit_rejects_duplicate_code(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    with pytest.raises(DomainError):
+        await CreateUnitUseCase(make_uow(tenant_id)).execute(
+            owner, CreateUnitCommand(code="pcs", name="дубликат предустановленной")
+        )
+
+
+async def test_seller_cannot_create_unit(make_uow, hasher, registered_shop, random_phone):
+    tenant_id, _, owner = registered_shop
+    seller = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner, CreateEmployeeCommand("Зара", random_phone(), "secret123", Role.SELLER)
+    )
+    with pytest.raises(AccessDeniedError):
+        await CreateUnitUseCase(make_uow(tenant_id)).execute(
+            Actor(id=seller.id, role=seller.role), CreateUnitCommand(code="box", name="коробка")
+        )
+
+
+async def test_create_product_rejects_unknown_unit_code(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    with pytest.raises(DomainError):
+        await CreateProductUseCase(make_uow(tenant_id)).execute(
+            owner,
+            CreateProductCommand(
+                name="Товар", unit_code="unknown",
+                purchase_price=Decimal("1"), retail_price=Decimal("2"),
             ),
         )
 
