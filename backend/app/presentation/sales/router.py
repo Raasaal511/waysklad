@@ -1,8 +1,10 @@
 from fastapi import APIRouter
 
 from app.domain.common.uow import IUnitOfWork
+from app.domain.identity.permissions import Permission
 from app.domain.sales.receipt import build_whatsapp_link, render_receipt_text
 from app.presentation.deps import ActorDep, CreateSaleDep, ReturnSaleDep, UowDep
+from app.presentation.deps.auth import require_permission
 from app.presentation.sales.schemas import (
     ReceiptResponse,
     SaleCreateRequest,
@@ -44,6 +46,6 @@ async def _build_receipt(sale_id: int, uow: IUnitOfWork) -> ReceiptResponse:
     return ReceiptResponse(text=text, whatsapp_link=build_whatsapp_link(phone, text) if phone else None)
 
 
-@router.get("/{sale_id}/receipt")
+@router.get("/{sale_id}/receipt", dependencies=[require_permission(Permission.SALES_CREATE)])
 async def get_receipt(sale_id: int, uow: UowDep) -> ReceiptResponse:
     return await _build_receipt(sale_id, uow)

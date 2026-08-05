@@ -406,6 +406,36 @@ async def test_order_full_lifecycle_via_api(client, owner_headers):
     response = await client.get("/api/orders", headers=owner_headers)
     assert response.json() == []  # выданные заказы не входят в список активных
 
+    response = await client.get(f"/api/orders/{order_id}", headers=owner_headers)
+    assert response.status_code == 200
+    assert response.json()["status"] == "issued"
+
+
+async def test_storekeeper_cannot_view_orders_via_api(client, owner_headers, random_phone):
+    storekeeper_phone = random_phone()
+    response = await client.post(
+        "/api/auth/employees",
+        headers=owner_headers,
+        json={
+            "name": "Иса",
+            "phone": storekeeper_phone,
+            "password": "secret123",
+            "role": "storekeeper",
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    response = await client.post(
+        "/api/auth/login", json={"phone": storekeeper_phone, "password": "secret123"}
+    )
+    storekeeper_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+    response = await client.get("/api/orders", headers=storekeeper_headers)
+    assert response.status_code == 403
+
+    response = await client.get("/api/orders/1", headers=storekeeper_headers)
+    assert response.status_code == 403
+
 
 async def test_audit_log_records_actions_and_guards_access(client, owner_headers, random_phone):
     response = await client.post(

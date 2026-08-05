@@ -2,6 +2,7 @@ from datetime import date
 
 from fastapi import APIRouter
 
+from app.domain.identity.permissions import Permission
 from app.presentation.debts.schemas import (
     CreateInstallmentRequest,
     DebtResponse,
@@ -18,8 +19,10 @@ from app.presentation.deps import (
     RepayDebtDep,
     UowDep,
 )
+from app.presentation.deps.auth import require_permission
 
 router = APIRouter(prefix="/debts", tags=["debts"])
+_view = require_permission(Permission.DEBTS_VIEW)
 
 
 @router.post("", status_code=201)
@@ -53,19 +56,19 @@ async def create_installment(
     return DebtResponse.from_entity(await use_case.execute(actor, body.to_command(debt_id)))
 
 
-@router.get("/due")
+@router.get("/due", dependencies=[_view])
 async def list_due_debts(uow: UowDep, on: date | None = None) -> list[DebtResponse]:
     async with uow:
         return [DebtResponse.from_entity(d) for d in await uow.debts.list_due(on or date.today())]
 
 
-@router.get("/client/{client_id}")
+@router.get("/client/{client_id}", dependencies=[_view])
 async def list_client_debts(client_id: int, uow: UowDep) -> DebtsSummaryResponse:
     async with uow:
         return DebtsSummaryResponse.from_debts(await uow.debts.list_by_client(client_id))
 
 
-@router.get("/supplier/{supplier_id}")
+@router.get("/supplier/{supplier_id}", dependencies=[_view])
 async def list_supplier_debts(supplier_id: int, uow: UowDep) -> DebtsSummaryResponse:
     async with uow:
         return DebtsSummaryResponse.from_debts(await uow.debts.list_by_supplier(supplier_id))
