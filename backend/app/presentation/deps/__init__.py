@@ -36,6 +36,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     ReceiveGoodsDep,
     RegisterShopDep,
     RepayDebtDep,
+    ReturnSaleDep,
     SetProductPhotoDep,
     StocktakeDep,
     TransferDep,

@@ -22,6 +22,7 @@ from app.application.products.import_excel import ImportProductsUseCase
 from app.application.products.set_product_photo import SetProductPhotoUseCase
 from app.application.products.update_product import UpdateProductUseCase
 from app.application.sales.create_sale import CreateSaleUseCase
+from app.application.sales.return_sale import ReturnSaleUseCase
 from app.presentation.deps.security import FileStorageDep, HasherDep
 from app.presentation.deps.uow import PublicUowDep, UowDep
 
@@ -58,6 +59,7 @@ get_write_off = _with_uow(WriteOffUseCase)
 get_transfer = _with_uow(TransferUseCase)
 get_stocktake = _with_uow(StocktakeUseCase)
 get_create_sale = _with_uow(CreateSaleUseCase)
+get_return_sale = _with_uow(ReturnSaleUseCase)
 get_issue_debt = _with_uow(IssueDebtUseCase)
 get_repay_debt = _with_uow(RepayDebtUseCase)
 get_create_installment = _with_uow(CreateInstallmentUseCase)
@@ -80,6 +82,7 @@ WriteOffDep = Annotated[WriteOffUseCase, Depends(get_write_off)]
 TransferDep = Annotated[TransferUseCase, Depends(get_transfer)]
 StocktakeDep = Annotated[StocktakeUseCase, Depends(get_stocktake)]
 CreateSaleDep = Annotated[CreateSaleUseCase, Depends(get_create_sale)]
+ReturnSaleDep = Annotated[ReturnSaleUseCase, Depends(get_return_sale)]
 IssueDebtDep = Annotated[IssueDebtUseCase, Depends(get_issue_debt)]
 RepayDebtDep = Annotated[RepayDebtUseCase, Depends(get_repay_debt)]
 CreateInstallmentDep = Annotated[CreateInstallmentUseCase, Depends(get_create_installment)]
@@ -87,3 +90,4 @@ CreateOrderDep = Annotated[CreateOrderUseCase, Depends(get_create_order)]
 ChangeOrderStatusDep = Annotated[ChangeOrderStatusUseCase, Depends(get_change_order_status)]
 CreateClientDep = Annotated[CreateClientUseCase, Depends(get_create_client)]
 CreateSupplierDep = Annotated[CreateSupplierUseCase, Depends(get_create_supplier)]
+ 
