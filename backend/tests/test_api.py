@@ -1,4 +1,7 @@
 from decimal import Decimal
+from io import BytesIO
+
+import openpyxl
 
 
 async def test_register_login_flow(client, random_phone):
@@ -280,6 +283,69 @@ async def test_audit_log_records_actions_and_guards_access(client, owner_headers
     )
     seller_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
     response = await client.get("/api/audit", headers=seller_headers)
+    assert response.status_code == 403
+
+
+def _excel_file(rows: list[tuple]) -> bytes:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(
+        ["Название", "Артикул", "Штрихкод", "Ед. изм.", "Закупочная цена", "Розничная цена", "Мин. остаток"]
+    )
+    for row in rows:
+        sheet.append(list(row))
+    buffer = BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+async def test_import_products_from_excel_via_api(client, owner_headers, random_phone):
+    file_bytes = _excel_file(
+        [
+            ("Мёд горный", "", "", "kg", 400, 700, 0),
+            ("Без цены", "", "", "pcs", "не число", 700, 0),
+        ]
+    )
+    response = await client.post(
+        "/api/products/import",
+        headers=owner_headers,
+        files={
+            "file": (
+                "products.xlsx",
+                file_bytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["created"] == 1
+    assert len(body["errors"]) == 1 and body["errors"][0]["row"] == 3
+
+    response = await client.get("/api/products", headers=owner_headers)
+    assert [p["name"] for p in response.json()] == ["Мёд горный"]
+
+    response = await client.post(
+        "/api/auth/employees",
+        headers=owner_headers,
+        json={"name": "Зара", "phone": random_phone(), "password": "secret123", "role": "seller"},
+    )
+    login = await client.post(
+        "/api/auth/login",
+        json={"phone": response.json()["phone"], "password": "secret123"},
+    )
+    seller_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    response = await client.post(
+        "/api/products/import",
+        headers=seller_headers,
+        files={
+            "file": (
+                "products.xlsx",
+                _excel_file([("Товар", "", "", "pcs", 1, 2, 0)]),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
     assert response.status_code == 403
 
 

@@ -1,6 +1,8 @@
 from datetime import date, timedelta
 from decimal import Decimal
+from io import BytesIO
 
+import openpyxl
 import pytest
 
 from app.application.auth.create_employee import CreateEmployeeCommand, CreateEmployeeUseCase
@@ -37,6 +39,7 @@ from app.application.orders.create_order import (
 )
 from app.application.products.create_product import CreateProductCommand, CreateProductUseCase
 from app.application.products.create_unit import CreateUnitCommand, CreateUnitUseCase
+from app.application.products.import_excel import ImportProductsCommand, ImportProductsUseCase
 from app.application.products.set_product_photo import (
     SetProductPhotoCommand,
     SetProductPhotoUseCase,
@@ -219,6 +222,65 @@ async def test_create_product_rejects_unknown_unit_code(make_uow, registered_sho
                 name="Товар", unit_code="unknown",
                 purchase_price=Decimal("1"), retail_price=Decimal("2"),
             ),
+        )
+
+
+def _build_workbook(rows: list[tuple]) -> bytes:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(
+        ["Название", "Артикул", "Штрихкод", "Ед. изм.", "Закупочная цена", "Розничная цена", "Мин. остаток"]
+    )
+    for row in rows:
+        sheet.append(list(row))
+    buffer = BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+async def test_import_products_from_excel_creates_all_valid_rows(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    file_bytes = _build_workbook(
+        [
+            ("Мёд горный", "", "", "kg", 400, 700, 2),
+            ("Орехи грецкие", "NUT-1", "", "kg", 600, 900, 0),
+            ("Плитка облицовочная", "", "", "box", 500, 800, 0),
+        ]
+    )
+    result = await ImportProductsUseCase(make_uow(tenant_id)).execute(
+        owner, ImportProductsCommand(file_bytes)
+    )
+    assert result.created == 2  # третья строка (unit_code="box") не существует
+    assert len(result.errors) == 1
+    assert result.errors[0].row == 4
+
+
+async def test_import_products_skips_bad_rows_but_keeps_good_ones(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    file_bytes = _build_workbook(
+        [
+            ("Мёд горный", "", "", "kg", 400, 700, 0),
+            ("Без цены", "", "", "pcs", "не число", 700, 0),
+            ("Орехи грецкие", "", "", "kg", 600, 900, 0),
+        ]
+    )
+    result = await ImportProductsUseCase(make_uow(tenant_id)).execute(
+        owner, ImportProductsCommand(file_bytes)
+    )
+    assert result.created == 2
+    assert len(result.errors) == 1
+    assert result.errors[0].row == 3
+
+
+async def test_seller_cannot_import_products(make_uow, hasher, registered_shop, random_phone):
+    tenant_id, _, owner = registered_shop
+    seller = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner, CreateEmployeeCommand("Зара", random_phone(), "secret123", Role.SELLER)
+    )
+    file_bytes = _build_workbook([("Товар", "", "", "pcs", 1, 2, 0)])
+    with pytest.raises(AccessDeniedError):
+        await ImportProductsUseCase(make_uow(tenant_id)).execute(
+            Actor(id=seller.id, role=seller.role), ImportProductsCommand(file_bytes)
         )
 
 
