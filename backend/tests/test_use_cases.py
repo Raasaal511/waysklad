@@ -83,6 +83,10 @@ from app.domain.identity.entities import Role, Warehouse
 from app.domain.identity.permissions import Actor
 from app.domain.inventory.entities import StockDocType
 from app.domain.orders.entities import OrderStatus
+from app.application.sync.apply_offline_ops import (
+    ApplyOfflineSalesCommand,
+    ApplyOfflineSalesUseCase,
+)
 from app.domain.sales.payment import PaymentMethod
 from app.infrastructure.db.models.identity import TenantModel
 from app.infrastructure.files import LocalFileStorage
@@ -1036,3 +1040,70 @@ async def test_telegram_daily_summary(
     assert "Продаж: 1" in text
     assert "Выручка: 200" in text
     assert "Прибыль: 100" in text
+
+
+async def test_create_sale_is_idempotent_by_client_op_id(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, retail_price=Money.of("250"))
+
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("10"))],
+        ),
+    )
+
+    cmd = CreateSaleCommand(
+        warehouse_id=warehouse_id,
+        payment_method=PaymentMethod.CASH,
+        items=[SaleItemInput(product_id=product.id, quantity=Decimal("2"), price=Decimal("250"))],
+        client_op_id="device-1-op-42",
+    )
+
+    first = await CreateSaleUseCase(make_uow(tenant_id)).execute(owner, cmd)
+    second = await CreateSaleUseCase(make_uow(tenant_id)).execute(owner, cmd)
+
+    assert first.sale.id == second.sale.id  # повторная отправка не создала вторую продажу
+
+    async with make_uow(tenant_id) as uow:
+        remaining = await uow.stock.get(product.id, warehouse_id)
+    assert remaining == Decimal("8")  # остаток списан один раз, не дважды
+
+
+async def test_apply_offline_sales_isolates_failures(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, retail_price=Money.of("100"))
+
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("3"))],
+        ),
+    )
+
+    ok_sale = CreateSaleCommand(
+        warehouse_id=warehouse_id,
+        payment_method=PaymentMethod.CASH,
+        items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("100"))],
+        client_op_id="op-ok",
+    )
+    failing_sale = CreateSaleCommand(
+        warehouse_id=warehouse_id,
+        payment_method=PaymentMethod.CASH,
+        items=[SaleItemInput(product_id=product.id, quantity=Decimal("100"), price=Decimal("100"))],
+        client_op_id="op-fail",
+    )
+
+    result = await ApplyOfflineSalesUseCase(make_uow(tenant_id)).execute(
+        owner, ApplyOfflineSalesCommand(sales=[ok_sale, failing_sale])
+    )
+
+    assert len(result.applied) == 1
+    assert len(result.errors) == 1
+    assert result.errors[0].client_op_id == "op-fail"

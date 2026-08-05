@@ -734,3 +734,47 @@ async def test_analytics_endpoints_via_api(client, owner_headers, random_phone):
 
     response = await client.get("/api/analytics/dashboard", headers=seller_headers)
     assert response.status_code == 403
+
+
+async def test_sync_sales_offline_queue_via_api(client, owner_headers):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Товар офлайн", "purchase_price": "50", "retail_price": "100"},
+    )
+    product_id = response.json()["id"]
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "10"}]},
+    )
+
+    batch = {
+        "sales": [
+            {
+                "client_op_id": "device-a-1",
+                "warehouse_id": 1,
+                "payment_method": "cash",
+                "items": [{"product_id": product_id, "quantity": "2", "price": "100"}],
+            },
+            {
+                "client_op_id": "device-a-2",
+                "warehouse_id": 1,
+                "payment_method": "cash",
+                "items": [{"product_id": product_id, "quantity": "100", "price": "100"}],
+            },
+        ]
+    }
+    response = await client.post("/api/sync/sales", headers=owner_headers, json=batch)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert len(result["applied"]) == 1
+    assert len(result["errors"]) == 1
+    assert result["errors"][0]["client_op_id"] == "device-a-2"
+
+    # повторная отправка той же пачки (обрыв связи после ответа) не задваивает продажу
+    response = await client.post("/api/sync/sales", headers=owner_headers, json=batch)
+    assert response.status_code == 200
+    result_retry = response.json()
+    assert len(result_retry["applied"]) == 1
+    assert result_retry["applied"][0]["id"] == result["applied"][0]["id"]
