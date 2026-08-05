@@ -28,32 +28,38 @@ export function LoginPage() {
   }
 
   return (
-    <main>
-      <h1>ВайСклад</h1>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Телефон
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            required
-          />
-        </label>
-        <label>
-          Пароль
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </label>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit" disabled={loading}>
-          {loading ? 'Вход…' : 'Войти'}
-        </button>
-      </form>
-    </main>
+    <div className="center-screen">
+      <div className="card stack">
+        <div>
+          <h1>WaySklad</h1>
+          <p className="text-muted">Товарный учёт для малого бизнеса</p>
+        </div>
+        <form className="form" onSubmit={handleSubmit}>
+          <label className="field">
+            Телефон
+            <input
+              type="tel"
+              placeholder="+7 928 000 00 00"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+            />
+          </label>
+          <label className="field">
+            Пароль
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </label>
+          {error && <p className="error">{error}</p>}
+          <button type="submit" disabled={loading}>
+            {loading ? 'Вход…' : 'Войти'}
+          </button>
+        </form>
+      </div>
+    </div>
   )
 }

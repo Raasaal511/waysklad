@@ -8,8 +8,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'ВайСклад',
-        short_name: 'ВайСклад',
+        name: 'WaySklad',
+        short_name: 'WaySklad',
         description: 'Товарный учёт, продажи и долги для малого бизнеса',
         theme_color: '#1b6b4d',
         background_color: '#ffffff',
