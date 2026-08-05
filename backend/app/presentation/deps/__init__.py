@@ -32,6 +32,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     CreateUnitDep,
     ImportProductsDep,
     IssueDebtDep,
+    IssueSupplierDebtDep,
     LoginDep,
     ReceiveGoodsDep,
     RegisterShopDep,

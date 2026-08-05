@@ -1,15 +1,20 @@
+from datetime import date
+
 from fastapi import APIRouter
 
 from app.presentation.debts.schemas import (
     CreateInstallmentRequest,
     DebtResponse,
+    DebtsSummaryResponse,
     IssueDebtRequest,
+    IssueSupplierDebtRequest,
     RepayDebtRequest,
 )
 from app.presentation.deps import (
     ActorDep,
     CreateInstallmentDep,
     IssueDebtDep,
+    IssueSupplierDebtDep,
     RepayDebtDep,
     UowDep,
 )
@@ -20,6 +25,13 @@ router = APIRouter(prefix="/debts", tags=["debts"])
 @router.post("", status_code=201)
 async def issue_debt(
     body: IssueDebtRequest, actor: ActorDep, use_case: IssueDebtDep
+) -> DebtResponse:
+    return DebtResponse.from_entity(await use_case.execute(actor, body.to_command()))
+
+
+@router.post("/suppliers", status_code=201)
+async def issue_supplier_debt(
+    body: IssueSupplierDebtRequest, actor: ActorDep, use_case: IssueSupplierDebtDep
 ) -> DebtResponse:
     return DebtResponse.from_entity(await use_case.execute(actor, body.to_command()))
 
@@ -41,7 +53,19 @@ async def create_installment(
     return DebtResponse.from_entity(await use_case.execute(actor, body.to_command(debt_id)))
 
 
-@router.get("/client/{client_id}")
-async def list_client_debts(client_id: int, uow: UowDep) -> list[DebtResponse]:
+@router.get("/due")
+async def list_due_debts(uow: UowDep, on: date | None = None) -> list[DebtResponse]:
     async with uow:
-        return [DebtResponse.from_entity(d) for d in await uow.debts.list_by_client(client_id)]
+        return [DebtResponse.from_entity(d) for d in await uow.debts.list_due(on or date.today())]
+
+
+@router.get("/client/{client_id}")
+async def list_client_debts(client_id: int, uow: UowDep) -> DebtsSummaryResponse:
+    async with uow:
+        return DebtsSummaryResponse.from_debts(await uow.debts.list_by_client(client_id))
+
+
+@router.get("/supplier/{supplier_id}")
+async def list_supplier_debts(supplier_id: int, uow: UowDep) -> DebtsSummaryResponse:
+    async with uow:
+        return DebtsSummaryResponse.from_debts(await uow.debts.list_by_supplier(supplier_id))

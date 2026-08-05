@@ -9,6 +9,7 @@ from app.application.counterparties.create_client import CreateClientUseCase
 from app.application.counterparties.create_supplier import CreateSupplierUseCase
 from app.application.debts.create_installment import CreateInstallmentUseCase
 from app.application.debts.issue_debt import IssueDebtUseCase
+from app.application.debts.issue_supplier_debt import IssueSupplierDebtUseCase
 from app.application.debts.repay_debt import RepayDebtUseCase
 from app.application.inventory.receive_goods import ReceiveGoodsUseCase
 from app.application.inventory.stocktake import StocktakeUseCase
@@ -61,6 +62,7 @@ get_stocktake = _with_uow(StocktakeUseCase)
 get_create_sale = _with_uow(CreateSaleUseCase)
 get_return_sale = _with_uow(ReturnSaleUseCase)
 get_issue_debt = _with_uow(IssueDebtUseCase)
+get_issue_supplier_debt = _with_uow(IssueSupplierDebtUseCase)
 get_repay_debt = _with_uow(RepayDebtUseCase)
 get_create_installment = _with_uow(CreateInstallmentUseCase)
 get_create_order = _with_uow(CreateOrderUseCase)
@@ -84,6 +86,9 @@ StocktakeDep = Annotated[StocktakeUseCase, Depends(get_stocktake)]
 CreateSaleDep = Annotated[CreateSaleUseCase, Depends(get_create_sale)]
 ReturnSaleDep = Annotated[ReturnSaleUseCase, Depends(get_return_sale)]
 IssueDebtDep = Annotated[IssueDebtUseCase, Depends(get_issue_debt)]
+IssueSupplierDebtDep = Annotated[
+    IssueSupplierDebtUseCase, Depends(get_issue_supplier_debt)
+]
 RepayDebtDep = Annotated[RepayDebtUseCase, Depends(get_repay_debt)]
 CreateInstallmentDep = Annotated[CreateInstallmentUseCase, Depends(get_create_installment)]
 CreateOrderDep = Annotated[CreateOrderUseCase, Depends(get_create_order)]

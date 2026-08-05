@@ -8,8 +8,9 @@ from app.application.debts.create_installment import (
     InstallmentInput,
 )
 from app.application.debts.issue_debt import IssueDebtCommand
+from app.application.debts.issue_supplier_debt import IssueSupplierDebtCommand
 from app.application.debts.repay_debt import RepayDebtCommand
-from app.domain.debts.entities import Debt
+from app.domain.debts.entities import Debt, total_balance
 
 
 class IssueDebtRequest(BaseModel):
@@ -21,6 +22,21 @@ class IssueDebtRequest(BaseModel):
     def to_command(self) -> IssueDebtCommand:
         return IssueDebtCommand(
             client_id=self.client_id,
+            amount=self.amount,
+            due_date=self.due_date,
+            note=self.note,
+        )
+
+
+class IssueSupplierDebtRequest(BaseModel):
+    supplier_id: int
+    amount: Decimal
+    due_date: date | None = None
+    note: str = ""
+
+    def to_command(self) -> IssueSupplierDebtCommand:
+        return IssueSupplierDebtCommand(
+            supplier_id=self.supplier_id,
             amount=self.amount,
             due_date=self.due_date,
             note=self.note,
@@ -60,7 +76,8 @@ class InstallmentResponse(BaseModel):
 
 class DebtResponse(BaseModel):
     id: int
-    client_id: int
+    client_id: int | None
+    supplier_id: int | None
     amount: Decimal
     repaid: Decimal
     balance: Decimal
@@ -76,6 +93,7 @@ class DebtResponse(BaseModel):
         return cls(
             id=debt.id,
             client_id=debt.client_id,
+            supplier_id=debt.supplier_id,
             amount=debt.amount.amount,
             repaid=debt.repaid.amount,
             balance=debt.balance.amount,
@@ -88,4 +106,18 @@ class DebtResponse(BaseModel):
                 InstallmentResponse(due_date=p.due_date, amount=p.amount.amount)
                 for p in debt.schedule
             ],
+        )
+
+
+class DebtsSummaryResponse(BaseModel):
+    """Баланс контрагента: список долгов + сумма остатков — «сверка одной кнопкой»."""
+
+    total_balance: Decimal
+    debts: list[DebtResponse]
+
+    @classmethod
+    def from_debts(cls, debts: list[Debt]) -> "DebtsSummaryResponse":
+        return cls(
+            total_balance=total_balance(debts).amount,
+            debts=[DebtResponse.from_entity(d) for d in debts],
         )
