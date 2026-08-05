@@ -3,13 +3,21 @@ from fastapi import APIRouter
 from app.domain.identity.entities import User
 from app.infrastructure.security import create_access_token
 from app.presentation.auth.schemas import (
+    ConnectTelegramRequest,
     CreateEmployeeRequest,
     LoginRequest,
     RegisterRequest,
+    TenantResponse,
     TokenResponse,
     UserResponse,
 )
-from app.presentation.deps import ActorDep, CreateEmployeeDep, LoginDep, RegisterShopDep
+from app.presentation.deps import (
+    ActorDep,
+    ConnectTelegramDep,
+    CreateEmployeeDep,
+    LoginDep,
+    RegisterShopDep,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -37,3 +45,10 @@ async def create_employee(
     body: CreateEmployeeRequest, actor: ActorDep, use_case: CreateEmployeeDep
 ) -> UserResponse:
     return UserResponse.from_entity(await use_case.execute(actor, body.to_command()))
+
+
+@router.post("/telegram")
+async def connect_telegram(
+    body: ConnectTelegramRequest, actor: ActorDep, use_case: ConnectTelegramDep
+) -> TenantResponse:
+    return TenantResponse.from_entity(await use_case.execute(actor, body.to_command()))

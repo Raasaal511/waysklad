@@ -8,6 +8,7 @@ from app.application.analytics.top_products import (
     GetCategoryProfitUseCase,
     GetTopProductsUseCase,
 )
+from app.application.auth.connect_telegram import ConnectTelegramUseCase
 from app.application.auth.create_employee import CreateEmployeeUseCase
 from app.application.auth.login import LoginUseCase
 from app.application.auth.register_shop import RegisterShopUseCase
@@ -82,6 +83,7 @@ get_category_profit = _with_uow(GetCategoryProfitUseCase)
 get_dead_stock = _with_uow(GetDeadStockUseCase)
 get_stock_value = _with_uow(GetStockValueUseCase)
 get_apply_offline_sales = _with_uow(ApplyOfflineSalesUseCase)
+get_connect_telegram = _with_uow(ConnectTelegramUseCase)
 
 # готовые зависимости для сигнатур роутов
 RegisterShopDep = Annotated[RegisterShopUseCase, Depends(get_register_shop)]
@@ -116,4 +118,5 @@ GetStockValueDep = Annotated[GetStockValueUseCase, Depends(get_stock_value)]
 ApplyOfflineSalesDep = Annotated[
     ApplyOfflineSalesUseCase, Depends(get_apply_offline_sales)
 ]
+ConnectTelegramDep = Annotated[ConnectTelegramUseCase, Depends(get_connect_telegram)]
  

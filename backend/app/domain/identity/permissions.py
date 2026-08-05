@@ -40,6 +40,7 @@ class Permission(StrEnum):
 
     ANALYTICS_VIEW = "analytics.view"  # дашборд, прибыль — «отчёты о прибыли»
     AUDIT_VIEW = "audit.view"
+    SETTINGS_MANAGE = "settings.manage"  # настройки магазина (Telegram-сводка и т.п.) — только владелец
 
 
 _SELLER = {

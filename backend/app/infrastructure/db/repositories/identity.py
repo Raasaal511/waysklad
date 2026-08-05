@@ -41,6 +41,16 @@ class SqlAlchemyTenantRepository(SqlAlchemyRepository, ITenantRepository):
             raise NotFoundError(f"Магазин {tenant_id} не найден")
         return TenantMapper.to_entity(model)
 
+    async def save(self, tenant: Tenant) -> Tenant:
+        model = (
+            await self._session.execute(select(TenantModel).where(TenantModel.id == tenant.id))
+        ).scalar_one_or_none()
+        if model is None:
+            raise NotFoundError(f"Магазин {tenant.id} не найден")
+        model.owner_telegram_chat_id = tenant.owner_telegram_chat_id
+        await self._session.flush()
+        return tenant
+
     async def get_by_slug(self, slug: str) -> Tenant | None:
         model = (
             await self._session.execute(select(TenantModel).where(TenantModel.slug == slug))
