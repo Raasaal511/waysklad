@@ -18,6 +18,7 @@ from app.application.debts.create_installment import CreateInstallmentUseCase
 from app.application.debts.issue_debt import IssueDebtUseCase
 from app.application.debts.issue_supplier_debt import IssueSupplierDebtUseCase
 from app.application.debts.repay_debt import RepayDebtUseCase
+from app.application.inventory.create_warehouse import CreateWarehouseUseCase
 from app.application.inventory.receive_goods import ReceiveGoodsUseCase
 from app.application.inventory.stocktake import StocktakeUseCase
 from app.application.inventory.transfer import TransferUseCase
@@ -67,6 +68,7 @@ get_receive_goods = _with_uow(ReceiveGoodsUseCase)
 get_write_off = _with_uow(WriteOffUseCase)
 get_transfer = _with_uow(TransferUseCase)
 get_stocktake = _with_uow(StocktakeUseCase)
+get_create_warehouse = _with_uow(CreateWarehouseUseCase)
 get_create_sale = _with_uow(CreateSaleUseCase)
 get_return_sale = _with_uow(ReturnSaleUseCase)
 get_issue_debt = _with_uow(IssueDebtUseCase)
@@ -98,6 +100,7 @@ ReceiveGoodsDep = Annotated[ReceiveGoodsUseCase, Depends(get_receive_goods)]
 WriteOffDep = Annotated[WriteOffUseCase, Depends(get_write_off)]
 TransferDep = Annotated[TransferUseCase, Depends(get_transfer)]
 StocktakeDep = Annotated[StocktakeUseCase, Depends(get_stocktake)]
+CreateWarehouseDep = Annotated[CreateWarehouseUseCase, Depends(get_create_warehouse)]
 CreateSaleDep = Annotated[CreateSaleUseCase, Depends(get_create_sale)]
 ReturnSaleDep = Annotated[ReturnSaleUseCase, Depends(get_return_sale)]
 IssueDebtDep = Annotated[IssueDebtUseCase, Depends(get_issue_debt)]

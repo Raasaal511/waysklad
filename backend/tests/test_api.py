@@ -353,6 +353,31 @@ async def test_inventory_write_off_and_stocktake_endpoints(client, owner_headers
     assert len(discrepancies) == 1
     assert Decimal(discrepancies[0]["delta"]) == Decimal("-5")  # получено 50 - списано 5 = 45, факт 40
 
+    response = await client.get("/api/inventory/stock", headers=owner_headers)
+    assert response.status_code == 200
+    stock = [i for i in response.json() if i["product_id"] == product_id]
+    assert len(stock) == 1
+    assert stock[0]["quantity"] == "40.000"
+
+
+async def test_warehouses_via_api(client, owner_headers):
+    response = await client.get("/api/inventory/warehouses", headers=owner_headers)
+    assert response.status_code == 200
+    warehouses = response.json()
+    assert len(warehouses) == 1  # основной склад создан при регистрации
+    assert warehouses[0]["name"] == "Основной склад"
+
+    response = await client.post(
+        "/api/inventory/warehouses",
+        headers=owner_headers,
+        json={"name": "Склад на Кадырова", "address": "ул. Кадырова, 12"},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["name"] == "Склад на Кадырова"
+
+    response = await client.get("/api/inventory/warehouses", headers=owner_headers)
+    assert len(response.json()) == 2
+
 
 async def test_order_full_lifecycle_via_api(client, owner_headers):
     response = await client.post(

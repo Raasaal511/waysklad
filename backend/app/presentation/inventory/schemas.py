@@ -1,13 +1,15 @@
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.application.inventory.common import LineInput
+from app.application.inventory.create_warehouse import CreateWarehouseCommand
 from app.application.inventory.receive_goods import ReceiveGoodsCommand
 from app.application.inventory.stocktake import StocktakeCommand, StocktakeResult
 from app.application.inventory.transfer import TransferCommand
 from app.application.inventory.write_off import WriteOffCommand
-from app.domain.inventory.entities import StockDocType, StockDocument
+from app.domain.identity.entities import Warehouse
+from app.domain.inventory.entities import StockDocType, StockDocument, StockItem
 
 
 class LineRequest(BaseModel):
@@ -65,6 +67,38 @@ class StocktakeRequest(_DocumentRequest):
     def to_command(self) -> StocktakeCommand:
         return StocktakeCommand(
             warehouse_id=self.warehouse_id, lines=self._lines(), note=self.note
+        )
+
+
+class WarehouseCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    address: str = ""
+
+    def to_command(self) -> CreateWarehouseCommand:
+        return CreateWarehouseCommand(name=self.name, address=self.address)
+
+
+class WarehouseResponse(BaseModel):
+    id: int
+    name: str
+    address: str
+
+    @classmethod
+    def from_entity(cls, warehouse: Warehouse) -> "WarehouseResponse":
+        return cls(id=warehouse.id, name=warehouse.name, address=warehouse.address)
+
+
+class StockItemResponse(BaseModel):
+    product_id: int
+    variant_id: int | None
+    warehouse_id: int
+    quantity: Decimal
+
+    @classmethod
+    def from_entity(cls, item: StockItem) -> "StockItemResponse":
+        return cls(
+            product_id=item.product_id, variant_id=item.variant_id,
+            warehouse_id=item.warehouse_id, quantity=item.quantity,
         )
 
 

@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Protocol
 
-from app.domain.inventory.entities import StockDocument
+from app.domain.inventory.entities import StockDocument, StockItem
 
 
 class IStockRepository(Protocol):
@@ -12,6 +12,10 @@ class IStockRepository(Protocol):
     ) -> Decimal:
         """Изменить остаток, вернуть новое значение. Отрицательный итог допустим
         только при накате офлайн-очереди («сервер прав, продажи докатываются»)."""
+        ...
+
+    async def list_all(self) -> list[StockItem]:
+        """Все ненулевые остатки по всем складам/товарам — для экрана «Остатки»."""
         ...
 
 

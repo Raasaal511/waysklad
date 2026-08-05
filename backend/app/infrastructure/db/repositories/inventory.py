@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
-from app.domain.inventory.entities import StockDocument
+from app.domain.inventory.entities import StockDocument, StockItem
 from app.domain.inventory.repository import IStockDocumentRepository, IStockRepository
 from app.infrastructure.db.mappers.inventory import StockDocumentMapper
 from app.infrastructure.db.models.inventory import StockDocumentModel, StockItemModel
@@ -33,6 +33,23 @@ class SqlAlchemyStockRepository(SqlAlchemyRepository, IStockRepository):
             item.quantity = item.quantity + delta
         await self._session.flush()
         return item.quantity
+
+    async def list_all(self) -> list[StockItem]:
+        models = (
+            await self._session.execute(
+                select(StockItemModel).where(
+                    StockItemModel.tenant_id == self._tenant,
+                    StockItemModel.quantity != 0,
+                )
+            )
+        ).scalars()
+        return [
+            StockItem(
+                product_id=m.product_id, warehouse_id=m.warehouse_id,
+                quantity=m.quantity, variant_id=m.variant_id,
+            )
+            for m in models
+        ]
 
     async def _get_item(
         self, product_id: int, warehouse_id: int, variant_id: int | None, for_update: bool
