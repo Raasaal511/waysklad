@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile
 
+from app.application.products.import_excel import ImportProductsCommand
 from app.application.products.set_product_photo import SetProductPhotoCommand
 from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Product
@@ -7,12 +8,14 @@ from app.presentation.deps import (
     ActorDep,
     CreateProductDep,
     CreateUnitDep,
+    ImportProductsDep,
     SetProductPhotoDep,
     ShowPurchaseDep,
     UowDep,
     UpdateProductDep,
 )
 from app.presentation.products.schemas import (
+    ImportProductsResponse,
     ProductCreateRequest,
     ProductResponse,
     ProductUpdateRequest,
@@ -29,6 +32,10 @@ def _maybe(product: Product | None, show_purchase: bool) -> ProductResponse | No
 
 async def _photo_command(product_id: int, file: UploadFile) -> SetProductPhotoCommand:
     return SetProductPhotoCommand(product_id, file.filename or "photo.jpg", await file.read())
+
+
+async def _import_command(file: UploadFile) -> ImportProductsCommand:
+    return ImportProductsCommand(await file.read())
 
 
 @router.post("", status_code=201)
@@ -64,6 +71,14 @@ async def set_product_photo(
 ) -> ProductResponse:
     product = await use_case.execute(actor, await _photo_command(product_id, file))
     return ProductResponse.from_entity(product, show_purchase)
+
+
+@router.post("/import", status_code=201)
+async def import_products(
+    actor: ActorDep, file: UploadFile, use_case: ImportProductsDep
+) -> ImportProductsResponse:
+    result = await use_case.execute(actor, await _import_command(file))
+    return ImportProductsResponse.from_result(result)
 
 
 @router.post("/units", status_code=201)

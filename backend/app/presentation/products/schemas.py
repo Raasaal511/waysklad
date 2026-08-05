@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.application.products.create_product import CreateProductCommand, VariantInput
 from app.application.products.create_unit import CreateUnitCommand
+from app.application.products.import_excel import ImportProductsResult, RowError
 from app.application.products.update_product import (
     UpdateProductCommand,
     UpdateVariantInput,
@@ -101,6 +102,27 @@ class UnitResponse(BaseModel):
     @classmethod
     def from_entity(cls, unit: Unit) -> "UnitResponse":
         return cls(code=unit.code, name=unit.name, fractional=unit.fractional)
+
+
+class RowErrorResponse(BaseModel):
+    row: int
+    message: str
+
+    @classmethod
+    def from_entity(cls, error: RowError) -> "RowErrorResponse":
+        return cls(row=error.row, message=error.message)
+
+
+class ImportProductsResponse(BaseModel):
+    created: int
+    errors: list[RowErrorResponse]
+
+    @classmethod
+    def from_result(cls, result: ImportProductsResult) -> "ImportProductsResponse":
+        return cls(
+            created=result.created,
+            errors=[RowErrorResponse.from_entity(e) for e in result.errors],
+        )
 
 
 class VariantResponse(BaseModel):

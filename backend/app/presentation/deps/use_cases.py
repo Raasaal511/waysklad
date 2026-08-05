@@ -18,6 +18,7 @@ from app.application.orders.change_status import ChangeOrderStatusUseCase
 from app.application.orders.create_order import CreateOrderUseCase
 from app.application.products.create_product import CreateProductUseCase
 from app.application.products.create_unit import CreateUnitUseCase
+from app.application.products.import_excel import ImportProductsUseCase
 from app.application.products.set_product_photo import SetProductPhotoUseCase
 from app.application.products.update_product import UpdateProductUseCase
 from app.application.sales.create_sale import CreateSaleUseCase
@@ -51,6 +52,7 @@ def get_set_product_photo(uow: UowDep, storage: FileStorageDep) -> SetProductPho
 get_create_product = _with_uow(CreateProductUseCase)
 get_update_product = _with_uow(UpdateProductUseCase)
 get_create_unit = _with_uow(CreateUnitUseCase)
+get_import_products = _with_uow(ImportProductsUseCase)
 get_receive_goods = _with_uow(ReceiveGoodsUseCase)
 get_write_off = _with_uow(WriteOffUseCase)
 get_transfer = _with_uow(TransferUseCase)
@@ -71,6 +73,7 @@ CreateEmployeeDep = Annotated[CreateEmployeeUseCase, Depends(get_create_employee
 CreateProductDep = Annotated[CreateProductUseCase, Depends(get_create_product)]
 UpdateProductDep = Annotated[UpdateProductUseCase, Depends(get_update_product)]
 CreateUnitDep = Annotated[CreateUnitUseCase, Depends(get_create_unit)]
+ImportProductsDep = Annotated[ImportProductsUseCase, Depends(get_import_products)]
 SetProductPhotoDep = Annotated[SetProductPhotoUseCase, Depends(get_set_product_photo)]
 ReceiveGoodsDep = Annotated[ReceiveGoodsUseCase, Depends(get_receive_goods)]
 WriteOffDep = Annotated[WriteOffUseCase, Depends(get_write_off)]
