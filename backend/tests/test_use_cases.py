@@ -50,6 +50,11 @@ from app.application.sales.create_sale import (
     CreateSaleUseCase,
     SaleItemInput,
 )
+from app.application.sales.return_sale import (
+    ReturnItemInput,
+    ReturnSaleCommand,
+    ReturnSaleUseCase,
+)
 from app.domain.common.exceptions import (
     AccessDeniedError,
     DomainError,
@@ -414,6 +419,152 @@ async def test_sale_change_calculation(make_uow, registered_shop, warehouse_id, 
         ),
     )
     assert result.change == Money.of("750")
+
+
+async def test_return_sale_restocks_and_computes_refund(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Платье")
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("10"))],
+        ),
+    )
+    sale_result = await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("3"), price=Decimal("250"))],
+        ),
+    )
+    sale_line_id = sale_result.sale.lines[0].id
+
+    return_result = await ReturnSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReturnSaleCommand(
+            sale_id=sale_result.sale.id,
+            items=[ReturnItemInput(sale_line_id=sale_line_id, quantity=Decimal("2"))],
+        ),
+    )
+    assert return_result.refund == Money.of("500")
+
+    async with make_uow(tenant_id) as uow:
+        assert await uow.stock.get(product.id, warehouse_id) == Decimal("9")  # 10 - 3 + 2
+
+
+async def test_return_sale_reduces_linked_debt(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Куртка")
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("5"))],
+        ),
+    )
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Ахмед", debt_limit=Decimal("10000"))
+    )
+    sale_result = await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CREDIT,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("2"), price=Decimal("1000"))],
+            client_id=client.id,
+        ),
+    )
+    sale_line_id = sale_result.sale.lines[0].id
+
+    await ReturnSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReturnSaleCommand(
+            sale_id=sale_result.sale.id,
+            items=[ReturnItemInput(sale_line_id=sale_line_id, quantity=Decimal("1"))],
+        ),
+    )
+
+    async with make_uow(tenant_id) as uow:
+        debts = await uow.debts.list_by_client(client.id)
+        assert debts[0].balance == Money.of("1000")  # было 2000, возврат на 1000 уменьшил долг
+
+
+async def test_return_sale_rejects_quantity_over_remaining(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Тарелка")
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("10"))],
+        ),
+    )
+    sale_result = await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("2"), price=Decimal("100"))],
+        ),
+    )
+    sale_line_id = sale_result.sale.lines[0].id
+
+    await ReturnSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReturnSaleCommand(
+            sale_id=sale_result.sale.id,
+            items=[ReturnItemInput(sale_line_id=sale_line_id, quantity=Decimal("1"))],
+        ),
+    )
+    with pytest.raises(DomainError):
+        await ReturnSaleUseCase(make_uow(tenant_id)).execute(
+            owner,
+            ReturnSaleCommand(
+                sale_id=sale_result.sale.id,
+                items=[ReturnItemInput(sale_line_id=sale_line_id, quantity=Decimal("2"))],
+            ),
+        )
+
+
+async def test_storekeeper_cannot_return_sale(
+    make_uow, hasher, registered_shop, warehouse_id, create_product, random_phone
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Обувь")
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("5"))],
+        ),
+    )
+    sale_result = await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("100"))],
+        ),
+    )
+    storekeeper = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner, CreateEmployeeCommand("Руслан", random_phone(), "secret123", Role.STOREKEEPER)
+    )
+    with pytest.raises(AccessDeniedError):
+        await ReturnSaleUseCase(make_uow(tenant_id)).execute(
+            Actor(id=storekeeper.id, role=storekeeper.role),
+            ReturnSaleCommand(
+                sale_id=sale_result.sale.id,
+                items=[ReturnItemInput(sale_line_id=sale_result.sale.lines[0].id, quantity=Decimal("1"))],
+            ),
+        )
 
 
 async def test_write_off_reduces_stock(make_uow, registered_shop, warehouse_id, create_product):

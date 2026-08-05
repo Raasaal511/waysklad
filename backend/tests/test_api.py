@@ -141,6 +141,140 @@ async def test_full_trading_flow(client, owner_headers):
     assert "Духи" in response.json()["detail"]
 
 
+async def test_sale_return_via_api(client, owner_headers, random_phone):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Платье летнее", "purchase_price": "1000", "retail_price": "2000"},
+    )
+    product = response.json()
+
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product["id"], "quantity": "10"}]},
+    )
+
+    response = await client.post(
+        "/api/sales",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1,
+            "payment_method": "cash",
+            "items": [{"product_id": product["id"], "quantity": "3", "price": "2000"}],
+        },
+    )
+    sale = response.json()
+    sale_line_id = sale["lines"][0]["id"]
+
+    response = await client.post(
+        f"/api/sales/{sale['id']}/returns",
+        headers=owner_headers,
+        json={"items": [{"sale_line_id": sale_line_id, "quantity": "1"}], "note": "не подошло"},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["refund"] == "2000.00"
+
+    # остаток теперь 8 (10 получено - 3 продано + 1 возвращено): продадим весь остаток, чтобы проверить
+    response = await client.post(
+        "/api/sales",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1,
+            "payment_method": "cash",
+            # было 10, продано 3, возвращено 1 → остаток 8
+            "items": [{"product_id": product["id"], "quantity": "8", "price": "2000"}],
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    # перевозврат: продано 3, уже возвращён 1 → доступно к возврату 2, просим 3
+    response = await client.post(
+        f"/api/sales/{sale['id']}/returns",
+        headers=owner_headers,
+        json={"items": [{"sale_line_id": sale_line_id, "quantity": "3"}]},
+    )
+    assert response.status_code == 400
+
+    # кладовщику возврат недоступен
+    response = await client.post(
+        "/api/auth/employees",
+        headers=owner_headers,
+        json={
+            "name": "Руслан", "phone": random_phone(), "password": "secret123",
+            "role": "storekeeper",
+        },
+    )
+    login = await client.post(
+        "/api/auth/login",
+        json={"phone": response.json()["phone"], "password": "secret123"},
+    )
+    storekeeper_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    response = await client.post(
+        f"/api/sales/{sale['id']}/returns",
+        headers=storekeeper_headers,
+        json={"items": [{"sale_line_id": sale_line_id, "quantity": "1"}]},
+    )
+    assert response.status_code == 403
+
+
+async def test_sale_receipt_via_api(client, owner_headers):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Мёд горный", "purchase_price": "400", "retail_price": "700"},
+    )
+    product = response.json()
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product["id"], "quantity": "5"}]},
+    )
+
+    # продажа без клиента — ссылки на WhatsApp быть не должно
+    response = await client.post(
+        "/api/sales",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1,
+            "payment_method": "cash",
+            "items": [{"product_id": product["id"], "quantity": "1", "price": "700"}],
+        },
+    )
+    sale_id = response.json()["id"]
+
+    response = await client.get(f"/api/sales/{sale_id}/receipt", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    receipt = response.json()
+    assert "Мёд горный" in receipt["text"]
+    assert "Итого: 700.00 ₽" in receipt["text"]
+    assert receipt["whatsapp_link"] is None
+
+    # продажа клиенту с телефоном — ссылка должна появиться
+    response = await client.post(
+        "/api/counterparties/clients",
+        headers=owner_headers,
+        json={"name": "Ахмед", "whatsapp": "+79280001122"},
+    )
+    client_id = response.json()["id"]
+    response = await client.post(
+        "/api/sales",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1,
+            "payment_method": "cash",
+            "items": [{"product_id": product["id"], "quantity": "1", "price": "700"}],
+            "client_id": client_id,
+        },
+    )
+    sale_id = response.json()["id"]
+
+    response = await client.get(f"/api/sales/{sale_id}/receipt", headers=owner_headers)
+    receipt = response.json()
+    assert receipt["whatsapp_link"].startswith("https://wa.me/79280001122?text=")
+    assert "Клиент: Ахмед" in receipt["text"]
+
+
 async def test_inventory_write_off_and_stocktake_endpoints(client, owner_headers):
     response = await client.post(
         "/api/products",
