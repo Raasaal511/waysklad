@@ -1,5 +1,6 @@
 from sqlalchemy import select
 
+from app.domain.common.exceptions import NotFoundError
 from app.domain.common.quantity import UNITS
 from app.domain.identity.entities import Tenant, User, Warehouse
 from app.domain.identity.repository import (
@@ -31,6 +32,14 @@ class SqlAlchemyTenantRepository(SqlAlchemyRepository, ITenantRepository):
             )
         await self._session.flush()
         return tenant
+
+    async def get(self, tenant_id: int) -> Tenant:
+        model = (
+            await self._session.execute(select(TenantModel).where(TenantModel.id == tenant_id))
+        ).scalar_one_or_none()
+        if model is None:
+            raise NotFoundError(f"Магазин {tenant_id} не найден")
+        return TenantMapper.to_entity(model)
 
     async def get_by_slug(self, slug: str) -> Tenant | None:
         model = (
