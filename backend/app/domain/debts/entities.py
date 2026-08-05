@@ -23,17 +23,27 @@ class InstallmentPayment:
 
 @dataclass
 class Debt:
-    """Запись долговой книги: «запиши на меня»."""
+    """Запись долговой книги: «запиши на меня» (клиент) либо «взяли под долг» (поставщик).
+
+    Ровно один из client_id/supplier_id — кому мы должны или кто должен нам.
+    """
 
     id: int | None
-    client_id: int
     amount: Money
     issued_at: date
+    client_id: int | None = None
+    supplier_id: int | None = None
     due_date: date | None = None  # «обещал вернуть до…»
     sale_id: int | None = None
     note: str = ""
     schedule: list[InstallmentPayment] = field(default_factory=list)
     repayments: list[Repayment] = field(default_factory=list)
+
+    def validate(self) -> None:
+        if (self.client_id is None) == (self.supplier_id is None):
+            raise DomainError(
+                "Долг должен относиться либо к клиенту, либо к поставщику — не к обоим и не ни к одному"
+            )
 
     @property
     def repaid(self) -> Money:
@@ -56,3 +66,10 @@ class Debt:
         if amount > self.balance:
             raise OverRepaymentError("Погашение больше остатка долга")
         self.repayments.append(Repayment(amount, on))
+
+
+def total_balance(debts: list[Debt]) -> Money:
+    total = Money.zero()
+    for debt in debts:
+        total = total + debt.balance
+    return total

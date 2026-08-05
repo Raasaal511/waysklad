@@ -7,7 +7,7 @@ from app.domain.common.exceptions import DomainError, InsufficientStockError
 from app.domain.common.money import Money
 from app.domain.common.quantity import Quantity
 from app.domain.common.uow import IUnitOfWork
-from app.domain.debts.entities import Debt
+from app.domain.debts.entities import Debt, total_balance
 from app.domain.identity.permissions import Actor, Permission, require
 from app.domain.sales.entities import Sale, SaleLine
 from app.domain.sales.payment import PaymentMethod
@@ -87,15 +87,15 @@ class CreateSaleUseCase:
             await uow.sales.add(sale)
 
             if sale.payment_method is PaymentMethod.CREDIT:
-                await uow.debts.add(
-                    Debt(
-                        id=None,
-                        client_id=sale.client_id,
-                        amount=sale.total,
-                        issued_at=date.today(),
-                        sale_id=sale.id,
-                    )
+                debt = Debt(
+                    id=None,
+                    client_id=sale.client_id,
+                    amount=sale.total,
+                    issued_at=date.today(),
+                    sale_id=sale.id,
                 )
+                debt.validate()
+                await uow.debts.add(debt)
 
             change = (
                 sale.change_for(Money.of(cmd.cash_received))
@@ -118,9 +118,7 @@ class CreateSaleUseCase:
         client = await uow.clients.get(sale.client_id)
         if client.debt_limit is None:
             return
-        balance = sale.total
-        for debt in await uow.debts.list_by_client(client.id):
-            balance = balance + debt.balance
+        balance = sale.total + total_balance(await uow.debts.list_by_client(client.id))
         if balance > client.debt_limit:
             raise DomainError(
                 f"Превышен лимит долга клиента «{client.name}»: "

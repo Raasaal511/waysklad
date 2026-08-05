@@ -6,7 +6,7 @@ from app.domain.audit.entities import AuditEntry
 from app.domain.common.exceptions import DomainError
 from app.domain.common.money import Money
 from app.domain.common.uow import IUnitOfWork
-from app.domain.debts.entities import Debt
+from app.domain.debts.entities import Debt, total_balance
 from app.domain.identity.permissions import Actor, Permission, require
 
 
@@ -33,25 +33,23 @@ class IssueDebtUseCase:
         async with self._uow as uow:
             client = await uow.clients.get(cmd.client_id)
             if client.debt_limit is not None:
-                balance = amount
-                for debt in await uow.debts.list_by_client(client.id):
-                    balance = balance + debt.balance
+                balance = amount + total_balance(await uow.debts.list_by_client(client.id))
                 if balance > client.debt_limit:
                     raise DomainError(
                         f"Превышен лимит долга клиента «{client.name}»: "
                         f"{balance} при лимите {client.debt_limit}"
                     )
 
-            debt = await uow.debts.add(
-                Debt(
-                    id=None,
-                    client_id=cmd.client_id,
-                    amount=amount,
-                    issued_at=date.today(),
-                    due_date=cmd.due_date,
-                    note=cmd.note,
-                )
+            debt = Debt(
+                id=None,
+                client_id=cmd.client_id,
+                amount=amount,
+                issued_at=date.today(),
+                due_date=cmd.due_date,
+                note=cmd.note,
             )
+            debt.validate()
+            debt = await uow.debts.add(debt)
             await uow.audit.add(
                 AuditEntry.record(
                     actor, "debt.issue", debt.id,

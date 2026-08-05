@@ -1,19 +1,26 @@
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Date, ForeignKey, Numeric, Text
+from sqlalchemy import CheckConstraint, Date, ForeignKey, Numeric, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.db.models.base import Base, TenantMixin, TimestampMixin
 
 
 class DebtModel(Base, TenantMixin, TimestampMixin):
-    """Запись долговой книги: «запиши на меня»."""
+    """Запись долговой книги: «запиши на меня» (клиент) либо «взяли под долг» (поставщик)."""
 
     __tablename__ = "debts"
+    __table_args__ = (
+        CheckConstraint(
+            "(client_id IS NOT NULL) != (supplier_id IS NOT NULL)",
+            name="ck_debts_one_counterparty",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), index=True)
+    supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), index=True)
     sale_id: Mapped[int | None] = mapped_column(ForeignKey("sales.id"))  # долг из продажи
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     issued_at: Mapped[date] = mapped_column(Date)

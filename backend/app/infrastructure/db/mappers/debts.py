@@ -13,6 +13,7 @@ class DebtMapper:
         return DebtModel(
             tenant_id=tenant_id,
             client_id=debt.client_id,
+            supplier_id=debt.supplier_id,
             sale_id=debt.sale_id,
             amount=debt.amount.amount,
             issued_at=debt.issued_at,
@@ -35,6 +36,7 @@ class DebtMapper:
         return Debt(
             id=model.id,
             client_id=model.client_id,
+            supplier_id=model.supplier_id,
             amount=Money(model.amount),
             issued_at=model.issued_at,
             due_date=model.due_date,

@@ -75,6 +75,16 @@ class SqlAlchemyDebtRepository(SqlAlchemyRepository, IDebtRepository):
         ).scalars().all()
         return [DebtMapper.to_entity(m) for m in models]
 
+    async def list_by_supplier(self, supplier_id: int) -> list[Debt]:
+        models = (
+            await self._session.execute(
+                select(DebtModel)
+                .where(DebtModel.tenant_id == self._tenant, DebtModel.supplier_id == supplier_id)
+                .order_by(DebtModel.issued_at)
+            )
+        ).scalars().all()
+        return [DebtMapper.to_entity(m) for m in models]
+
     async def list_due(self, on: date) -> list[Debt]:
         models = (
             await self._session.execute(

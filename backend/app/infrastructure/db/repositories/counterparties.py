@@ -52,6 +52,18 @@ class SqlAlchemySupplierRepository(SqlAlchemyRepository, ISupplierRepository):
         supplier.id = model.id
         return supplier
 
+    async def get(self, supplier_id: int) -> Supplier:
+        model = (
+            await self._session.execute(
+                select(SupplierModel).where(
+                    SupplierModel.tenant_id == self._tenant, SupplierModel.id == supplier_id
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            raise NotFoundError(f"Поставщик {supplier_id} не найден")
+        return SupplierMapper.to_entity(model)
+
     async def list(self) -> list[Supplier]:
         models = (
             await self._session.execute(
