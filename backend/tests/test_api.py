@@ -673,3 +673,64 @@ async def test_seller_permissions_via_api(client, owner_headers, random_phone):
     assert products[0]["purchase_price"] is None
     assert products[0]["margin"] is None
     assert products[0]["retail_price"] == "2000.00"
+
+
+async def test_analytics_endpoints_via_api(client, owner_headers, random_phone):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Товар аналитики", "purchase_price": "100", "retail_price": "200"},
+    )
+    product_id = response.json()["id"]
+
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1,
+            "lines": [{"product_id": product_id, "quantity": "5", "cost": "100"}],
+        },
+    )
+    response = await client.post(
+        "/api/sales",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1,
+            "payment_method": "cash",
+            "items": [{"product_id": product_id, "quantity": "2", "price": "200"}],
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    response = await client.get("/api/analytics/dashboard", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    dashboard = response.json()
+    assert dashboard["today"]["sales_count"] == 1
+    assert dashboard["today"]["revenue"] == "400.00"
+    assert dashboard["today"]["profit"] == "200.00"
+
+    response = await client.get("/api/analytics/top-products", headers=owner_headers)
+    assert response.status_code == 200
+    assert response.json()[0]["product_name"] == "Товар аналитики"
+
+    response = await client.get("/api/analytics/stock-value", headers=owner_headers)
+    assert response.status_code == 200
+    assert response.json()["total_value"] == "300.00"  # 3 осталось * 100
+
+    response = await client.get("/api/analytics/dead-stock?stale_days=0", headers=owner_headers)
+    assert response.status_code == 200
+    assert response.json() == []  # только что продавался
+
+    seller_phone = random_phone()
+    await client.post(
+        "/api/auth/employees",
+        headers=owner_headers,
+        json={"name": "Продавец", "phone": seller_phone, "password": "secret123", "role": "seller"},
+    )
+    login = await client.post(
+        "/api/auth/login", json={"phone": seller_phone, "password": "secret123"}
+    )
+    seller_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    response = await client.get("/api/analytics/dashboard", headers=seller_headers)
+    assert response.status_code == 403

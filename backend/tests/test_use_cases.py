@@ -1,10 +1,23 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from io import BytesIO
 
 import openpyxl
 import pytest
+from sqlalchemy import select
 
+from app.application.analytics.dashboard import GetDashboardUseCase
+from app.application.analytics.dead_stock import (
+    DeadStockQuery,
+    GetDeadStockUseCase,
+    GetStockValueUseCase,
+)
+from app.application.analytics.top_products import (
+    CategoryProfitQuery,
+    GetCategoryProfitUseCase,
+    GetTopProductsUseCase,
+    TopProductsQuery,
+)
 from app.application.auth.create_employee import CreateEmployeeCommand, CreateEmployeeUseCase
 from app.application.auth.login import LoginCommand, LoginUseCase
 from app.application.auth.register_shop import RegisterShopCommand, RegisterShopUseCase
@@ -71,7 +84,9 @@ from app.domain.identity.permissions import Actor
 from app.domain.inventory.entities import StockDocType
 from app.domain.orders.entities import OrderStatus
 from app.domain.sales.payment import PaymentMethod
+from app.infrastructure.db.models.identity import TenantModel
 from app.infrastructure.files import LocalFileStorage
+from app.infrastructure.telegram import _send_summaries_async
 
 
 async def test_register_login_and_wrong_password(make_uow, hasher, registered_shop):
@@ -840,3 +855,184 @@ async def test_order_lifecycle(make_uow, registered_shop, create_product):
         await ChangeOrderStatusUseCase(make_uow(tenant_id)).execute(
             owner, ChangeOrderStatusCommand(order.id, OrderStatus.ISSUED)
         )
+
+
+async def test_dashboard_counts_sales_and_profit(
+    make_uow, registered_shop, warehouse_id, create_product, hasher
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(
+        tenant_id, name="Товар", purchase_price=Money.of("150"), retail_price=Money.of("250")
+    )
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("10"), cost=Decimal("150"))],
+        ),
+    )
+    await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("2"), price=Decimal("250"))],
+        ),
+    )
+
+    dashboard = await GetDashboardUseCase(make_uow(tenant_id)).execute(owner)
+    assert dashboard.today.sales_count == 1
+    assert dashboard.today.revenue == Decimal("500")
+    assert dashboard.today.profit == Decimal("200")  # (250-150)*2
+    assert dashboard.month.sales_count == 1
+
+    seller = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner, CreateEmployeeCommand(name="Продавец", phone="+79280001122",
+                                      password="secret123", role=Role.SELLER)
+    )
+    with pytest.raises(AccessDeniedError):
+        await GetDashboardUseCase(make_uow(tenant_id)).execute(
+            Actor(id=seller.id, role=seller.role)
+        )
+
+
+async def test_top_products_and_category_profit(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    popular = await create_product(
+        tenant_id, name="Хит продаж", purchase_price=Money.of("100"), retail_price=Money.of("200")
+    )
+    rare = await create_product(
+        tenant_id, name="Редкий товар", purchase_price=Money.of("50"), retail_price=Money.of("80")
+    )
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[
+                LineInput(product_id=popular.id, quantity=Decimal("20"), cost=Decimal("100")),
+                LineInput(product_id=rare.id, quantity=Decimal("20"), cost=Decimal("50")),
+            ],
+        ),
+    )
+    await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[
+                SaleItemInput(product_id=popular.id, quantity=Decimal("5"), price=Decimal("200")),
+                SaleItemInput(product_id=rare.id, quantity=Decimal("1"), price=Decimal("80")),
+            ],
+        ),
+    )
+
+    now = datetime.now(timezone.utc)
+    period = (now - timedelta(days=1), now + timedelta(days=1))
+
+    top = await GetTopProductsUseCase(make_uow(tenant_id)).execute(
+        owner, TopProductsQuery(date_from=period[0], date_to=period[1])
+    )
+    assert top[0].product_name == "Хит продаж"
+    assert top[0].quantity_sold == Decimal("5")
+
+    profit_by_category = await GetCategoryProfitUseCase(make_uow(tenant_id)).execute(
+        owner, CategoryProfitQuery(date_from=period[0], date_to=period[1])
+    )
+    assert len(profit_by_category) == 1  # оба товара без категории — одна группа
+    assert profit_by_category[0].category_id is None
+    assert profit_by_category[0].profit == Decimal("530")  # (200-100)*5 + (80-50)*1
+
+
+async def test_dead_stock_and_stock_value(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    stale = await create_product(
+        tenant_id, name="Залежался", purchase_price=Money.of("100"), retail_price=Money.of("150")
+    )
+    fresh = await create_product(
+        tenant_id, name="Свежий", purchase_price=Money.of("50"), retail_price=Money.of("90")
+    )
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[
+                LineInput(product_id=stale.id, quantity=Decimal("3"), cost=Decimal("100")),
+                LineInput(product_id=fresh.id, quantity=Decimal("4"), cost=Decimal("50")),
+            ],
+        ),
+    )
+    await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=fresh.id, quantity=Decimal("1"), price=Decimal("90"))],
+        ),
+    )
+
+    dead_stock = await GetDeadStockUseCase(make_uow(tenant_id)).execute(
+        owner, DeadStockQuery(stale_days=0)
+    )
+    dead_names = {item.product_name for item in dead_stock}
+    assert "Залежался" in dead_names  # никогда не продавался, остаток есть
+    assert "Свежий" not in dead_names  # продавался только что
+
+    stock_value = await GetStockValueUseCase(make_uow(tenant_id)).execute(owner)
+    values = {item.product_name: item.value for item in stock_value}
+    assert values["Залежался"] == Decimal("300")  # 3 * 100
+    assert values["Свежий"] == Decimal("150")  # 3 (осталось) * 50
+
+
+async def test_telegram_daily_summary(
+    make_uow, registered_shop, warehouse_id, create_product, db_session_factory, monkeypatch
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(
+        tenant_id, name="Товар", purchase_price=Money.of("100"), retail_price=Money.of("200")
+    )
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("5"), cost=Decimal("100"))],
+        ),
+    )
+    await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("200"))],
+        ),
+    )
+
+    async with db_session_factory() as session:
+        model = (
+            await session.execute(select(TenantModel).where(TenantModel.id == tenant_id))
+        ).scalar_one()
+        model.owner_telegram_chat_id = "12345"
+        await session.commit()
+
+    monkeypatch.setattr(
+        "app.infrastructure.telegram.SqlAlchemyUnitOfWork",
+        lambda tid: make_uow(tid) if tid is not None else make_uow(None),
+    )
+
+    sent = []
+
+    class FakeNotifier:
+        def send(self, chat_id: str, text: str) -> None:
+            sent.append((chat_id, text))
+
+    await _send_summaries_async(FakeNotifier())
+
+    assert len(sent) == 1
+    chat_id, text = sent[0]
+    assert chat_id == "12345"
+    assert "Продаж: 1" in text
+    assert "Выручка: 200" in text
+    assert "Прибыль: 100" in text
