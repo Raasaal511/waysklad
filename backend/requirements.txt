@@ -5,6 +5,7 @@ anyio==4.14.2
 bcrypt==5.0.0
 certifi==2026.7.22
 click==8.4.2
+et_xmlfile==2.0.0
 fastapi==0.141.1
 greenlet==3.5.4
 h11==0.16.0
@@ -15,6 +16,7 @@ idna==3.18
 iniconfig==2.3.0
 Mako==1.3.12
 MarkupSafe==3.0.3
+openpyxl==3.1.5
 packaging==26.2
 phonenumbers==9.0.36
 pluggy==1.6.0
