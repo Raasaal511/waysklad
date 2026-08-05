@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from app.domain.common.uow import IUnitOfWork
 from app.infrastructure.db.repositories.audit import SqlAlchemyAuditRepository
-from app.infrastructure.db.repositories.catalog import SqlAlchemyProductRepository
+from app.infrastructure.db.repositories.catalog import (
+    SqlAlchemyProductRepository,
+    SqlAlchemyUnitRepository,
+)
 from app.infrastructure.db.repositories.counterparties import (
     SqlAlchemyClientRepository,
     SqlAlchemySupplierRepository,
@@ -39,6 +42,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.users = SqlAlchemyUserRepository(self)
         self.warehouses = SqlAlchemyWarehouseRepository(self)
         self.products = SqlAlchemyProductRepository(self)
+        self.units = SqlAlchemyUnitRepository(self)
         self.clients = SqlAlchemyClientRepository(self)
         self.suppliers = SqlAlchemySupplierRepository(self)
         self.stock = SqlAlchemyStockRepository(self)

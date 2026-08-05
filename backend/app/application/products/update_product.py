@@ -6,7 +6,6 @@ from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Product, ProductVariant
 from app.domain.common.exceptions import DomainError
 from app.domain.common.money import Money
-from app.domain.common.quantity import UNITS
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Actor, Permission, require
 
@@ -41,33 +40,32 @@ class UpdateProductUseCase:
     async def execute(self, actor: Actor, cmd: UpdateProductCommand) -> Product:
         require(actor, Permission.PRODUCTS_MANAGE)
 
-        unit = UNITS.get(cmd.unit_code)
-        if unit is None:
-            raise DomainError(f"Неизвестная единица измерения: {cmd.unit_code}")
-
-        product = Product(
-            id=cmd.product_id,
-            name=cmd.name,
-            unit=unit,
-            purchase_price=Money.of(cmd.purchase_price),
-            retail_price=Money.of(cmd.retail_price),
-            sku=cmd.sku,
-            barcode=Barcode(cmd.barcode) if cmd.barcode else None,
-            category_id=cmd.category_id,
-            min_stock=cmd.min_stock,
-            photo=cmd.photo,
-            variants=[
-                ProductVariant(
-                    id=v.id,
-                    size=v.size,
-                    color=v.color,
-                    barcode=Barcode(v.barcode) if v.barcode else None,
-                )
-                for v in cmd.variants
-            ],
-        )
-
         async with self._uow as uow:
+            unit = await uow.units.get(cmd.unit_code)
+            if unit is None:
+                raise DomainError(f"Неизвестная единица измерения: {cmd.unit_code}")
+
+            product = Product(
+                id=cmd.product_id,
+                name=cmd.name,
+                unit=unit,
+                purchase_price=Money.of(cmd.purchase_price),
+                retail_price=Money.of(cmd.retail_price),
+                sku=cmd.sku,
+                barcode=Barcode(cmd.barcode) if cmd.barcode else None,
+                category_id=cmd.category_id,
+                min_stock=cmd.min_stock,
+                photo=cmd.photo,
+                variants=[
+                    ProductVariant(
+                        id=v.id,
+                        size=v.size,
+                        color=v.color,
+                        barcode=Barcode(v.barcode) if v.barcode else None,
+                    )
+                    for v in cmd.variants
+                ],
+            )
             await uow.products.save(product)
             await uow.audit.add(
                 AuditEntry.record(actor, "product.update", product.id, name=product.name)

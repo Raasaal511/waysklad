@@ -2,7 +2,19 @@ from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Product, ProductVariant
 from app.domain.common.money import Money
 from app.domain.common.quantity import Unit
-from app.infrastructure.db.models.catalog import ProductModel, ProductVariantModel
+from app.infrastructure.db.models.catalog import ProductModel, ProductVariantModel, UnitModel
+
+
+class UnitMapper:
+    @staticmethod
+    def to_orm(unit: Unit, tenant_id: int) -> UnitModel:
+        return UnitModel(
+            tenant_id=tenant_id, code=unit.code, name=unit.name, fractional=unit.fractional
+        )
+
+    @staticmethod
+    def to_entity(model: UnitModel) -> Unit:
+        return Unit(code=model.code, name=model.name, fractional=model.fractional)
 
 
 class ProductVariantMapper:

@@ -2,11 +2,39 @@ from sqlalchemy import or_, select
 
 from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Product
-from app.domain.catalog.repository import IProductRepository
+from app.domain.catalog.repository import IProductRepository, IUnitRepository
 from app.domain.common.exceptions import NotFoundError
-from app.infrastructure.db.mappers.catalog import ProductMapper, ProductVariantMapper
-from app.infrastructure.db.models.catalog import ProductModel, ProductVariantModel
+from app.domain.common.quantity import Unit
+from app.infrastructure.db.mappers.catalog import ProductMapper, ProductVariantMapper, UnitMapper
+from app.infrastructure.db.models.catalog import ProductModel, ProductVariantModel, UnitModel
 from app.infrastructure.db.repositories.base import SqlAlchemyRepository
+
+
+class SqlAlchemyUnitRepository(SqlAlchemyRepository, IUnitRepository):
+    async def add(self, unit: Unit) -> Unit:
+        self._session.add(UnitMapper.to_orm(unit, self._tenant))
+        await self._session.flush()
+        return unit
+
+    async def get(self, code: str) -> Unit | None:
+        model = (
+            await self._session.execute(
+                select(UnitModel).where(
+                    UnitModel.tenant_id == self._tenant, UnitModel.code == code
+                )
+            )
+        ).scalar_one_or_none()
+        return UnitMapper.to_entity(model) if model else None
+
+    async def list(self) -> list[Unit]:
+        models = (
+            await self._session.execute(
+                select(UnitModel)
+                .where(UnitModel.tenant_id == self._tenant)
+                .order_by(UnitModel.code)
+            )
+        ).scalars()
+        return [UnitMapper.to_entity(m) for m in models]
 
 
 class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
