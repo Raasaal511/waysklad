@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.domain.common.uow import IUnitOfWork
+from app.infrastructure.db.repositories.analytics import SqlAlchemyAnalyticsRepository
 from app.infrastructure.db.repositories.audit import SqlAlchemyAuditRepository
 from app.infrastructure.db.repositories.catalog import (
     SqlAlchemyProductRepository,
@@ -55,6 +56,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.debts = SqlAlchemyDebtRepository(self)
         self.orders = SqlAlchemyOrderRepository(self)
         self.audit = SqlAlchemyAuditRepository(self)
+        self.analytics = SqlAlchemyAnalyticsRepository(self)
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:

@@ -2,6 +2,12 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from app.application.analytics.dashboard import GetDashboardUseCase
+from app.application.analytics.dead_stock import GetDeadStockUseCase, GetStockValueUseCase
+from app.application.analytics.top_products import (
+    GetCategoryProfitUseCase,
+    GetTopProductsUseCase,
+)
 from app.application.auth.create_employee import CreateEmployeeUseCase
 from app.application.auth.login import LoginUseCase
 from app.application.auth.register_shop import RegisterShopUseCase
@@ -69,6 +75,11 @@ get_create_order = _with_uow(CreateOrderUseCase)
 get_change_order_status = _with_uow(ChangeOrderStatusUseCase)
 get_create_client = _with_uow(CreateClientUseCase)
 get_create_supplier = _with_uow(CreateSupplierUseCase)
+get_dashboard = _with_uow(GetDashboardUseCase)
+get_top_products = _with_uow(GetTopProductsUseCase)
+get_category_profit = _with_uow(GetCategoryProfitUseCase)
+get_dead_stock = _with_uow(GetDeadStockUseCase)
+get_stock_value = _with_uow(GetStockValueUseCase)
 
 # готовые зависимости для сигнатур роутов
 RegisterShopDep = Annotated[RegisterShopUseCase, Depends(get_register_shop)]
@@ -95,4 +106,9 @@ CreateOrderDep = Annotated[CreateOrderUseCase, Depends(get_create_order)]
 ChangeOrderStatusDep = Annotated[ChangeOrderStatusUseCase, Depends(get_change_order_status)]
 CreateClientDep = Annotated[CreateClientUseCase, Depends(get_create_client)]
 CreateSupplierDep = Annotated[CreateSupplierUseCase, Depends(get_create_supplier)]
+GetDashboardDep = Annotated[GetDashboardUseCase, Depends(get_dashboard)]
+GetTopProductsDep = Annotated[GetTopProductsUseCase, Depends(get_top_products)]
+GetCategoryProfitDep = Annotated[GetCategoryProfitUseCase, Depends(get_category_profit)]
+GetDeadStockDep = Annotated[GetDeadStockUseCase, Depends(get_dead_stock)]
+GetStockValueDep = Annotated[GetStockValueUseCase, Depends(get_stock_value)]
  

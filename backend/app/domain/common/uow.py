@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from app.domain.analytics.repository import IAnalyticsRepository
     from app.domain.audit.repository import IAuditRepository
     from app.domain.catalog.repository import IProductRepository, IUnitRepository
     from app.domain.counterparties.repository import IClientRepository, ISupplierRepository
@@ -42,6 +43,7 @@ class IUnitOfWork(ABC):
     debts: IDebtRepository
     orders: IOrderRepository
     audit: IAuditRepository
+    analytics: IAnalyticsRepository
 
     async def __aenter__(self) -> IUnitOfWork:
         return self
