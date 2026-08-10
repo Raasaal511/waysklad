@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 from app.domain.common.phone import Phone
@@ -32,6 +32,9 @@ class Warehouse:
     id: int | None
     name: str
     address: str = ""
+    # кладовщики (storekeeper), которым разрешена работа с этим складом;
+    # owner/manager имеют доступ ко всем складам вне зависимости от списка
+    assigned_user_ids: list[int] = field(default_factory=list)
 
 
 @dataclass

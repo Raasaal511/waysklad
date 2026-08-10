@@ -1,7 +1,7 @@
 from typing import Protocol
 
 from app.domain.catalog.barcode import Barcode
-from app.domain.catalog.entities import Product
+from app.domain.catalog.entities import Category, Product
 from app.domain.common.quantity import Unit
 
 
@@ -17,4 +17,10 @@ class IUnitRepository(Protocol):
     async def add(self, unit: Unit) -> Unit: ...
     async def get(self, code: str) -> Unit | None: ...
     async def list(self) -> list[Unit]: ...
+
+
+class ICategoryRepository(Protocol):
+    async def add(self, category: Category) -> Category: ...
+    async def get(self, category_id: int) -> Category: ...
+    async def list(self) -> list[Category]: ...
 

@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.domain.analytics.repository import IAnalyticsRepository
     from app.domain.audit.repository import IAuditRepository
-    from app.domain.catalog.repository import IProductRepository, IUnitRepository
+    from app.domain.catalog.repository import (
+        ICategoryRepository,
+        IProductRepository,
+        IUnitRepository,
+    )
     from app.domain.counterparties.repository import IClientRepository, ISupplierRepository
     from app.domain.debts.repository import IDebtRepository
     from app.domain.identity.repository import (
@@ -34,6 +38,7 @@ class IUnitOfWork(ABC):
     warehouses: IWarehouseRepository
     products: IProductRepository
     units: IUnitRepository
+    categories: ICategoryRepository
     clients: IClientRepository
     suppliers: ISupplierRepository
     stock: IStockRepository

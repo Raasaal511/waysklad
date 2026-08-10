@@ -1,9 +1,10 @@
-import { api } from './client'
+import { api } from '../../shared/api/client'
 
 export interface Warehouse {
   id: number
   name: string
   address: string
+  assigned_user_ids: number[]
 }
 
 export interface StockItem {
@@ -32,8 +33,18 @@ export function listWarehouses() {
   return api.get<Warehouse[]>('/inventory/warehouses')
 }
 
-export function createWarehouse(input: { name: string; address?: string }) {
+export function createWarehouse(input: {
+  name: string
+  address?: string
+  assigned_user_ids?: number[]
+}) {
   return api.post<Warehouse>('/inventory/warehouses', input)
+}
+
+export function setWarehouseAssignments(warehouseId: number, userIds: number[]) {
+  return api.put<Warehouse>(`/inventory/warehouses/${warehouseId}/assignments`, {
+    user_ids: userIds,
+  })
 }
 
 export function listStock() {

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.application.inventory.common import LineInput, build_lines
+from app.application.inventory.common import LineInput, build_lines, require_warehouse_access
 from app.domain.audit.entities import AuditEntry
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Actor, Permission, require
@@ -22,6 +22,7 @@ class ReceiveGoodsUseCase:
         require(actor, Permission.STOCK_RECEIVE)
 
         async with self._uow as uow:
+            await require_warehouse_access(uow, actor, cmd.warehouse_id)
             document = StockDocument(
                 id=None,
                 type=StockDocType.RECEIPT,

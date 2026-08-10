@@ -1,8 +1,25 @@
 from app.domain.catalog.barcode import Barcode
-from app.domain.catalog.entities import Product, ProductVariant
+from app.domain.catalog.entities import Category, Product, ProductVariant
 from app.domain.common.money import Money
 from app.domain.common.quantity import Unit
-from app.infrastructure.db.models.catalog import ProductModel, ProductVariantModel, UnitModel
+from app.infrastructure.db.models.catalog import (
+    CategoryModel,
+    ProductModel,
+    ProductVariantModel,
+    UnitModel,
+)
+
+
+class CategoryMapper:
+    @staticmethod
+    def to_orm(category: Category, tenant_id: int) -> CategoryModel:
+        return CategoryModel(
+            tenant_id=tenant_id, name=category.name, parent_id=category.parent_id
+        )
+
+    @staticmethod
+    def to_entity(model: CategoryModel) -> Category:
+        return Category(id=model.id, name=model.name, parent_id=model.parent_id)
 
 
 class UnitMapper:

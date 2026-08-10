@@ -1,9 +1,11 @@
 from pydantic import BaseModel, Field
 
+from app.application.auth.change_password import ChangePasswordCommand
 from app.application.auth.connect_telegram import ConnectTelegramCommand
 from app.application.auth.create_employee import CreateEmployeeCommand
 from app.application.auth.login import LoginCommand
 from app.application.auth.register_shop import RegisterShopCommand
+from app.application.auth.update_shop import UpdateShopCommand
 from app.domain.identity.entities import Role, Tenant, User
 
 
@@ -77,4 +79,21 @@ class TenantResponse(BaseModel):
         return cls(
             id=tenant.id, name=tenant.name,
             owner_telegram_chat_id=tenant.owner_telegram_chat_id,
+        )
+
+
+class UpdateShopRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+    def to_command(self) -> UpdateShopCommand:
+        return UpdateShopCommand(name=self.name)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=100)
+    new_password: str = Field(min_length=6, max_length=100)
+
+    def to_command(self) -> ChangePasswordCommand:
+        return ChangePasswordCommand(
+            current_password=self.current_password, new_password=self.new_password
         )

@@ -30,6 +30,7 @@ class CreateSaleCommand:
     client_id: int | None = None
     cash_received: Decimal | None = None  # для расчёта сдачи
     client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
+    debt_due_date: date | None = None  # «долг до» — обязателен при payment_method=CREDIT
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,9 @@ class CreateSaleUseCase:
             )
             sale.validate()
 
+            if sale.payment_method is PaymentMethod.CREDIT and cmd.debt_due_date is None:
+                raise DomainError("Для продажи в долг нужно указать срок «Долг до»")
+
             for line in sale.lines:
                 new_quantity = await uow.stock.change(
                     line.product_id, sale.warehouse_id, -line.quantity.value, line.variant_id
@@ -101,6 +105,7 @@ class CreateSaleUseCase:
                     client_id=sale.client_id,
                     amount=sale.total,
                     issued_at=date.today(),
+                    due_date=cmd.debt_due_date,
                     sale_id=sale.id,
                 )
                 debt.validate()

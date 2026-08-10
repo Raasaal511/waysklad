@@ -6,6 +6,7 @@ from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Product
 from app.presentation.deps import (
     ActorDep,
+    CreateCategoryDep,
     CreateProductDep,
     CreateUnitDep,
     ImportProductsDep,
@@ -15,6 +16,8 @@ from app.presentation.deps import (
     UpdateProductDep,
 )
 from app.presentation.products.schemas import (
+    CategoryCreateRequest,
+    CategoryResponse,
     ImportProductsResponse,
     ProductCreateRequest,
     ProductResponse,
@@ -92,6 +95,19 @@ async def create_unit(
 async def list_units(uow: UowDep) -> list[UnitResponse]:
     async with uow:
         return [UnitResponse.from_entity(u) for u in await uow.units.list()]
+
+
+@router.post("/categories", status_code=201)
+async def create_category(
+    body: CategoryCreateRequest, actor: ActorDep, use_case: CreateCategoryDep
+) -> CategoryResponse:
+    return CategoryResponse.from_entity(await use_case.execute(actor, body.to_command()))
+
+
+@router.get("/categories")
+async def list_categories(uow: UowDep) -> list[CategoryResponse]:
+    async with uow:
+        return [CategoryResponse.from_entity(c) for c in await uow.categories.list()]
 
 
 @router.get("")

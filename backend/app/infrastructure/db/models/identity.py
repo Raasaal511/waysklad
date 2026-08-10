@@ -1,5 +1,5 @@
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import String
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domain.identity.entities import Role
@@ -37,3 +37,15 @@ class UserModel(Base, TenantMixin, TimestampMixin):
     password_hash: Mapped[str] = mapped_column(String(200))
     role: Mapped[Role] = mapped_column(RoleColumn, default=Role.SELLER)
     is_active: Mapped[bool] = mapped_column(default=True)
+
+
+class WarehouseAssignmentModel(Base):
+    """Кто из кладовщиков (storekeeper) отвечает за какой склад — многие-ко-многим."""
+
+    __tablename__ = "warehouse_assignments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    warehouse_id: Mapped[int] = mapped_column(
+        ForeignKey("warehouses.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)

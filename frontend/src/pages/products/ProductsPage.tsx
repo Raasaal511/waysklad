@@ -1,6 +1,16 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { listProducts, createProduct, updateProduct, listUnits, type Product, type Unit } from '../../api/products'
-import { ApiError } from '../../api/client'
+import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react'
+import { listProducts, createProduct, updateProduct, listUnits, type Product, type Unit } from '../../entities/product/api'
+import { ApiError } from '../../shared/api/client'
+import { Modal } from '../../shared/ui/Modal'
+import { Icon } from '../../shared/ui/icons/Icon'
+import { Button } from '../../shared/ui/Button'
+import { Select } from '../../shared/ui/Select'
+import { isBarcodeScannerSupported } from '../../entities/barcode/barcodeSupport'
+import { normalizeDecimalInput } from '../../shared/lib/format'
+
+const BarcodeScanner = lazy(() =>
+  import('../../entities/barcode/BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })),
+)
 
 export function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -32,7 +42,7 @@ export function ProductsPage() {
 
   function openCreate() {
     setEditing(null)
-    setShowForm((v) => !v)
+    setShowForm(true)
   }
 
   function openEdit(product: Product) {
@@ -40,28 +50,30 @@ export function ProductsPage() {
     setShowForm(true)
   }
 
+  function closeForm() {
+    setShowForm(false)
+    setEditing(null)
+  }
+
   return (
     <div className="stack">
       <div className="section-title">
         <h2>Товары</h2>
-        <button type="button" onClick={openCreate}>
-          {showForm && !editing ? 'Отмена' : '+ Товар'}
-        </button>
+        <Button onClick={openCreate}>
+          <Icon name="plus" size={16} /> Товар
+        </Button>
       </div>
 
       {showForm && (
-        <ProductForm
-          product={editing}
-          onDone={() => {
-            setShowForm(false)
-            setEditing(null)
-            load(query)
-          }}
-          onCancel={() => {
-            setShowForm(false)
-            setEditing(null)
-          }}
-        />
+        <Modal title={editing ? `Товар: ${editing.name}` : 'Новый товар'} onClose={closeForm}>
+          <ProductForm
+            product={editing}
+            onDone={() => {
+              closeForm()
+              load(query)
+            }}
+          />
+        </Modal>
       )}
 
       <form className="row" onSubmit={handleSearch}>
@@ -71,9 +83,9 @@ export function ProductsPage() {
           onChange={(e) => setQuery(e.target.value)}
           style={{ flex: 1 }}
         />
-        <button type="submit" className="secondary">
+        <Button type="submit" variant="secondary">
           Найти
-        </button>
+        </Button>
       </form>
 
       {error && <p className="error">{error}</p>}
@@ -116,14 +128,14 @@ export function ProductsPage() {
 function ProductForm({
   product,
   onDone,
-  onCancel,
 }: {
   product: Product | null
   onDone: () => void
-  onCancel: () => void
 }) {
   const [name, setName] = useState(product?.name ?? '')
   const [sku, setSku] = useState(product?.sku ?? '')
+  const [barcode, setBarcode] = useState(product?.barcode ?? '')
+  const [showScanner, setShowScanner] = useState(false)
   const [unitCode, setUnitCode] = useState(product?.unit_code ?? 'pcs')
   const [units, setUnits] = useState<Unit[]>([])
   const [purchasePrice, setPurchasePrice] = useState(product?.purchase_price ?? '')
@@ -144,6 +156,7 @@ function ProductForm({
       const payload = {
         name,
         sku,
+        barcode: barcode || null,
         unit_code: unitCode,
         purchase_price: purchasePrice || '0',
         retail_price: retailPrice || '0',
@@ -163,15 +176,7 @@ function ProductForm({
   }
 
   return (
-    <form className="form card card-full" onSubmit={handleSubmit}>
-      <div className="row between">
-        <h3>{product ? `Товар: ${product.name}` : 'Новый товар'}</h3>
-        {product && (
-          <button type="button" className="secondary" onClick={onCancel}>
-            Отмена
-          </button>
-        )}
-      </div>
+    <form className="form" onSubmit={handleSubmit}>
       <label className="field">
         Название
         <input value={name} onChange={(e) => setName(e.target.value)} required />
@@ -181,52 +186,88 @@ function ProductForm({
         <input value={sku} onChange={(e) => setSku(e.target.value)} />
       </label>
       <label className="field">
-        Единица измерения
-        <select value={unitCode} onChange={(e) => setUnitCode(e.target.value)}>
-          {units.length === 0 ? (
-            <option value={unitCode}>{unitCode}</option>
-          ) : (
-            units.map((u) => (
-              <option key={u.code} value={u.code}>
-                {u.name}
-              </option>
-            ))
+        Штрихкод
+        <div className="row">
+          <input
+            value={barcode ?? ''}
+            onChange={(e) => setBarcode(e.target.value)}
+            placeholder="Отсканируйте или введите вручную"
+            style={{ flex: 1 }}
+          />
+          {isBarcodeScannerSupported() && (
+            <Button variant="secondary" onClick={() => setShowScanner(true)}>
+              <Icon name="barcode" size={16} />
+            </Button>
           )}
-        </select>
+        </div>
+      </label>
+      {showScanner && (
+        <Modal title="Сканировать штрихкод" onClose={() => setShowScanner(false)}>
+          <Suspense fallback={<p className="text-muted">Загрузка сканера…</p>}>
+            <BarcodeScanner
+              onDetected={(code) => {
+                setBarcode(code)
+                setShowScanner(false)
+              }}
+              onClose={() => setShowScanner(false)}
+            />
+          </Suspense>
+        </Modal>
+      )}
+      <label className="field">
+        Единица измерения
+        <Select
+          value={unitCode}
+          onChange={setUnitCode}
+          options={
+            units.length === 0
+              ? [{ value: unitCode, label: unitCode }]
+              : units.map((u) => ({ value: u.code, label: u.name }))
+          }
+        />
       </label>
       <div className="row">
         <label className="field" style={{ flex: 1 }}>
           Закупочная цена
           <input
-            type="number"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
             value={purchasePrice}
-            onChange={(e) => setPurchasePrice(e.target.value)}
+            onChange={(e) => {
+              const normalized = normalizeDecimalInput(e.target.value)
+              if (normalized !== null) setPurchasePrice(normalized)
+            }}
           />
         </label>
         <label className="field" style={{ flex: 1 }}>
           Розничная цена
           <input
-            type="number"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
             value={retailPrice}
-            onChange={(e) => setRetailPrice(e.target.value)}
+            onChange={(e) => {
+              const normalized = normalizeDecimalInput(e.target.value)
+              if (normalized !== null) setRetailPrice(normalized)
+            }}
           />
         </label>
       </div>
       <label className="field">
         Минимальный остаток
         <input
-          type="number"
-          step="0.001"
+          type="text"
+          inputMode="decimal"
           value={minStock}
-          onChange={(e) => setMinStock(e.target.value)}
+          onChange={(e) => {
+            const normalized = normalizeDecimalInput(e.target.value)
+            if (normalized !== null) setMinStock(normalized)
+          }}
         />
       </label>
       {error && <p className="error">{error}</p>}
-      <button type="submit" disabled={saving}>
+      <Button type="submit" disabled={saving}>
         {saving ? 'Сохранение…' : product ? 'Сохранить изменения' : 'Создать товар'}
-      </button>
+      </Button>
     </form>
   )
 }

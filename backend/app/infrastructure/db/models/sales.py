@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import Enum as SAEnum, ForeignKey, Numeric, String, Text, UniqueConstraint
@@ -28,6 +29,8 @@ class SaleModel(Base, TenantMixin, TimestampMixin):
     discount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)  # снимок суммы чека
     client_op_id: Mapped[str | None] = mapped_column(String(64))
+    note: Mapped[str] = mapped_column(Text, default="")
+    deleted_at: Mapped[datetime | None] = mapped_column(default=None)
 
     lines: Mapped[list["SaleLineModel"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"

@@ -18,3 +18,7 @@ class IDebtRepository(Protocol):
     async def list_due(self, on: date) -> list[Debt]:
         """Долги со сроком на дату — для напоминаний «сегодня должны вернуть»."""
         ...
+
+    async def list_active(self) -> list[Debt]:
+        """Все незакрытые долги арендатора (клиентские и поставщические) — для общего списка."""
+        ...

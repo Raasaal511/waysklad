@@ -7,6 +7,7 @@ from app.domain.debts.entities import Debt
 from app.domain.debts.repository import IDebtRepository
 from app.infrastructure.db.mappers.debts import DebtMapper
 from app.infrastructure.db.models.debts import (
+    DebtExtensionModel,
     DebtInstallmentModel,
     DebtModel,
     DebtRepaymentModel,
@@ -41,6 +42,20 @@ class SqlAlchemyDebtRepository(SqlAlchemyRepository, IDebtRepository):
                     tenant_id=self._tenant,
                     amount=repayment.amount.amount,
                     paid_on=repayment.on,
+                    note=repayment.note,
+                    author_id=repayment.author_id,
+                )
+            )
+        # продления тоже только дописываются
+        for extension in debt.extensions[len(model.extensions):]:
+            model.extensions.append(
+                DebtExtensionModel(
+                    tenant_id=self._tenant,
+                    old_due_date=extension.old_due_date,
+                    new_due_date=extension.new_due_date,
+                    reason=extension.reason,
+                    author_id=extension.author_id,
+                    created_at=extension.created_at,
                 )
             )
         # график рассрочки заменяется целиком (delete-orphan удалит старый)
@@ -91,6 +106,16 @@ class SqlAlchemyDebtRepository(SqlAlchemyRepository, IDebtRepository):
                 select(DebtModel).where(
                     DebtModel.tenant_id == self._tenant, DebtModel.due_date == on
                 )
+            )
+        ).scalars().all()
+        return [debt for debt in map(DebtMapper.to_entity, models) if not debt.is_closed]
+
+    async def list_active(self) -> list[Debt]:
+        models = (
+            await self._session.execute(
+                select(DebtModel)
+                .where(DebtModel.tenant_id == self._tenant)
+                .order_by(DebtModel.due_date.asc().nulls_last(), DebtModel.issued_at)
             )
         ).scalars().all()
         return [debt for debt in map(DebtMapper.to_entity, models) if not debt.is_closed]

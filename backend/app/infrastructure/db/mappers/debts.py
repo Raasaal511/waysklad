@@ -1,6 +1,7 @@
 from app.domain.common.money import Money
-from app.domain.debts.entities import Debt, InstallmentPayment, Repayment
+from app.domain.debts.entities import Debt, DebtExtension, InstallmentPayment, Repayment
 from app.infrastructure.db.models.debts import (
+    DebtExtensionModel,
     DebtInstallmentModel,
     DebtModel,
     DebtRepaymentModel,
@@ -26,8 +27,25 @@ class DebtMapper:
                 for p in debt.schedule
             ],
             repayments=[
-                DebtRepaymentModel(tenant_id=tenant_id, amount=r.amount.amount, paid_on=r.on)
+                DebtRepaymentModel(
+                    tenant_id=tenant_id,
+                    amount=r.amount.amount,
+                    paid_on=r.on,
+                    note=r.note,
+                    author_id=r.author_id,
+                )
                 for r in debt.repayments
+            ],
+            extensions=[
+                DebtExtensionModel(
+                    tenant_id=tenant_id,
+                    old_due_date=e.old_due_date,
+                    new_due_date=e.new_due_date,
+                    reason=e.reason,
+                    author_id=e.author_id,
+                    created_at=e.created_at,
+                )
+                for e in debt.extensions
             ],
         )
 
@@ -47,6 +65,17 @@ class DebtMapper:
                 for p in model.installments
             ],
             repayments=[
-                Repayment(amount=Money(r.amount), on=r.paid_on) for r in model.repayments
+                Repayment(amount=Money(r.amount), on=r.paid_on, note=r.note, author_id=r.author_id)
+                for r in model.repayments
+            ],
+            extensions=[
+                DebtExtension(
+                    old_due_date=e.old_due_date,
+                    new_due_date=e.new_due_date,
+                    reason=e.reason,
+                    author_id=e.author_id,
+                    created_at=e.created_at,
+                )
+                for e in model.extensions
             ],
         )

@@ -1,4 +1,4 @@
-import { api } from './client'
+import { api } from '../../shared/api/client'
 
 export type OrderStatus = 'new' | 'in_progress' | 'ready' | 'issued'
 

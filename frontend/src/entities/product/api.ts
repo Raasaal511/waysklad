@@ -1,4 +1,4 @@
-import { api } from './client'
+import { api } from '../../shared/api/client'
 
 export interface Variant {
   id: number
@@ -28,6 +28,20 @@ export interface Unit {
   fractional: boolean
 }
 
+export interface Category {
+  id: number
+  name: string
+  parent_id: number | null
+}
+
+export function listCategories() {
+  return api.get<Category[]>('/products/categories')
+}
+
+export function createCategory(input: { name: string; parent_id?: number | null }) {
+  return api.post<Category>('/products/categories', input)
+}
+
 export function listProducts(query = '') {
   const q = query ? `?query=${encodeURIComponent(query)}` : ''
   return api.get<Product[]>(`/products${q}`)
@@ -47,6 +61,10 @@ export function createProduct(input: {
 
 export function listUnits() {
   return api.get<Unit[]>('/products/units')
+}
+
+export function getByBarcode(barcode: string) {
+  return api.get<Product | null>(`/products/barcode/${encodeURIComponent(barcode)}`)
 }
 
 export function updateProduct(

@@ -42,6 +42,15 @@ class CreateProductUseCase:
             if unit is None:
                 raise DomainError(f"Неизвестная единица измерения: {cmd.unit_code}")
 
+            barcodes = [cmd.barcode, *(v.barcode for v in cmd.variants)]
+            non_empty = [b for b in barcodes if b]
+            if len(non_empty) != len(set(non_empty)):
+                raise DomainError("Штрихкоды товара и его вариантов не должны повторяться")
+            for value in non_empty:
+                existing = await uow.products.get_by_barcode(Barcode(value))
+                if existing is not None:
+                    raise DomainError(f"Штрихкод «{value}» уже используется товаром «{existing.name}»")
+
             product = Product(
                 id=None,
                 name=cmd.name,

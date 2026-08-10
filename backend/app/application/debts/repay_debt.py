@@ -14,6 +14,7 @@ class RepayDebtCommand:
     debt_id: int
     amount: Decimal
     paid_on: date | None = None  # по умолчанию — сегодня
+    note: str = ""
 
 
 class RepayDebtUseCase:
@@ -25,7 +26,12 @@ class RepayDebtUseCase:
 
         async with self._uow as uow:
             debt = await uow.debts.get(cmd.debt_id)
-            debt.repay(Money.of(cmd.amount), on=cmd.paid_on or date.today())
+            debt.repay(
+                Money.of(cmd.amount),
+                on=cmd.paid_on or date.today(),
+                note=cmd.note,
+                author_id=actor.id,
+            )
             await uow.debts.save(debt)
             await uow.audit.add(
                 AuditEntry.record(

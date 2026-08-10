@@ -24,6 +24,8 @@ class Permission(StrEnum):
 
     SALES_CREATE = "sales.create"
     SALES_RETURN = "sales.return"
+    SALES_EDIT = "sales.edit"  # правка клиента/заметки задним числом
+    SALES_DELETE = "sales.delete"  # полный возврат + аннулирование долга — только владелец/управляющий
 
     DEBTS_VIEW = "debts.view"
     DEBTS_MANAGE = "debts.manage"
@@ -84,6 +86,8 @@ _MANAGER = _SELLER | _STOREKEEPER | {
     Permission.PRODUCTS_MANAGE,
     Permission.WAREHOUSES_MANAGE,
     Permission.USERS_MANAGE,  # но создавать может только продавцов/кладовщиков/аналитиков
+    Permission.SALES_EDIT,
+    Permission.SALES_DELETE,
 }
 
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {

@@ -4,6 +4,7 @@ from app.domain.common.uow import IUnitOfWork
 from app.infrastructure.db.repositories.analytics import SqlAlchemyAnalyticsRepository
 from app.infrastructure.db.repositories.audit import SqlAlchemyAuditRepository
 from app.infrastructure.db.repositories.catalog import (
+    SqlAlchemyCategoryRepository,
     SqlAlchemyProductRepository,
     SqlAlchemyUnitRepository,
 )
@@ -47,6 +48,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.warehouses = SqlAlchemyWarehouseRepository(self)
         self.products = SqlAlchemyProductRepository(self)
         self.units = SqlAlchemyUnitRepository(self)
+        self.categories = SqlAlchemyCategoryRepository(self)
         self.clients = SqlAlchemyClientRepository(self)
         self.suppliers = SqlAlchemySupplierRepository(self)
         self.stock = SqlAlchemyStockRepository(self)

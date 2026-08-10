@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 
 from app.domain.common.exceptions import (
     AccessDeniedError,
@@ -21,3 +22,11 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def domain_error(request: Request, exc: DomainError) -> JSONResponse:
         # все остальные нарушения бизнес-правил, включая InsufficientStockError
         return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+    @app.exception_handler(IntegrityError)
+    async def integrity_error(request: Request, exc: IntegrityError) -> JSONResponse:
+        # запасной барьер на случай гонки — основные конфликты (например,
+        # дублирующийся штрихкод) уже отлавливаются явной проверкой в use case
+        return JSONResponse(
+            status_code=409, content={"detail": "Нарушение уникальности данных — проверьте вводимые значения"}
+        )

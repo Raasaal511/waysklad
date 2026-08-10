@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from app.application.inventory.common import LineInput
 from app.application.inventory.create_warehouse import CreateWarehouseCommand
 from app.application.inventory.receive_goods import ReceiveGoodsCommand
+from app.application.inventory.set_warehouse_assignments import SetWarehouseAssignmentsCommand
 from app.application.inventory.stocktake import StocktakeCommand, StocktakeResult
 from app.application.inventory.transfer import TransferCommand
 from app.application.inventory.write_off import WriteOffCommand
@@ -73,19 +74,33 @@ class StocktakeRequest(_DocumentRequest):
 class WarehouseCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     address: str = ""
+    assigned_user_ids: list[int] = Field(default_factory=list)
 
     def to_command(self) -> CreateWarehouseCommand:
-        return CreateWarehouseCommand(name=self.name, address=self.address)
+        return CreateWarehouseCommand(
+            name=self.name, address=self.address, assigned_user_ids=self.assigned_user_ids
+        )
+
+
+class WarehouseAssignmentsRequest(BaseModel):
+    user_ids: list[int] = Field(default_factory=list)
+
+    def to_command(self, warehouse_id: int) -> SetWarehouseAssignmentsCommand:
+        return SetWarehouseAssignmentsCommand(warehouse_id=warehouse_id, user_ids=self.user_ids)
 
 
 class WarehouseResponse(BaseModel):
     id: int
     name: str
     address: str
+    assigned_user_ids: list[int]
 
     @classmethod
     def from_entity(cls, warehouse: Warehouse) -> "WarehouseResponse":
-        return cls(id=warehouse.id, name=warehouse.name, address=warehouse.address)
+        return cls(
+            id=warehouse.id, name=warehouse.name, address=warehouse.address,
+            assigned_user_ids=warehouse.assigned_user_ids,
+        )
 
 
 class StockItemResponse(BaseModel):

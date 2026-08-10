@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import type { TokenResponse, User } from '../api/auth'
+import type { TokenResponse, User } from '../entities/auth/api'
 
 interface AuthState {
   user: User | null

@@ -1,13 +1,55 @@
 from sqlalchemy import or_, select
 
 from app.domain.catalog.barcode import Barcode
-from app.domain.catalog.entities import Product
-from app.domain.catalog.repository import IProductRepository, IUnitRepository
+from app.domain.catalog.entities import Category, Product
+from app.domain.catalog.repository import ICategoryRepository, IProductRepository, IUnitRepository
 from app.domain.common.exceptions import NotFoundError
 from app.domain.common.quantity import Unit
-from app.infrastructure.db.mappers.catalog import ProductMapper, ProductVariantMapper, UnitMapper
-from app.infrastructure.db.models.catalog import ProductModel, ProductVariantModel, UnitModel
+from app.infrastructure.db.mappers.catalog import (
+    CategoryMapper,
+    ProductMapper,
+    ProductVariantMapper,
+    UnitMapper,
+)
+from app.infrastructure.db.models.catalog import (
+    CategoryModel,
+    ProductModel,
+    ProductVariantModel,
+    UnitModel,
+)
 from app.infrastructure.db.repositories.base import SqlAlchemyRepository
+
+
+class SqlAlchemyCategoryRepository(SqlAlchemyRepository, ICategoryRepository):
+    async def add(self, category: Category) -> Category:
+        model = CategoryMapper.to_orm(category, self._tenant)
+        self._session.add(model)
+        await self._session.flush()
+        category.id = model.id
+        return category
+
+    async def get(self, category_id: int) -> Category:
+        model = (
+            await self._session.execute(
+                select(CategoryModel).where(
+                    CategoryModel.tenant_id == self._tenant,
+                    CategoryModel.id == category_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            raise NotFoundError(f"Категория {category_id} не найдена")
+        return CategoryMapper.to_entity(model)
+
+    async def list(self) -> list[Category]:
+        models = (
+            await self._session.execute(
+                select(CategoryModel)
+                .where(CategoryModel.tenant_id == self._tenant)
+                .order_by(CategoryModel.name)
+            )
+        ).scalars()
+        return [CategoryMapper.to_entity(m) for m in models]
 
 
 class SqlAlchemyUnitRepository(SqlAlchemyRepository, IUnitRepository):

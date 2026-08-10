@@ -104,6 +104,27 @@ async def test_full_trading_flow(client, owner_headers):
     product = response.json()
     assert product["purchase_price"] == "150.00"  # владелец видит закупочную
 
+    response = await client.get("/api/products/barcode/4600000000017", headers=owner_headers)
+    assert response.status_code == 200
+    assert response.json()["id"] == product["id"]
+
+    response = await client.get("/api/products/barcode/0000000000000", headers=owner_headers)
+    assert response.status_code == 200
+    assert response.json() is None
+
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={
+            "name": "Другой товар с тем же ШК",
+            "unit_code": "pcs",
+            "purchase_price": "10",
+            "retail_price": "20",
+            "barcode": "4600000000017",
+        },
+    )
+    assert response.status_code == 400
+
     # склад создан при регистрации — id всегда 1 на чистой схеме теста
     response = await client.post(
         "/api/inventory/receive",
@@ -146,6 +167,7 @@ async def test_full_trading_flow(client, owner_headers):
             "payment_method": "credit",
             "items": [{"product_id": product["id"], "quantity": "3", "price": "250"}],
             "client_id": client_id,
+            "debt_due_date": str(date.today() + timedelta(days=7)),
         },
     )
     assert response.status_code == 201
@@ -377,6 +399,85 @@ async def test_warehouses_via_api(client, owner_headers):
 
     response = await client.get("/api/inventory/warehouses", headers=owner_headers)
     assert len(response.json()) == 2
+
+
+async def test_storekeeper_limited_to_assigned_warehouse_via_api(
+    client, owner_headers, random_phone
+):
+    # заводим кладовщика и второй склад, назначаем его только на второй склад
+    response = await client.post(
+        "/api/auth/employees",
+        headers=owner_headers,
+        json={
+            "name": "Руслан", "phone": random_phone(), "password": "secret123",
+            "role": "storekeeper",
+        },
+    )
+    storekeeper_id = response.json()["id"]
+
+    login = await client.post(
+        "/api/auth/login",
+        json={"phone": response.json()["phone"], "password": "secret123"},
+    )
+    storekeeper_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    warehouses = (await client.get("/api/inventory/warehouses", headers=owner_headers)).json()
+    main_warehouse_id = warehouses[0]["id"]
+
+    response = await client.post(
+        "/api/inventory/warehouses",
+        headers=owner_headers,
+        json={"name": "Склад Б", "assigned_user_ids": [storekeeper_id]},
+    )
+    assert response.status_code == 201, response.text
+    second_warehouse = response.json()
+    assert second_warehouse["assigned_user_ids"] == [storekeeper_id]
+
+    # кладовщик видит только назначенный склад
+    response = await client.get("/api/inventory/warehouses", headers=storekeeper_headers)
+    assert [w["id"] for w in response.json()] == [second_warehouse["id"]]
+
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Кирпич", "purchase_price": "10", "retail_price": "15"},
+        )
+    ).json()
+
+    # приёмка на назначенный склад — можно
+    response = await client.post(
+        "/api/inventory/receive",
+        headers=storekeeper_headers,
+        json={
+            "warehouse_id": second_warehouse["id"],
+            "lines": [{"product_id": product["id"], "quantity": "10"}],
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    # приёмка на чужой (не назначенный) склад — запрещена
+    response = await client.post(
+        "/api/inventory/receive",
+        headers=storekeeper_headers,
+        json={
+            "warehouse_id": main_warehouse_id,
+            "lines": [{"product_id": product["id"], "quantity": "10"}],
+        },
+    )
+    assert response.status_code == 403
+
+    # владелец меняет назначения — снимает кладовщика со склада
+    response = await client.put(
+        f"/api/inventory/warehouses/{second_warehouse['id']}/assignments",
+        headers=owner_headers,
+        json={"user_ids": []},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["assigned_user_ids"] == []
+
+    response = await client.get("/api/inventory/warehouses", headers=storekeeper_headers)
+    assert response.json() == []
 
 
 async def test_order_full_lifecycle_via_api(client, owner_headers):

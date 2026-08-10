@@ -55,5 +55,10 @@ class WarehouseMapper:
         )
 
     @staticmethod
-    def to_entity(model: WarehouseModel) -> Warehouse:
-        return Warehouse(id=model.id, name=model.name, address=model.address)
+    def to_entity(model: WarehouseModel, assigned_user_ids: list[int] | None = None) -> Warehouse:
+        return Warehouse(
+            id=model.id,
+            name=model.name,
+            address=model.address,
+            assigned_user_ids=assigned_user_ids or [],
+        )

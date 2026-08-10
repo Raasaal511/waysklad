@@ -24,3 +24,17 @@ class SqlAlchemyAuditRepository(SqlAlchemyRepository, IAuditRepository):
             )
         ).scalars().all()
         return [AuditMapper.to_entity(m) for m in models]
+
+    async def list_by_entity(self, entity: str, entity_id: int) -> list[AuditEntry]:
+        models = (
+            await self._session.execute(
+                select(AuditLogModel)
+                .where(
+                    AuditLogModel.tenant_id == self._tenant,
+                    AuditLogModel.entity == entity,
+                    AuditLogModel.entity_id == entity_id,
+                )
+                .order_by(AuditLogModel.id.desc())
+            )
+        ).scalars().all()
+        return [AuditMapper.to_entity(m) for m in models]

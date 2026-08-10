@@ -1,4 +1,4 @@
-import { api } from './client'
+import { api } from '../../shared/api/client'
 
 export interface PeriodTotals {
   sales_count: number

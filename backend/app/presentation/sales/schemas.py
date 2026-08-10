@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel
@@ -8,11 +8,13 @@ from app.application.sales.create_sale import (
     CreateSaleResult,
     SaleItemInput,
 )
+from app.application.sales.edit_sale import EditSaleCommand
 from app.application.sales.return_sale import (
     ReturnItemInput,
     ReturnSaleCommand,
     ReturnSaleResult,
 )
+from app.domain.sales.entities import Sale
 from app.domain.sales.payment import PaymentMethod
 
 
@@ -31,6 +33,7 @@ class SaleCreateRequest(BaseModel):
     client_id: int | None = None
     cash_received: Decimal | None = None
     client_op_id: str | None = None  # id операции с устройства — для повтора из офлайн-очереди
+    debt_due_date: date | None = None  # «долг до» — обязателен при payment_method=credit
 
     def to_command(self) -> CreateSaleCommand:
         return CreateSaleCommand(
@@ -49,6 +52,7 @@ class SaleCreateRequest(BaseModel):
             client_id=self.client_id,
             cash_received=self.cash_received,
             client_op_id=self.client_op_id,
+            debt_due_date=self.debt_due_date,
         )
 
 
@@ -63,6 +67,8 @@ class SaleLineResponse(BaseModel):
 
 class SaleResponse(BaseModel):
     id: int
+    warehouse_id: int
+    seller_id: int
     payment_method: PaymentMethod
     subtotal: Decimal
     discount: Decimal
@@ -70,20 +76,33 @@ class SaleResponse(BaseModel):
     change: Decimal | None  # сдача
     client_id: int | None
     created_at: datetime
+    note: str
+    deleted_at: datetime | None
     lines: list[SaleLineResponse]
 
     @classmethod
     def from_result(cls, result: CreateSaleResult) -> "SaleResponse":
-        sale = result.sale
+        return cls._build(result.sale, result.change.amount if result.change else None)
+
+    @classmethod
+    def from_entity(cls, sale: Sale) -> "SaleResponse":
+        return cls._build(sale, None)
+
+    @classmethod
+    def _build(cls, sale: Sale, change: Decimal | None) -> "SaleResponse":
         return cls(
             id=sale.id,
+            warehouse_id=sale.warehouse_id,
+            seller_id=sale.seller_id,
             payment_method=sale.payment_method,
             subtotal=sale.subtotal.amount,
             discount=sale.discount.amount,
             total=sale.total.amount,
-            change=result.change.amount if result.change else None,
+            change=change,
             client_id=sale.client_id,
             created_at=sale.created_at,
+            note=sale.note,
+            deleted_at=sale.deleted_at,
             lines=[
                 SaleLineResponse(
                     id=line.id,
@@ -96,6 +115,14 @@ class SaleResponse(BaseModel):
                 for line in sale.lines
             ],
         )
+
+
+class SaleEditRequest(BaseModel):
+    client_id: int | None = None
+    note: str = ""
+
+    def to_command(self, sale_id: int) -> EditSaleCommand:
+        return EditSaleCommand(sale_id=sale_id, client_id=self.client_id, note=self.note)
 
 
 class ReturnItemRequest(BaseModel):

@@ -22,6 +22,7 @@ class SaleMapper:
             discount=sale.discount.amount,
             total=sale.total.amount,  # снимок суммы чека для аналитики
             client_op_id=sale.client_op_id,
+            note=sale.note,
             lines=[
                 SaleLineModel(
                     tenant_id=tenant_id,
@@ -46,6 +47,8 @@ class SaleMapper:
             client_id=model.client_id,
             created_at=model.created_at,
             client_op_id=model.client_op_id,
+            note=model.note,
+            deleted_at=model.deleted_at,
             lines=[
                 SaleLine(
                     id=line.id,

@@ -4,7 +4,7 @@ from io import BytesIO
 
 import openpyxl
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.application.analytics.dashboard import GetDashboardUseCase
 from app.application.analytics.dead_stock import (
@@ -39,9 +39,14 @@ from app.application.debts.issue_supplier_debt import (
     IssueSupplierDebtCommand,
     IssueSupplierDebtUseCase,
 )
+from app.application.debts.extend_debt import ExtendDebtCommand, ExtendDebtUseCase
 from app.application.debts.repay_debt import RepayDebtCommand, RepayDebtUseCase
 from app.application.inventory.common import LineInput
 from app.application.inventory.receive_goods import ReceiveGoodsCommand, ReceiveGoodsUseCase
+from app.application.inventory.set_warehouse_assignments import (
+    SetWarehouseAssignmentsCommand,
+    SetWarehouseAssignmentsUseCase,
+)
 from app.application.inventory.stocktake import StocktakeCommand, StocktakeUseCase
 from app.application.inventory.transfer import TransferCommand, TransferUseCase
 from app.application.inventory.write_off import WriteOffCommand, WriteOffUseCase
@@ -54,7 +59,11 @@ from app.application.orders.create_order import (
     CreateOrderUseCase,
     OrderItemInput,
 )
-from app.application.products.create_product import CreateProductCommand, CreateProductUseCase
+from app.application.products.create_product import (
+    CreateProductCommand,
+    CreateProductUseCase,
+    VariantInput,
+)
 from app.application.products.create_unit import CreateUnitCommand, CreateUnitUseCase
 from app.application.products.import_excel import ImportProductsCommand, ImportProductsUseCase
 from app.application.products.set_product_photo import (
@@ -67,18 +76,21 @@ from app.application.sales.create_sale import (
     CreateSaleUseCase,
     SaleItemInput,
 )
+from app.application.sales.delete_sale import DeleteSaleCommand, DeleteSaleUseCase
+from app.application.sales.edit_sale import EditSaleCommand, EditSaleUseCase
 from app.application.sales.return_sale import (
     ReturnItemInput,
     ReturnSaleCommand,
     ReturnSaleUseCase,
 )
+from app.domain.catalog.barcode import Barcode
 from app.domain.common.exceptions import (
     AccessDeniedError,
     DomainError,
     InsufficientStockError,
 )
 from app.domain.common.money import Money
-from app.domain.debts.entities import Debt, total_balance
+from app.domain.debts.entities import Debt, DebtStatus, total_balance
 from app.domain.identity.entities import Role, Warehouse
 from app.domain.identity.permissions import Actor
 from app.domain.inventory.entities import StockDocType
@@ -93,6 +105,7 @@ from app.application.sync.apply_offline_ops import (
 )
 from app.domain.sales.payment import PaymentMethod
 from app.infrastructure.db.models.identity import TenantModel
+from app.infrastructure.db.models.sales import SaleModel
 from app.infrastructure.files import LocalFileStorage
 from app.infrastructure.telegram import _send_summaries_async
 
@@ -258,6 +271,130 @@ async def test_create_product_rejects_unknown_unit_code(make_uow, registered_sho
         )
 
 
+async def test_create_product_rejects_duplicate_barcode(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    await CreateProductUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateProductCommand(
+            name="Первый товар", unit_code="pcs",
+            purchase_price=Decimal("100"), retail_price=Decimal("150"),
+            barcode="4600000000017",
+        ),
+    )
+
+    with pytest.raises(DomainError):
+        await CreateProductUseCase(make_uow(tenant_id)).execute(
+            owner,
+            CreateProductCommand(
+                name="Второй товар", unit_code="pcs",
+                purchase_price=Decimal("200"), retail_price=Decimal("300"),
+                barcode="4600000000017",
+            ),
+        )
+
+
+async def test_create_product_rejects_barcode_reused_across_own_variants(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    with pytest.raises(DomainError):
+        await CreateProductUseCase(make_uow(tenant_id)).execute(
+            owner,
+            CreateProductCommand(
+                name="Футболка", unit_code="pcs",
+                purchase_price=Decimal("300"), retail_price=Decimal("500"),
+                variants=[
+                    VariantInput(size="S", barcode="4600000000031"),
+                    VariantInput(size="M", barcode="4600000000031"),
+                ],
+            ),
+        )
+
+
+def test_barcode_accepts_alphanumeric_codes():
+    assert Barcode("4600000000017").value == "4600000000017"
+    assert Barcode("ABC-abc-123").value == "ABC-ABC-123"
+    assert Barcode(" code128-1 ").value == "CODE128-1"
+
+
+def test_barcode_rejects_invalid_values():
+    with pytest.raises(DomainError):
+        Barcode("ab")  # короче 4 символов
+    with pytest.raises(DomainError):
+        Barcode("has space")
+    with pytest.raises(DomainError):
+        Barcode("плохой_штрихкод")  # кириллица и подчёркивание не допускаются
+
+
+async def test_create_product_accepts_alphanumeric_barcode(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    product = await CreateProductUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateProductCommand(
+            name="Товар с внутренним кодом", unit_code="pcs",
+            purchase_price=Decimal("100"), retail_price=Decimal("150"),
+            barcode="ABC-123-45",
+        ),
+    )
+    assert product.barcode.value == "ABC-123-45"
+
+    async with make_uow(tenant_id) as uow:
+        result = await uow.products.get_by_barcode(Barcode("abc-123-45"))
+        assert result is not None
+        assert result.id == product.id
+
+
+async def test_update_product_rejects_duplicate_barcode_from_other_product(
+    make_uow, registered_shop, create_product
+):
+    tenant_id, _, owner = registered_shop
+    await CreateProductUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateProductCommand(
+            name="Товар А", unit_code="pcs",
+            purchase_price=Decimal("100"), retail_price=Decimal("150"),
+            barcode="4600000000048",
+        ),
+    )
+    product_b = await create_product(tenant_id, name="Товар Б")
+
+    with pytest.raises(DomainError):
+        await UpdateProductUseCase(make_uow(tenant_id)).execute(
+            owner,
+            UpdateProductCommand(
+                product_id=product_b.id,
+                name=product_b.name,
+                unit_code="pcs",
+                purchase_price=Decimal("100"),
+                retail_price=Decimal("150"),
+                barcode="4600000000048",
+            ),
+        )
+
+
+async def test_update_product_allows_keeping_its_own_barcode(make_uow, registered_shop, create_product):
+    tenant_id, _, owner = registered_shop
+    product = await CreateProductUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateProductCommand(
+            name="Товар с ШК", unit_code="pcs",
+            purchase_price=Decimal("100"), retail_price=Decimal("150"),
+            barcode="4600000000055",
+        ),
+    )
+
+    updated = await UpdateProductUseCase(make_uow(tenant_id)).execute(
+        owner,
+        UpdateProductCommand(
+            product_id=product.id,
+            name="Товар с ШК (обновлён)",
+            unit_code="pcs",
+            purchase_price=Decimal("100"),
+            retail_price=Decimal("150"),
+            barcode="4600000000055",
+        ),
+    )
+    assert updated.barcode.value == "4600000000055"
+
+
 def _build_workbook(rows: list[tuple]) -> bytes:
     workbook = openpyxl.Workbook()
     sheet = workbook.active
@@ -380,6 +517,7 @@ async def test_sale_flow_stock_and_credit_debt(
             payment_method=PaymentMethod.CREDIT,
             items=[SaleItemInput(product_id=product.id, quantity=Decimal("2"), price=Decimal("250"))],
             client_id=client.id,
+            debt_due_date=date.today() + timedelta(days=7),
         ),
     )
     assert result.sale.total == Money.of("500")
@@ -400,6 +538,7 @@ async def test_sale_flow_stock_and_credit_debt(
                 payment_method=PaymentMethod.CREDIT,
                 items=[SaleItemInput(product_id=product.id, quantity=Decimal("3"), price=Decimal("250"))],
                 client_id=client.id,
+                debt_due_date=date.today() + timedelta(days=7),
             ),
         )
 
@@ -506,6 +645,7 @@ async def test_return_sale_reduces_linked_debt(
             payment_method=PaymentMethod.CREDIT,
             items=[SaleItemInput(product_id=product.id, quantity=Decimal("2"), price=Decimal("1000"))],
             client_id=client.id,
+            debt_due_date=date.today() + timedelta(days=7),
         ),
     )
     sale_line_id = sale_result.sale.lines[0].id
@@ -592,6 +732,180 @@ async def test_storekeeper_cannot_return_sale(
                 sale_id=sale_result.sale.id,
                 items=[ReturnItemInput(sale_line_id=sale_result.sale.lines[0].id, quantity=Decimal("1"))],
             ),
+        )
+
+
+async def test_delete_sale_restocks_and_annuls_debt(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Сумка")
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("10"))],
+        ),
+    )
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Ахмед", debt_limit=Decimal("10000"))
+    )
+    sale_result = await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CREDIT,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("3"), price=Decimal("500"))],
+            client_id=client.id,
+            debt_due_date=date.today() + timedelta(days=7),
+        ),
+    )
+
+    async with make_uow(tenant_id) as uow:
+        assert await uow.stock.get(product.id, warehouse_id) == Decimal("7")  # 10 - 3
+
+    await DeleteSaleUseCase(make_uow(tenant_id)).execute(
+        owner, DeleteSaleCommand(sale_id=sale_result.sale.id)
+    )
+
+    async with make_uow(tenant_id) as uow:
+        assert await uow.stock.get(product.id, warehouse_id) == Decimal("10")  # остаток вернулся
+        debts = await uow.debts.list_by_client(client.id)
+        assert debts[0].balance == Money.zero()  # долг аннулирован
+        deleted_sale = await uow.sales.get(sale_result.sale.id)
+        assert deleted_sale.deleted_at is not None
+
+
+async def test_deleted_sale_excluded_from_list(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Ремень")
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("5"))],
+        ),
+    )
+    sale_result = await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("100"))],
+        ),
+    )
+    await DeleteSaleUseCase(make_uow(tenant_id)).execute(
+        owner, DeleteSaleCommand(sale_id=sale_result.sale.id)
+    )
+
+    async with make_uow(tenant_id) as uow:
+        sales = await uow.sales.list()
+        assert all(s.id != sale_result.sale.id for s in sales)
+
+
+async def test_seller_cannot_delete_sale(
+    make_uow, hasher, registered_shop, warehouse_id, create_product, random_phone
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Кепка")
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("5"))],
+        ),
+    )
+    sale_result = await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("100"))],
+        ),
+    )
+    seller = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner, CreateEmployeeCommand("Марат", random_phone(), "secret123", Role.SELLER)
+    )
+    with pytest.raises(AccessDeniedError):
+        await DeleteSaleUseCase(make_uow(tenant_id)).execute(
+            Actor(id=seller.id, role=seller.role),
+            DeleteSaleCommand(sale_id=sale_result.sale.id),
+        )
+
+
+async def test_edit_sale_updates_client_and_note(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Зонт")
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("5"))],
+        ),
+    )
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Заур", debt_limit=Decimal("10000"))
+    )
+    sale_result = await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("100"))],
+        ),
+    )
+
+    await EditSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        EditSaleCommand(sale_id=sale_result.sale.id, client_id=client.id, note="Забрал сам"),
+    )
+
+    async with make_uow(tenant_id) as uow:
+        sale = await uow.sales.get(sale_result.sale.id)
+        assert sale.client_id == client.id
+        assert sale.note == "Забрал сам"
+
+
+async def test_seller_cannot_edit_sale_after_window(
+    make_uow, hasher, registered_shop, warehouse_id, create_product, random_phone
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Шарф")
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("5"))],
+        ),
+    )
+    seller = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner, CreateEmployeeCommand("Ислам", random_phone(), "secret123", Role.SELLER)
+    )
+    sale_result = await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        Actor(id=seller.id, role=seller.role),
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("100"))],
+        ),
+    )
+
+    async with make_uow(tenant_id) as uow:
+        await uow.session.execute(
+            update(SaleModel)
+            .where(SaleModel.id == sale_result.sale.id)
+            .values(created_at=datetime.now(timezone.utc) - timedelta(hours=25))
+        )
+        await uow.commit()
+
+    with pytest.raises(AccessDeniedError):
+        await EditSaleUseCase(make_uow(tenant_id)).execute(
+            Actor(id=seller.id, role=seller.role),
+            EditSaleCommand(sale_id=sale_result.sale.id, client_id=None, note="поздно"),
         )
 
 
@@ -789,6 +1103,108 @@ async def test_create_installment_schedule_must_match_balance(make_uow, register
     assert len(updated.schedule) == 2
 
 
+async def test_extend_debt_records_history_and_changes_due_date(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Тимур")
+    )
+    original_due = date.today() + timedelta(days=3)
+    debt = await IssueDebtUseCase(make_uow(tenant_id)).execute(
+        owner,
+        IssueDebtCommand(client_id=client.id, amount=Decimal("1000"), due_date=original_due),
+    )
+
+    new_due = date.today() + timedelta(days=10)
+    updated = await ExtendDebtUseCase(make_uow(tenant_id)).execute(
+        owner, ExtendDebtCommand(debt_id=debt.id, new_due_date=new_due, reason="попросил ещё неделю"),
+    )
+    assert updated.due_date == new_due
+    assert len(updated.extensions) == 1
+    assert updated.extensions[0].old_due_date == original_due
+    assert updated.extensions[0].new_due_date == new_due
+    assert updated.extensions[0].reason == "попросил ещё неделю"
+    assert updated.extensions[0].author_id == owner.id
+
+
+async def test_extend_debt_fails_when_already_closed(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Рустам")
+    )
+    debt = await IssueDebtUseCase(make_uow(tenant_id)).execute(
+        owner, IssueDebtCommand(client_id=client.id, amount=Decimal("500")),
+    )
+    await RepayDebtUseCase(make_uow(tenant_id)).execute(
+        owner, RepayDebtCommand(debt_id=debt.id, amount=Decimal("500")),
+    )
+
+    with pytest.raises(DomainError):
+        await ExtendDebtUseCase(make_uow(tenant_id)).execute(
+            owner,
+            ExtendDebtCommand(debt_id=debt.id, new_due_date=date.today() + timedelta(days=5)),
+        )
+
+
+async def test_repay_debt_records_note_and_author(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Иса")
+    )
+    debt = await IssueDebtUseCase(make_uow(tenant_id)).execute(
+        owner, IssueDebtCommand(client_id=client.id, amount=Decimal("800")),
+    )
+
+    updated = await RepayDebtUseCase(make_uow(tenant_id)).execute(
+        owner,
+        RepayDebtCommand(debt_id=debt.id, amount=Decimal("300"), note="занёс наличкой"),
+    )
+    assert updated.repayments[-1].note == "занёс наличкой"
+    assert updated.repayments[-1].author_id == owner.id
+    assert updated.balance == Money.of("500")
+
+
+async def test_debt_status_transitions(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Магомед")
+    )
+
+    active = await IssueDebtUseCase(make_uow(tenant_id)).execute(
+        owner,
+        IssueDebtCommand(client_id=client.id, amount=Decimal("100"), due_date=date.today() + timedelta(days=30)),
+    )
+    assert active.status() == DebtStatus.ACTIVE
+
+    due_soon = await IssueDebtUseCase(make_uow(tenant_id)).execute(
+        owner,
+        IssueDebtCommand(client_id=client.id, amount=Decimal("100"), due_date=date.today() + timedelta(days=2)),
+    )
+    assert due_soon.status() == DebtStatus.DUE_SOON
+
+    overdue = await IssueDebtUseCase(make_uow(tenant_id)).execute(
+        owner,
+        IssueDebtCommand(client_id=client.id, amount=Decimal("100"), due_date=date.today() - timedelta(days=1)),
+    )
+    assert overdue.status() == DebtStatus.OVERDUE
+
+    partially_paid = await IssueDebtUseCase(make_uow(tenant_id)).execute(
+        owner,
+        IssueDebtCommand(client_id=client.id, amount=Decimal("100"), due_date=date.today() + timedelta(days=30)),
+    )
+    partially_paid = await RepayDebtUseCase(make_uow(tenant_id)).execute(
+        owner, RepayDebtCommand(debt_id=partially_paid.id, amount=Decimal("40")),
+    )
+    assert partially_paid.status() == DebtStatus.PARTIALLY_PAID
+
+    closed = await IssueDebtUseCase(make_uow(tenant_id)).execute(
+        owner, IssueDebtCommand(client_id=client.id, amount=Decimal("100")),
+    )
+    closed = await RepayDebtUseCase(make_uow(tenant_id)).execute(
+        owner, RepayDebtCommand(debt_id=closed.id, amount=Decimal("100")),
+    )
+    assert closed.status() == DebtStatus.CLOSED
+
+
 async def test_storekeeper_cannot_create_sale_but_can_receive_goods(
     make_uow, hasher, registered_shop, warehouse_id, create_product, random_phone
 ):
@@ -798,6 +1214,11 @@ async def test_storekeeper_cannot_create_sale_but_can_receive_goods(
         owner, CreateEmployeeCommand("Руслан", random_phone(), "secret123", Role.STOREKEEPER)
     )
     storekeeper_actor = Actor(id=storekeeper.id, role=storekeeper.role)
+
+    await SetWarehouseAssignmentsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        SetWarehouseAssignmentsCommand(warehouse_id=warehouse_id, user_ids=[storekeeper.id]),
+    )
 
     await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
         storekeeper_actor,

@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { login } from '../../api/auth'
-import { ApiError } from '../../api/client'
+import { login } from '../../entities/auth/api'
+import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
+import { Button } from '../../shared/ui/Button'
 
 export function LoginPage() {
   const auth = useAuth()
@@ -55,9 +56,9 @@ export function LoginPage() {
             />
           </label>
           {error && <p className="error">{error}</p>}
-          <button type="submit" disabled={loading}>
+          <Button type="submit" disabled={loading}>
             {loading ? 'Вход…' : 'Войти'}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

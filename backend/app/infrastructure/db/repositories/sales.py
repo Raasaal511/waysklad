@@ -47,6 +47,33 @@ class SqlAlchemySaleRepository(SqlAlchemyRepository, ISaleRepository):
         units = await self._product_unit_by_id({line.product_id for line in model.lines})
         return SaleMapper.to_entity(model, units)
 
+    async def list(self, limit: int = 100) -> list[Sale]:
+        models = (
+            await self._session.execute(
+                select(SaleModel)
+                .where(SaleModel.tenant_id == self._tenant, SaleModel.deleted_at.is_(None))
+                .order_by(SaleModel.created_at.desc())
+                .limit(limit)
+            )
+        ).scalars().all()
+        product_ids = {line.product_id for model in models for line in model.lines}
+        units = await self._product_unit_by_id(product_ids)
+        return [SaleMapper.to_entity(m, units) for m in models]
+
+    async def save(self, sale: Sale) -> None:
+        model = (
+            await self._session.execute(
+                select(SaleModel).where(
+                    SaleModel.tenant_id == self._tenant, SaleModel.id == sale.id
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            raise NotFoundError(f"Продажа {sale.id} не найдена")
+        model.client_id = sale.client_id
+        model.note = sale.note
+        model.deleted_at = sale.deleted_at
+
 
 class SqlAlchemySaleReturnRepository(SqlAlchemyRepository, ISaleReturnRepository):
     async def add(self, sale_return: SaleReturn) -> SaleReturn:

@@ -5,10 +5,16 @@ import {
   changeOrderStatus,
   type Order,
   type OrderStatus,
-} from '../../api/orders'
-import { listProducts, type Product } from '../../api/products'
-import { searchClients, type Client } from '../../api/counterparties'
-import { ApiError } from '../../api/client'
+} from '../../entities/order/api'
+import { listProducts, type Product } from '../../entities/product/api'
+import { searchClients, type Client } from '../../entities/counterparty/api'
+import { ApiError } from '../../shared/api/client'
+import { Modal } from '../../shared/ui/Modal'
+import { Icon } from '../../shared/ui/icons/Icon'
+import { Button } from '../../shared/ui/Button'
+import { Select } from '../../shared/ui/Select'
+import { DateInput } from '../../shared/ui/DateInput'
+import { normalizeDecimalInput } from '../../shared/lib/format'
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   new: 'Новый',
@@ -67,20 +73,22 @@ export function OrdersPage() {
     <div className="stack">
       <div className="section-title">
         <h2>Заказы</h2>
-        <button type="button" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? 'Отмена' : '+ Заказ'}
-        </button>
+        <Button onClick={() => setShowForm(true)}>
+          <Icon name="plus" size={16} /> Заказ
+        </Button>
       </div>
 
       {showForm && (
-        <NewOrderForm
-          products={products}
-          clients={clients}
-          onDone={() => {
-            setShowForm(false)
-            load()
-          }}
-        />
+        <Modal title="Новый заказ" onClose={() => setShowForm(false)}>
+          <NewOrderForm
+            products={products}
+            clients={clients}
+            onDone={() => {
+              setShowForm(false)
+              load()
+            }}
+          />
+        </Modal>
       )}
 
       {error && <p className="error">{error}</p>}
@@ -103,9 +111,9 @@ export function OrdersPage() {
               <div className="row">
                 <span className="badge accent">{STATUS_LABELS[o.status]}</span>
                 {NEXT_STATUS[o.status] && (
-                  <button type="button" className="secondary" onClick={() => advance(o)}>
+                  <Button variant="secondary" onClick={() => advance(o)}>
                     → {STATUS_LABELS[NEXT_STATUS[o.status]!]}
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -157,54 +165,65 @@ function NewOrderForm({
   }
 
   return (
-    <form className="form card card-full" onSubmit={handleSubmit}>
+    <form className="form" onSubmit={handleSubmit}>
       <label className="field">
         Клиент
-        <select value={clientId ?? ''} onChange={(e) => setClientId(Number(e.target.value))}>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+        <Select
+          value={clientId != null ? String(clientId) : ''}
+          onChange={(v) => setClientId(Number(v))}
+          options={clients.map((c) => ({ value: String(c.id), label: c.name }))}
+        />
       </label>
       <label className="field">
         Товар
-        <select value={productId ?? ''} onChange={(e) => setProductId(Number(e.target.value))}>
-          {products.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <Select
+          value={productId != null ? String(productId) : ''}
+          onChange={(v) => setProductId(Number(v))}
+          options={products.map((p) => ({ value: String(p.id), label: p.name }))}
+        />
       </label>
       <div className="row">
         <label className="field" style={{ flex: 1 }}>
           Количество
           <input
-            type="number"
-            step="0.001"
+            type="text"
+            inputMode="decimal"
             value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
+            onChange={(e) => {
+              const normalized = normalizeDecimalInput(e.target.value)
+              if (normalized !== null) setQuantity(normalized)
+            }}
           />
         </label>
         <label className="field" style={{ flex: 1 }}>
           Цена
-          <input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required />
+          <input
+            type="text"
+            inputMode="decimal"
+            value={price}
+            onChange={(e) => {
+              const normalized = normalizeDecimalInput(e.target.value)
+              if (normalized !== null) setPrice(normalized)
+            }}
+            required
+          />
         </label>
       </div>
       <div className="row">
         <label className="field" style={{ flex: 1 }}>
           Дата готовности
-          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          <DateInput value={dueDate} onChange={setDueDate} />
         </label>
         <label className="field" style={{ flex: 1 }}>
           Предоплата
           <input
-            type="number"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
             value={prepayment}
-            onChange={(e) => setPrepayment(e.target.value)}
+            onChange={(e) => {
+              const normalized = normalizeDecimalInput(e.target.value)
+              if (normalized !== null) setPrepayment(normalized)
+            }}
           />
         </label>
       </div>
@@ -213,9 +232,9 @@ function NewOrderForm({
         <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="из директа…" />
       </label>
       {error && <p className="error">{error}</p>}
-      <button type="submit" disabled={saving || !clientId || !productId}>
+      <Button type="submit" disabled={saving || !clientId || !productId}>
         {saving ? 'Сохранение…' : 'Создать заказ'}
-      </button>
+      </Button>
     </form>
   )
 }

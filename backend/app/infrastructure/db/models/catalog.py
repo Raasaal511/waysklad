@@ -36,7 +36,7 @@ class ProductModel(Base, TenantMixin, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(300), index=True)
     sku: Mapped[str | None] = mapped_column(String(100), index=True)  # артикул
-    barcode: Mapped[str | None] = mapped_column(String(14))
+    barcode: Mapped[str | None] = mapped_column(String(32))
     category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"))
     unit_code: Mapped[str] = mapped_column(String(10), default="pcs")
     purchase_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)  # видна только владельцу
@@ -60,4 +60,4 @@ class ProductVariantModel(Base, TenantMixin):
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"))
     size: Mapped[str] = mapped_column(String(50), default="")
     color: Mapped[str] = mapped_column(String(50), default="")
-    barcode: Mapped[str | None] = mapped_column(String(14))
+    barcode: Mapped[str | None] = mapped_column(String(32))

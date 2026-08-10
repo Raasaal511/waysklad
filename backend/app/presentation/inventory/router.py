@@ -1,9 +1,11 @@
 from fastapi import APIRouter
 
+from app.domain.identity.entities import Role
 from app.presentation.deps import (
     ActorDep,
     CreateWarehouseDep,
     ReceiveGoodsDep,
+    SetWarehouseAssignmentsDep,
     StocktakeDep,
     TransferDep,
     UowDep,
@@ -16,6 +18,7 @@ from app.presentation.inventory.schemas import (
     StocktakeRequest,
     StocktakeResponse,
     TransferRequest,
+    WarehouseAssignmentsRequest,
     WarehouseCreateRequest,
     WarehouseResponse,
     WriteOffRequest,
@@ -31,16 +34,40 @@ async def create_warehouse(
     return WarehouseResponse.from_entity(await use_case.execute(actor, body.to_command()))
 
 
+@router.put("/warehouses/{warehouse_id}/assignments")
+async def set_warehouse_assignments(
+    warehouse_id: int,
+    body: WarehouseAssignmentsRequest,
+    actor: ActorDep,
+    use_case: SetWarehouseAssignmentsDep,
+) -> WarehouseResponse:
+    return WarehouseResponse.from_entity(
+        await use_case.execute(actor, body.to_command(warehouse_id))
+    )
+
+
 @router.get("/warehouses")
-async def list_warehouses(uow: UowDep) -> list[WarehouseResponse]:
+async def list_warehouses(actor: ActorDep, uow: UowDep) -> list[WarehouseResponse]:
     async with uow:
-        return [WarehouseResponse.from_entity(w) for w in await uow.warehouses.list()]
+        if actor.role is Role.STOREKEEPER:
+            warehouses = await uow.warehouses.list_for_user(actor.id)
+        else:
+            warehouses = await uow.warehouses.list()
+        return [WarehouseResponse.from_entity(w) for w in warehouses]
 
 
 @router.get("/stock")
-async def list_stock(uow: UowDep) -> list[StockItemResponse]:
+async def list_stock(actor: ActorDep, uow: UowDep) -> list[StockItemResponse]:
     async with uow:
-        return [StockItemResponse.from_entity(item) for item in await uow.stock.list_all()]
+        items = await uow.stock.list_all()
+        if actor.role is not Role.STOREKEEPER:
+            return [StockItemResponse.from_entity(item) for item in items]
+        allowed_ids = {w.id for w in await uow.warehouses.list_for_user(actor.id)}
+        return [
+            StockItemResponse.from_entity(item)
+            for item in items
+            if item.warehouse_id in allowed_ids
+        ]
 
 
 @router.post("/receive", status_code=201)

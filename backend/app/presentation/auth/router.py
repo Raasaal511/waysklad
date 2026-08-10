@@ -4,21 +4,25 @@ from app.domain.identity.entities import User
 from app.domain.identity.permissions import Permission
 from app.infrastructure.security import create_access_token
 from app.presentation.auth.schemas import (
+    ChangePasswordRequest,
     ConnectTelegramRequest,
     CreateEmployeeRequest,
     LoginRequest,
     RegisterRequest,
     TenantResponse,
     TokenResponse,
+    UpdateShopRequest,
     UserResponse,
 )
 from app.presentation.deps import (
     ActorDep,
+    ChangePasswordDep,
     ConnectTelegramDep,
     CreateEmployeeDep,
     LoginDep,
     RegisterShopDep,
     UowDep,
+    UpdateShopDep,
 )
 from app.presentation.deps.auth import require_permission
 
@@ -61,3 +65,23 @@ async def connect_telegram(
     body: ConnectTelegramRequest, actor: ActorDep, use_case: ConnectTelegramDep
 ) -> TenantResponse:
     return TenantResponse.from_entity(await use_case.execute(actor, body.to_command()))
+
+
+@router.get("/shop")
+async def get_shop(uow: UowDep) -> TenantResponse:
+    async with uow:
+        return TenantResponse.from_entity(await uow.tenants.get(uow.tenant_id))
+
+
+@router.patch("/shop")
+async def update_shop(
+    body: UpdateShopRequest, actor: ActorDep, use_case: UpdateShopDep
+) -> TenantResponse:
+    return TenantResponse.from_entity(await use_case.execute(actor, body.to_command()))
+
+
+@router.patch("/me/password", status_code=204)
+async def change_password(
+    body: ChangePasswordRequest, actor: ActorDep, use_case: ChangePasswordDep
+) -> None:
+    await use_case.execute(actor, body.to_command())

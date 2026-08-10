@@ -38,6 +38,8 @@ class Sale:
     client_id: int | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
+    note: str = ""
+    deleted_at: datetime | None = None
 
     @property
     def subtotal(self) -> Money:

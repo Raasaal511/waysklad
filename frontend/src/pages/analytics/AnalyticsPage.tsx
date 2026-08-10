@@ -8,8 +8,9 @@ import {
   type ProductSales,
   type DeadStockItem,
   type StockValue,
-} from '../../api/analytics'
-import { ApiError } from '../../api/client'
+} from '../../entities/analytics/api'
+import { ApiError } from '../../shared/api/client'
+import { formatQuantity } from '../../shared/lib/format'
 
 export function AnalyticsPage() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
@@ -121,7 +122,7 @@ export function AnalyticsPage() {
                 {deadStock.map((d) => (
                   <tr key={d.product_id}>
                     <td>{d.product_name}</td>
-                    <td>{d.quantity}</td>
+                    <td>{formatQuantity(d.quantity)}</td>
                     <td>{d.last_sale_at ? new Date(d.last_sale_at).toLocaleDateString('ru-RU') : 'никогда'}</td>
                   </tr>
                 ))}

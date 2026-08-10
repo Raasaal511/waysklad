@@ -33,6 +33,9 @@ class DebtModel(Base, TenantMixin, TimestampMixin):
     installments: Mapped[list["DebtInstallmentModel"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"
     )
+    extensions: Mapped[list["DebtExtensionModel"]] = relationship(
+        cascade="all, delete-orphan", lazy="selectin"
+    )
 
 
 class DebtRepaymentModel(Base, TenantMixin):
@@ -42,6 +45,7 @@ class DebtRepaymentModel(Base, TenantMixin):
     debt_id: Mapped[int] = mapped_column(ForeignKey("debts.id", ondelete="CASCADE"))
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     paid_on: Mapped[date] = mapped_column(Date)
+    note: Mapped[str] = mapped_column(Text, default="")
     author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
 
@@ -54,3 +58,17 @@ class DebtInstallmentModel(Base, TenantMixin):
     debt_id: Mapped[int] = mapped_column(ForeignKey("debts.id", ondelete="CASCADE"))
     due_date: Mapped[date] = mapped_column(Date)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+
+
+class DebtExtensionModel(Base, TenantMixin):
+    """История переносов срока долга («продлить долг»)."""
+
+    __tablename__ = "debt_extensions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    debt_id: Mapped[int] = mapped_column(ForeignKey("debts.id", ondelete="CASCADE"))
+    old_due_date: Mapped[date | None] = mapped_column(Date)
+    new_due_date: Mapped[date] = mapped_column(Date)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[date] = mapped_column(Date)

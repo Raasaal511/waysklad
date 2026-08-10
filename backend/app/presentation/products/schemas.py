@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
+from app.application.products.create_category import CreateCategoryCommand
 from app.application.products.create_product import CreateProductCommand, VariantInput
 from app.application.products.create_unit import CreateUnitCommand
 from app.application.products.import_excel import ImportProductsResult, RowError
@@ -9,7 +10,7 @@ from app.application.products.update_product import (
     UpdateProductCommand,
     UpdateVariantInput,
 )
-from app.domain.catalog.entities import Product
+from app.domain.catalog.entities import Category, Product
 from app.domain.common.quantity import Unit
 
 
@@ -83,6 +84,24 @@ class ProductUpdateRequest(BaseModel):
                 for v in self.variants
             ],
         )
+
+
+class CategoryCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    parent_id: int | None = None
+
+    def to_command(self) -> CreateCategoryCommand:
+        return CreateCategoryCommand(name=self.name, parent_id=self.parent_id)
+
+
+class CategoryResponse(BaseModel):
+    id: int
+    name: str
+    parent_id: int | None
+
+    @classmethod
+    def from_entity(cls, category: Category) -> "CategoryResponse":
+        return cls(id=category.id, name=category.name, parent_id=category.parent_id)
 
 
 class UnitCreateRequest(BaseModel):
