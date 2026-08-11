@@ -52,7 +52,7 @@ class StockDocumentModel(Base, TenantMixin, TimestampMixin):
     author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     note: Mapped[str] = mapped_column(Text, default="")
     posted: Mapped[bool] = mapped_column(default=False)
-    posted_at: Mapped[datetime | None] = mapped_column(DateTime)
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     lines: Mapped[list["StockDocumentLineModel"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"
