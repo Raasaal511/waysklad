@@ -5,6 +5,7 @@ import { useShop } from './ShopContext'
 import { useTheme } from './ThemeContext'
 import { Icon, type IconName } from '../shared/ui/icons/Icon'
 import { Button } from '../shared/ui/Button'
+import { IconButton } from '../shared/ui/IconButton'
 import type { Role } from '../entities/auth/api'
 
 const NAV_ITEMS: { to: string; label: string; icon: IconName; roles?: Role[] }[] = [
@@ -142,15 +143,15 @@ export function AppLayout() {
               <ShopTitle shopName={shopName} />
             </div>
           )}
-          <button
-            type="button"
+          <IconButton
+            variant="accent"
             className="app-sidebar-toggle"
             onClick={() => setCollapsed((v) => !v)}
             aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
             data-tooltip={collapsed ? 'Развернуть' : undefined}
           >
             <Icon name={collapsed ? 'chevronRight' : 'chevronLeft'} size={18} />
-          </button>
+          </IconButton>
         </div>
 
         <UserBadge name={user?.name} role={user?.role} collapsed={collapsed} />
