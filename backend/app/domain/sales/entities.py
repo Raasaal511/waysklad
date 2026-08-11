@@ -40,6 +40,7 @@ class Sale:
     client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
     note: str = ""
     deleted_at: datetime | None = None
+    cash_received: Money | None = None  # сколько внёс клиент наличными (снимок на момент продажи)
 
     @property
     def subtotal(self) -> Money:

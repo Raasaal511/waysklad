@@ -23,6 +23,7 @@ class SaleMapper:
             total=sale.total.amount,  # снимок суммы чека для аналитики
             client_op_id=sale.client_op_id,
             note=sale.note,
+            cash_received=sale.cash_received.amount if sale.cash_received is not None else None,
             lines=[
                 SaleLineModel(
                     tenant_id=tenant_id,
@@ -49,6 +50,7 @@ class SaleMapper:
             client_op_id=model.client_op_id,
             note=model.note,
             deleted_at=model.deleted_at,
+            cash_received=Money(model.cash_received) if model.cash_received is not None else None,
             lines=[
                 SaleLine(
                     id=line.id,

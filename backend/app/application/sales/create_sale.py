@@ -79,6 +79,7 @@ class CreateSaleUseCase:
                 discount=Money.of(cmd.discount),
                 client_id=cmd.client_id,
                 client_op_id=cmd.client_op_id,
+                cash_received=Money.of(cmd.cash_received) if cmd.cash_received is not None else None,
             )
             sale.validate()
 

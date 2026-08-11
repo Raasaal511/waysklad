@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Enum as SAEnum, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.sales.payment import PaymentMethod
@@ -30,7 +30,8 @@ class SaleModel(Base, TenantMixin, TimestampMixin):
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)  # снимок суммы чека
     client_op_id: Mapped[str | None] = mapped_column(String(64))
     note: Mapped[str] = mapped_column(Text, default="")
-    deleted_at: Mapped[datetime | None] = mapped_column(default=None)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    cash_received: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), default=None)
 
     lines: Mapped[list["SaleLineModel"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"
