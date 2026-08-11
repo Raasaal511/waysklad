@@ -55,3 +55,10 @@ class Quantity:
     def _same_unit(self, other: Quantity) -> None:
         if self.unit != other.unit:
             raise DomainError(f"Нельзя смешивать {self.unit.name} и {other.unit.name}")
+
+    @property
+    def formatted(self) -> str:
+        """Строка для отображения: "1" для шт, "1.5" для кг — без хвостовых нулей Decimal(14,3)."""
+        normalized = self.value.normalize()
+        # normalize() может вернуть экспоненциальную форму (напр. 1E+2) — приводим обратно
+        return format(normalized, "f") if "E" in str(normalized) else str(normalized)

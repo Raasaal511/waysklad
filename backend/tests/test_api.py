@@ -333,6 +333,12 @@ async def test_sale_receipt_via_api(client, owner_headers):
     assert receipt["whatsapp_link"].startswith("https://wa.me/79280001122?text=")
     assert "Клиент: Ахмед" in receipt["text"]
 
+    # квитанция PDF-документом — та же продажа
+    response = await client.get(f"/api/sales/{sale_id}/receipt.pdf", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.content[:5] == b"%PDF-"
+
 
 async def test_inventory_write_off_and_stocktake_endpoints(client, owner_headers):
     response = await client.post(

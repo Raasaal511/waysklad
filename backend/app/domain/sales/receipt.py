@@ -21,7 +21,7 @@ def render_receipt_text(
     lines.append("")
     for line in sale.lines:
         name = product_names.get(line.product_id, f"Товар #{line.product_id}")
-        lines.append(f"{name} — {line.quantity.value} x {line.price.amount} = {line.total.amount}")
+        lines.append(f"{name} — {line.quantity.formatted} x {line.price.amount} = {line.total.amount}")
     lines.append("")
     if sale.discount.amount:
         lines.append(f"Скидка: {sale.discount.amount}")

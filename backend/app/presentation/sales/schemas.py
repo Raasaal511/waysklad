@@ -74,6 +74,7 @@ class SaleResponse(BaseModel):
     discount: Decimal
     total: Decimal
     change: Decimal | None  # сдача
+    cash_received: Decimal | None  # сколько внёс клиент наличными
     client_id: int | None
     created_at: datetime
     note: str
@@ -86,7 +87,10 @@ class SaleResponse(BaseModel):
 
     @classmethod
     def from_entity(cls, sale: Sale) -> "SaleResponse":
-        return cls._build(sale, None)
+        change = None
+        if sale.cash_received is not None and sale.cash_received >= sale.total:
+            change = sale.change_for(sale.cash_received)
+        return cls._build(sale, change.amount if change else None)
 
     @classmethod
     def _build(cls, sale: Sale, change: Decimal | None) -> "SaleResponse":
@@ -99,6 +103,7 @@ class SaleResponse(BaseModel):
             discount=sale.discount.amount,
             total=sale.total.amount,
             change=change,
+            cash_received=sale.cash_received.amount if sale.cash_received is not None else None,
             client_id=sale.client_id,
             created_at=sale.created_at,
             note=sale.note,
