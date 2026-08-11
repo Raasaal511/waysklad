@@ -86,13 +86,24 @@
   --accent-soft: rgba(155, 127, 212, 0.16);
 }
 
+:root {
+  /* Слабее --accent-soft (фон вторичных кнопок) и полупрозрачная акцентная граница */
+  --accent-soft-weak: color-mix(in srgb, var(--accent-soft) 55%, var(--bg));
+  --accent-border: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
 * {
   box-sizing: border-box;
+}
+
+html {
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
   background: var(--bg-muted);
+  overflow-x: hidden;
 }
 
 #root {
@@ -234,13 +245,14 @@ button:disabled {
 }
 
 .btn-secondary {
-  background: var(--bg-muted);
+  background: var(--accent-soft-weak);
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent-border);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--border);
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .btn-secondary.btn-active {
@@ -539,10 +551,22 @@ button:disabled {
     border-right: 1px solid var(--border);
     padding: 16px 12px;
     gap: 18px;
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
     height: 100svh;
+    background: var(--bg);
+    z-index: 20;
     transition: width 0.15s ease;
+  }
+
+  .app-main {
+    margin-left: 240px;
+    transition: margin-left 0.15s ease;
+  }
+
+  .sidebar-collapsed .app-main {
+    margin-left: 68px;
   }
 
   .app-sidebar-top {
@@ -571,21 +595,8 @@ button:disabled {
   }
 
   .app-sidebar-toggle {
-    background: transparent;
-    color: var(--text);
-    border: none;
-    padding: 6px;
     margin-top: -4px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     flex-shrink: 0;
-  }
-
-  .app-sidebar-toggle:hover {
-    background: var(--bg-muted);
-    color: var(--bg);
   }
 
   .app-sidebar-nav {
@@ -623,6 +634,10 @@ button:disabled {
     flex-shrink: 0;
   }
 
+  .app-sidebar-icon svg {
+    stroke-width: 1.5;
+  }
+
   .app-sidebar-user {
     display: flex;
     flex-direction: column;
@@ -631,7 +646,7 @@ button:disabled {
   }
 
   .app-sidebar-footer {
-    padding: 0 8px;
+    padding: 0;
   }
 
   .app-logout {
@@ -679,7 +694,10 @@ button:disabled {
 
   .sidebar-collapsed .app-sidebar-item {
     justify-content: center;
-    padding: 10px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    margin: 0 auto;
   }
 
   .sidebar-collapsed .app-user-badge {
@@ -699,8 +717,15 @@ button:disabled {
     height: 36px;
   }
 
+  .sidebar-collapsed .app-sidebar-footer {
+    display: flex;
+    justify-content: center;
+  }
+
   .sidebar-collapsed .app-logout {
-    padding: 11px;
+    width: 36px;
+    height: 36px;
+    padding: 0;
   }
 
   [data-tooltip] {
@@ -775,6 +800,30 @@ thead th {
 
 tbody tr:not(:last-child) {
   border-bottom: 1px solid var(--border);
+}
+
+.sale-detail-totals {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--bg-muted);
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.sale-detail-totals-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  color: var(--text-muted);
+}
+
+.sale-detail-totals-row-sum {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text);
 }
 
 @keyframes row-highlight-fade {
@@ -890,8 +939,8 @@ tbody tr:not(:last-child) {
 }
 
 .icon-button-muted:hover:not(:disabled) {
-  background: var(--bg-muted);
-  color: var(--text);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .icon-button-accent {
@@ -900,6 +949,60 @@ tbody tr:not(:last-child) {
 
 .icon-button-accent:hover:not(:disabled) {
   background: var(--accent-soft);
+}
+
+.icon-button-neutral {
+  color: var(--text-muted);
+}
+
+.icon-button-neutral:hover:not(:disabled) {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.icon-button-lg {
+  padding: 8px;
+  border-radius: 10px;
+}
+
+/* Быстрый tooltip для IconButton: без задержки открытия, короткий fade.
+   Свой неймспейс (has-hint/data-hint), чтобы не пересекаться с [data-tooltip]
+   из свёрнутого сайдбара (AppLayout) — тот же атрибут на разных элементах
+   раньше давал смешение правил и ломал геометрию тултипа. */
+.has-hint {
+  position: relative;
+}
+
+/* Растёт от правого края кнопки влево, а не от центра — так он никогда
+   не вылезает за правый край модалки/экрана и не вызывает horizontal scroll */
+.has-hint::after {
+  content: attr(data-hint);
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 5px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.05s ease;
+  z-index: 10;
+}
+
+/* Danger-кнопки (возврат/удаление) и закрытие модалки — красный тултип, в цвет hover-состояния */
+.icon-button-danger.has-hint::after,
+.icon-button-neutral.has-hint::after {
+  background: var(--danger);
+}
+
+.has-hint:hover::after,
+.has-hint:focus-visible::after {
+  opacity: 1;
+  transition-delay: 0s;
 }
 
 /* Modal */
@@ -1008,6 +1111,17 @@ tbody tr:not(:last-child) {
 
 .modal-header h3 {
   margin: 0;
+}
+
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.modal-close {
+  margin-left: 5px;
 }
 
 .modal-body {
@@ -1248,6 +1362,12 @@ button.product-tile-remove:hover {
   opacity: 0.7;
 }
 
+.product-tile-stock-low {
+  color: var(--warning);
+  opacity: 1;
+  font-weight: 600;
+}
+
 .cart-table-wrap {
   max-height: 360px;
   overflow-y: auto;
@@ -1477,6 +1597,37 @@ input.sale-client-search:not([type='checkbox']):not([type='radio']) {
   border-color: var(--accent);
 }
 
+.disclosure-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.disclosure-link:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.disclosure-link:disabled {
+  opacity: 0.6;
+}
+
+.disclosure-link svg {
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.disclosure-link[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
 .sale-reset-link {
   flex-shrink: 0;
   display: inline-flex;
@@ -1493,13 +1644,6 @@ input.sale-client-search:not([type='checkbox']):not([type='radio']) {
 .sale-reset-link:hover:not(:disabled) {
   background: transparent;
   color: var(--text);
-}
-
-.sale-period-total {
-  margin-left: auto;
-  font-size: 13px;
-  color: var(--text-muted);
-  white-space: nowrap;
 }
 
 .sale-day-group {
@@ -1544,7 +1688,7 @@ input.sale-client-search:not([type='checkbox']):not([type='radio']) {
 
 .sale-history-row {
   display: grid;
-  grid-template-columns: 100px 92px 1fr 1fr 70px;
+  grid-template-columns: var(--history-row-columns, 100px 92px 1fr 1fr 70px);
   align-items: center;
   gap: 8px 14px;
   padding: 12px 14px;
@@ -1758,6 +1902,11 @@ input.sale-client-search:not([type='checkbox']):not([type='radio']) {
   font-weight: 600;
 }
 
+.sale-change-short {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 .sale-client-row select.input-required,
 input.input-required:not([type='checkbox']):not([type='radio']) {
   border-color: var(--danger);
@@ -1798,11 +1947,6 @@ input.input-required:not([type='checkbox']):not([type='radio']) {
   white-space: nowrap;
 }
 
-.sale-total-row {
-  padding-top: 4px;
-  border-top: 1px solid var(--border);
-}
-
 .sale-detail-meta {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -1818,6 +1962,16 @@ input.input-required:not([type='checkbox']):not([type='radio']) {
   align-items: flex-start;
   gap: 3px;
   font-size: 14px;
+}
+
+.sale-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sale-detail-section-title {
+  margin: 0;
 }
 
 .sale-detail-client-card {
@@ -1917,10 +2071,43 @@ input.input-required:not([type='checkbox']):not([type='radio']) {
   border-top: 1px solid var(--border);
 }
 
+.sale-detail-history-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+}
+
 .sale-detail-history-item {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
   gap: 10px;
+  padding: 9px 0;
+  font-size: 14px;
+}
+
+.sale-detail-history-item:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.sale-detail-history-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+}
+
+.sale-detail-history-label {
+  flex: 1;
+}
+
+.sale-detail-history-time {
+  flex-shrink: 0;
+  color: var(--text-muted);
   font-size: 13px;
 }
 

@@ -10,9 +10,10 @@ interface ModalProps {
   wide?: boolean
   size?: 'wide' | 'full'
   footer?: ReactNode
+  headerActions?: ReactNode
 }
 
-export function Modal({ title, onClose, children, wide, size, footer }: ModalProps) {
+export function Modal({ title, onClose, children, wide, size, footer, headerActions }: ModalProps) {
   const effectiveSize = size ?? (wide ? 'wide' : undefined)
   const bodyRef = useRef<HTMLDivElement>(null)
   const [atBottom, setAtBottom] = useState(true)
@@ -59,9 +60,19 @@ export function Modal({ title, onClose, children, wide, size, footer }: ModalPro
       >
         <div className="modal-header">
           <h3>{title}</h3>
-          <IconButton variant="muted" className="modal-close" onClick={onClose} aria-label="Закрыть">
-            <Icon name="close" size={18} />
-          </IconButton>
+          <div className="modal-header-actions">
+            {headerActions}
+            <IconButton
+              variant="neutral"
+              size="lg"
+              className="modal-close"
+              onClick={onClose}
+              tooltip="Закрыть"
+              aria-label="Закрыть"
+            >
+              <Icon name="close" size={22} />
+            </IconButton>
+          </div>
         </div>
         <div className="modal-body" ref={bodyRef}>
           {children}

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   listProducts,
@@ -18,6 +18,7 @@ import {
   createSale,
   returnSale,
   getReceipt,
+  getReceiptPdf,
   listSales,
   editSale,
   deleteSale,
@@ -27,9 +28,10 @@ import {
   type SaleItemInput,
   type Sale,
   type SaleHistoryEntry,
+  type SaleReturn,
 } from '../../entities/sale/api'
 import { ApiError } from '../../shared/api/client'
-import { Icon } from '../../shared/ui/icons/Icon'
+import { Icon, type IconName } from '../../shared/ui/icons/Icon'
 import { Modal } from '../../shared/ui/Modal'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
@@ -314,7 +316,8 @@ export function SalePage() {
             <Button
               key={p}
               translate="no"
-              variant={period === p ? 'primary' : 'secondary'}
+              variant="secondary"
+              active={period === p}
               onClick={() => setPeriod(p)}
             >
               {PERIOD_LABELS[p]}
@@ -372,7 +375,9 @@ export function SalePage() {
         <div className="card card-full sale-period-summary">
           <h3 className="sale-period-summary-title">
             Итого за «{PERIOD_LABELS[period]}»
-            {warehouseFilter !== 'all' && ` · ${warehouseName(warehouseFilter)}`}
+            {warehouseFilter !== 'all'
+              ? ` · ${warehouseName(warehouseFilter)}`
+              : warehouses.length > 1 && singleWarehouseId !== null && ` · ${warehouseName(singleWarehouseId)}`}
             {paymentFilter !== 'all' && ` · ${PAYMENT_LABELS[paymentFilter]}`}
             {clientQuery.trim() !== '' && ` · «${clientQuery.trim()}»`}
           </h3>
@@ -442,7 +447,7 @@ export function SalePage() {
                 {group.sales.map((s) => (
                   <Button
                     className="sale-history-row"
-                    style={{ gridTemplateColumns: historyRowColumns }}
+                    style={{ '--history-row-columns': historyRowColumns } as CSSProperties}
                     key={s.id}
                     onClick={() => setSelectedSale(s)}
                   >
@@ -488,15 +493,13 @@ export function SalePage() {
       )}
 
       {selectedSale && (
-        <Modal title={`Продажа №${selectedSale.id}`} onClose={() => setSelectedSale(null)} size="full">
-          <LastSaleCard
-            sale={selectedSale}
-            warehouses={warehouses}
-            clients={clients}
-            onDone={() => setSelectedSale(null)}
-            onUpdated={load}
-          />
-        </Modal>
+        <LastSaleCard
+          sale={selectedSale}
+          warehouses={warehouses}
+          clients={clients}
+          onDone={() => setSelectedSale(null)}
+          onUpdated={load}
+        />
       )}
 
       {showNewSale && (
@@ -534,6 +537,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
   useEffect(() => () => window.clearTimeout(maxReachedTimerRef.current), [])
   const [payment, setPayment] = useState<PaymentMethod>(draft?.payment ?? 'cash')
   const [debtDueDate, setDebtDueDate] = useState('')
+  const [cashReceived, setCashReceived] = useState('')
   const [discount, setDiscount] = useState(draft?.discount ?? '0')
   const [discountMode, setDiscountMode] = useState<'amount' | 'percent'>(
     draft?.discountMode ?? 'amount',
@@ -773,6 +777,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
     setClientId(null)
     setPayment('cash')
     setDebtDueDate('')
+    setCashReceived('')
     setError(null)
   }
 
@@ -783,7 +788,11 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
       ? Math.round((subtotalCents * Number(discount || 0)) / 100)
       : Math.round(Number(discount || 0) * 100)
   const discountAmount = centsToMoney(discountAmountCents)
-  const total = centsToMoney(Math.max(0, subtotalCents - discountAmountCents))
+  const totalCents = Math.max(0, subtotalCents - discountAmountCents)
+  const total = centsToMoney(totalCents)
+  const cashReceivedCents = Math.round(Number(cashReceived || 0) * 100)
+  const changeCents = cashReceivedCents - totalCents
+  const change = centsToMoney(Math.max(0, changeCents))
 
   async function handleCheckout() {
     if (!warehouseId || cart.length === 0) return
@@ -817,6 +826,8 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
         items,
         discount: discountAmount.toFixed(2),
         client_id: clientId,
+        cash_received:
+          payment === 'cash' && cashReceived && cashReceivedCents >= totalCents ? cashReceived : null,
         debt_due_date: payment === 'credit' ? debtDueDate : null,
       })
       clearDraft()
@@ -825,6 +836,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
       setDiscount('0')
       setClientId(null)
       setDebtDueDate('')
+      setCashReceived('')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось провести продажу')
     } finally {
@@ -834,15 +846,13 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   if (lastSale) {
     return (
-      <Modal title="Продажа проведена" onClose={onDone} size="full">
-        <LastSaleCard
-          sale={lastSale}
-          warehouses={warehouses}
-          clients={clients}
-          onDone={onDone}
-          onUpdated={() => {}}
-        />
-      </Modal>
+      <LastSaleCard
+        sale={lastSale}
+        warehouses={warehouses}
+        clients={clients}
+        onDone={onDone}
+        onUpdated={() => {}}
+      />
     )
   }
 
@@ -872,7 +882,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
     >
       <div className="stack">
       <div className="sale-search-panel">
-        <div className="sale-search-main">
+        <div>
           <div className="sale-search-row">
             <Icon name="barcode" size={18} className="sale-search-icon" />
             <input
@@ -998,7 +1008,13 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                   <span className="product-tile-name">{p.name}</span>
                   <span className="product-tile-price">{formatMoney(p.retail_price)} ₽</span>
                   {qty !== null && (
-                    <span className="product-tile-stock">
+                    <span
+                      className={`product-tile-stock${
+                        Number(p.min_stock) > 0 && Number(qty) <= Number(p.min_stock)
+                          ? ' product-tile-stock-low'
+                          : ''
+                      }`}
+                    >
                       Остаток: {formatQuantity(qty)} {unitName(p.unit_code)}
                     </span>
                   )}
@@ -1165,6 +1181,29 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
               />
             </label>
 
+            {payment === 'cash' && (
+              <label className="field">
+                Получено
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder={formatMoney(total)}
+                  value={cashReceived}
+                  onChange={(e) => {
+                    const normalized = normalizeDecimalInput(e.target.value)
+                    if (normalized !== null) setCashReceived(normalized)
+                  }}
+                />
+                {cashReceivedCents > 0 && (
+                  <span className={changeCents < 0 ? 'sale-change-short' : 'text-muted'}>
+                    {changeCents >= 0
+                      ? `Сдача: ${formatMoney(change)} ₽`
+                      : `Не хватает: ${formatMoney(centsToMoney(-changeCents))} ₽`}
+                  </span>
+                )}
+              </label>
+            )}
+
             <label className="field sale-client-field">
               Клиент
               {payment === 'credit' && (
@@ -1226,6 +1265,13 @@ const SALE_HISTORY_ACTION_LABELS: Record<string, string> = {
   'sale.delete': 'Продажа удалена',
 }
 
+const SALE_HISTORY_ACTION_ICONS: Record<string, IconName> = {
+  'sale.create': 'check',
+  'sale.return': 'return',
+  'sale.edit': 'edit',
+  'sale.delete': 'trash',
+}
+
 function LastSaleCard({
   sale: initialSale,
   warehouses,
@@ -1244,10 +1290,11 @@ function LastSaleCard({
   const [products, setProducts] = useState<Product[]>([])
   const [units, setUnits] = useState<Unit[]>([])
   const [employees, setEmployees] = useState<User[]>([])
-  const [returns, setReturns] = useState<{ sale_line_id: number; quantity: string }[]>([])
+  const [returns, setReturns] = useState<SaleReturn[]>([])
   const [clientDebt, setClientDebt] = useState<Debt | null>(null)
   const [history, setHistory] = useState<SaleHistoryEntry[] | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [showReturn, setShowReturn] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
@@ -1260,11 +1307,14 @@ function LastSaleCard({
   const [done, setDone] = useState(false)
   const [receiptError, setReceiptError] = useState<string | null>(null)
   const [sendingReceipt, setSendingReceipt] = useState(false)
+  const [sharingReceipt, setSharingReceipt] = useState(false)
+  const [downloadingReceipt, setDownloadingReceipt] = useState(false)
+  const canShareFiles = typeof navigator.share === 'function' && typeof navigator.canShare === 'function'
 
   useEffect(() => {
     listProducts().then(setProducts).catch(() => {})
     listUnits().then(setUnits).catch(() => {})
-    listSaleReturns(sale.id).then((list) => setReturns(list.flatMap((r) => r.lines))).catch(() => {})
+    listSaleReturns(sale.id).then(setReturns).catch(() => {})
     listEmployees().then(setEmployees).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sale.id])
@@ -1287,8 +1337,11 @@ function LastSaleCard({
 
   const alreadyReturned = (saleLineId: number) =>
     returns
-      .filter((r) => r.sale_line_id === saleLineId)
-      .reduce((sum, r) => sum + Number(r.quantity), 0)
+      .flatMap((r) => r.lines)
+      .filter((l) => l.sale_line_id === saleLineId)
+      .reduce((sum, l) => sum + Number(l.quantity), 0)
+
+  const totalRefunded = returns.reduce((sum, r) => sum + Number(r.refund), 0)
 
   const canDelete = user?.role === 'owner' || user?.role === 'manager'
   const isOwnSaleWithinWindow =
@@ -1297,7 +1350,13 @@ function LastSaleCard({
     Date.now() - new Date(sale.created_at).getTime() < 24 * 60 * 60 * 1000
   const canEdit = canDelete || isOwnSaleWithinWindow
 
-  async function loadHistory() {
+  async function toggleHistory() {
+    if (historyOpen) {
+      setHistoryOpen(false)
+      return
+    }
+    setHistoryOpen(true)
+    if (history !== null) return
     setLoadingHistory(true)
     try {
       setHistory(await getSaleHistory(sale.id))
@@ -1322,6 +1381,44 @@ function LastSaleCard({
       setReceiptError(err instanceof ApiError ? err.message : 'Не удалось получить квитанцию')
     } finally {
       setSendingReceipt(false)
+    }
+  }
+
+  async function handleDownloadReceipt() {
+    setReceiptError(null)
+    setDownloadingReceipt(true)
+    try {
+      const blob = await getReceiptPdf(sale.id)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `chek-${sale.id}.pdf`
+      link.click()
+      URL.revokeObjectURL(url)
+
+      const phone = client?.whatsapp || client?.phone
+      if (phone) {
+        window.open(`https://wa.me/${phone.replace(/\D/g, '')}`, '_blank', 'noopener,noreferrer')
+      }
+    } catch (err) {
+      setReceiptError(err instanceof ApiError ? err.message : 'Не удалось получить квитанцию')
+    } finally {
+      setDownloadingReceipt(false)
+    }
+  }
+
+  async function handleShareReceipt() {
+    setReceiptError(null)
+    setSharingReceipt(true)
+    try {
+      const blob = await getReceiptPdf(sale.id)
+      const file = new File([blob], `chek-${sale.id}.pdf`, { type: 'application/pdf' })
+      await navigator.share({ files: [file], title: `Чек №${sale.id}` })
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      setReceiptError(err instanceof ApiError ? err.message : 'Не удалось получить квитанцию')
+    } finally {
+      setSharingReceipt(false)
     }
   }
 
@@ -1359,53 +1456,113 @@ function LastSaleCard({
 
   if (done) {
     return (
-      <div className="stack">
-        <div className="card card-full row" style={{ gap: 8 }}>
-          <Icon name="check" size={18} className="icon-accent" />
-          <p>Возврат по продаже №{sale.id} оформлен, остаток восстановлен</p>
+      <Modal title={`Продажа №${sale.id}`} onClose={onDone}>
+        <div className="stack">
+          <div className="row" style={{ gap: 8 }}>
+            <Icon name="check" size={18} className="icon-accent" />
+            <p>Возврат по продаже №{sale.id} оформлен, остаток восстановлен</p>
+          </div>
         </div>
-        <Button onClick={onDone}>
-          Готово
-        </Button>
-      </div>
+      </Modal>
     )
   }
 
+  const headerActions = (
+    <>
+      <IconButton
+        variant="muted"
+        size="lg"
+        onClick={handleSendReceipt}
+        disabled={sendingReceipt}
+        tooltip={
+          sendingReceipt
+            ? 'Открываем…'
+            : client?.whatsapp || client?.phone
+              ? `Отправить чек клиенту${client?.name ? ` (${client.name})` : ''}`
+              : 'Отправить чек текстом'
+        }
+        aria-label="Отправить чек в WhatsApp"
+      >
+        <Icon name="whatsapp" size={22} />
+      </IconButton>
+      <IconButton
+        variant="muted"
+        size="lg"
+        onClick={handleDownloadReceipt}
+        disabled={downloadingReceipt}
+        tooltip={
+          downloadingReceipt
+            ? 'Готовим…'
+            : client?.whatsapp || client?.phone
+              ? 'Скачать чек и открыть WhatsApp'
+              : 'Скачать чек (PDF)'
+        }
+        aria-label="Скачать чек"
+      >
+        <Icon name="download" size={22} />
+      </IconButton>
+      {canShareFiles && (
+        <IconButton
+          variant="muted"
+          size="lg"
+          onClick={handleShareReceipt}
+          disabled={sharingReceipt}
+          tooltip={sharingReceipt ? 'Готовим…' : 'Поделиться'}
+          aria-label="Поделиться чеком"
+        >
+          <Icon name="share" size={22} />
+        </IconButton>
+      )}
+    </>
+  )
+
   return (
-    <div className="stack card card-full">
+    <Modal title={`Продажа №${sale.id}`} onClose={onDone} size="full" headerActions={headerActions}>
+      <div className="stack">
       <div className="row between wrap" style={{ gap: 10 }}>
-        <p>
-          Продажа №{sale.id} на сумму <strong>{formatMoney(sale.total)} ₽</strong>
-          {sale.deleted_at && <span className="badge danger" style={{ marginLeft: 8 }}>Удалена</span>}
-        </p>
-        <div className="row wrap" style={{ gap: 8 }}>
-          <Button
-            variant="secondary"
-            onClick={handleSendReceipt}
-            disabled={sendingReceipt}
-          >
-            {sendingReceipt ? 'Открываем…' : 'В WhatsApp'}
-          </Button>
-          {!sale.deleted_at && (
-            <Button variant="danger" onClick={() => setShowReturn(true)}>
-              Оформить возврат
-            </Button>
-          )}
-          {!sale.deleted_at && canEdit && (
-            <Button variant="secondary" onClick={() => setShowEdit(true)}>
-              Изменить
-            </Button>
-          )}
-          {!sale.deleted_at && canDelete && (
-            <Button variant="danger" onClick={() => setShowDeleteConfirm(true)}>
-              Удалить продажу
-            </Button>
-          )}
-        </div>
+        {sale.deleted_at ? (
+          <span className="badge danger">Удалена</span>
+        ) : (
+          <span />
+        )}
+        {!sale.deleted_at && (
+          <div className="sale-detail-actions">
+            {canEdit && (
+              <IconButton
+                variant="muted"
+                size="lg"
+                onClick={() => setShowEdit(true)}
+                tooltip="Изменить продажу"
+                aria-label="Изменить продажу"
+              >
+                <Icon name="edit" size={22} />
+              </IconButton>
+            )}
+            <IconButton
+              variant="muted"
+              size="lg"
+              onClick={() => setShowReturn(true)}
+              tooltip="Оформить возврат"
+              aria-label="Оформить возврат"
+            >
+              <Icon name="return" size={22} />
+            </IconButton>
+            {canDelete && (
+              <IconButton
+                variant="danger"
+                size="lg"
+                onClick={() => setShowDeleteConfirm(true)}
+                tooltip="Удалить продажу"
+                aria-label="Удалить продажу"
+              >
+                <Icon name="trash" size={22} />
+              </IconButton>
+            )}
+          </div>
+        )}
       </div>
 
-      {receiptError && <p className="error">{receiptError}</p>}
-      {error && <p className="error">{error}</p>}
+      {(receiptError || error) && <p className="error">{receiptError || error}</p>}
 
       <div className="sale-detail-meta">
         <div className="sale-detail-meta-item">
@@ -1434,6 +1591,18 @@ function LastSaleCard({
           <span className="text-muted">Сотрудник</span>
           <span>{seller ? seller.name : `#${sale.seller_id}`}</span>
         </div>
+        {sale.payment_method === 'cash' && (
+          <>
+            <div className="sale-detail-meta-item">
+              <span className="text-muted">Внесено</span>
+              <span>{sale.cash_received != null ? `${formatMoney(sale.cash_received)} ₽` : '—'}</span>
+            </div>
+            <div className="sale-detail-meta-item">
+              <span className="text-muted">Сдача</span>
+              <span>{sale.change != null ? `${formatMoney(sale.change)} ₽` : '—'}</span>
+            </div>
+          </>
+        )}
       </div>
 
       {client && (
@@ -1456,6 +1625,22 @@ function LastSaleCard({
           <Icon name="chevronRight" size={16} className="sale-detail-client-arrow" />
         </Link>
       )}
+
+      {returns.length > 0 && (
+        <p className="text-muted">
+          Возвращено: {formatMoney(totalRefunded)} ₽
+          {returns
+            .map((r) => r.note.trim())
+            .filter(Boolean)
+            .map((note, i) => (
+              <span key={i}> · {note}</span>
+            ))}
+        </p>
+      )}
+
+      <h3 className="sale-detail-section-title">
+        Товары <span className="text-muted">· {sale.lines.length} поз.</span>
+      </h3>
 
       <div className="table-wrap">
         <table>
@@ -1480,35 +1665,59 @@ function LastSaleCard({
             ))}
           </tbody>
         </table>
+
+        <div className="sale-detail-totals">
+          {Number(sale.discount) > 0 && (
+            <div className="sale-detail-totals-row">
+              <span>Скидка</span>
+              <span>−{formatMoney(sale.discount)} ₽</span>
+            </div>
+          )}
+          <div className="sale-detail-totals-row sale-detail-totals-row-sum">
+            <span>Итого</span>
+            <span>{formatMoney(sale.total)} ₽</span>
+          </div>
+        </div>
       </div>
 
       <SaleNoteEditor sale={sale} canEdit={canEdit} onSaved={setSale} />
 
       <div className="sale-detail-history">
-        {history === null ? (
-          <Button variant="secondary" onClick={loadHistory} disabled={loadingHistory}>
-            {loadingHistory ? 'Загрузка…' : 'Показать историю изменений'}
-          </Button>
-        ) : history.length === 0 ? (
-          <p className="text-muted">Изменений не было</p>
-        ) : (
-          <div className="stack" style={{ gap: 6 }}>
-            <span className="text-muted">История изменений</span>
-            {history.map((entry) => (
-              <div key={entry.id} className="sale-detail-history-item">
-                <span>{SALE_HISTORY_ACTION_LABELS[entry.action] ?? entry.action}</span>
-                <span className="text-muted">
-                  {new Date(entry.created_at).toLocaleString('ru-RU', {
-                    day: 'numeric',
-                    month: 'short',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+        <button
+          type="button"
+          className="disclosure-link"
+          onClick={toggleHistory}
+          disabled={loadingHistory}
+          aria-expanded={historyOpen}
+        >
+          {loadingHistory ? 'Загрузка…' : 'История изменений'}
+          <Icon name="chevronDown" size={14} />
+        </button>
+        {historyOpen &&
+          (history === null ? null : history.length === 0 ? (
+            <p className="text-muted">Изменений не было</p>
+          ) : (
+            <div className="sale-detail-history-list">
+              {history.map((entry) => (
+                <div key={entry.id} className="sale-detail-history-item">
+                  <span className="sale-detail-history-icon">
+                    <Icon name={SALE_HISTORY_ACTION_ICONS[entry.action] ?? 'edit'} size={15} />
+                  </span>
+                  <span className="sale-detail-history-label">
+                    {SALE_HISTORY_ACTION_LABELS[entry.action] ?? entry.action}
+                  </span>
+                  <span className="sale-detail-history-time">
+                    {new Date(entry.created_at).toLocaleString('ru-RU', {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))}
       </div>
 
       {showReturn && (
@@ -1577,11 +1786,8 @@ function LastSaleCard({
           </div>
         </Modal>
       )}
-
-      <Button onClick={onDone}>
-        Готово
-      </Button>
     </div>
+    </Modal>
   )
 }
 

@@ -20,6 +20,7 @@ export interface Sale {
   discount: string
   total: string
   change: string | null
+  cash_received: string | null
   client_id: number | null
   created_at: string
   note: string
@@ -103,4 +104,8 @@ export interface Receipt {
 
 export function getReceipt(saleId: number) {
   return api.get<Receipt>(`/sales/${saleId}/receipt`)
+}
+
+export function getReceiptPdf(saleId: number) {
+  return api.getBlob(`/sales/${saleId}/receipt.pdf`)
 }

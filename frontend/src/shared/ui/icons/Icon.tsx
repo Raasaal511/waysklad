@@ -19,6 +19,13 @@ export type IconName =
   | 'chevronDown'
   | 'plus'
   | 'calendar'
+  | 'download'
+  | 'share'
+  | 'undo'
+  | 'return'
+  | 'trash'
+  | 'whatsapp'
+  | 'edit'
 
 interface IconProps extends SVGProps<SVGSVGElement> {
   name: IconName
@@ -129,6 +136,52 @@ const PATHS: Record<IconName, ReactElement> = {
     <>
       <rect x="3" y="5" width="18" height="16" rx="2" />
       <path d="M3 10h18M8 3v4M16 3v4" />
+    </>
+  ),
+  download: (
+    <>
+      <path d="M12 3v12M7 10l5 5 5-5" />
+      <path d="M4 19h16" />
+    </>
+  ),
+  share: (
+    <>
+      <circle cx="18" cy="5" r="2.5" />
+      <circle cx="6" cy="12" r="2.5" />
+      <circle cx="18" cy="19" r="2.5" />
+      <path d="M8.3 10.7 15.7 6.3M8.3 13.3l7.4 4.4" />
+    </>
+  ),
+  undo: (
+    <>
+      <path d="M4 12a8 8 0 1 1 2.6 5.9" />
+      <path d="M4 7v5h5" />
+    </>
+  ),
+  return: (
+    <>
+      <path d="M20 6v6a4 4 0 0 1-4 4H4" />
+      <path d="M8 20 4 16l4-4" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M4 7h16" />
+      <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+      <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+      <path d="M10 11v6M14 11v6" />
+    </>
+  ),
+  whatsapp: (
+    <>
+      <path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.7-1.2A9 9 0 1 0 12 3Z" />
+      <path d="M9.2 8.7a1 1 0 0 1 1.4-.2l.7.6a1 1 0 0 1 .2 1.2l-.4.7a4.8 4.8 0 0 0 2.1 2.1l.7-.4a1 1 0 0 1 1.2.2l.6.7a1 1 0 0 1-.2 1.4c-.6.5-1.5.7-2.2.4a7.4 7.4 0 0 1-4.4-4.4c-.3-.7-.1-1.6.4-2.2Z" />
+    </>
+  ),
+  edit: (
+    <>
+      <path d="M14.06 6.19 17.81 9.94" />
+      <path d="M4 20h3.75L19.03 8.72a2.65 2.65 0 0 0-3.75-3.75L4 16.25V20Z" />
     </>
   ),
 }

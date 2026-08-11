@@ -109,13 +109,23 @@ export function StockPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {stock.map((item, i) => (
-                    <tr key={i}>
-                      <td>{productName(item.product_id)}</td>
-                      <td>{warehouseName(item.warehouse_id)}</td>
-                      <td>{formatQuantity(item.quantity)}</td>
-                    </tr>
-                  ))}
+                  {stock.map((item, i) => {
+                    const product = products.find((p) => p.id === item.product_id)
+                    const low =
+                      product != null &&
+                      Number(product.min_stock) > 0 &&
+                      Number(item.quantity) <= Number(product.min_stock)
+                    return (
+                      <tr key={i}>
+                        <td>{productName(item.product_id)}</td>
+                        <td>{warehouseName(item.warehouse_id)}</td>
+                        <td>
+                          {formatQuantity(item.quantity)}
+                          {low && <span className="badge warning" style={{ marginLeft: 6 }}>заканчивается</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
