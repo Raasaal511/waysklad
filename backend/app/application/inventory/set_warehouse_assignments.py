@@ -13,8 +13,11 @@ class SetWarehouseAssignmentsCommand:
     user_ids: list[int] = field(default_factory=list)
 
 
+_ASSIGNABLE_ROLES = (Role.MANAGER, Role.SELLER, Role.STOREKEEPER)
+
+
 class SetWarehouseAssignmentsUseCase:
-    """Владелец/управляющий назначает или снимает ответственных за склад."""
+    """Владелец/управляющий назначает или снимает сотрудников, работающих со складом."""
 
     def __init__(self, uow: IUnitOfWork):
         self._uow = uow
@@ -27,10 +30,10 @@ class SetWarehouseAssignmentsUseCase:
 
             for user_id in cmd.user_ids:
                 candidate = await uow.users.get(user_id)
-                if candidate.role not in (Role.STOREKEEPER, Role.OWNER):
+                if candidate.role not in _ASSIGNABLE_ROLES:
                     raise DomainError(
-                        f"«{candidate.name}» не может быть ответственным за склад — "
-                        "нужна роль кладовщика или владельца"
+                        f"«{candidate.name}» не может быть привязан к складу — "
+                        "нужна роль управляющего, продавца или кладовщика"
                     )
 
             warehouse = await uow.warehouses.set_assignments(cmd.warehouse_id, cmd.user_ids)

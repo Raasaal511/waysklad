@@ -7,6 +7,23 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        // NetworkFirst для read-эндпоинтов — экран продажи открывается даже офлайн,
+        // хоть и с последними закэшированными товарами/остатками. Не кэшируем мутации.
+        runtimeCaching: [
+          {
+            urlPattern: /\/api\/(products|inventory|counterparties)(\/|\?|$)/,
+            method: 'GET',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'waysklad-api-read',
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
+      },
       manifest: {
         name: 'WaySklad',
         short_name: 'WaySklad',
@@ -26,6 +43,10 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
+        target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/uploads': {
         target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:8000',
         changeOrigin: true,
       },

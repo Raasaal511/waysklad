@@ -11,6 +11,7 @@ from app.presentation.auth.schemas import (
     RegisterRequest,
     TenantResponse,
     TokenResponse,
+    UpdateEmployeeRequest,
     UpdateShopRequest,
     UserResponse,
 )
@@ -22,6 +23,7 @@ from app.presentation.deps import (
     LoginDep,
     RegisterShopDep,
     UowDep,
+    UpdateEmployeeDep,
     UpdateShopDep,
 )
 from app.presentation.deps.auth import require_permission
@@ -57,7 +59,24 @@ async def create_employee(
 @router.get("/employees", dependencies=[require_permission(Permission.USERS_MANAGE)])
 async def list_employees(uow: UowDep) -> list[UserResponse]:
     async with uow:
-        return [UserResponse.from_entity(u) for u in await uow.users.list_by_tenant()]
+        employees = await uow.users.list_by_tenant()
+        warehouses = await uow.warehouses.list()
+        by_user: dict[int, list[int]] = {}
+        for warehouse in warehouses:
+            for user_id in warehouse.assigned_user_ids:
+                by_user.setdefault(user_id, []).append(warehouse.id)
+        return [
+            UserResponse.from_entity(u, warehouse_ids=by_user.get(u.id, []))
+            for u in employees
+        ]
+
+
+@router.patch("/employees/{employee_id}", dependencies=[require_permission(Permission.USERS_MANAGE)])
+async def update_employee(
+    employee_id: int, body: UpdateEmployeeRequest, actor: ActorDep, use_case: UpdateEmployeeDep
+) -> UserResponse:
+    employee = await use_case.execute(actor, body.to_command(employee_id))
+    return UserResponse.from_entity(employee)
 
 
 @router.post("/telegram")

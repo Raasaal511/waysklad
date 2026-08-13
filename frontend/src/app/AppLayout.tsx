@@ -1,22 +1,47 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
+import {
+  IconShoppingCart,
+  IconBox,
+  IconBuildingWarehouse,
+  IconClipboardList,
+  IconCash,
+  IconUsers,
+  IconChartBar,
+  IconUserCog,
+  IconHistory,
+  IconChevronLeft,
+  IconChevronRight,
+  type Icon as TablerIcon,
+} from '@tabler/icons-react'
 import { useAuth } from './AuthContext'
 import { useShop } from './ShopContext'
 import { useTheme } from './ThemeContext'
-import { Icon, type IconName } from '../shared/ui/icons/Icon'
 import { Button } from '../shared/ui/Button'
 import { IconButton } from '../shared/ui/IconButton'
+import { useOfflineSync } from '../shared/offline/useOfflineSync'
 import type { Role } from '../entities/auth/api'
 
-const NAV_ITEMS: { to: string; label: string; icon: IconName; roles?: Role[] }[] = [
-  { to: '/', label: 'Продажи', icon: 'sale' },
-  { to: '/products', label: 'Товары', icon: 'products' },
-  { to: '/stock', label: 'Остатки', icon: 'stock' },
-  { to: '/orders', label: 'Заказы', icon: 'orders' },
-  { to: '/debts', label: 'Долги', icon: 'debts' },
-  { to: '/clients', label: 'Клиенты', icon: 'clients' },
-  { to: '/analytics', label: 'Аналитика', icon: 'analytics' },
-  { to: '/employees', label: 'Сотрудники', icon: 'employees', roles: ['owner', 'manager'] },
+const NAV_ITEMS: { to: string; label: string; icon: TablerIcon; roles?: Role[] }[] = [
+  { to: '/', label: 'Продажи', icon: IconShoppingCart, roles: ['owner', 'manager', 'seller'] },
+  { to: '/products', label: 'Товары', icon: IconBox },
+  { to: '/stock', label: 'Остатки', icon: IconBuildingWarehouse },
+  {
+    to: '/orders', label: 'Заказы', icon: IconClipboardList,
+    roles: ['owner', 'manager', 'seller', 'analyst'],
+  },
+  {
+    to: '/debts', label: 'Долги', icon: IconCash,
+    roles: ['owner', 'manager', 'seller', 'analyst'],
+  },
+  {
+    to: '/clients', label: 'Клиенты', icon: IconUsers,
+    roles: ['owner', 'manager', 'seller', 'analyst'],
+  },
+  { to: '/analytics', label: 'Аналитика', icon: IconChartBar, roles: ['owner', 'manager', 'analyst'] },
+  { to: '/employees', label: 'Сотрудники', icon: IconUserCog, roles: ['owner', 'manager'] },
+  // видно только ролям с Permission.AUDIT_VIEW (backend/app/domain/identity/permissions.py)
+  { to: '/audit', label: 'Журнал', icon: IconHistory, roles: ['owner', 'analyst'] },
 ]
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -52,7 +77,7 @@ function NavItems({
           data-tooltip={collapsed ? item.label : undefined}
         >
           <span className={variant === 'sidebar' ? 'app-sidebar-icon' : 'app-nav-icon'}>
-            <Icon name={item.icon} size={variant === 'sidebar' ? 19 : 21} />
+            <item.icon size={variant === 'sidebar' ? 19 : 21} stroke={1.8} />
           </span>
           {!(variant === 'sidebar' && collapsed) && <span>{item.label}</span>}
         </NavLink>
@@ -108,6 +133,13 @@ export function AppLayout() {
   const { shopName } = useShop()
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1')
   const headerRef = useRef<HTMLElement>(null)
+  const { pendingCount, notice, dismissNotice } = useOfflineSync()
+
+  useEffect(() => {
+    if (!notice) return
+    const timer = window.setTimeout(dismissNotice, 5000)
+    return () => window.clearTimeout(timer)
+  }, [notice, dismissNotice])
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0')
@@ -133,6 +165,19 @@ export function AppLayout() {
 
   return (
     <div className={`app-layout${collapsed ? ' sidebar-collapsed' : ''}`}>
+      {notice && (
+        <div className={`app-offline-toast app-offline-toast-${notice.kind}`} role="status">
+          {notice.message}
+          <button
+            type="button"
+            className="app-offline-toast-close"
+            onClick={dismissNotice}
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
+        </div>
+      )}
       <aside className="app-sidebar">
         <div className="app-sidebar-top">
           {collapsed ? (
@@ -150,11 +195,16 @@ export function AppLayout() {
             aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
             data-tooltip={collapsed ? 'Развернуть' : undefined}
           >
-            <Icon name={collapsed ? 'chevronRight' : 'chevronLeft'} size={18} />
+            {collapsed ? <IconChevronRight size={18} stroke={1.8} /> : <IconChevronLeft size={18} stroke={1.8} />}
           </IconButton>
         </div>
 
         <UserBadge name={user?.name} role={user?.role} collapsed={collapsed} />
+        {pendingCount > 0 && (
+          <div className="app-offline-pending" data-tooltip="Продажи, ожидающие отправки на сервер">
+            {collapsed ? pendingCount : `Не отправлено: ${pendingCount}`}
+          </div>
+        )}
 
         <nav className="app-sidebar-nav">
           <NavItems variant="sidebar" collapsed={collapsed} role={user?.role} />

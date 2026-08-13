@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 
@@ -34,6 +35,8 @@ class StockDocument:
     to_warehouse_id: int | None = None  # для перемещения
     note: str = ""
     posted: bool = False
+    number: int | None = None  # заполняется репозиторием при add()/чтении, не при создании
+    created_at: datetime | None = None
 
     def post(self) -> None:
         if self.posted:

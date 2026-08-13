@@ -13,6 +13,7 @@ router = APIRouter(
 
 
 @router.get("")
-async def list_audit(uow: UowDep, limit: int = 100) -> list[AuditEntryResponse]:
+async def list_audit(uow: UowDep, limit: int = 50, offset: int = 0) -> list[AuditEntryResponse]:
     async with uow:
-        return [AuditEntryResponse.from_entity(e) for e in await uow.audit.list_recent(limit)]
+        entries = await uow.audit.list_recent(limit, offset)
+        return [AuditEntryResponse.from_entity(e) for e in entries]

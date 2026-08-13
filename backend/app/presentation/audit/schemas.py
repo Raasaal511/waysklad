@@ -8,6 +8,7 @@ from app.domain.audit.entities import AuditEntry
 class AuditEntryResponse(BaseModel):
     id: int
     user_id: int
+    user_name: str | None = None  # заполнено только в общем журнале /audit
     action: str
     entity: str
     entity_id: int | None
@@ -19,6 +20,7 @@ class AuditEntryResponse(BaseModel):
         return cls(
             id=entry.id,
             user_id=entry.user_id,
+            user_name=entry.user_name,
             action=entry.action,
             entity=entry.entity,
             entity_id=entry.entity_id,

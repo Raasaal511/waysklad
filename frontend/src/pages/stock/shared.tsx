@@ -1,19 +1,37 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   createWarehouse,
   receiveGoods,
   writeOff,
   transferStock,
+  type StockItem,
   type Warehouse,
 } from '../../entities/inventory/api'
-import { type Product } from '../../entities/product/api'
+import { getByBarcode, type Category, type Product, type Unit } from '../../entities/product/api'
 import { listEmployees } from '../../entities/profile/api'
 import type { User } from '../../entities/auth/api'
 import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
 import { Button } from '../../shared/ui/Button'
+import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
-import { normalizeDecimalInput } from '../../shared/lib/format'
+import { Modal } from '../../shared/ui/Modal'
+import { ProductPhoto } from '../../shared/ui/ProductPhoto'
+import { normalizeDecimalInput, formatQuantity } from '../../shared/lib/format'
+import { isBarcodeScannerSupported } from '../../entities/barcode/barcodeSupport'
+import {
+  IconBarcode,
+  IconTrash,
+  IconChevronRight,
+  IconArrowBarToDown,
+  IconArrowBarUp,
+  IconArrowsRightLeft,
+  type Icon,
+} from '@tabler/icons-react'
+
+const BarcodeScanner = lazy(() =>
+  import('../../entities/barcode/BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })),
+)
 
 export type MovementMode = 'receive' | 'write_off' | 'transfer'
 
@@ -21,6 +39,12 @@ export const MODE_LABELS: Record<MovementMode, string> = {
   receive: 'Приёмка',
   write_off: 'Списание',
   transfer: 'Перемещение',
+}
+
+export const MODE_ICONS: Record<MovementMode, Icon> = {
+  receive: IconArrowBarToDown,
+  write_off: IconArrowBarUp,
+  transfer: IconArrowsRightLeft,
 }
 
 /** Ответственным за склад может быть только владелец или кладовщик (storekeeper) — так же проверяется на бэкенде. */
@@ -131,17 +155,36 @@ export function NewWarehouseForm({ onCreated }: { onCreated: () => void }) {
   )
 }
 
+interface MovementLine {
+  product: Product
+  quantity: string
+  cost: string
+}
+
+/**
+ * Форма движения товара (приёмка/списание/перемещение) по образцу экрана продажи:
+ * плитки с фото/поиском/сканером штрихкода вместо голого <Select> с товарами
+ * «по памяти», несколько позиций за один документ — как реальная накладная.
+ */
 export function MovementForm({
   mode,
   products,
   warehouses,
+  units,
+  categories,
+  stock,
   fixedWarehouseId,
+  initialProductId,
   onDone,
 }: {
   mode: MovementMode
   products: Product[]
   warehouses: Warehouse[]
+  units: Unit[]
+  categories: Category[]
+  stock: StockItem[]
   fixedWarehouseId?: number
+  initialProductId?: number
   onDone: () => void
 }) {
   const otherWarehouses = fixedWarehouseId
@@ -152,32 +195,128 @@ export function MovementForm({
     fixedWarehouseId ?? warehouses[0]?.id ?? null,
   )
   const [toWarehouseId, setToWarehouseId] = useState<number | null>(otherWarehouses[0]?.id ?? null)
-  const [productId, setProductId] = useState<number | null>(products[0]?.id ?? null)
-  const [quantity, setQuantity] = useState('')
-  const [cost, setCost] = useState('')
+  const [lines, setLines] = useState<MovementLine[]>([])
+  const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [categoryId, setCategoryId] = useState<number | 'all'>('all')
+  const [showScanner, setShowScanner] = useState(false)
+  const [scanError, setScanError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 300)
+    return () => clearTimeout(timer)
+  }, [query])
+
+  useEffect(() => {
+    if (initialProductId == null) return
+    const product = products.find((p) => p.id === initialProductId)
+    if (product) addLine(product)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialProductId])
+
+  const unitName = (code: string) => units.find((u) => u.code === code)?.name ?? code
+  const isFractional = (code: string) => units.find((u) => u.code === code)?.fractional ?? false
+
+  // Для списания/перемещения нельзя увести больше, чем реально есть на складе-источнике;
+  // приёмка ничем не ограничена — товар только поступает.
+  const stockLimited = mode !== 'receive'
+  const stockFor = (productId: number) =>
+    warehouseId == null
+      ? null
+      : Number(stock.find((s) => s.product_id === productId && s.warehouse_id === warehouseId)?.quantity ?? '0')
+
+  const filtered = useMemo(() => {
+    let list = products
+    if (categoryId !== 'all') list = list.filter((p) => p.category_id === categoryId)
+    if (debouncedQuery.trim()) {
+      const q = debouncedQuery.trim().toLowerCase()
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.sku.toLowerCase().includes(q) ||
+          (p.barcode ?? '').toLowerCase().includes(q),
+      )
+    }
+    if (stockLimited) {
+      list = list.filter((p) => (stockFor(p.id) ?? 0) > 0)
+    }
+    return list
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, categoryId, debouncedQuery, stockLimited, warehouseId, stock])
+
+  function addLine(product: Product) {
+    const max = stockLimited ? stockFor(product.id) : null
+    const fractional = isFractional(product.unit_code)
+    const clamp = (value: number) => (fractional ? value : Math.floor(value))
+    setLines((prev) => {
+      const existing = prev.find((l) => l.product.id === product.id)
+      if (existing) {
+        const current = Number(existing.quantity)
+        if (max !== null && current >= max) return prev
+        const next = clamp(max !== null ? Math.min(current + 1, max) : current + 1)
+        return prev.map((l) => (l.product.id === product.id ? { ...l, quantity: String(next) } : l))
+      }
+      if (max !== null && max <= 0) return prev
+      const initial = clamp(max !== null ? Math.min(1, max) : 1)
+      if (initial <= 0) return prev
+      return [...prev, { product, quantity: String(initial), cost: product.purchase_price ?? '' }]
+    })
+  }
+
+  function updateLine(productId: number, field: 'quantity' | 'cost', rawValue: string) {
+    const normalized = normalizeDecimalInput(rawValue)
+    if (normalized === null) return
+    setLines((prev) =>
+      prev.map((l) => {
+        if (l.product.id !== productId) return l
+        let value = normalized
+        if (field === 'quantity' && !isFractional(l.product.unit_code) && value.includes('.')) {
+          value = value.split('.')[0] || '0'
+        }
+        return { ...l, [field]: value }
+      }),
+    )
+  }
+
+  function removeLine(productId: number) {
+    setLines((prev) => prev.filter((l) => l.product.id !== productId))
+  }
+
+  async function handleScan(code: string) {
+    setShowScanner(false)
+    setScanError(null)
+    try {
+      const product = await getByBarcode(code)
+      if (product) {
+        addLine(product)
+      } else {
+        setScanError(`Товар со штрихкодом ${code} не найден`)
+      }
+    } catch {
+      setScanError('Не удалось найти товар по штрихкоду')
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!warehouseId || !productId) return
+    if (!warehouseId || lines.length === 0) return
     setError(null)
     setSaving(true)
     try {
+      const payloadLines = lines.map((l) => ({
+        product_id: l.product.id,
+        quantity: l.quantity,
+        cost: mode === 'receive' ? l.cost || undefined : undefined,
+      }))
       if (mode === 'receive') {
-        await receiveGoods({
-          warehouse_id: warehouseId,
-          lines: [{ product_id: productId, quantity, cost: cost || undefined }],
-        })
+        await receiveGoods({ warehouse_id: warehouseId, lines: payloadLines })
       } else if (mode === 'write_off') {
-        await writeOff({ warehouse_id: warehouseId, lines: [{ product_id: productId, quantity }] })
+        await writeOff({ warehouse_id: warehouseId, lines: payloadLines })
       } else {
         if (!toWarehouseId) return
-        await transferStock({
-          warehouse_id: warehouseId,
-          to_warehouse_id: toWarehouseId,
-          lines: [{ product_id: productId, quantity }],
-        })
+        await transferStock({ warehouse_id: warehouseId, to_warehouse_id: toWarehouseId, lines: payloadLines })
       }
       onDone()
     } catch (err) {
@@ -189,67 +328,243 @@ export function MovementForm({
 
   return (
     <form className="form" onSubmit={handleSubmit}>
-      {!fixedWarehouseId && (
-        <label className="field">
-          {mode === 'transfer' ? 'Склад-отправитель' : 'Склад'}
-          <Select
-            value={warehouseId != null ? String(warehouseId) : ''}
-            onChange={(v) => setWarehouseId(Number(v))}
-            options={warehouses.map((w) => ({ value: String(w.id), label: w.name }))}
-          />
-        </label>
-      )}
-      {mode === 'transfer' && (
-        <label className="field">
-          Склад-получатель
-          <Select
-            value={toWarehouseId != null ? String(toWarehouseId) : ''}
-            onChange={(v) => setToWarehouseId(Number(v))}
-            options={otherWarehouses.map((w) => ({ value: String(w.id), label: w.name }))}
-          />
-        </label>
-      )}
-      <label className="field">
-        Товар
-        <Select
-          value={productId != null ? String(productId) : ''}
-          onChange={(v) => setProductId(Number(v))}
-          options={products.map((p) => ({ value: String(p.id), label: p.name }))}
-        />
-      </label>
       <div className="row">
-        <label className="field" style={{ flex: 1 }}>
-          Количество
-          <input
-            type="text"
-            inputMode="decimal"
-            value={quantity}
-            onChange={(e) => {
-              const normalized = normalizeDecimalInput(e.target.value)
-              if (normalized !== null) setQuantity(normalized)
-            }}
-            required
-          />
-        </label>
-        {mode === 'receive' && (
+        {!fixedWarehouseId && (
           <label className="field" style={{ flex: 1 }}>
-            Закупочная цена
-            <input
-              type="text"
-              inputMode="decimal"
-              value={cost}
-              onChange={(e) => {
-                const normalized = normalizeDecimalInput(e.target.value)
-                if (normalized !== null) setCost(normalized)
-              }}
+            {mode === 'transfer' ? 'Склад-отправитель' : 'Склад'}
+            <Select
+              value={warehouseId != null ? String(warehouseId) : ''}
+              onChange={(v) => setWarehouseId(Number(v))}
+              options={warehouses.map((w) => ({ value: String(w.id), label: w.name }))}
+            />
+          </label>
+        )}
+        {mode === 'transfer' && (
+          <label className="field" style={{ flex: 1 }}>
+            Склад-получатель
+            <Select
+              value={toWarehouseId != null ? String(toWarehouseId) : ''}
+              onChange={(v) => setToWarehouseId(Number(v))}
+              options={otherWarehouses.map((w) => ({ value: String(w.id), label: w.name }))}
             />
           </label>
         )}
       </div>
+
+      <div className="sale-search-panel">
+        <div className="sale-search-row">
+          <input
+            className="sale-search-input"
+            placeholder="Поиск по названию, артикулу, штрихкоду…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {isBarcodeScannerSupported() && (
+            <Button type="button" variant="secondary" onClick={() => setShowScanner(true)}>
+              <IconBarcode size={16} stroke={1.8} />
+            </Button>
+          )}
+        </div>
+        {categories.length > 0 && (
+          <div className="sale-filters-row">
+            <label className="filter-field">
+              <Select
+                value={categoryId === 'all' ? 'all' : String(categoryId)}
+                onChange={(v) => setCategoryId(v === 'all' ? 'all' : Number(v))}
+                options={[
+                  { value: 'all', label: 'Все категории' },
+                  ...categories.map((c) => ({ value: String(c.id), label: c.name })),
+                ]}
+              />
+            </label>
+          </div>
+        )}
+        {scanError && <p className="error">{scanError}</p>}
+      </div>
+
+      <div className="sale-results-panel">
+        <div className="sale-results-header">
+          <span>Товары</span>
+          <span className="text-muted">{filtered.length} найдено</span>
+        </div>
+        {filtered.length === 0 ? (
+          <p className="text-muted">
+            {stockLimited ? 'На складе нет товаров, доступных для этой операции' : 'Ничего не найдено'}
+          </p>
+        ) : (
+          <div className="product-grid" style={{ maxHeight: 280, overflowY: 'auto' }}>
+            {filtered.map((p) => {
+              const inLineQty = lines.find((l) => l.product.id === p.id)?.quantity
+              const available = stockFor(p.id)
+              return (
+                <div
+                  key={p.id}
+                  role="button"
+                  tabIndex={0}
+                  className={`product-tile${inLineQty ? ' product-tile-in-cart' : ''}`}
+                  onClick={() => addLine(p)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      addLine(p)
+                    }
+                  }}
+                >
+                  <span
+                    className={`product-tile-cart-badge${inLineQty ? '' : ' product-tile-cart-badge-hidden'}`}
+                  >
+                    {inLineQty ? (
+                      <>
+                        {formatQuantity(inLineQty)} {unitName(p.unit_code)}
+                        <IconButton
+                          className="product-tile-remove"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            removeLine(p.id)
+                          }}
+                          aria-label="Убрать из списка"
+                        >
+                          <IconTrash size={10} stroke={1.8} />
+                        </IconButton>
+                      </>
+                    ) : (
+                      ' '
+                    )}
+                  </span>
+                  <ProductPhoto src={p.photo} />
+                  <span className="product-tile-name">{p.name}</span>
+                  {available !== null && (
+                    <span className="product-tile-stock">
+                      <span className="product-tile-stock-label">Остаток:</span>
+                      <span className="product-tile-stock-value">
+                        {formatQuantity(available)} {unitName(p.unit_code)}
+                      </span>
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {showScanner && (
+        <Modal title="Сканировать штрихкод" onClose={() => setShowScanner(false)}>
+          <Suspense fallback={<p className="text-muted">Загрузка сканера…</p>}>
+            <BarcodeScanner onDetected={handleScan} onClose={() => setShowScanner(false)} />
+          </Suspense>
+        </Modal>
+      )}
+
+      {lines.length > 0 && (
+        <div className="stack card card-full">
+          <div className="section-title">
+            <h3>{MODE_LABELS[mode]}</h3>
+            <span className="text-muted">{lines.length} поз.</span>
+          </div>
+          <div className="table-wrap cart-table-wrap">
+            <table className="cart-table">
+              <colgroup>
+                <col style={{ width: mode === 'receive' ? '45%' : '70%' }} />
+                <col style={{ width: mode === 'receive' ? '30%' : '22%' }} />
+                {mode === 'receive' && <col style={{ width: '17%' }} />}
+                <col style={{ width: '8%' }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Товар</th>
+                  <th>Кол-во</th>
+                  {mode === 'receive' && <th>Закуп. цена</th>}
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((line) => {
+                  const available = stockFor(line.product.id)
+                  const overStock = stockLimited && available !== null && Number(line.quantity || 0) > available
+                  return (
+                    <tr key={line.product.id}>
+                      <td className="cart-table-name">
+                        <div>{line.product.name}</div>
+                        {available !== null && (
+                          <div className="cart-table-stock">
+                            Остаток: {formatQuantity(available)} {unitName(line.product.unit_code)}
+                          </div>
+                        )}
+                      </td>
+                      <td className="cart-table-qty-cell">
+                        <div className="cart-qty-stepper">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            className={overStock ? 'cart-input-warning' : undefined}
+                            value={line.quantity}
+                            onChange={(e) => updateLine(line.product.id, 'quantity', e.target.value)}
+                          />
+                          <div className="cart-qty-step-column">
+                            <IconButton
+                              variant="muted"
+                              className="cart-qty-step"
+                              onClick={() => addLine(line.product)}
+                              aria-label="Увеличить количество"
+                            >
+                              <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-up" />
+                            </IconButton>
+                            <IconButton
+                              variant="muted"
+                              className="cart-qty-step"
+                              onClick={() =>
+                                updateLine(line.product.id, 'quantity', String(Math.max(0, Number(line.quantity) - 1)))
+                              }
+                              aria-label="Уменьшить количество"
+                            >
+                              <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-down" />
+                            </IconButton>
+                          </div>
+                        </div>
+                        {overStock && available !== null && (
+                          <div className="cart-table-warning">больше остатка ({formatQuantity(available)})</div>
+                        )}
+                      </td>
+                      {mode === 'receive' && (
+                        <td className="cart-table-price-cell">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={line.cost}
+                            onChange={(e) => updateLine(line.product.id, 'cost', e.target.value)}
+                          />
+                          <span className="cart-table-price-suffix">₽</span>
+                        </td>
+                      )}
+                      <td>
+                        <IconButton
+                          variant="danger"
+                          onClick={() => removeLine(line.product.id)}
+                          aria-label="Убрать позицию"
+                        >
+                          <IconTrash size={16} stroke={1.8} />
+                        </IconButton>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {error && <p className="error">{error}</p>}
       <Button
         type="submit"
-        disabled={saving || !warehouseId || !productId || (mode === 'transfer' && !toWarehouseId)}
+        disabled={
+          saving ||
+          !warehouseId ||
+          lines.length === 0 ||
+          (mode === 'transfer' && !toWarehouseId) ||
+          lines.some((l) => Number(l.quantity) <= 0)
+        }
       >
         {saving ? 'Проведение…' : `Провести: ${MODE_LABELS[mode]}`}
       </Button>

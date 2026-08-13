@@ -3,6 +3,7 @@ from decimal import Decimal
 from io import BytesIO
 
 import openpyxl
+from PIL import Image
 
 
 async def test_register_login_flow(client, random_phone):
@@ -407,6 +408,28 @@ async def test_warehouses_via_api(client, owner_headers):
     assert len(response.json()) == 2
 
 
+async def test_update_warehouse_details_via_api(client, owner_headers):
+    warehouses = (
+        await client.get("/api/inventory/warehouses", headers=owner_headers)
+    ).json()
+    warehouse_id = warehouses[0]["id"]
+
+    response = await client.put(
+        f"/api/inventory/warehouses/{warehouse_id}",
+        headers=owner_headers,
+        json={"name": "Склад на Кадырова", "address": "ул. Кадырова, 12"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["name"] == "Склад на Кадырова"
+    assert body["address"] == "ул. Кадырова, 12"
+
+    response = await client.get("/api/inventory/warehouses", headers=owner_headers)
+    updated = next(w for w in response.json() if w["id"] == warehouse_id)
+    assert updated["name"] == "Склад на Кадырова"
+    assert updated["address"] == "ул. Кадырова, 12"
+
+
 async def test_storekeeper_limited_to_assigned_warehouse_via_api(
     client, owner_headers, random_phone
 ):
@@ -429,6 +452,16 @@ async def test_storekeeper_limited_to_assigned_warehouse_via_api(
 
     warehouses = (await client.get("/api/inventory/warehouses", headers=owner_headers)).json()
     main_warehouse_id = warehouses[0]["id"]
+
+    # в момент создания кладовщика склад был единственным — сотрудник привязан
+    # к нему автоматически; снимаем эту привязку, чтобы проверить ограничение
+    # доступа именно ко второму (явно не назначенному) складу
+    response = await client.put(
+        f"/api/inventory/warehouses/{main_warehouse_id}/assignments",
+        headers=owner_headers,
+        json={"user_ids": []},
+    )
+    assert response.status_code == 200, response.text
 
     response = await client.post(
         "/api/inventory/warehouses",
@@ -682,6 +715,12 @@ async def test_import_products_from_excel_via_api(client, owner_headers, random_
     assert response.status_code == 403
 
 
+def _test_photo_bytes(size: tuple[int, int] = (2000, 1500)) -> bytes:
+    buffer = BytesIO()
+    Image.new("RGB", size, color=(90, 140, 200)).save(buffer, "JPEG", quality=90)
+    return buffer.getvalue()
+
+
 async def test_product_photo_upload_via_api(client, owner_headers, random_phone, tmp_path):
     response = await client.post(
         "/api/products",
@@ -690,16 +729,26 @@ async def test_product_photo_upload_via_api(client, owner_headers, random_phone,
     )
     product_id = response.json()["id"]
 
+    original = _test_photo_bytes()
     response = await client.post(
         f"/api/products/{product_id}/photo",
         headers=owner_headers,
-        files={"file": ("photo.jpg", b"\xff\xd8\xff-fake-jpeg-bytes", "image/jpeg")},
+        files={"file": ("photo.jpg", original, "image/jpeg")},
     )
     assert response.status_code == 201, response.text
-    photo_url = response.json()["photo"]
-    assert photo_url.startswith("/uploads/") and photo_url.endswith(".jpg")
-    saved = list(tmp_path.iterdir())
-    assert len(saved) == 1 and saved[0].read_bytes() == b"\xff\xd8\xff-fake-jpeg-bytes"
+    body = response.json()
+
+    # оригинал переупаковывается в WebP, а не сохраняется как есть
+    assert body["photo"].startswith("/uploads/") and body["photo"].endswith(".webp")
+
+    full_path = tmp_path / body["photo"].removeprefix("/uploads/")
+    assert full_path.exists()
+
+    with Image.open(full_path) as full_image:
+        assert max(full_image.size) <= 1200
+
+    # реальное фото с телефона весит существенно больше, чем пережатый WebP
+    assert full_path.stat().st_size < len(original)
 
     response = await client.post(
         f"/api/products/{product_id}/photo",
@@ -707,6 +756,13 @@ async def test_product_photo_upload_via_api(client, owner_headers, random_phone,
         files={"file": ("virus.exe", b"not-an-image", "application/octet-stream")},
     )
     assert response.status_code == 400  # недопустимое расширение
+
+    response = await client.post(
+        f"/api/products/{product_id}/photo",
+        headers=owner_headers,
+        files={"file": ("not-an-image.jpg", b"totally not a jpeg", "image/jpeg")},
+    )
+    assert response.status_code == 400  # расширение верное, но не изображение
 
     response = await client.post(
         f"/api/products/{product_id}/photo",
@@ -728,7 +784,7 @@ async def test_product_photo_upload_via_api(client, owner_headers, random_phone,
     response = await client.post(
         f"/api/products/{product_id}/photo",
         headers=seller_headers,
-        files={"file": ("photo.jpg", b"\xff\xd8\xff-fake-jpeg-bytes", "image/jpeg")},
+        files={"file": ("photo.jpg", original, "image/jpeg")},
     )
     assert response.status_code == 403
 
@@ -868,6 +924,62 @@ async def test_analytics_endpoints_via_api(client, owner_headers, random_phone):
     assert response.status_code == 403
 
 
+async def test_restock_recommendations_via_api(client, owner_headers):
+    # раскупаемый товар: остаток 2 <= min_stock 5, продавался — должен попасть в рекомендации
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={
+            "name": "Ходовой товар", "purchase_price": "100", "retail_price": "200",
+            "min_stock": "5",
+        },
+    )
+    hot_product_id = response.json()["id"]
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1,
+            "lines": [{"product_id": hot_product_id, "quantity": "5", "cost": "100"}],
+        },
+    )
+    response = await client.post(
+        "/api/sales",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1,
+            "payment_method": "cash",
+            "items": [{"product_id": hot_product_id, "quantity": "3", "price": "200"}],
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    # тоже мало на остатке, но никогда не продавался — не должен попасть в рекомендации
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={
+            "name": "Незнакомец", "purchase_price": "50", "retail_price": "100",
+            "min_stock": "5",
+        },
+    )
+    cold_product_id = response.json()["id"]
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1,
+            "lines": [{"product_id": cold_product_id, "quantity": "1", "cost": "50"}],
+        },
+    )
+
+    response = await client.get("/api/inventory/restock-recommendations", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    names = [item["product_name"] for item in response.json()]
+    assert "Ходовой товар" in names
+    assert "Незнакомец" not in names
+
+
 async def test_sync_sales_offline_queue_via_api(client, owner_headers):
     response = await client.post(
         "/api/products",
@@ -934,3 +1046,292 @@ async def test_connect_telegram_via_api(client, owner_headers, random_phone):
         "/api/auth/telegram", headers=seller_headers, json={"chat_id": "111"}
     )
     assert response.status_code == 403
+
+
+async def test_product_history_via_api(client, owner_headers):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Свеча ароматическая", "purchase_price": "100", "retail_price": "200"},
+    )
+    assert response.status_code == 201, response.text
+    product = response.json()
+
+    response = await client.put(
+        f"/api/products/{product['id']}",
+        headers=owner_headers,
+        json={"name": "Свеча ароматическая (лаванда)", "purchase_price": "100", "retail_price": "220"},
+    )
+    assert response.status_code == 200, response.text
+
+    response = await client.get(f"/api/products/{product['id']}/history", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    actions = [e["action"] for e in response.json()]
+    assert actions == ["product.update", "product.create"]
+
+
+async def test_import_products_from_csv_via_api(client, owner_headers):
+    csv_text = (
+        "Название,Артикул,Штрихкод,Ед. изм.,Закупочная цена,Розничная цена,Мин. остаток\n"
+        "Соль морская,,,kg,50,90,0\n"
+        "Без цены,,,pcs,не число,90,0\n"
+    )
+    response = await client.post(
+        "/api/products/import",
+        headers=owner_headers,
+        files={"file": ("products.csv", csv_text.encode("utf-8-sig"), "text/csv")},
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["created"] == 1
+    assert len(body["errors"]) == 1 and body["errors"][0]["row"] == 3
+
+    response = await client.get("/api/products", headers=owner_headers)
+    assert "Соль морская" in [p["name"] for p in response.json()]
+
+
+async def test_export_products_via_api(client, owner_headers):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Йогурт питьевой", "purchase_price": "60", "retail_price": "100"},
+    )
+    assert response.status_code == 201, response.text
+
+    response = await client.get("/api/products/export.xlsx", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert len(response.content) > 0
+
+    response = await client.get("/api/products/export.csv", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "Йогурт питьевой" in response.content.decode("utf-8-sig")
+
+    response = await client.get("/api/products/export.pdf", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith("application/pdf")
+    assert response.content.startswith(b"%PDF")
+
+
+async def test_products_pagination_via_api(client, owner_headers):
+    for i in range(55):
+        response = await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": f"Пагинация {i:03d}", "purchase_price": "10", "retail_price": "20"},
+        )
+        assert response.status_code == 201, response.text
+
+    # без limit/offset — дефолтная страница из 50, но X-Total-Count честно больше
+    response = await client.get("/api/products", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    assert len(response.json()) == 50
+    assert int(response.headers["x-total-count"]) >= 55
+
+    # вторая страница — оставшиеся товары
+    response = await client.get(
+        "/api/products", headers=owner_headers, params={"limit": 50, "offset": 50}
+    )
+    assert response.status_code == 200, response.text
+    assert len(response.json()) >= 5
+
+    # экспорт не должен быть обрезан лимитом страницы
+    response = await client.get("/api/products/export.csv", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    rows = response.content.decode("utf-8-sig").strip().splitlines()
+    assert len(rows) - 1 >= 55  # минус строка заголовка
+
+
+async def test_products_search_by_barcode_via_api(client, owner_headers):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={
+            "name": "Шоколад молочный",
+            "purchase_price": "80",
+            "retail_price": "150",
+            "barcode": "4600000000123",
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    response = await client.get(
+        "/api/products", headers=owner_headers, params={"query": "4600000000123"}
+    )
+    assert response.status_code == 200, response.text
+    assert [p["name"] for p in response.json()] == ["Шоколад молочный"]
+
+
+async def test_products_category_and_sort_via_api(client, owner_headers):
+    category = await client.post(
+        "/api/products/categories", headers=owner_headers, json={"name": "Напитки"}
+    )
+    category_id = category.json()["id"]
+
+    await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={
+            "name": "Сок яблочный", "purchase_price": "50", "retail_price": "100",
+            "category_id": category_id,
+        },
+    )
+    await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={
+            "name": "Сок вишнёвый", "purchase_price": "60", "retail_price": "90",
+            "category_id": category_id,
+        },
+    )
+    await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Гвозди", "purchase_price": "5", "retail_price": "10"},
+    )
+
+    response = await client.get(
+        "/api/products", headers=owner_headers, params={"category_id": category_id}
+    )
+    assert response.status_code == 200, response.text
+    names = [p["name"] for p in response.json()]
+    assert set(names) == {"Сок яблочный", "Сок вишнёвый"}
+
+    response = await client.get(
+        "/api/products",
+        headers=owner_headers,
+        params={"category_id": category_id, "sort": "price_asc"},
+    )
+    assert [p["name"] for p in response.json()] == ["Сок вишнёвый", "Сок яблочный"]
+
+    response = await client.get(
+        "/api/products",
+        headers=owner_headers,
+        params={"category_id": category_id, "sort": "price_desc"},
+    )
+    assert [p["name"] for p in response.json()] == ["Сок яблочный", "Сок вишнёвый"]
+
+    response = await client.get(
+        "/api/products",
+        headers=owner_headers,
+        params={"category_id": category_id, "sort": "created_desc"},
+    )
+    assert [p["name"] for p in response.json()] == ["Сок вишнёвый", "Сок яблочный"]
+
+    response = await client.get(
+        "/api/products",
+        headers=owner_headers,
+        params={"category_id": category_id, "sort": "created_asc"},
+    )
+    assert [p["name"] for p in response.json()] == ["Сок яблочный", "Сок вишнёвый"]
+
+
+async def test_inventory_documents_history_via_api(client, owner_headers):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Гвозди 100мм", "unit_code": "pcs", "purchase_price": "5", "retail_price": "10"},
+    )
+    product_id = response.json()["id"]
+
+    response = await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1,
+            "lines": [{"product_id": product_id, "quantity": "50", "cost": "5"}],
+            "note": "Первая поставка",
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    response = await client.post(
+        "/api/inventory/write-off",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "3"}]},
+    )
+    assert response.status_code == 201, response.text
+
+    response = await client.get("/api/inventory/documents", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    documents = response.json()
+    assert len(documents) == 2
+    # новые сначала
+    assert documents[0]["type"] == "write_off"
+    assert documents[1]["type"] == "receipt"
+    assert documents[1]["note"] == "Первая поставка"
+    assert documents[1]["lines"] == [
+        {"product_id": product_id, "variant_id": None, "quantity": "50.000", "cost": "5.00"}
+    ]
+    assert documents[0]["lines"][0]["quantity"] == "3.000"
+    assert all("number" in d and "created_at" in d and "author_id" in d for d in documents)
+
+    response = await client.get("/api/inventory/documents/export.xlsx", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert len(response.content) > 0
+
+    response = await client.get("/api/inventory/documents/export.csv", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith("text/csv")
+    csv_text = response.content.decode("utf-8-sig")
+    assert "Гвозди 100мм" in csv_text
+    assert "Первая поставка" in csv_text
+
+    response = await client.get("/api/inventory/documents/export.pdf", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith("application/pdf")
+    assert response.content.startswith(b"%PDF")
+
+
+async def test_seller_sees_only_own_warehouse_documents(client, owner_headers, random_phone):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Товар склад 2", "unit_code": "pcs", "purchase_price": "1", "retail_price": "2"},
+    )
+    product_id = response.json()["id"]
+
+    response = await client.post(
+        "/api/inventory/warehouses", headers=owner_headers, json={"name": "Второй склад"}
+    )
+    warehouse2_id = response.json()["id"]
+
+    phone = random_phone()
+    response = await client.post(
+        "/api/auth/employees",
+        headers=owner_headers,
+        json={
+            "name": "Продавец",
+            "phone": phone,
+            "password": "secret123",
+            "role": "seller",
+            "warehouse_ids": [warehouse2_id],
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "5"}]},
+    )
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": warehouse2_id, "lines": [{"product_id": product_id, "quantity": "7"}]},
+    )
+
+    response = await client.post("/api/auth/login", json={"phone": phone, "password": "secret123"})
+    seller_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+    response = await client.get("/api/inventory/documents", headers=seller_headers)
+    assert response.status_code == 200, response.text
+    documents = response.json()
+    assert len(documents) == 1
+    assert documents[0]["warehouse_id"] == warehouse2_id

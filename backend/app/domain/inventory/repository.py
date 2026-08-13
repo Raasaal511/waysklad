@@ -21,3 +21,9 @@ class IStockRepository(Protocol):
 
 class IStockDocumentRepository(Protocol):
     async def add(self, document: StockDocument) -> StockDocument: ...
+
+    async def list_all(self, warehouse_ids: list[int] | None = None) -> list[StockDocument]:
+        """История документов движения, новые сначала. warehouse_ids=None — без
+        ограничения по складу (owner/analyst); иначе — только документы, где склад
+        документа (источник или получатель при перемещении) входит в список."""
+        ...

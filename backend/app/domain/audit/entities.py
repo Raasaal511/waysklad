@@ -15,6 +15,7 @@ class AuditEntry:
     details: dict
     id: int | None = None
     created_at: datetime | None = None
+    user_name: str | None = None  # заполняется при чтении общего журнала (join с users)
 
     @classmethod
     def record(

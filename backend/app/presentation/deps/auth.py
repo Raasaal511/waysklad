@@ -8,9 +8,14 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.domain.common.exceptions import AccessDeniedError
 from app.domain.identity.entities import Role
 from app.domain.identity.permissions import Actor, Permission, has_permission
+from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.security import decode_access_token
+from app.presentation.deps.session import SessionFactoryDep
 
 _bearer = HTTPBearer(auto_error=False)
+
+# роли, чьи данные фильтруются по списку привязанных складов
+_WAREHOUSE_SCOPED_ROLES = (Role.MANAGER, Role.SELLER, Role.STOREKEEPER)
 
 
 @dataclass(frozen=True)
@@ -36,8 +41,17 @@ def get_current_user(
     )
 
 
-def get_actor(user: Annotated[CurrentUser, Depends(get_current_user)]) -> Actor:
-    return Actor(id=user.id, role=user.role)
+async def get_actor(
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    factory: SessionFactoryDep,
+) -> Actor:
+    if user.role not in _WAREHOUSE_SCOPED_ROLES:
+        return Actor(id=user.id, role=user.role)
+    # manager/seller/storekeeper видят только свои склады — подгружаем список назначений
+    uow = SqlAlchemyUnitOfWork(user.tenant_id, session_factory=factory)
+    async with uow:
+        warehouse_ids = [w.id for w in await uow.warehouses.list_for_user(user.id)]
+    return Actor(id=user.id, role=user.role, warehouse_ids=warehouse_ids)
 
 
 CurrentUserDep = Annotated[CurrentUser, Depends(get_current_user)]

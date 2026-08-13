@@ -7,7 +7,7 @@ from app.domain.common.exceptions import DomainError
 from app.domain.common.money import Money
 from app.domain.common.quantity import Quantity
 from app.domain.common.uow import IUnitOfWork
-from app.domain.identity.permissions import Actor, Permission, require
+from app.domain.identity.permissions import Actor, Permission, require, require_warehouse
 from app.domain.sales.entities import Sale, SaleReturn, SaleReturnLine
 from app.domain.sales.payment import PaymentMethod
 
@@ -40,6 +40,7 @@ class ReturnSaleUseCase:
 
         async with self._uow as uow:
             sale = await uow.sales.get(cmd.sale_id)
+            require_warehouse(actor, sale.warehouse_id)
             lines_by_id = {line.id: line for line in sale.lines}
             already_returned = self._already_returned(await uow.sale_returns.list_by_sale(sale.id))
 

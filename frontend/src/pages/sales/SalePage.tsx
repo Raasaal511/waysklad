@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  listProducts,
+  listAllProducts,
   getByBarcode,
   listCategories,
   listUnits,
@@ -30,14 +30,35 @@ import {
   type SaleHistoryEntry,
   type SaleReturn,
 } from '../../entities/sale/api'
+import {
+  IconReceiptRefund,
+  IconPlus,
+  IconX,
+  IconBuildingWarehouse,
+  IconUsers,
+  IconBarcode,
+  IconChevronRight,
+  IconCheck,
+  IconBrandWhatsapp,
+  IconDownload,
+  IconShare,
+  IconPencil,
+  IconTrash,
+  IconChevronDown,
+  type Icon as TablerIcon,
+} from '@tabler/icons-react'
 import { ApiError } from '../../shared/api/client'
-import { Icon, type IconName } from '../../shared/ui/icons/Icon'
 import { Modal } from '../../shared/ui/Modal'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
 import { DateInput } from '../../shared/ui/DateInput'
+import { PhoneInput } from '../../shared/ui/PhoneInput'
+import { ProductPhoto } from '../../shared/ui/ProductPhoto'
+import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
+import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
 import { isBarcodeScannerSupported } from '../../entities/barcode/barcodeSupport'
+import { queueSale } from '../../shared/offline/outbox'
 
 const BarcodeScanner = lazy(() =>
   import('../../entities/barcode/BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })),
@@ -49,6 +70,8 @@ import {
   lineTotalCents,
   centsToMoney,
   normalizeDecimalInput,
+  isLowStock,
+  isOutOfStock,
 } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
 import { useAuth } from '../../app/AuthContext'
@@ -304,7 +327,7 @@ export function SalePage() {
       <div className="section-title">
         <h2>Продажи</h2>
         <Button onClick={() => setShowNewSale(true)}>
-          <Icon name="plus" size={16} />
+          <IconPlus size={16} stroke={1.8} />
           {hasDraft ? 'Продолжить продажу' : 'Новая продажа'}
         </Button>
       </div>
@@ -356,7 +379,7 @@ export function SalePage() {
             />
           </label>
           {activeFilterCount > 0 && (
-            <Button
+            <ResetFiltersButton
               className="sale-reset-link"
               onClick={() => {
                 setPaymentFilter('all')
@@ -364,9 +387,7 @@ export function SalePage() {
                 setWarehouseFilter('all')
                 setClientQuery('')
               }}
-            >
-              <Icon name="close" size={12} /> Сбросить
-            </Button>
+            />
           )}
         </div>
       </div>
@@ -424,6 +445,23 @@ export function SalePage() {
 
       {error && <p className="error">{error}</p>}
 
+      {!loading && warehouses.length === 0 && (
+        <div className="card card-full onboarding-banner">
+          <div className="stack" style={{ gap: 2 }}>
+            <strong>Добавьте склад — и можно начинать</strong>
+            <span className="text-muted">
+              Склад — это то место, где реально лежит товар (магазин, точка, подсобка). Без него
+              некуда принять товар и не с чего продавать.
+            </span>
+          </div>
+          <Link to="/stock">
+            <Button>
+              <IconPlus size={16} stroke={1.8} /> Добавить склад
+            </Button>
+          </Link>
+        </div>
+      )}
+
       {loading ? (
         <p className="text-muted">Загрузка…</p>
       ) : filteredSales.length === 0 ? (
@@ -459,14 +497,14 @@ export function SalePage() {
                     )}
                     {showWarehouseTag && (
                       <span className="sale-history-detail">
-                        <Icon name="stock" size={13} />
+                        <IconBuildingWarehouse size={13} stroke={1.8} />
                         {warehouseName(s.warehouse_id)}
                       </span>
                     )}
                     <span className="sale-history-detail">
                       {clientName(s.client_id) && (
                         <>
-                          <Icon name="clients" size={13} />
+                          <IconUsers size={13} stroke={1.8} />
                           {clientName(s.client_id)}
                         </>
                       )}
@@ -550,6 +588,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [lastSale, setLastSale] = useState<Sale | null>(null)
+  const [offlineQueued, setOfflineQueued] = useState<{ itemsCount: number; total: string } | null>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 300)
@@ -558,7 +597,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   useEffect(() => {
     setProductsLoading(true)
-    listProducts(debouncedQuery)
+    listAllProducts(debouncedQuery)
       .then(setProducts)
       .catch(() => {})
       .finally(() => setProductsLoading(false))
@@ -578,13 +617,13 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   // Черновик переживает закрытие модалки/перезагрузку страницы, пока продажа не проведена
   useEffect(() => {
-    if (lastSale) return
+    if (lastSale || offlineQueued) return
     if (cart.length === 0) {
       clearDraft()
       return
     }
     saveDraft({ warehouseId, cart, payment, discount, discountMode, clientId })
-  }, [warehouseId, cart, payment, discount, discountMode, clientId, lastSale])
+  }, [warehouseId, cart, payment, discount, discountMode, clientId, lastSale, offlineQueued])
 
   async function handleScan(code: string) {
     setShowScanner(false)
@@ -814,20 +853,21 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
     }
     setError(null)
     setSaving(true)
+    const items: SaleItemInput[] = cart.map((l) => ({
+      product_id: l.product.id,
+      quantity: l.quantity,
+      price: l.price,
+    }))
+    const cashReceivedValue =
+      payment === 'cash' && cashReceived && cashReceivedCents >= totalCents ? cashReceived : null
     try {
-      const items: SaleItemInput[] = cart.map((l) => ({
-        product_id: l.product.id,
-        quantity: l.quantity,
-        price: l.price,
-      }))
       const sale = await createSale({
         warehouse_id: warehouseId,
         payment_method: payment,
         items,
         discount: discountAmount.toFixed(2),
         client_id: clientId,
-        cash_received:
-          payment === 'cash' && cashReceived && cashReceivedCents >= totalCents ? cashReceived : null,
+        cash_received: cashReceivedValue,
         debt_due_date: payment === 'credit' ? debtDueDate : null,
       })
       clearDraft()
@@ -838,10 +878,47 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
       setDebtDueDate('')
       setCashReceived('')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось провести продажу')
+      // Сеть недоступна (offline или fetch упал по TypeError, не по HTTP-ответу) —
+      // и продажа не в долг (офлайн-синк на бэкенде долги не поддерживает, см. sync/schemas.py) —
+      // сохраняем в очередь вместо показа ошибки. Бизнес-ошибки (ApiError) остаются ошибками.
+      const isNetworkFailure = !(err instanceof ApiError) && (!navigator.onLine || err instanceof TypeError)
+      if (isNetworkFailure && payment !== 'credit') {
+        await queueSale({
+          warehouse_id: warehouseId,
+          payment_method: payment,
+          items,
+          discount: discountAmount.toFixed(2),
+          client_id: clientId,
+          cash_received: cashReceivedValue,
+        })
+        clearDraft()
+        setOfflineQueued({ itemsCount: items.length, total: total.toFixed(2) })
+        setCart([])
+        setDiscount('0')
+        setClientId(null)
+        setDebtDueDate('')
+        setCashReceived('')
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Не удалось провести продажу')
+      }
     } finally {
       setSaving(false)
     }
+  }
+
+  if (offlineQueued) {
+    return (
+      <Modal title="Продажа сохранена локально" onClose={onDone} size="full">
+        <div className="stack" style={{ textAlign: 'center', padding: '24px 12px' }}>
+          <p>
+            Нет подключения к интернету. Продажа на сумму {formatMoney(offlineQueued.total)} (позиций в чеке:{' '}
+            {offlineQueued.itemsCount}) сохранена на устройстве и отправится на сервер автоматически, как
+            только появится сеть.
+          </p>
+          <Button onClick={onDone}>Понятно</Button>
+        </div>
+      </Modal>
+    )
   }
 
   if (lastSale) {
@@ -884,7 +961,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
       <div className="sale-search-panel">
         <div>
           <div className="sale-search-row">
-            <Icon name="barcode" size={18} className="sale-search-icon" />
+            <IconBarcode size={18} stroke={1.8} className="sale-search-icon" />
             <input
               className="sale-search-input"
               placeholder={
@@ -901,7 +978,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                 className="sale-scan-button"
                 onClick={() => setShowScanner(true)}
               >
-                <Icon name="barcode" size={16} /> Скан
+                <IconBarcode size={16} stroke={1.8} /> Скан
               </Button>
             )}
           </div>
@@ -998,24 +1075,27 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                           }}
                           aria-label="Убрать из чека"
                         >
-                          <Icon name="close" size={10} />
+                          <IconX size={10} stroke={1.8} />
                         </IconButton>
                       </>
                     ) : (
                       ' '
                     )}
                   </span>
+                  <ProductPhoto src={p.photo} />
                   <span className="product-tile-name">{p.name}</span>
                   <span className="product-tile-price">{formatMoney(p.retail_price)} ₽</span>
                   {qty !== null && (
                     <span
                       className={`product-tile-stock${
-                        Number(p.min_stock) > 0 && Number(qty) <= Number(p.min_stock)
-                          ? ' product-tile-stock-low'
-                          : ''
+                        isOutOfStock(qty) ? ' product-tile-stock-out' : ' product-tile-stock-in'
                       }`}
                     >
-                      Остаток: {formatQuantity(qty)} {unitName(p.unit_code)}
+                      <span className="product-tile-stock-label">Остаток:</span>
+                      <span className="product-tile-stock-value">
+                        {formatQuantity(qty)} {unitName(p.unit_code)}
+                      </span>
+                      {isLowStock(qty, p.min_stock) && <StockWarningIcon />}
                     </span>
                   )}
                   {maxReachedProductId === p.id && (
@@ -1093,7 +1173,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                               onClick={() => stepLineQuantity(line.product.id, 1, availableNum)}
                               aria-label="Увеличить количество"
                             >
-                              <Icon name="chevronRight" size={10} className="cart-qty-step-icon-up" />
+                              <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-up" />
                             </IconButton>
                             <IconButton
                               variant="muted"
@@ -1101,7 +1181,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                               onClick={() => stepLineQuantity(line.product.id, -1, availableNum)}
                               aria-label="Уменьшить количество"
                             >
-                              <Icon name="chevronRight" size={10} className="cart-qty-step-icon-down" />
+                              <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-down" />
                             </IconButton>
                           </div>
                         </div>
@@ -1129,7 +1209,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                           onClick={() => removeLine(line.product.id)}
                           aria-label="Убрать из чека"
                         >
-                          <Icon name="close" size={16} />
+                          <IconX size={16} stroke={1.8} />
                         </IconButton>
                       </td>
                     </tr>
@@ -1220,7 +1300,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                   ]}
                 />
                 <Button variant="secondary" onClick={() => setShowNewClientForm(true)}>
-                  <Icon name="plus" size={16} /> Клиент
+                  <IconPlus size={16} stroke={1.8} /> Клиент
                 </Button>
               </div>
             </label>
@@ -1265,11 +1345,10 @@ const SALE_HISTORY_ACTION_LABELS: Record<string, string> = {
   'sale.delete': 'Продажа удалена',
 }
 
-const SALE_HISTORY_ACTION_ICONS: Record<string, IconName> = {
-  'sale.create': 'check',
-  'sale.return': 'return',
-  'sale.edit': 'edit',
-  'sale.delete': 'trash',
+const SALE_HISTORY_ACTION_ICONS: Record<string, TablerIcon> = {
+  'sale.create': IconCheck,
+  'sale.edit': IconPencil,
+  'sale.delete': IconTrash,
 }
 
 function LastSaleCard({
@@ -1312,7 +1391,7 @@ function LastSaleCard({
   const canShareFiles = typeof navigator.share === 'function' && typeof navigator.canShare === 'function'
 
   useEffect(() => {
-    listProducts().then(setProducts).catch(() => {})
+    listAllProducts().then(setProducts).catch(() => {})
     listUnits().then(setUnits).catch(() => {})
     listSaleReturns(sale.id).then(setReturns).catch(() => {})
     listEmployees().then(setEmployees).catch(() => {})
@@ -1459,7 +1538,7 @@ function LastSaleCard({
       <Modal title={`Продажа №${sale.id}`} onClose={onDone}>
         <div className="stack">
           <div className="row" style={{ gap: 8 }}>
-            <Icon name="check" size={18} className="icon-accent" />
+            <IconCheck size={18} stroke={1.8} className="icon-accent" />
             <p>Возврат по продаже №{sale.id} оформлен, остаток восстановлен</p>
           </div>
         </div>
@@ -1483,7 +1562,7 @@ function LastSaleCard({
         }
         aria-label="Отправить чек в WhatsApp"
       >
-        <Icon name="whatsapp" size={22} />
+        <IconBrandWhatsapp size={22} stroke={1.8} />
       </IconButton>
       <IconButton
         variant="muted"
@@ -1499,7 +1578,7 @@ function LastSaleCard({
         }
         aria-label="Скачать чек"
       >
-        <Icon name="download" size={22} />
+        <IconDownload size={22} stroke={1.8} />
       </IconButton>
       {canShareFiles && (
         <IconButton
@@ -1510,7 +1589,7 @@ function LastSaleCard({
           tooltip={sharingReceipt ? 'Готовим…' : 'Поделиться'}
           aria-label="Поделиться чеком"
         >
-          <Icon name="share" size={22} />
+          <IconShare size={22} stroke={1.8} />
         </IconButton>
       )}
     </>
@@ -1535,7 +1614,7 @@ function LastSaleCard({
                 tooltip="Изменить продажу"
                 aria-label="Изменить продажу"
               >
-                <Icon name="edit" size={22} />
+                <IconPencil size={22} stroke={1.8} />
               </IconButton>
             )}
             <IconButton
@@ -1545,7 +1624,7 @@ function LastSaleCard({
               tooltip="Оформить возврат"
               aria-label="Оформить возврат"
             >
-              <Icon name="return" size={22} />
+              <IconReceiptRefund size={22} stroke={1.8} />
             </IconButton>
             {canDelete && (
               <IconButton
@@ -1555,7 +1634,7 @@ function LastSaleCard({
                 tooltip="Удалить продажу"
                 aria-label="Удалить продажу"
               >
-                <Icon name="trash" size={22} />
+                <IconTrash size={22} stroke={1.8} />
               </IconButton>
             )}
           </div>
@@ -1570,8 +1649,7 @@ function LastSaleCard({
           <span>
             {new Date(sale.created_at).toLocaleString('ru-RU', {
               day: 'numeric',
-              month: 'long',
-              year: 'numeric',
+              month: 'short',
               hour: '2-digit',
               minute: '2-digit',
             })}
@@ -1606,24 +1684,28 @@ function LastSaleCard({
       </div>
 
       {client && (
-        <Link
-          to={`/clients?highlight=${client.id}`}
-          className="sale-detail-client-card"
-        >
-          <Icon name="clients" size={16} />
-          <span className="sale-detail-client-name">{client.name}</span>
+        <div className="sale-detail-client-card">
+          <Link to={`/clients?highlight=${client.id}`} className="sale-detail-client-link">
+            <IconUsers size={16} stroke={1.8} />
+            <span className="sale-detail-client-name">{client.name}</span>
+          </Link>
           {clientDebt && !clientDebt.is_closed && (
-            <span className={DEBT_STATUS_BADGE_CLASS[clientDebt.status]}>
+            <Link
+              to={`/debts?highlight=${clientDebt.id}`}
+              className={DEBT_STATUS_BADGE_CLASS[clientDebt.status]}
+            >
               {formatMoney(clientDebt.balance)} ₽
               {clientDebt.due_date &&
                 ` · до ${new Date(clientDebt.due_date).toLocaleDateString('ru-RU')}`}
               {' · '}
               {DEBT_STATUS_LABELS[clientDebt.status]}
-            </span>
+            </Link>
           )}
           {clientDebt && clientDebt.is_closed && <span className="badge accent">Долг погашен</span>}
-          <Icon name="chevronRight" size={16} className="sale-detail-client-arrow" />
-        </Link>
+          <Link to={`/clients?highlight=${client.id}`} className="sale-detail-client-arrow-link">
+            <IconChevronRight size={16} stroke={1.8} className="sale-detail-client-arrow" />
+          </Link>
+        </div>
       )}
 
       {returns.length > 0 && (
@@ -1665,18 +1747,24 @@ function LastSaleCard({
             ))}
           </tbody>
         </table>
+      </div>
 
-        <div className="sale-detail-totals">
-          {Number(sale.discount) > 0 && (
+      <div className="sale-detail-totals">
+        {Number(sale.discount) > 0 && (
+          <>
+            <div className="sale-detail-totals-row">
+              <span>Товары</span>
+              <span>{formatMoney(sale.subtotal)} ₽</span>
+            </div>
             <div className="sale-detail-totals-row">
               <span>Скидка</span>
               <span>−{formatMoney(sale.discount)} ₽</span>
             </div>
-          )}
-          <div className="sale-detail-totals-row sale-detail-totals-row-sum">
-            <span>Итого</span>
-            <span>{formatMoney(sale.total)} ₽</span>
-          </div>
+          </>
+        )}
+        <div className="sale-detail-totals-row sale-detail-totals-row-sum">
+          <span>Итого</span>
+          <span>{formatMoney(sale.total)} ₽</span>
         </div>
       </div>
 
@@ -1691,7 +1779,7 @@ function LastSaleCard({
           aria-expanded={historyOpen}
         >
           {loadingHistory ? 'Загрузка…' : 'История изменений'}
-          <Icon name="chevronDown" size={14} />
+          <IconChevronDown size={14} stroke={1.8} />
         </button>
         {historyOpen &&
           (history === null ? null : history.length === 0 ? (
@@ -1701,7 +1789,14 @@ function LastSaleCard({
               {history.map((entry) => (
                 <div key={entry.id} className="sale-detail-history-item">
                   <span className="sale-detail-history-icon">
-                    <Icon name={SALE_HISTORY_ACTION_ICONS[entry.action] ?? 'edit'} size={15} />
+                    {entry.action === 'sale.return' ? (
+                      <IconReceiptRefund size={15} stroke={1.8} />
+                    ) : (
+                      (() => {
+                        const HistoryIcon = SALE_HISTORY_ACTION_ICONS[entry.action] ?? IconPencil
+                        return <HistoryIcon size={15} stroke={1.8} />
+                      })()
+                    )}
                   </span>
                   <span className="sale-detail-history-label">
                     {SALE_HISTORY_ACTION_LABELS[entry.action] ?? entry.action}
@@ -1844,7 +1939,7 @@ function SaleNoteEditor({
           {status === 'saving' && 'Сохранение…'}
           {status === 'saved' && (
             <>
-              <Icon name="check" size={12} /> Сохранено
+              <IconCheck size={12} stroke={1.8} /> Сохранено
             </>
           )}
           {status === 'error' && 'Не удалось сохранить'}
@@ -1918,6 +2013,7 @@ function QuickNewClientForm({ onCreated }: { onCreated: (client: Client) => void
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    e.stopPropagation()
     setError(null)
     setSaving(true)
     try {
@@ -1938,7 +2034,7 @@ function QuickNewClientForm({ onCreated }: { onCreated: (client: Client) => void
       </label>
       <label className="field">
         Телефон
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <PhoneInput value={phone} onChange={setPhone} />
       </label>
       {error && <p className="error">{error}</p>}
       <Button type="submit" disabled={saving || !name.trim()}>

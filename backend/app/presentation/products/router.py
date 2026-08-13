@@ -1,9 +1,14 @@
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, Response, UploadFile
 
 from app.application.products.import_excel import ImportProductsCommand
 from app.application.products.set_product_photo import SetProductPhotoCommand
 from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Product
+from app.infrastructure.products_export import (
+    render_products_csv,
+    render_products_pdf,
+    render_products_xlsx,
+)
 from app.presentation.deps import (
     ActorDep,
     CreateCategoryDep,
@@ -15,6 +20,7 @@ from app.presentation.deps import (
     UowDep,
     UpdateProductDep,
 )
+from app.presentation.audit.schemas import AuditEntryResponse
 from app.presentation.products.schemas import (
     CategoryCreateRequest,
     CategoryResponse,
@@ -38,7 +44,18 @@ async def _photo_command(product_id: int, file: UploadFile) -> SetProductPhotoCo
 
 
 async def _import_command(file: UploadFile) -> ImportProductsCommand:
-    return ImportProductsCommand(await file.read())
+    filename = (file.filename or "").lower()
+    file_format = "csv" if filename.endswith(".csv") else "xlsx"
+    return ImportProductsCommand(await file.read(), file_format=file_format)
+
+
+async def _load_export_data(uow: UowDep) -> tuple[list[Product], dict[int, str], str]:
+    async with uow:
+        products = await uow.products.search_all()
+        categories = await uow.categories.list()
+        tenant = await uow.tenants.get(uow.tenant_id)
+        category_names = {c.id: c.name for c in categories}
+        return products, category_names, tenant.name
 
 
 @router.post("", status_code=201)
@@ -112,13 +129,54 @@ async def list_categories(uow: UowDep) -> list[CategoryResponse]:
 
 @router.get("")
 async def search_products(
-    uow: UowDep, show_purchase: ShowPurchaseDep, query: str = ""
+    response: Response,
+    uow: UowDep,
+    show_purchase: ShowPurchaseDep,
+    query: str = "",
+    limit: int = 50,
+    offset: int = 0,
+    category_id: int | None = None,
+    sort: str = "name",
 ) -> list[ProductResponse]:
     async with uow:
-        return [
-            ProductResponse.from_entity(p, show_purchase)
-            for p in await uow.products.search(query)
-        ]
+        products, total = await uow.products.search(
+            query, limit=limit, offset=offset, category_id=category_id, sort=sort
+        )
+        response.headers["X-Total-Count"] = str(total)
+        return [ProductResponse.from_entity(p, show_purchase) for p in products]
+
+
+@router.get("/export.xlsx")
+async def export_products_xlsx(uow: UowDep, show_purchase: ShowPurchaseDep) -> Response:
+    products, category_names, _ = await _load_export_data(uow)
+    content = render_products_xlsx(products, category_names, show_purchase)
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="tovary.xlsx"'},
+    )
+
+
+@router.get("/export.csv")
+async def export_products_csv(uow: UowDep, show_purchase: ShowPurchaseDep) -> Response:
+    products, category_names, _ = await _load_export_data(uow)
+    content = render_products_csv(products, category_names, show_purchase)
+    return Response(
+        content=content,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="tovary.csv"'},
+    )
+
+
+@router.get("/export.pdf")
+async def export_products_pdf(uow: UowDep, show_purchase: ShowPurchaseDep) -> Response:
+    products, category_names, shop_name = await _load_export_data(uow)
+    content = render_products_pdf(shop_name, products, category_names, show_purchase)
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="tovary.pdf"'},
+    )
 
 
 @router.get("/barcode/{barcode}")
@@ -137,3 +195,10 @@ async def get_product(
         return ProductResponse.from_entity(
             await uow.products.get(product_id), show_purchase
         )
+
+
+@router.get("/{product_id}/history")
+async def get_product_history(product_id: int, uow: UowDep) -> list[AuditEntryResponse]:
+    async with uow:
+        entries = await uow.audit.list_by_entity("product", product_id)
+        return [AuditEntryResponse.from_entity(e) for e in entries]

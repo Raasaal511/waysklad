@@ -4,6 +4,7 @@ from app.domain.audit.entities import AuditEntry
 from app.domain.audit.repository import IAuditRepository
 from app.infrastructure.db.mappers.audit import AuditMapper
 from app.infrastructure.db.models.audit import AuditLogModel
+from app.infrastructure.db.models.identity import UserModel
 from app.infrastructure.db.repositories.base import SqlAlchemyRepository
 
 
@@ -14,16 +15,19 @@ class SqlAlchemyAuditRepository(SqlAlchemyRepository, IAuditRepository):
         await self._session.flush()
         return AuditMapper.to_entity(model)
 
-    async def list_recent(self, limit: int = 100) -> list[AuditEntry]:
-        models = (
+    async def list_recent(self, limit: int = 100, offset: int = 0) -> list[AuditEntry]:
+        # join с users — общему журналу нужно имя сотрудника, а не только id
+        rows = (
             await self._session.execute(
-                select(AuditLogModel)
+                select(AuditLogModel, UserModel.name)
+                .join(UserModel, UserModel.id == AuditLogModel.user_id)
                 .where(AuditLogModel.tenant_id == self._tenant)
                 .order_by(AuditLogModel.id.desc())
                 .limit(limit)
+                .offset(offset)
             )
-        ).scalars().all()
-        return [AuditMapper.to_entity(m) for m in models]
+        ).all()
+        return [AuditMapper.to_entity(m, user_name) for m, user_name in rows]
 
     async def list_by_entity(self, entity: str, entity_id: int) -> list[AuditEntry]:
         models = (

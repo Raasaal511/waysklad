@@ -109,3 +109,35 @@ export function getReceipt(saleId: number) {
 export function getReceiptPdf(saleId: number) {
   return api.getBlob(`/sales/${saleId}/receipt.pdf`)
 }
+
+// Синхронизация офлайн-очереди — см. shared/offline/outbox.ts
+export interface OfflineSaleInput {
+  client_op_id: string
+  warehouse_id: number
+  payment_method: PaymentMethod
+  items: SaleItemInput[]
+  discount?: string
+  client_id?: number | null
+  cash_received?: string | null
+}
+
+export interface AppliedOfflineSale {
+  client_op_id: string | null
+  id: number
+  total: string
+  created_at: string
+}
+
+export interface SyncSalesError {
+  client_op_id: string | null
+  message: string
+}
+
+export interface SyncSalesResponse {
+  applied: AppliedOfflineSale[]
+  errors: SyncSalesError[]
+}
+
+export function syncSales(sales: OfflineSaleInput[]) {
+  return api.post<SyncSalesResponse>('/sync/sales', { sales })
+}

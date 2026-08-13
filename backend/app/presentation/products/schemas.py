@@ -37,6 +37,8 @@ class ProductCreateRequest(BaseModel):
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
     variants: list[VariantCreateRequest] = []
+    initial_stock_warehouse_id: int | None = None
+    initial_stock_quantity: Decimal | None = None
 
     def to_command(self) -> CreateProductCommand:
         return CreateProductCommand(
@@ -52,6 +54,8 @@ class ProductCreateRequest(BaseModel):
                 VariantInput(size=v.size, color=v.color, barcode=v.barcode)
                 for v in self.variants
             ],
+            initial_stock_warehouse_id=self.initial_stock_warehouse_id,
+            initial_stock_quantity=self.initial_stock_quantity,
         )
 
 

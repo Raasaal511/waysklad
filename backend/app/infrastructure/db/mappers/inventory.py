@@ -48,6 +48,8 @@ class StockDocumentMapper:
             to_warehouse_id=model.to_warehouse_id,
             note=model.note,
             posted=model.posted,
+            number=model.number,
+            created_at=model.created_at,
             lines=[
                 StockLine(
                     product_id=line.product_id,

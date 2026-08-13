@@ -4,6 +4,9 @@ from fastapi import Depends
 
 from app.application.analytics.dashboard import GetDashboardUseCase
 from app.application.analytics.dead_stock import GetDeadStockUseCase, GetStockValueUseCase
+from app.application.analytics.restock_recommendations import (
+    GetRestockRecommendationsUseCase,
+)
 from app.application.analytics.top_products import (
     GetCategoryProfitUseCase,
     GetTopProductsUseCase,
@@ -13,6 +16,7 @@ from app.application.auth.connect_telegram import ConnectTelegramUseCase
 from app.application.auth.create_employee import CreateEmployeeUseCase
 from app.application.auth.login import LoginUseCase
 from app.application.auth.register_shop import RegisterShopUseCase
+from app.application.auth.update_employee import UpdateEmployeeUseCase
 from app.application.auth.update_shop import UpdateShopUseCase
 from app.application.counterparties.create_client import CreateClientUseCase
 from app.application.counterparties.create_supplier import CreateSupplierUseCase
@@ -28,6 +32,9 @@ from app.application.inventory.set_warehouse_assignments import (
 )
 from app.application.inventory.stocktake import StocktakeUseCase
 from app.application.inventory.transfer import TransferUseCase
+from app.application.inventory.update_warehouse_details import (
+    UpdateWarehouseDetailsUseCase,
+)
 from app.application.inventory.write_off import WriteOffUseCase
 from app.application.orders.change_status import ChangeOrderStatusUseCase
 from app.application.orders.create_order import CreateOrderUseCase
@@ -65,6 +72,9 @@ def get_create_employee(uow: UowDep, hasher: HasherDep) -> CreateEmployeeUseCase
     return CreateEmployeeUseCase(uow, hasher)
 
 
+get_update_employee = _with_uow(UpdateEmployeeUseCase)
+
+
 def get_change_password(uow: UowDep, hasher: HasherDep) -> ChangePasswordUseCase:
     return ChangePasswordUseCase(uow, hasher)
 
@@ -84,6 +94,7 @@ get_transfer = _with_uow(TransferUseCase)
 get_stocktake = _with_uow(StocktakeUseCase)
 get_create_warehouse = _with_uow(CreateWarehouseUseCase)
 get_set_warehouse_assignments = _with_uow(SetWarehouseAssignmentsUseCase)
+get_update_warehouse_details = _with_uow(UpdateWarehouseDetailsUseCase)
 get_create_sale = _with_uow(CreateSaleUseCase)
 get_return_sale = _with_uow(ReturnSaleUseCase)
 get_edit_sale = _with_uow(EditSaleUseCase)
@@ -102,6 +113,7 @@ get_top_products = _with_uow(GetTopProductsUseCase)
 get_category_profit = _with_uow(GetCategoryProfitUseCase)
 get_dead_stock = _with_uow(GetDeadStockUseCase)
 get_stock_value = _with_uow(GetStockValueUseCase)
+get_restock_recommendations = _with_uow(GetRestockRecommendationsUseCase)
 get_apply_offline_sales = _with_uow(ApplyOfflineSalesUseCase)
 get_connect_telegram = _with_uow(ConnectTelegramUseCase)
 get_update_shop = _with_uow(UpdateShopUseCase)
@@ -110,6 +122,7 @@ get_update_shop = _with_uow(UpdateShopUseCase)
 RegisterShopDep = Annotated[RegisterShopUseCase, Depends(get_register_shop)]
 LoginDep = Annotated[LoginUseCase, Depends(get_login)]
 CreateEmployeeDep = Annotated[CreateEmployeeUseCase, Depends(get_create_employee)]
+UpdateEmployeeDep = Annotated[UpdateEmployeeUseCase, Depends(get_update_employee)]
 CreateProductDep = Annotated[CreateProductUseCase, Depends(get_create_product)]
 UpdateProductDep = Annotated[UpdateProductUseCase, Depends(get_update_product)]
 CreateUnitDep = Annotated[CreateUnitUseCase, Depends(get_create_unit)]
@@ -123,6 +136,9 @@ StocktakeDep = Annotated[StocktakeUseCase, Depends(get_stocktake)]
 CreateWarehouseDep = Annotated[CreateWarehouseUseCase, Depends(get_create_warehouse)]
 SetWarehouseAssignmentsDep = Annotated[
     SetWarehouseAssignmentsUseCase, Depends(get_set_warehouse_assignments)
+]
+UpdateWarehouseDetailsDep = Annotated[
+    UpdateWarehouseDetailsUseCase, Depends(get_update_warehouse_details)
 ]
 CreateSaleDep = Annotated[CreateSaleUseCase, Depends(get_create_sale)]
 ReturnSaleDep = Annotated[ReturnSaleUseCase, Depends(get_return_sale)]
@@ -144,6 +160,9 @@ GetTopProductsDep = Annotated[GetTopProductsUseCase, Depends(get_top_products)]
 GetCategoryProfitDep = Annotated[GetCategoryProfitUseCase, Depends(get_category_profit)]
 GetDeadStockDep = Annotated[GetDeadStockUseCase, Depends(get_dead_stock)]
 GetStockValueDep = Annotated[GetStockValueUseCase, Depends(get_stock_value)]
+GetRestockRecommendationsDep = Annotated[
+    GetRestockRecommendationsUseCase, Depends(get_restock_recommendations)
+]
 ApplyOfflineSalesDep = Annotated[
     ApplyOfflineSalesUseCase, Depends(get_apply_offline_sales)
 ]

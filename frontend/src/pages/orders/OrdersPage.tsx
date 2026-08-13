@@ -6,11 +6,11 @@ import {
   type Order,
   type OrderStatus,
 } from '../../entities/order/api'
-import { listProducts, type Product } from '../../entities/product/api'
+import { listAllProducts, type Product } from '../../entities/product/api'
 import { searchClients, type Client } from '../../entities/counterparty/api'
 import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
-import { Icon } from '../../shared/ui/icons/Icon'
+import { IconPlus } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
 import { DateInput } from '../../shared/ui/DateInput'
@@ -41,7 +41,7 @@ export function OrdersPage() {
   async function load() {
     setLoading(true)
     try {
-      const [o, p, c] = await Promise.all([listActiveOrders(), listProducts(), searchClients()])
+      const [o, p, c] = await Promise.all([listActiveOrders(), listAllProducts(), searchClients()])
       setOrders(o)
       setProducts(p)
       setClients(c)
@@ -74,7 +74,7 @@ export function OrdersPage() {
       <div className="section-title">
         <h2>Заказы</h2>
         <Button onClick={() => setShowForm(true)}>
-          <Icon name="plus" size={16} /> Заказ
+          <IconPlus size={16} stroke={1.8} /> Заказ
         </Button>
       </div>
 

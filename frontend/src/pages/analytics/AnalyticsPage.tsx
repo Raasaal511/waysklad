@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import {
   getDashboard,
   getTopProducts,
+  getCategoryProfit,
   getDeadStock,
   getStockValue,
   type Dashboard,
   type ProductSales,
+  type CategoryProfit,
   type DeadStockItem,
   type StockValue,
 } from '../../entities/analytics/api'
@@ -15,16 +17,18 @@ import { formatQuantity } from '../../shared/lib/format'
 export function AnalyticsPage() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
   const [topProducts, setTopProducts] = useState<ProductSales[]>([])
+  const [categoryProfit, setCategoryProfit] = useState<CategoryProfit[]>([])
   const [deadStock, setDeadStock] = useState<DeadStockItem[]>([])
   const [stockValue, setStockValue] = useState<StockValue | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([getDashboard(), getTopProducts(), getDeadStock(), getStockValue()])
-      .then(([d, t, dead, sv]) => {
+    Promise.all([getDashboard(), getTopProducts(), getCategoryProfit(), getDeadStock(), getStockValue()])
+      .then(([d, t, cp, dead, sv]) => {
         setDashboard(d)
         setTopProducts(t)
+        setCategoryProfit(cp)
         setDeadStock(dead)
         setStockValue(sv)
       })
@@ -98,6 +102,38 @@ export function AnalyticsPage() {
                     <td>{p.revenue} ₽</td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="stack">
+        <h3>Прибыльность по категориям</h3>
+        {categoryProfit.length === 0 ? (
+          <p className="text-muted">Продаж за месяц пока нет</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Категория</th>
+                  <th>Выручка</th>
+                  <th>Прибыль</th>
+                  <th>Маржа</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...categoryProfit]
+                  .sort((a, b) => Number(b.profit) - Number(a.profit))
+                  .map((c) => (
+                    <tr key={c.category_id ?? 'none'}>
+                      <td>{c.category_name}</td>
+                      <td>{c.revenue} ₽</td>
+                      <td>{c.profit} ₽</td>
+                      <td>{Number(c.revenue) > 0 ? `${((Number(c.profit) / Number(c.revenue)) * 100).toFixed(1)}%` : '—'}</td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>

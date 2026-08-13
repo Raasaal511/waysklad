@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Icon } from './icons/Icon'
+import { IconChevronDown } from '@tabler/icons-react'
 
 export interface SelectOption {
   value: string
@@ -137,7 +137,7 @@ export function Select({
         <span className={selected ? 'select-trigger-value' : 'select-trigger-placeholder'}>
           {selected ? selected.label : placeholder ?? ' '}
         </span>
-        <Icon name="chevronDown" size={16} className="select-trigger-icon" />
+        <IconChevronDown size={16} stroke={1.8} className="select-trigger-icon" />
       </button>
 
       {open &&
@@ -147,7 +147,7 @@ export function Select({
             ref={menuRef}
             role="listbox"
             className="select-menu"
-            style={{ top: menuStyle.top, left: menuStyle.left, width: menuStyle.width }}
+            style={{ top: menuStyle.top, left: menuStyle.left, minWidth: menuStyle.width }}
           >
             {options.map((option, i) => (
               <li

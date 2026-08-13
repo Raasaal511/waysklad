@@ -1,7 +1,8 @@
 """Сценарий: владелец (или управляющий) добавляет сотрудника."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from app.application.auth.employee_warehouses import resolve_warehouse_ids
 from app.domain.audit.entities import AuditEntry
 from app.domain.common.exceptions import AccessDeniedError, DomainError
 from app.domain.common.phone import Phone
@@ -17,6 +18,9 @@ class CreateEmployeeCommand:
     phone: str
     password: str
     role: Role
+    # склады для manager/seller/storekeeper; при одном складе в магазине можно
+    # не передавать — подставится автоматически (см. resolve_warehouse_ids)
+    warehouse_ids: list[int] = field(default_factory=list)
 
 
 class CreateEmployeeUseCase:
@@ -38,6 +42,7 @@ class CreateEmployeeUseCase:
         async with self._uow as uow:
             if await uow.users.get_by_phone(str(phone)) is not None:
                 raise DomainError("Этот телефон уже зарегистрирован")
+            warehouse_ids = await resolve_warehouse_ids(uow, cmd.role, cmd.warehouse_ids)
             employee = await uow.users.add(
                 User(
                     id=None,
@@ -47,10 +52,14 @@ class CreateEmployeeUseCase:
                     password_hash=self._hasher.hash(cmd.password),
                 )
             )
+            if warehouse_ids:
+                for warehouse_id in warehouse_ids:
+                    await uow.warehouses.add_assignment(warehouse_id, employee.id)
             await uow.audit.add(
                 AuditEntry.record(
                     actor, "user.create", employee.id,
                     name=employee.name, role=employee.role.value,
+                    warehouse_ids=warehouse_ids,
                 )
             )
             await uow.commit()

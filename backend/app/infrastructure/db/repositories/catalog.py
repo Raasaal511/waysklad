@@ -1,4 +1,4 @@
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
 from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Category, Product
@@ -126,18 +126,57 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
             raise NotFoundError(f"Товар {product_id} не найден")
         return ProductMapper.to_entity(model, await self._units_map())
 
-    async def search(self, query: str) -> list[Product]:
+    _SORT_COLUMNS = {
+        "name": ProductModel.name,
+        "price_asc": ProductModel.retail_price,
+        "price_desc": ProductModel.retail_price.desc(),
+        "margin_desc": (ProductModel.retail_price - ProductModel.purchase_price).desc(),
+        "created_desc": ProductModel.created_at.desc(),
+        "created_asc": ProductModel.created_at,
+    }
+
+    def _search_filter(self, query: str, category_id: int | None = None):
         pattern = f"%{query}%"
+        conditions = [
+            ProductModel.tenant_id == self._tenant,
+            ProductModel.is_active.is_(True),
+            or_(
+                ProductModel.name.ilike(pattern),
+                ProductModel.sku.ilike(pattern),
+                ProductModel.barcode.ilike(pattern),
+            ),
+        ]
+        if category_id is not None:
+            conditions.append(ProductModel.category_id == category_id)
+        return conditions
+
+    async def search(
+        self,
+        query: str,
+        limit: int = 50,
+        offset: int = 0,
+        category_id: int | None = None,
+        sort: str = "name",
+    ) -> tuple[list[Product], int]:
+        conditions = self._search_filter(query, category_id)
+        total = (
+            await self._session.execute(
+                select(func.count()).select_from(ProductModel).where(*conditions)
+            )
+        ).scalar_one()
+        order = self._SORT_COLUMNS.get(sort, ProductModel.name)
         models = (
             await self._session.execute(
-                select(ProductModel)
-                .where(
-                    ProductModel.tenant_id == self._tenant,
-                    ProductModel.is_active.is_(True),
-                    or_(ProductModel.name.ilike(pattern), ProductModel.sku.ilike(pattern)),
-                )
-                .order_by(ProductModel.name)
-                .limit(50)
+                select(ProductModel).where(*conditions).order_by(order).limit(limit).offset(offset)
+            )
+        ).scalars().all()
+        units = await self._units_map()
+        return [ProductMapper.to_entity(m, units) for m in models], total
+
+    async def search_all(self, query: str = "") -> list[Product]:
+        models = (
+            await self._session.execute(
+                select(ProductModel).where(*self._search_filter(query)).order_by(ProductModel.name)
             )
         ).scalars().all()
         units = await self._units_map()

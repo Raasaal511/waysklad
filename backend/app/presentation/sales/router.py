@@ -4,7 +4,7 @@ from fastapi import APIRouter, Response
 
 from app.application.sales.delete_sale import DeleteSaleCommand
 from app.domain.common.uow import IUnitOfWork
-from app.domain.identity.permissions import Permission
+from app.domain.identity.permissions import Permission, require_warehouse
 from app.domain.sales.receipt import build_whatsapp_link, render_receipt_text
 from app.infrastructure.receipt_pdf import render_receipt_pdf
 from app.presentation.audit.schemas import AuditEntryResponse
@@ -46,15 +46,20 @@ async def return_sale(
 
 
 @router.get("", dependencies=[require_permission(Permission.SALES_CREATE)])
-async def list_sales(uow: UowDep) -> list[SaleResponse]:
+async def list_sales(actor: ActorDep, uow: UowDep) -> list[SaleResponse]:
     async with uow:
-        return [SaleResponse.from_entity(s) for s in await uow.sales.list()]
+        sales = await uow.sales.list()
+        if actor.is_warehouse_scoped:
+            sales = [s for s in sales if s.warehouse_id in actor.warehouse_ids]
+        return [SaleResponse.from_entity(s) for s in sales]
 
 
 @router.get("/{sale_id}", dependencies=[require_permission(Permission.SALES_CREATE)])
-async def get_sale(sale_id: int, uow: UowDep) -> SaleResponse:
+async def get_sale(sale_id: int, actor: ActorDep, uow: UowDep) -> SaleResponse:
     async with uow:
-        return SaleResponse.from_entity(await uow.sales.get(sale_id))
+        sale = await uow.sales.get(sale_id)
+        require_warehouse(actor, sale.warehouse_id)
+        return SaleResponse.from_entity(sale)
 
 
 @router.patch("/{sale_id}", dependencies=[require_permission(Permission.SALES_EDIT)])
@@ -76,8 +81,9 @@ async def delete_sale(sale_id: int, actor: ActorDep, use_case: DeleteSaleDep) ->
 @router.get(
     "/{sale_id}/history", dependencies=[require_permission(Permission.SALES_CREATE)]
 )
-async def get_sale_history(sale_id: int, uow: UowDep) -> list[AuditEntryResponse]:
+async def get_sale_history(sale_id: int, actor: ActorDep, uow: UowDep) -> list[AuditEntryResponse]:
     async with uow:
+        require_warehouse(actor, (await uow.sales.get(sale_id)).warehouse_id)
         entries = await uow.audit.list_by_entity("sale", sale_id)
         return [AuditEntryResponse.from_entity(e) for e in entries]
 
@@ -85,9 +91,10 @@ async def get_sale_history(sale_id: int, uow: UowDep) -> list[AuditEntryResponse
 @router.get(
     "/{sale_id}/returns", dependencies=[require_permission(Permission.SALES_CREATE)]
 )
-async def list_sale_returns(sale_id: int, uow: UowDep) -> list[SaleReturnResponse]:
+async def list_sale_returns(sale_id: int, actor: ActorDep, uow: UowDep) -> list[SaleReturnResponse]:
     async with uow:
         sale = await uow.sales.get(sale_id)
+        require_warehouse(actor, sale.warehouse_id)
         price_by_line = {line.id: line.price.amount for line in sale.lines}
         returns = await uow.sale_returns.list_by_sale(sale_id)
         return [
@@ -125,8 +132,9 @@ async def _load_receipt_data(sale_id: int, uow: IUnitOfWork):
 
 
 @router.get("/{sale_id}/receipt", dependencies=[require_permission(Permission.SALES_CREATE)])
-async def get_receipt(sale_id: int, uow: UowDep) -> ReceiptResponse:
+async def get_receipt(sale_id: int, actor: ActorDep, uow: UowDep) -> ReceiptResponse:
     sale, tenant, product_names, client = await _load_receipt_data(sale_id, uow)
+    require_warehouse(actor, sale.warehouse_id)
     text = render_receipt_text(tenant.name, sale, product_names, client.name if client else None)
     phone = (client.whatsapp or client.phone) if client else None
     return ReceiptResponse(text=text, whatsapp_link=build_whatsapp_link(phone, text) if phone else None)
@@ -135,8 +143,9 @@ async def get_receipt(sale_id: int, uow: UowDep) -> ReceiptResponse:
 @router.get(
     "/{sale_id}/receipt.pdf", dependencies=[require_permission(Permission.SALES_CREATE)]
 )
-async def get_receipt_pdf(sale_id: int, uow: UowDep) -> Response:
+async def get_receipt_pdf(sale_id: int, actor: ActorDep, uow: UowDep) -> Response:
     sale, tenant, product_names, client = await _load_receipt_data(sale_id, uow)
+    require_warehouse(actor, sale.warehouse_id)
     pdf_bytes = render_receipt_pdf(tenant.name, sale, product_names, client.name if client else None)
     return Response(
         content=pdf_bytes,

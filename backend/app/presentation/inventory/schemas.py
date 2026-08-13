@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
@@ -8,9 +9,13 @@ from app.application.inventory.receive_goods import ReceiveGoodsCommand
 from app.application.inventory.set_warehouse_assignments import SetWarehouseAssignmentsCommand
 from app.application.inventory.stocktake import StocktakeCommand, StocktakeResult
 from app.application.inventory.transfer import TransferCommand
+from app.application.inventory.update_warehouse_details import (
+    UpdateWarehouseDetailsCommand,
+)
 from app.application.inventory.write_off import WriteOffCommand
+from app.domain.analytics.repository import RestockRecommendation
 from app.domain.identity.entities import Warehouse
-from app.domain.inventory.entities import StockDocType, StockDocument, StockItem
+from app.domain.inventory.entities import StockDocType, StockDocument, StockItem, StockLine
 
 
 class LineRequest(BaseModel):
@@ -89,6 +94,32 @@ class WarehouseAssignmentsRequest(BaseModel):
         return SetWarehouseAssignmentsCommand(warehouse_id=warehouse_id, user_ids=self.user_ids)
 
 
+class WarehouseDetailsRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    address: str = ""
+
+    def to_command(self, warehouse_id: int) -> UpdateWarehouseDetailsCommand:
+        return UpdateWarehouseDetailsCommand(
+            warehouse_id=warehouse_id, name=self.name, address=self.address
+        )
+
+
+class RestockRecommendationResponse(BaseModel):
+    product_id: int
+    product_name: str
+    quantity: Decimal
+    min_stock: Decimal
+    quantity_sold: Decimal
+
+    @classmethod
+    def from_entity(cls, item: RestockRecommendation) -> "RestockRecommendationResponse":
+        return cls(
+            product_id=item.product_id, product_name=item.product_name,
+            quantity=item.quantity, min_stock=item.min_stock,
+            quantity_sold=item.quantity_sold,
+        )
+
+
 class WarehouseResponse(BaseModel):
     id: int
     name: str
@@ -132,6 +163,48 @@ class DocumentResponse(BaseModel):
             warehouse_id=document.warehouse_id,
             to_warehouse_id=document.to_warehouse_id,
             note=document.note,
+        )
+
+
+class DocumentLineResponse(BaseModel):
+    product_id: int
+    variant_id: int | None
+    quantity: Decimal
+    cost: Decimal | None
+
+    @classmethod
+    def from_entity(cls, line: StockLine) -> "DocumentLineResponse":
+        return cls(
+            product_id=line.product_id,
+            variant_id=line.variant_id,
+            quantity=line.quantity.value,
+            cost=line.cost.amount if line.cost else None,
+        )
+
+
+class DocumentHistoryResponse(BaseModel):
+    id: int
+    number: int
+    type: StockDocType
+    warehouse_id: int
+    to_warehouse_id: int | None
+    author_id: int
+    note: str
+    created_at: datetime
+    lines: list[DocumentLineResponse]
+
+    @classmethod
+    def from_entity(cls, document: StockDocument) -> "DocumentHistoryResponse":
+        return cls(
+            id=document.id,
+            number=document.number,
+            type=document.type,
+            warehouse_id=document.warehouse_id,
+            to_warehouse_id=document.to_warehouse_id,
+            author_id=document.author_id,
+            note=document.note,
+            created_at=document.created_at,
+            lines=[DocumentLineResponse.from_entity(line) for line in document.lines],
         )
 
 

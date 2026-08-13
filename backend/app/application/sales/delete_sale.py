@@ -5,7 +5,7 @@ from decimal import Decimal
 from app.domain.audit.entities import AuditEntry
 from app.domain.common.exceptions import DomainError
 from app.domain.common.uow import IUnitOfWork
-from app.domain.identity.permissions import Actor, Permission, require
+from app.domain.identity.permissions import Actor, Permission, require, require_warehouse
 from app.domain.sales.entities import SaleReturn
 from app.domain.sales.payment import PaymentMethod
 
@@ -31,6 +31,7 @@ class DeleteSaleUseCase:
 
         async with self._uow as uow:
             sale = await uow.sales.get(cmd.sale_id)
+            require_warehouse(actor, sale.warehouse_id)
             if sale.deleted_at is not None:
                 raise DomainError(f"Продажа {sale.id} уже удалена")
 

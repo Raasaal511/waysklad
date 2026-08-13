@@ -97,3 +97,4 @@ backend/uploads/
 *.swo
 .DS_Store
 Thumbs.db
+.claude

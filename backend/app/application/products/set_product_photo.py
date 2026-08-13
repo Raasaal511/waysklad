@@ -24,8 +24,11 @@ class SetProductPhotoUseCase:
 
         async with self._uow as uow:
             product = await uow.products.get(cmd.product_id)
+            old_photo = product.photo
             product.photo = self._storage.save(cmd.filename, cmd.content)
             await uow.products.save(product)
+            if old_photo:
+                self._storage.delete(old_photo)
             await uow.audit.add(
                 AuditEntry.record(actor, "product.set_photo", product.id, photo=product.photo)
             )

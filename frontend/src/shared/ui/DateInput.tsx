@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Icon } from './icons/Icon'
+import { IconCalendar, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
 
 interface DateInputProps {
   value: string
@@ -67,7 +67,18 @@ export function DateInput({ value, onChange, min, max, className, disabled, requ
       const trigger = triggerRef.current
       if (!trigger) return
       const rect = trigger.getBoundingClientRect()
-      setMenuStyle({ top: rect.bottom + 4, left: rect.left })
+      const menuWidth = 280 // совпадает с шириной .date-picker в index.css
+      const menuHeight = menuRef.current?.offsetHeight ?? 340
+      const margin = 8
+      const left = Math.min(
+        Math.max(rect.left, margin),
+        window.innerWidth - menuWidth - margin,
+      )
+      const fitsBelow = rect.bottom + 4 + menuHeight <= window.innerHeight - margin
+      const top = fitsBelow
+        ? rect.bottom + 4
+        : Math.max(rect.top - 4 - menuHeight, margin)
+      setMenuStyle({ top, left })
     }
     updatePosition()
     window.addEventListener('resize', updatePosition)
@@ -77,6 +88,21 @@ export function DateInput({ value, onChange, min, max, className, disabled, requ
       window.removeEventListener('scroll', updatePosition, true)
     }
   }, [open])
+
+  // после первого рендера попапа известна его реальная высота — уточняем позицию
+  useLayoutEffect(() => {
+    if (!open || !menuStyle) return
+    const trigger = triggerRef.current
+    const menu = menuRef.current
+    if (!trigger || !menu) return
+    const rect = trigger.getBoundingClientRect()
+    const menuHeight = menu.offsetHeight
+    const margin = 8
+    const fitsBelow = rect.bottom + 4 + menuHeight <= window.innerHeight - margin
+    const top = fitsBelow ? rect.bottom + 4 : Math.max(rect.top - 4 - menuHeight, margin)
+    if (top !== menuStyle.top) setMenuStyle((s) => (s ? { ...s, top } : s))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, menuStyle?.left])
 
   useEffect(() => {
     if (!open) return
@@ -159,7 +185,7 @@ export function DateInput({ value, onChange, min, max, className, disabled, requ
         aria-expanded={open}
         onClick={() => !disabled && setOpen((v) => !v)}
       >
-        <Icon name="calendar" size={16} className="date-input-icon" />
+        <IconCalendar size={16} stroke={1.8} className="date-input-icon" />
         <span className={value ? 'select-trigger-value' : 'select-trigger-placeholder'}>
           {value ? formatDisplay(value) : 'Выберите дату'}
         </span>
@@ -181,7 +207,7 @@ export function DateInput({ value, onChange, min, max, className, disabled, requ
                 onClick={goToPrevMonth}
                 aria-label="Предыдущий месяц"
               >
-                <Icon name="chevronLeft" size={16} />
+                <IconChevronLeft size={16} stroke={1.8} />
               </button>
               <span className="date-picker-title">
                 {MONTHS[viewMonth]} {viewYear}
@@ -192,7 +218,7 @@ export function DateInput({ value, onChange, min, max, className, disabled, requ
                 onClick={goToNextMonth}
                 aria-label="Следующий месяц"
               >
-                <Icon name="chevronRight" size={16} />
+                <IconChevronRight size={16} stroke={1.8} />
               </button>
             </div>
             <div className="date-picker-weekdays">

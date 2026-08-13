@@ -41,6 +41,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     GetCategoryProfitDep,
     GetDashboardDep,
     GetDeadStockDep,
+    GetRestockRecommendationsDep,
     GetStockValueDep,
     GetTopProductsDep,
     ImportProductsDep,
@@ -55,7 +56,9 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     SetWarehouseAssignmentsDep,
     StocktakeDep,
     TransferDep,
+    UpdateEmployeeDep,
     UpdateProductDep,
     UpdateShopDep,
+    UpdateWarehouseDetailsDep,
     WriteOffDep,
 )

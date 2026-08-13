@@ -80,14 +80,15 @@ _ANALYST = {
     Permission.AUDIT_VIEW,
 }
 
-# управляющий = продавец + кладовщик + управление товарами/складами/сотрудниками,
-# но БЕЗ отчётов о прибыли (ANALYTICS_VIEW) и журнала
+# управляющий = продавец + кладовщик + управление товарами/складами/сотрудниками + аналитика
+# (данные и аналитика ограничены складами, к которым привязан управляющий)
 _MANAGER = _SELLER | _STOREKEEPER | {
     Permission.PRODUCTS_MANAGE,
     Permission.WAREHOUSES_MANAGE,
     Permission.USERS_MANAGE,  # но создавать может только продавцов/кладовщиков/аналитиков
     Permission.SALES_EDIT,
     Permission.SALES_DELETE,
+    Permission.ANALYTICS_VIEW,
 }
 
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
@@ -105,6 +106,14 @@ class Actor:
 
     id: int
     role: Role
+    # склады, к которым привязан актор (manager/seller/storekeeper) — данные фильтруются
+    # по этому списку; None — без ограничения (owner/analyst, видят весь tenant)
+    warehouse_ids: list[int] | None = None
+
+    @property
+    def is_warehouse_scoped(self) -> bool:
+        """True, если данные актора нужно фильтровать по его складам."""
+        return self.warehouse_ids is not None
 
 
 def has_permission(role: Role, permission: Permission) -> bool:
@@ -114,3 +123,9 @@ def has_permission(role: Role, permission: Permission) -> bool:
 def require(actor: Actor, permission: Permission) -> None:
     if not has_permission(actor.role, permission):
         raise AccessDeniedError(f"Роль «{actor.role}» не имеет права «{permission}»")
+
+
+def require_warehouse(actor: Actor, warehouse_id: int) -> None:
+    """Проверка, что документ/склад входит в зону видимости актора."""
+    if actor.is_warehouse_scoped and warehouse_id not in actor.warehouse_ids:
+        raise AccessDeniedError("Этот склад вам не назначен")

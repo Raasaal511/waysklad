@@ -1,7 +1,9 @@
+import csv
+import io
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
-from typing import Iterator
+from typing import Iterator, Literal
 
 import openpyxl
 
@@ -11,14 +13,17 @@ from app.domain.common.exceptions import DomainError
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Actor, Permission, require
 
-# порядок колонок после заголовка (строка 1 листа пропускается):
+# порядок колонок после заголовка (первая строка пропускается):
 # Название | Артикул | Штрихкод | Ед. изм. | Закупочная цена | Розничная цена | Мин. остаток
 _ROW_LENGTH = 7
+
+ImportFormat = Literal["xlsx", "csv"]
 
 
 @dataclass(frozen=True)
 class ImportProductsCommand:
     file_bytes: bytes
+    file_format: ImportFormat = "xlsx"
 
 
 @dataclass(frozen=True)
@@ -43,7 +48,12 @@ class ImportProductsUseCase:
         create_product = CreateProductUseCase(self._uow)
         created = 0
         errors: list[RowError] = []
-        for row_number, row in self._read_rows(cmd.file_bytes):
+        rows = (
+            self._read_csv_rows(cmd.file_bytes)
+            if cmd.file_format == "csv"
+            else self._read_xlsx_rows(cmd.file_bytes)
+        )
+        for row_number, row in rows:
             try:
                 await create_product.execute(actor, self._row_to_command(row))
                 created += 1
@@ -60,7 +70,7 @@ class ImportProductsUseCase:
         return ImportProductsResult(created=created, errors=errors)
 
     @staticmethod
-    def _read_rows(file_bytes: bytes) -> Iterator[tuple[int, tuple]]:
+    def _read_xlsx_rows(file_bytes: bytes) -> Iterator[tuple[int, tuple]]:
         workbook = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
         try:
             sheet = workbook.active
@@ -69,6 +79,16 @@ class ImportProductsUseCase:
                     yield row_number, row
         finally:
             workbook.close()
+
+    @staticmethod
+    def _read_csv_rows(file_bytes: bytes) -> Iterator[tuple[int, tuple]]:
+        text = file_bytes.decode("utf-8-sig")
+        reader = csv.reader(io.StringIO(text))
+        for row_number, row in enumerate(reader, start=1):
+            if row_number == 1:
+                continue  # заголовок
+            if row and row[0]:
+                yield row_number, tuple(row)
 
     @staticmethod
     def _row_to_command(row: tuple) -> CreateProductCommand:

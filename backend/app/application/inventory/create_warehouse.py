@@ -7,11 +7,14 @@ from app.domain.identity.entities import Role, Warehouse
 from app.domain.identity.permissions import Actor, Permission, require
 
 
+_ASSIGNABLE_ROLES = (Role.MANAGER, Role.SELLER, Role.STOREKEEPER)
+
+
 @dataclass(frozen=True)
 class CreateWarehouseCommand:
     name: str
     address: str = ""
-    # id сотрудников-кладовщиков (или владельца), назначаемых ответственными за склад
+    # id сотрудников (manager/seller/storekeeper), назначаемых на этот склад
     assigned_user_ids: list[int] = field(default_factory=list)
 
 
@@ -25,10 +28,10 @@ class CreateWarehouseUseCase:
         async with self._uow as uow:
             for user_id in cmd.assigned_user_ids:
                 candidate = await uow.users.get(user_id)
-                if candidate.role not in (Role.STOREKEEPER, Role.OWNER):
+                if candidate.role not in _ASSIGNABLE_ROLES:
                     raise DomainError(
-                        f"«{candidate.name}» не может быть ответственным за склад — "
-                        "нужна роль кладовщика или владельца"
+                        f"«{candidate.name}» не может быть привязан к складу — "
+                        "нужна роль управляющего, продавца или кладовщика"
                     )
 
             warehouse = await uow.warehouses.add(

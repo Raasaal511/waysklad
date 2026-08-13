@@ -32,8 +32,9 @@ class Warehouse:
     id: int | None
     name: str
     address: str = ""
-    # кладовщики (storekeeper), которым разрешена работа с этим складом;
-    # owner/manager имеют доступ ко всем складам вне зависимости от списка
+    # сотрудники (manager/seller/storekeeper), которым разрешена работа с этим складом —
+    # данные (продажи, остатки, аналитика) для них фильтруются по этому списку;
+    # owner имеет доступ ко всем складам магазина вне зависимости от списка
     assigned_user_ids: list[int] = field(default_factory=list)
 
 

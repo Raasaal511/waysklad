@@ -118,6 +118,9 @@ class SqlAlchemyUserRepository(SqlAlchemyRepository, IUserRepository):
         ).scalar_one_or_none()
         if model is None:
             raise NotFoundError(f"Пользователь {user.id} не найден")
+        model.name = user.name
+        model.role = user.role
+        model.is_active = user.is_active
         model.password_hash = user.password_hash
         await self._session.flush()
         return user
@@ -132,6 +135,21 @@ class SqlAlchemyWarehouseRepository(SqlAlchemyRepository, IWarehouseRepository):
         if warehouse.assigned_user_ids:
             await self.set_assignments(model.id, warehouse.assigned_user_ids)
         return warehouse
+
+    async def update_details(self, warehouse_id: int, name: str, address: str) -> Warehouse:
+        model = (
+            await self._session.execute(
+                select(WarehouseModel).where(
+                    WarehouseModel.id == warehouse_id, WarehouseModel.tenant_id == self._tenant
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            raise NotFoundError(f"Склад {warehouse_id} не найден")
+        model.name = name
+        model.address = address
+        await self._session.flush()
+        return await self.get(warehouse_id)
 
     async def _assigned_user_ids(self, warehouse_ids: list[int]) -> dict[int, list[int]]:
         if not warehouse_ids:
@@ -213,3 +231,31 @@ class SqlAlchemyWarehouseRepository(SqlAlchemyRepository, IWarehouseRepository):
             )
         await self._session.flush()
         return await self.get(warehouse_id)
+
+    async def add_assignment(self, warehouse_id: int, user_id: int) -> None:
+        already = (
+            await self._session.execute(
+                select(WarehouseAssignmentModel.id).where(
+                    WarehouseAssignmentModel.warehouse_id == warehouse_id,
+                    WarehouseAssignmentModel.user_id == user_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if already is not None:
+            return
+        self._session.add(
+            WarehouseAssignmentModel(warehouse_id=warehouse_id, user_id=user_id)
+        )
+        await self._session.flush()
+
+    async def set_user_assignments(self, user_id: int, warehouse_ids: list[int]) -> None:
+        await self._session.execute(
+            delete(WarehouseAssignmentModel).where(
+                WarehouseAssignmentModel.user_id == user_id
+            )
+        )
+        for warehouse_id in set(warehouse_ids):
+            self._session.add(
+                WarehouseAssignmentModel(warehouse_id=warehouse_id, user_id=user_id)
+            )
+        await self._session.flush()

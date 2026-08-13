@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from app.domain.inventory.entities import StockDocument, StockItem
 from app.domain.inventory.repository import IStockDocumentRepository, IStockRepository
@@ -75,3 +75,24 @@ class SqlAlchemyStockDocumentRepository(SqlAlchemyRepository, IStockDocumentRepo
         await self._session.flush()
         document.id = model.id
         return document
+
+    async def list_all(self, warehouse_ids: list[int] | None = None) -> list[StockDocument]:
+        conditions = [StockDocumentModel.tenant_id == self._tenant]
+        if warehouse_ids is not None:
+            conditions.append(
+                or_(
+                    StockDocumentModel.warehouse_id.in_(warehouse_ids),
+                    StockDocumentModel.to_warehouse_id.in_(warehouse_ids),
+                )
+            )
+        models = (
+            await self._session.execute(
+                select(StockDocumentModel)
+                .where(*conditions)
+                .order_by(StockDocumentModel.created_at.desc())
+            )
+        ).scalars().all()
+
+        product_ids = {line.product_id for m in models for line in m.lines}
+        units_by_product = await self._product_unit_by_id(product_ids)
+        return [StockDocumentMapper.to_entity(m, units_by_product) for m in models]

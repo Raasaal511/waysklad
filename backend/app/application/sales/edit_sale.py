@@ -5,7 +5,7 @@ from app.domain.audit.entities import AuditEntry
 from app.domain.common.exceptions import AccessDeniedError, DomainError
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.entities import Role
-from app.domain.identity.permissions import Actor, Permission, require
+from app.domain.identity.permissions import Actor, Permission, require, require_warehouse
 
 EDIT_WINDOW = timedelta(hours=24)
 
@@ -32,6 +32,7 @@ class EditSaleUseCase:
 
         async with self._uow as uow:
             sale = await uow.sales.get(cmd.sale_id)
+            require_warehouse(actor, sale.warehouse_id)
             if sale.deleted_at is not None:
                 raise DomainError(f"Продажа {sale.id} удалена")
 

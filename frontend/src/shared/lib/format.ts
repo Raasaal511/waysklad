@@ -53,6 +53,21 @@ export function normalizeDecimalInput(rawValue: string): string | null {
   return value
 }
 
+/** Остаток закончился — товара нет вообще. */
+export function isOutOfStock(quantity: string | number): boolean {
+  return Number(quantity) <= 0
+}
+
+/**
+ * Остаток мало (задан min_stock > 0 и текущий остаток его не превышает), но товар
+ * ещё есть в наличии (> 0) — это не «закончилось», а просто «пора закупить».
+ */
+export function isLowStock(quantity: string | number, minStock: string | number): boolean {
+  const qty = Number(quantity)
+  const min = Number(minStock)
+  return qty > 0 && min > 0 && qty <= min
+}
+
 /** Склонение "продажа/продажи/продаж" по числу. */
 export function pluralizeSales(count: number): string {
   const mod10 = count % 10

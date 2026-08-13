@@ -5,7 +5,6 @@ from app.domain.common.exceptions import AccessDeniedError, InsufficientStockErr
 from app.domain.common.money import Money
 from app.domain.common.quantity import Quantity
 from app.domain.common.uow import IUnitOfWork
-from app.domain.identity.entities import Role
 from app.domain.identity.permissions import Actor
 from app.domain.inventory.entities import StockLine
 
@@ -37,11 +36,11 @@ async def build_lines(uow: IUnitOfWork, lines: list[LineInput]) -> list[StockLin
 async def require_warehouse_access(
     uow: IUnitOfWork, actor: Actor, warehouse_id: int
 ) -> None:
-    """Владелец и управляющий работают с любым складом; кладовщик — только
-    с назначенными ему складами (см. Warehouse.assigned_user_ids)."""
-    if actor.role in (Role.OWNER, Role.MANAGER):
+    """Владелец работает с любым складом; manager/seller/storekeeper — только
+    с назначенными им складами (Actor.warehouse_ids, см. Warehouse.assigned_user_ids)."""
+    if not actor.is_warehouse_scoped:
         return
-    if not await uow.warehouses.is_assigned(warehouse_id, actor.id):
+    if warehouse_id not in actor.warehouse_ids:
         raise AccessDeniedError("Этот склад вам не назначен")
 
 

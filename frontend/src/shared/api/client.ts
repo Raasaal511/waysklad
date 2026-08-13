@@ -10,7 +10,7 @@ export class ApiError extends Error {
 }
 
 function getToken(): string | null {
-  return localStorage.getItem('access_token')
+  return localStorage.getItem('access_token') ?? sessionStorage.getItem('access_token')
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -22,6 +22,43 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
+  })
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null)
+    const message = body?.detail ?? `Ошибка запроса: ${response.status}`
+    throw new ApiError(response.status, typeof message === 'string' ? message : JSON.stringify(message))
+  }
+
+  if (response.status === 204) {
+    return undefined as T
+  }
+  return response.json() as Promise<T>
+}
+
+async function requestWithTotal<T>(path: string): Promise<{ data: T; total: number }> {
+  const token = getToken()
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null)
+    const message = body?.detail ?? `Ошибка запроса: ${response.status}`
+    throw new ApiError(response.status, typeof message === 'string' ? message : JSON.stringify(message))
+  }
+
+  const totalHeader = response.headers.get('X-Total-Count')
+  const data = (await response.json()) as T
+  return { data, total: totalHeader ? Number(totalHeader) : Array.isArray(data) ? data.length : 0 }
+}
+
+async function requestForm<T>(path: string, form: FormData): Promise<T> {
+  const token = getToken()
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    body: form,
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   })
 
   if (!response.ok) {
@@ -49,9 +86,11 @@ async function requestBlob(path: string): Promise<Blob> {
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
+  getWithTotal: <T>(path: string) => requestWithTotal<T>(path),
   getBlob: (path: string) => requestBlob(path),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
+  postForm: <T>(path: string, form: FormData) => requestForm<T>(path, form),
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   patch: <T>(path: string, body?: unknown) =>

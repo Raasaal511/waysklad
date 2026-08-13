@@ -7,6 +7,8 @@ export interface User {
   name: string
   phone: string
   role: Role
+  is_active: boolean
+  warehouse_ids: number[]
 }
 
 export interface TokenResponse {

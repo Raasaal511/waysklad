@@ -15,7 +15,7 @@ class AuditMapper:
         )
 
     @staticmethod
-    def to_entity(model: AuditLogModel) -> AuditEntry:
+    def to_entity(model: AuditLogModel, user_name: str | None = None) -> AuditEntry:
         return AuditEntry(
             id=model.id,
             user_id=model.user_id,
@@ -24,4 +24,5 @@ class AuditMapper:
             entity_id=model.entity_id,
             details=model.details,
             created_at=model.created_at,
+            user_name=user_name,
         )

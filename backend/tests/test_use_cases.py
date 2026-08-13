@@ -4,6 +4,7 @@ from io import BytesIO
 
 import openpyxl
 import pytest
+from PIL import Image
 from sqlalchemy import select, update
 
 from app.application.analytics.dashboard import GetDashboardUseCase
@@ -21,6 +22,7 @@ from app.application.analytics.top_products import (
 from app.application.auth.create_employee import CreateEmployeeCommand, CreateEmployeeUseCase
 from app.application.auth.login import LoginCommand, LoginUseCase
 from app.application.auth.register_shop import RegisterShopCommand, RegisterShopUseCase
+from app.application.auth.update_employee import UpdateEmployeeCommand, UpdateEmployeeUseCase
 from app.application.counterparties.create_client import (
     CreateClientCommand,
     CreateClientUseCase,
@@ -42,6 +44,10 @@ from app.application.debts.issue_supplier_debt import (
 from app.application.debts.extend_debt import ExtendDebtCommand, ExtendDebtUseCase
 from app.application.debts.repay_debt import RepayDebtCommand, RepayDebtUseCase
 from app.application.inventory.common import LineInput
+from app.application.inventory.create_warehouse import (
+    CreateWarehouseCommand,
+    CreateWarehouseUseCase,
+)
 from app.application.inventory.receive_goods import ReceiveGoodsCommand, ReceiveGoodsUseCase
 from app.application.inventory.set_warehouse_assignments import (
     SetWarehouseAssignmentsCommand,
@@ -271,6 +277,63 @@ async def test_create_product_rejects_unknown_unit_code(make_uow, registered_sho
         )
 
 
+async def test_create_product_with_initial_stock_posts_receipt(
+    make_uow, registered_shop, warehouse_id
+):
+    tenant_id, _, owner = registered_shop
+    product = await CreateProductUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateProductCommand(
+            name="Вода питьевая 0.5л", unit_code="pcs",
+            purchase_price=Decimal("20"), retail_price=Decimal("40"),
+            initial_stock_warehouse_id=warehouse_id,
+            initial_stock_quantity=Decimal("100"),
+        ),
+    )
+
+    uow = make_uow(tenant_id)
+    async with uow:
+        item = await uow.stock.get(product.id, warehouse_id)
+        assert item == Decimal("100")
+
+
+async def test_create_product_without_initial_stock_leaves_zero_stock(
+    make_uow, registered_shop, warehouse_id
+):
+    tenant_id, _, owner = registered_shop
+    product = await CreateProductUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateProductCommand(
+            name="Товар без остатка", unit_code="pcs",
+            purchase_price=Decimal("10"), retail_price=Decimal("20"),
+        ),
+    )
+
+    uow = make_uow(tenant_id)
+    async with uow:
+        item = await uow.stock.get(product.id, warehouse_id)
+        assert item == Decimal("0")
+
+
+async def test_seller_cannot_create_product_with_initial_stock(
+    make_uow, hasher, registered_shop, random_phone, warehouse_id
+):
+    tenant_id, _, owner = registered_shop
+    seller = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner, CreateEmployeeCommand("Зара", random_phone(), "secret123", Role.SELLER)
+    )
+    with pytest.raises(AccessDeniedError):
+        await CreateProductUseCase(make_uow(tenant_id)).execute(
+            Actor(id=seller.id, role=seller.role),
+            CreateProductCommand(
+                name="Товар", unit_code="pcs",
+                purchase_price=Decimal("10"), retail_price=Decimal("20"),
+                initial_stock_warehouse_id=warehouse_id,
+                initial_stock_quantity=Decimal("5"),
+            ),
+        )
+
+
 async def test_create_product_rejects_duplicate_barcode(make_uow, registered_shop):
     tenant_id, _, owner = registered_shop
     await CreateProductUseCase(make_uow(tenant_id)).execute(
@@ -454,6 +517,12 @@ async def test_seller_cannot_import_products(make_uow, hasher, registered_shop, 
         )
 
 
+def _test_png_bytes() -> bytes:
+    buffer = BytesIO()
+    Image.new("RGB", (800, 600), color=(10, 200, 120)).save(buffer, "PNG")
+    return buffer.getvalue()
+
+
 async def test_set_product_photo_updates_product(
     make_uow, registered_shop, create_product, tmp_path
 ):
@@ -462,10 +531,34 @@ async def test_set_product_photo_updates_product(
     storage = LocalFileStorage(tmp_path)
 
     updated = await SetProductPhotoUseCase(make_uow(tenant_id), storage).execute(
-        owner, SetProductPhotoCommand(product.id, "photo.png", b"fake-png-bytes")
+        owner, SetProductPhotoCommand(product.id, "photo.png", _test_png_bytes())
     )
-    assert updated.photo.startswith("/uploads/") and updated.photo.endswith(".png")
-    assert (tmp_path / updated.photo.removeprefix("/uploads/")).read_bytes() == b"fake-png-bytes"
+    # оригинал переупаковывается в WebP, а не сохраняется как есть
+    assert updated.photo.startswith("/uploads/") and updated.photo.endswith(".webp")
+    full_path = tmp_path / updated.photo.removeprefix("/uploads/")
+    assert full_path.exists()
+
+
+async def test_set_product_photo_removes_previous_files(
+    make_uow, registered_shop, create_product, tmp_path
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Плитка")
+    storage = LocalFileStorage(tmp_path)
+
+    first = await SetProductPhotoUseCase(make_uow(tenant_id), storage).execute(
+        owner, SetProductPhotoCommand(product.id, "photo.png", _test_png_bytes())
+    )
+    first_full = tmp_path / first.photo.removeprefix("/uploads/")
+    assert first_full.exists()
+
+    second = await SetProductPhotoUseCase(make_uow(tenant_id), storage).execute(
+        owner, SetProductPhotoCommand(product.id, "photo.png", _test_png_bytes())
+    )
+    # старый файл предыдущей загрузки не должен оставаться мусором на диске
+    assert not first_full.exists()
+    second_full = tmp_path / second.photo.removeprefix("/uploads/")
+    assert second_full.exists()
 
 
 async def test_set_product_photo_rejects_bad_extension(make_uow, registered_shop, create_product, tmp_path):
@@ -1553,4 +1646,230 @@ async def test_connect_telegram_owner_only(make_uow, registered_shop, hasher):
     with pytest.raises(AccessDeniedError):
         await ConnectTelegramUseCase(make_uow(tenant_id)).execute(
             Actor(id=manager.id, role=manager.role), ConnectTelegramCommand(chat_id="11111")
+        )
+
+
+async def test_create_employee_auto_assigns_single_warehouse(
+    make_uow, hasher, registered_shop, warehouse_id, random_phone
+):
+    """Магазин с одним складом: seller/manager/storekeeper привязываются к нему
+    автоматически, даже если фронт не прислал warehouse_ids."""
+    tenant_id, _, owner = registered_shop
+
+    seller = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner, CreateEmployeeCommand("Зара", random_phone(), "secret123", Role.SELLER)
+    )
+
+    async with make_uow(tenant_id) as uow:
+        warehouses = await uow.warehouses.list_for_user(seller.id)
+    assert [w.id for w in warehouses] == [warehouse_id]
+
+
+async def test_create_employee_requires_warehouse_when_multiple_exist(
+    make_uow, hasher, registered_shop, warehouse_id, random_phone
+):
+    """Как только у магазина больше одного склада, для seller/manager/storekeeper
+    нужно явно выбрать хотя бы один — иначе DomainError."""
+    tenant_id, _, owner = registered_shop
+    second = await CreateWarehouseUseCase(make_uow(tenant_id)).execute(
+        owner, CreateWarehouseCommand(name="Склад Б")
+    )
+
+    with pytest.raises(DomainError):
+        await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+            owner, CreateEmployeeCommand("Зара", random_phone(), "secret123", Role.SELLER)
+        )
+
+    # с явным списком — успех, и в списке ровно переданные склады
+    seller = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner,
+        CreateEmployeeCommand(
+            "Зара", random_phone(), "secret123", Role.SELLER,
+            warehouse_ids=[warehouse_id, second.id],
+        ),
+    )
+    async with make_uow(tenant_id) as uow:
+        assigned = {w.id for w in await uow.warehouses.list_for_user(seller.id)}
+    assert assigned == {warehouse_id, second.id}
+
+
+async def test_create_employee_rejects_foreign_warehouse(
+    make_uow, hasher, registered_shop, random_phone
+):
+    tenant_id, _, owner = registered_shop
+    await CreateWarehouseUseCase(make_uow(tenant_id)).execute(
+        owner, CreateWarehouseCommand(name="Склад Б")
+    )
+    with pytest.raises(DomainError):
+        await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+            owner,
+            CreateEmployeeCommand(
+                "Зара", random_phone(), "secret123", Role.SELLER, warehouse_ids=[999999],
+            ),
+        )
+
+
+async def test_manager_and_seller_are_limited_to_their_warehouses(
+    make_uow, hasher, registered_shop, warehouse_id, create_product, random_phone
+):
+    """Продавец, привязанный только к одному из двух складов, не может продавать
+    и не видит продажи с чужого склада — новое правило из ТЗ (ранее только для storekeeper)."""
+    tenant_id, _, owner = registered_shop
+    second = await CreateWarehouseUseCase(make_uow(tenant_id)).execute(
+        owner, CreateWarehouseCommand(name="Склад Б")
+    )
+    product = await create_product(tenant_id, name="Товар")
+
+    seller = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner,
+        CreateEmployeeCommand(
+            "Зара", random_phone(), "secret123", Role.SELLER, warehouse_ids=[warehouse_id],
+        ),
+    )
+    async with make_uow(tenant_id) as uow:
+        seller_warehouse_ids = [w.id for w in await uow.warehouses.list_for_user(seller.id)]
+    seller_actor = Actor(id=seller.id, role=seller.role, warehouse_ids=seller_warehouse_ids)
+
+    for wid in (warehouse_id, second.id):
+        await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+            owner,
+            ReceiveGoodsCommand(
+                warehouse_id=wid,
+                lines=[LineInput(product_id=product.id, quantity=Decimal("5"))],
+            ),
+        )
+
+    # продажа со своего склада — можно
+    await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        seller_actor,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("100"))],
+        ),
+    )
+
+    # продажа с чужого (не назначенного) склада — запрещена
+    with pytest.raises(AccessDeniedError):
+        await CreateSaleUseCase(make_uow(tenant_id)).execute(
+            seller_actor,
+            CreateSaleCommand(
+                warehouse_id=second.id,
+                payment_method=PaymentMethod.CASH,
+                items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("100"))],
+            ),
+        )
+
+
+async def test_analytics_filtered_by_actor_warehouses(
+    make_uow, hasher, registered_shop, warehouse_id, create_product, random_phone
+):
+    """Аналитика (dashboard/top-products/dead-stock/stock-value) считается только
+    по складам, к которым привязан управляющий — новое правило из ТЗ."""
+    tenant_id, _, owner = registered_shop
+    second = await CreateWarehouseUseCase(make_uow(tenant_id)).execute(
+        owner, CreateWarehouseCommand(name="Склад Б")
+    )
+    product = await create_product(
+        tenant_id, name="Товар", purchase_price=Money.of("100"), retail_price=Money.of("200")
+    )
+
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("10"), cost=Decimal("100"))],
+        ),
+    )
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=second.id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("10"), cost=Decimal("100"))],
+        ),
+    )
+    await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("200"))],
+        ),
+    )
+    await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=second.id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("200"))],
+        ),
+    )
+
+    manager = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner,
+        CreateEmployeeCommand(
+            "Умар", random_phone(), "secret123", Role.MANAGER, warehouse_ids=[warehouse_id],
+        ),
+    )
+    manager_actor = Actor(id=manager.id, role=manager.role, warehouse_ids=[warehouse_id])
+
+    # владелец видит обе продажи, управляющий — только свою (по своему складу)
+    owner_dashboard = await GetDashboardUseCase(make_uow(tenant_id)).execute(owner)
+    assert owner_dashboard.today.sales_count == 2
+
+    manager_dashboard = await GetDashboardUseCase(make_uow(tenant_id)).execute(manager_actor)
+    assert manager_dashboard.today.sales_count == 1
+    assert manager_dashboard.today.revenue == Decimal("200")
+
+    stock_value = await GetStockValueUseCase(make_uow(tenant_id)).execute(manager_actor)
+    assert {item.product_id for item in stock_value} == {product.id}
+    assert stock_value[0].quantity == Decimal("9")  # 10 принято - 1 продано на своём складе
+
+
+async def test_update_employee_changes_role_and_warehouses(
+    make_uow, hasher, registered_shop, warehouse_id, random_phone
+):
+    tenant_id, _, owner = registered_shop
+    second = await CreateWarehouseUseCase(make_uow(tenant_id)).execute(
+        owner, CreateWarehouseCommand(name="Склад Б")
+    )
+    seller = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner,
+        CreateEmployeeCommand(
+            "Зара", random_phone(), "secret123", Role.SELLER, warehouse_ids=[warehouse_id],
+        ),
+    )
+
+    updated = await UpdateEmployeeUseCase(make_uow(tenant_id)).execute(
+        owner,
+        UpdateEmployeeCommand(
+            user_id=seller.id, name="Зара Х.", role=Role.SELLER, is_active=True,
+            warehouse_ids=[second.id],
+        ),
+    )
+    assert updated.name == "Зара Х."
+
+    async with make_uow(tenant_id) as uow:
+        assigned = {w.id for w in await uow.warehouses.list_for_user(seller.id)}
+    assert assigned == {second.id}
+
+
+async def test_update_employee_rejects_role_escalation_by_manager(
+    make_uow, hasher, registered_shop, random_phone
+):
+    tenant_id, _, owner = registered_shop
+    manager = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner, CreateEmployeeCommand("Умар", random_phone(), "secret123", Role.MANAGER)
+    )
+    seller = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner, CreateEmployeeCommand("Зара", random_phone(), "secret123", Role.SELLER)
+    )
+    manager_actor = Actor(id=manager.id, role=manager.role)
+
+    with pytest.raises(AccessDeniedError):
+        await UpdateEmployeeUseCase(make_uow(tenant_id)).execute(
+            manager_actor,
+            UpdateEmployeeCommand(
+                user_id=seller.id, name="Зара", role=Role.MANAGER, is_active=True,
+            ),
         )

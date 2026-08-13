@@ -9,12 +9,14 @@ import { SalePage } from './pages/sales/SalePage'
 import { ProductsPage } from './pages/products/ProductsPage'
 import { StockPage } from './pages/stock/StockPage'
 import { WarehouseDetailPage } from './pages/stock/WarehouseDetailPage'
+import { MovementHistoryPage } from './pages/stock/MovementHistoryPage'
 import { OrdersPage } from './pages/orders/OrdersPage'
 import { DebtsPage } from './pages/debts/DebtsPage'
 import { ClientsPage } from './pages/clients/ClientsPage'
 import { AnalyticsPage } from './pages/analytics/AnalyticsPage'
 import { ProfilePage } from './pages/profile/ProfilePage'
 import { EmployeesPage } from './pages/employees/EmployeesPage'
+import { AuditPage } from './pages/audit/AuditPage'
 
 export function App() {
   return (
@@ -35,12 +37,14 @@ export function App() {
               <Route path="/" element={<SalePage />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/stock" element={<StockPage />} />
+              <Route path="/stock/history" element={<MovementHistoryPage />} />
               <Route path="/stock/:id" element={<WarehouseDetailPage />} />
               <Route path="/orders" element={<OrdersPage />} />
               <Route path="/debts" element={<DebtsPage />} />
               <Route path="/clients" element={<ClientsPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/employees" element={<EmployeesPage />} />
+              <Route path="/audit" element={<AuditPage />} />
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
           </Routes>

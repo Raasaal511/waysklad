@@ -20,7 +20,9 @@ class GetTopProductsUseCase:
     async def execute(self, actor: Actor, query: TopProductsQuery) -> list[ProductSales]:
         require(actor, Permission.ANALYTICS_VIEW)
         async with self._uow as uow:
-            return await uow.analytics.top_products(query.date_from, query.date_to, query.limit)
+            return await uow.analytics.top_products(
+                query.date_from, query.date_to, query.limit, actor.warehouse_ids
+            )
 
 
 @dataclass(frozen=True)
@@ -36,4 +38,6 @@ class GetCategoryProfitUseCase:
     async def execute(self, actor: Actor, query: CategoryProfitQuery) -> list[CategoryProfit]:
         require(actor, Permission.ANALYTICS_VIEW)
         async with self._uow as uow:
-            return await uow.analytics.profit_by_category(query.date_from, query.date_to)
+            return await uow.analytics.profit_by_category(
+                query.date_from, query.date_to, actor.warehouse_ids
+            )

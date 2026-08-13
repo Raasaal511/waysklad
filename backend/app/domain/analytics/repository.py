@@ -37,6 +37,15 @@ class DeadStockItem:
 
 
 @dataclass(frozen=True)
+class RestockRecommendation:
+    product_id: int
+    product_name: str
+    quantity: Decimal  # текущий остаток (на переданных складах)
+    min_stock: Decimal
+    quantity_sold: Decimal  # продано за период (см. RestockRecommendationsUseCase)
+
+
+@dataclass(frozen=True)
 class StockValueItem:
     product_id: int
     product_name: str
@@ -49,18 +58,35 @@ class StockValueItem:
 
 
 class IAnalyticsRepository(Protocol):
-    async def totals_for_period(self, date_from: datetime, date_to: datetime) -> PeriodTotals: ...
+    # warehouse_ids: None — без ограничения (owner/analyst), список — фильтр
+    # по складам актора (manager/seller/storekeeper)
+    async def totals_for_period(
+        self, date_from: datetime, date_to: datetime, warehouse_ids: list[int] | None = None
+    ) -> PeriodTotals: ...
 
     async def top_products(
-        self, date_from: datetime, date_to: datetime, limit: int = 10
+        self,
+        date_from: datetime,
+        date_to: datetime,
+        limit: int = 10,
+        warehouse_ids: list[int] | None = None,
     ) -> list[ProductSales]: ...
 
     async def profit_by_category(
-        self, date_from: datetime, date_to: datetime
+        self, date_from: datetime, date_to: datetime, warehouse_ids: list[int] | None = None
     ) -> list[CategoryProfit]: ...
 
-    async def dead_stock(self, stale_after: date) -> list[DeadStockItem]: ...
+    async def dead_stock(
+        self, stale_after: date, warehouse_ids: list[int] | None = None
+    ) -> list[DeadStockItem]: ...
 
-    async def stock_value(self) -> list[StockValueItem]: ...
+    async def stock_value(self, warehouse_ids: list[int] | None = None) -> list[StockValueItem]: ...
+
+    async def restock_recommendations(
+        self, sale_period_from: datetime, warehouse_ids: list[int] | None = None
+    ) -> list[RestockRecommendation]:
+        """Товары с остатком <= min_stock, которые при этом продавались с sale_period_from —
+        значит их раскупают, а не просто забыли. Сортировка — по проданному, сначала ходовые."""
+        ...
 
     async def debts_issued_total(self, date_from: datetime, date_to: datetime) -> Decimal: ...

@@ -2,17 +2,12 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from app.infrastructure.db.session import SessionLocal
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.presentation.deps.auth import CurrentUserDep
-
-
-def get_session_factory():
-    # единая точка подмены БД в тестах через dependency_overrides
-    return SessionLocal
-
-
-SessionFactoryDep = Annotated[object, Depends(get_session_factory)]
+from app.presentation.deps.session import (  # noqa: F401  (реэкспорт для обратной совместимости)
+    SessionFactoryDep,
+    get_session_factory,
+)
 
 
 def get_public_uow(factory: SessionFactoryDep) -> SqlAlchemyUnitOfWork:

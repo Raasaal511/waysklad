@@ -27,7 +27,8 @@ class GetDashboardUseCase:
         month_start = today_start.replace(day=1)
 
         async with self._uow as uow:
-            today = await uow.analytics.totals_for_period(today_start, tomorrow_start)
-            week = await uow.analytics.totals_for_period(week_start, tomorrow_start)
-            month = await uow.analytics.totals_for_period(month_start, tomorrow_start)
+            wh = actor.warehouse_ids
+            today = await uow.analytics.totals_for_period(today_start, tomorrow_start, wh)
+            week = await uow.analytics.totals_for_period(week_start, tomorrow_start, wh)
+            month = await uow.analytics.totals_for_period(month_start, tomorrow_start, wh)
             return DashboardResult(today=today, week=week, month=month)

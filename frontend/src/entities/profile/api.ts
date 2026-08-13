@@ -10,8 +10,16 @@ export function createEmployee(input: {
   phone: string
   password: string
   role: Role
+  warehouse_ids?: number[]
 }) {
   return api.post<User>('/auth/employees', input)
+}
+
+export function updateEmployee(
+  employeeId: number,
+  input: { name: string; role: Role; is_active: boolean; warehouse_ids?: number[] | null },
+) {
+  return api.patch<User>(`/auth/employees/${employeeId}`, input)
 }
 
 export interface Tenant {

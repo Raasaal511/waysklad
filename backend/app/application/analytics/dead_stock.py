@@ -23,7 +23,7 @@ class GetDeadStockUseCase:
         require(actor, Permission.ANALYTICS_VIEW)
         stale_after = date.today() - timedelta(days=query.stale_days)
         async with self._uow as uow:
-            return await uow.analytics.dead_stock(stale_after)
+            return await uow.analytics.dead_stock(stale_after, actor.warehouse_ids)
 
 
 class GetStockValueUseCase:
@@ -35,4 +35,4 @@ class GetStockValueUseCase:
     async def execute(self, actor: Actor) -> list[StockValueItem]:
         require(actor, Permission.ANALYTICS_VIEW)
         async with self._uow as uow:
-            return await uow.analytics.stock_value()
+            return await uow.analytics.stock_value(actor.warehouse_ids)

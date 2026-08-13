@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Icon } from './icons/Icon'
+import { IconX } from '@tabler/icons-react'
 import { IconButton } from './IconButton'
 
 interface ModalProps {
@@ -70,7 +70,7 @@ export function Modal({ title, onClose, children, wide, size, footer, headerActi
               tooltip="Закрыть"
               aria-label="Закрыть"
             >
-              <Icon name="close" size={22} />
+              <IconX size={22} stroke={1.8} />
             </IconButton>
           </div>
         </div>

@@ -8,7 +8,7 @@ from app.domain.common.money import Money
 from app.domain.common.quantity import Quantity
 from app.domain.common.uow import IUnitOfWork
 from app.domain.debts.entities import Debt, total_balance
-from app.domain.identity.permissions import Actor, Permission, require
+from app.domain.identity.permissions import Actor, Permission, require, require_warehouse
 from app.domain.sales.entities import Sale, SaleLine
 from app.domain.sales.payment import PaymentMethod
 
@@ -47,6 +47,7 @@ class CreateSaleUseCase:
 
     async def execute(self, actor: Actor, cmd: CreateSaleCommand) -> CreateSaleResult:
         require(actor, Permission.SALES_CREATE)
+        require_warehouse(actor, cmd.warehouse_id)
 
         async with self._uow as uow:
             if cmd.client_op_id is not None:

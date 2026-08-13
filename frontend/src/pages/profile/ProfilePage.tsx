@@ -9,8 +9,9 @@ import { useAuth } from '../../app/AuthContext'
 import { useTheme, type AccentColor } from '../../app/ThemeContext'
 import { useShop } from '../../app/ShopContext'
 import { Modal } from '../../shared/ui/Modal'
-import { Icon } from '../../shared/ui/icons/Icon'
+import { IconCheck, IconBuildingWarehouse, IconChevronRight, IconPencil } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
+import { IconButton } from '../../shared/ui/IconButton'
 
 const ROLE_LABELS: Record<Role, string> = {
   owner: 'Владелец',
@@ -110,7 +111,7 @@ function PersonalizationTab() {
         {error && <p className="error">{error}</p>}
         {saved && !error && (
           <p className="row" style={{ gap: 6 }}>
-            <Icon name="check" size={16} className="icon-accent" /> Сохранено
+            <IconCheck size={16} stroke={1.8} className="icon-accent" /> Сохранено
           </p>
         )}
         <Button type="submit" disabled={saving || !shop}>
@@ -238,11 +239,11 @@ function MyWarehouses() {
             <div className="row between">
               <div className="row" style={{ gap: 10 }}>
                 <span className="warehouse-card-icon">
-                  <Icon name="stock" size={18} />
+                  <IconBuildingWarehouse size={18} stroke={1.8} />
                 </span>
                 <strong>{w.name}</strong>
               </div>
-              <Icon name="chevronRight" size={18} />
+              <IconChevronRight size={18} stroke={1.8} />
             </div>
             {w.address && <span className="text-muted">{w.address}</span>}
             <span className="badge accent">{itemCount(w.id)} позиций</span>
@@ -295,12 +296,17 @@ function TelegramSettings() {
       {!loading && connectedChatId && (
         <div className="row between">
           <span className="row" style={{ gap: 6 }}>
-            <Icon name="check" size={16} className="icon-accent" />
+            <IconCheck size={16} stroke={1.8} className="icon-accent" />
             Chat ID: {connectedChatId}
           </span>
-          <Button variant="secondary" onClick={() => setShowForm(true)}>
-            Изменить
-          </Button>
+          <IconButton
+            variant="muted"
+            tooltip="Изменить"
+            aria-label="Изменить подключение Telegram"
+            onClick={() => setShowForm(true)}
+          >
+            <IconPencil size={16} stroke={1.8} />
+          </IconButton>
         </div>
       )}
 

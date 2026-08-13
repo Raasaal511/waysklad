@@ -1,6 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   listActiveDebts,
+  listDueDebts,
   issueDebt,
   issueSupplierDebt,
   repayDebt,
@@ -13,7 +15,7 @@ import {
 import { searchClients, listSuppliers, type Client, type Supplier } from '../../entities/counterparty/api'
 import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
-import { Icon } from '../../shared/ui/icons/Icon'
+import { IconPlus } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
 import { DateInput } from '../../shared/ui/DateInput'
@@ -33,22 +35,28 @@ function formatDate(value: string) {
 }
 
 export function DebtsPage() {
+  const [searchParams] = useSearchParams()
+  const highlightId = searchParams.get('highlight')
   const [debts, setDebts] = useState<Debt[]>([])
+  const [dueDebts, setDueDebts] = useState<Debt[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const highlightRef = useRef<HTMLDivElement>(null)
 
   async function load() {
     setLoading(true)
     try {
-      const [activeDebts, clientList, supplierList] = await Promise.all([
+      const [activeDebts, dueToday, clientList, supplierList] = await Promise.all([
         listActiveDebts(),
+        listDueDebts(),
         searchClients(),
         listSuppliers(),
       ])
       setDebts(activeDebts)
+      setDueDebts(dueToday)
       setClients(clientList)
       setSuppliers(supplierList)
     } catch (err) {
@@ -62,17 +70,28 @@ export function DebtsPage() {
     load()
   }, [])
 
+  useEffect(() => {
+    if (!loading && highlightId) {
+      highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [loading, highlightId])
+
   const counterpartyName = (debt: Debt) =>
     debt.client_id
       ? clients.find((c) => c.id === debt.client_id)?.name ?? `Клиент #${debt.client_id}`
       : suppliers.find((s) => s.id === debt.supplier_id)?.name ?? `Поставщик #${debt.supplier_id}`
+
+  // должны сегодня + уже просроченные — объединяем без дублей
+  const overdue = debts.filter((d) => d.status === 'overdue')
+  const dueTodayIds = new Set(dueDebts.map((d) => d.id))
+  const urgentDebts = [...dueDebts, ...overdue.filter((d) => !dueTodayIds.has(d.id))]
 
   return (
     <div className="stack">
       <div className="section-title">
         <h2>Долги</h2>
         <Button onClick={() => setShowForm(true)}>
-          <Icon name="plus" size={16} /> Выдать долг
+          <IconPlus size={16} stroke={1.8} /> Выдать долг
         </Button>
       </div>
 
@@ -90,6 +109,39 @@ export function DebtsPage() {
       )}
 
       {error && <p className="error">{error}</p>}
+
+      {!loading && urgentDebts.length > 0 && (
+        <div className="stack">
+          <h3>Должны сегодня и просрочено</h3>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Контрагент</th>
+                  <th>Остаток</th>
+                  <th>Срок</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                {urgentDebts.map((d) => (
+                  <tr key={d.id}>
+                    <td>{counterpartyName(d)}</td>
+                    <td>{formatMoney(d.balance)} ₽</td>
+                    <td>{d.due_date ? formatDate(d.due_date) : '—'}</td>
+                    <td>
+                      <span className={DEBT_STATUS_BADGE_CLASS[d.status]}>
+                        {DEBT_STATUS_LABELS[d.status]}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <p className="text-muted">Загрузка…</p>
       ) : debts.length === 0 ? (
@@ -97,7 +149,14 @@ export function DebtsPage() {
       ) : (
         <div className="stack">
           {debts.map((d) => (
-            <DebtCard key={d.id} debt={d} name={counterpartyName(d)} onChanged={load} />
+            <DebtCard
+              key={d.id}
+              debt={d}
+              name={counterpartyName(d)}
+              onChanged={load}
+              highlighted={String(d.id) === highlightId}
+              highlightRef={String(d.id) === highlightId ? highlightRef : undefined}
+            />
           ))}
         </div>
       )}
@@ -109,10 +168,14 @@ function DebtCard({
   debt,
   name,
   onChanged,
+  highlighted,
+  highlightRef,
 }: {
   debt: Debt
   name: string
   onChanged: () => void
+  highlighted?: boolean
+  highlightRef?: React.RefObject<HTMLDivElement | null>
 }) {
   const [amount, setAmount] = useState('')
   const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10))
@@ -152,7 +215,7 @@ function DebtCard({
   }
 
   return (
-    <div className="card card-full stack">
+    <div ref={highlightRef} className={`card card-full stack${highlighted ? ' row-highlight' : ''}`}>
       <div className="row between wrap" style={{ gap: 8 }}>
         <div className="stat">
           <span>{name}</span>
