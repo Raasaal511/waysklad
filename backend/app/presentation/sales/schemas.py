@@ -79,6 +79,7 @@ class SaleResponse(BaseModel):
     created_at: datetime
     note: str
     deleted_at: datetime | None
+    order_id: int | None
     lines: list[SaleLineResponse]
 
     @classmethod
@@ -108,6 +109,7 @@ class SaleResponse(BaseModel):
             created_at=sale.created_at,
             note=sale.note,
             deleted_at=sale.deleted_at,
+            order_id=sale.order_id,
             lines=[
                 SaleLineResponse(
                     id=line.id,

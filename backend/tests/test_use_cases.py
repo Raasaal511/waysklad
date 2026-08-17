@@ -56,6 +56,7 @@ from app.application.inventory.set_warehouse_assignments import (
 from app.application.inventory.stocktake import StocktakeCommand, StocktakeUseCase
 from app.application.inventory.transfer import TransferCommand, TransferUseCase
 from app.application.inventory.write_off import WriteOffCommand, WriteOffUseCase
+from app.application.orders.cancel_order import CancelOrderCommand, CancelOrderUseCase
 from app.application.orders.change_status import (
     ChangeOrderStatusCommand,
     ChangeOrderStatusUseCase,
@@ -65,6 +66,8 @@ from app.application.orders.create_order import (
     CreateOrderUseCase,
     OrderItemInput,
 )
+from app.application.orders.issue_order import IssueOrderCommand, IssueOrderUseCase
+from app.application.orders.update_order import UpdateOrderCommand, UpdateOrderUseCase
 from app.application.products.create_product import (
     CreateProductCommand,
     CreateProductUseCase,
@@ -1348,9 +1351,16 @@ async def test_create_supplier_and_search_clients_use_cases(make_uow, registered
         assert str(clients[0].phone) == "+79280005566"
 
 
-async def test_order_lifecycle(make_uow, registered_shop, create_product):
+async def test_order_lifecycle(make_uow, registered_shop, warehouse_id, create_product):
     tenant_id, _, owner = registered_shop
     product = await create_product(tenant_id, name="Торт на заказ", retail_price=Money.of("3000"))
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("1"))],
+        ),
+    )
     client = await CreateClientUseCase(make_uow(tenant_id)).execute(
         owner, CreateClientCommand(name="Милана")
     )
@@ -1359,6 +1369,7 @@ async def test_order_lifecycle(make_uow, registered_shop, create_product):
         owner,
         CreateOrderCommand(
             client_id=client.id,
+            warehouse_id=warehouse_id,
             items=[OrderItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("3000"))],
             due_date=date.today() + timedelta(days=3),
             prepayment=Decimal("1000"),
@@ -1367,16 +1378,271 @@ async def test_order_lifecycle(make_uow, registered_shop, create_product):
     )
     assert order.to_pay == Money.of("2000")
 
+    async with make_uow(tenant_id) as uow:
+        # создание заказа резервирует остаток
+        assert await uow.stock.get_reserved(product.id, warehouse_id) == Decimal("1")
+
     order = await ChangeOrderStatusUseCase(make_uow(tenant_id)).execute(
         owner, ChangeOrderStatusCommand(order.id, OrderStatus.IN_PROGRESS)
     )
     assert order.status is OrderStatus.IN_PROGRESS
 
-    # из «в работе» нельзя сразу «выдан»
+    # выдача — не смена статуса, а отдельный сценарий (IssueOrderUseCase)
     with pytest.raises(DomainError):
         await ChangeOrderStatusUseCase(make_uow(tenant_id)).execute(
             owner, ChangeOrderStatusCommand(order.id, OrderStatus.ISSUED)
         )
+
+
+async def test_order_reservation_blocks_sale_of_reserved_stock(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Платье", retail_price=Money.of("250"))
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("3"))],
+        ),
+    )
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Хава")
+    )
+    await CreateOrderUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateOrderCommand(
+            client_id=client.id,
+            warehouse_id=warehouse_id,
+            items=[OrderItemInput(product_id=product.id, quantity=Decimal("3"), price=Decimal("250"))],
+            due_date=date.today(),
+        ),
+    )
+
+    # весь остаток зарезервирован под заказ — обычная продажа не пройдёт
+    with pytest.raises(InsufficientStockError):
+        await CreateSaleUseCase(make_uow(tenant_id)).execute(
+            owner,
+            CreateSaleCommand(
+                warehouse_id=warehouse_id,
+                payment_method=PaymentMethod.CASH,
+                items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("250"))],
+            ),
+        )
+
+
+async def test_order_cancel_releases_reservation(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Платье", retail_price=Money.of("250"))
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("2"))],
+        ),
+    )
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Хава")
+    )
+    order = await CreateOrderUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateOrderCommand(
+            client_id=client.id,
+            warehouse_id=warehouse_id,
+            items=[OrderItemInput(product_id=product.id, quantity=Decimal("2"), price=Decimal("250"))],
+            due_date=date.today(),
+        ),
+    )
+
+    order = await CancelOrderUseCase(make_uow(tenant_id)).execute(
+        owner, CancelOrderCommand(order_id=order.id, reason="передумал")
+    )
+    assert order.status is OrderStatus.CANCELLED
+
+    async with make_uow(tenant_id) as uow:
+        assert await uow.stock.get_reserved(product.id, warehouse_id) == Decimal("0")
+
+    # повторная отмена уже отменённого заказа — ошибка
+    with pytest.raises(DomainError):
+        await CancelOrderUseCase(make_uow(tenant_id)).execute(
+            owner, CancelOrderCommand(order_id=order.id)
+        )
+
+    # остаток снова свободно продаётся
+    await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("2"), price=Decimal("250"))],
+        ),
+    )
+
+
+async def test_order_update_recalculates_reservation(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Платье", retail_price=Money.of("250"))
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("5"))],
+        ),
+    )
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Хава")
+    )
+    order = await CreateOrderUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateOrderCommand(
+            client_id=client.id,
+            warehouse_id=warehouse_id,
+            items=[OrderItemInput(product_id=product.id, quantity=Decimal("2"), price=Decimal("250"))],
+            due_date=date.today(),
+        ),
+    )
+
+    order = await UpdateOrderUseCase(make_uow(tenant_id)).execute(
+        owner,
+        UpdateOrderCommand(
+            order_id=order.id,
+            client_id=client.id,
+            warehouse_id=warehouse_id,
+            items=[OrderItemInput(product_id=product.id, quantity=Decimal("4"), price=Decimal("250"))],
+            due_date=date.today(),
+        ),
+    )
+    assert order.total == Money.of("1000")
+
+    async with make_uow(tenant_id) as uow:
+        assert await uow.stock.get_reserved(product.id, warehouse_id) == Decimal("4")
+
+    # правка сверх остатка — InsufficientStockError, старый резерв не пострадал (откат)
+    with pytest.raises(InsufficientStockError):
+        await UpdateOrderUseCase(make_uow(tenant_id)).execute(
+            owner,
+            UpdateOrderCommand(
+                order_id=order.id,
+                client_id=client.id,
+                warehouse_id=warehouse_id,
+                items=[
+                    OrderItemInput(product_id=product.id, quantity=Decimal("10"), price=Decimal("250"))
+                ],
+            ),
+        )
+
+    async with make_uow(tenant_id) as uow:
+        assert await uow.stock.get_reserved(product.id, warehouse_id) == Decimal("4")
+
+
+async def test_order_issue_creates_sale_and_settles_debt(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(
+        tenant_id, name="Торт на заказ", purchase_price=Money.of("1200"), retail_price=Money.of("3000")
+    )
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("1"))],
+        ),
+    )
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Милана", debt_limit=Decimal("5000"))
+    )
+    order = await CreateOrderUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateOrderCommand(
+            client_id=client.id,
+            warehouse_id=warehouse_id,
+            items=[OrderItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("3000"))],
+            due_date=date.today(),
+            prepayment=Decimal("1000"),
+        ),
+    )
+
+    # выдать нельзя, пока заказ не «готов»
+    with pytest.raises(DomainError):
+        await IssueOrderUseCase(make_uow(tenant_id)).execute(
+            owner,
+            IssueOrderCommand(order_id=order.id, payment_method=PaymentMethod.CASH),
+        )
+
+    await ChangeOrderStatusUseCase(make_uow(tenant_id)).execute(
+        owner, ChangeOrderStatusCommand(order.id, OrderStatus.READY)
+    )
+
+    result = await IssueOrderUseCase(make_uow(tenant_id)).execute(
+        owner,
+        IssueOrderCommand(
+            order_id=order.id,
+            payment_method=PaymentMethod.CREDIT,
+            debt_due_date=date.today() + timedelta(days=5),
+        ),
+    )
+    assert result.sale.total == Money.of("2000")  # доплата (3000 - 1000), не полная сумма
+    assert result.order.status is OrderStatus.ISSUED
+    assert result.order.sale_id == result.sale.id
+    assert result.sale.order_id == order.id
+
+    async with make_uow(tenant_id) as uow:
+        assert await uow.stock.get(product.id, warehouse_id) == Decimal("0")
+        assert await uow.stock.get_reserved(product.id, warehouse_id) == Decimal("0")
+        debts = await uow.debts.list_by_client(client.id)
+        assert len(debts) == 1
+        assert debts[0].balance == Money.of("2000")
+        assert debts[0].sale_id == result.sale.id
+
+    # аналитика считает выручку по полной сумме заказа, а не по доплате —
+    # предоплата не теряется из отчётов
+    dashboard = await GetDashboardUseCase(make_uow(tenant_id)).execute(owner)
+    assert dashboard.today.revenue == Decimal("3000")
+    assert dashboard.today.profit == Decimal("1800")  # 3000 - 1200
+
+
+async def test_order_issue_cash_payment_computes_change_from_balance_due(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Торт на заказ", retail_price=Money.of("3000"))
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("1"))],
+        ),
+    )
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Милана")
+    )
+    order = await CreateOrderUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateOrderCommand(
+            client_id=client.id,
+            warehouse_id=warehouse_id,
+            items=[OrderItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("3000"))],
+            due_date=date.today(),
+            prepayment=Decimal("1000"),
+        ),
+    )
+    await ChangeOrderStatusUseCase(make_uow(tenant_id)).execute(
+        owner, ChangeOrderStatusCommand(order.id, OrderStatus.READY)
+    )
+
+    result = await IssueOrderUseCase(make_uow(tenant_id)).execute(
+        owner,
+        IssueOrderCommand(
+            order_id=order.id, payment_method=PaymentMethod.CASH, cash_received=Decimal("2500")
+        ),
+    )
+    assert result.sale.total == Money.of("2000")
+    assert result.change == Money.of("500")  # сдача с доплаты, не с полной суммы
 
 
 async def test_dashboard_counts_sales_and_profit(

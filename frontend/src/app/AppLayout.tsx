@@ -5,6 +5,7 @@ import {
   IconBox,
   IconBuildingWarehouse,
   IconClipboardList,
+  IconChecklist,
   IconCash,
   IconUsers,
   IconChartBar,
@@ -17,19 +18,28 @@ import {
 import { useAuth } from './AuthContext'
 import { useShop } from './ShopContext'
 import { useTheme } from './ThemeContext'
+import { NotificationBell } from './NotificationBell'
 import { Button } from '../shared/ui/Button'
 import { IconButton } from '../shared/ui/IconButton'
 import { useOfflineSync } from '../shared/offline/useOfflineSync'
 import type { Role } from '../entities/auth/api'
 
-const NAV_ITEMS: { to: string; label: string; icon: TablerIcon; roles?: Role[] }[] = [
+interface NavItem {
+  to: string
+  label: string
+  icon: TablerIcon
+  roles?: Role[]
+}
+
+const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Продажи', icon: IconShoppingCart, roles: ['owner', 'manager', 'seller'] },
   { to: '/products', label: 'Товары', icon: IconBox },
-  { to: '/stock', label: 'Остатки', icon: IconBuildingWarehouse },
+  { to: '/stock', label: 'Склады', icon: IconBuildingWarehouse },
   {
     to: '/orders', label: 'Заказы', icon: IconClipboardList,
     roles: ['owner', 'manager', 'seller', 'analyst'],
   },
+  { to: '/tasks', label: 'Задачи', icon: IconChecklist },
   {
     to: '/debts', label: 'Долги', icon: IconCash,
     roles: ['owner', 'manager', 'seller', 'analyst'],
@@ -75,6 +85,7 @@ function NavItems({
             `${variant === 'sidebar' ? 'app-sidebar-item' : 'app-nav-item'}${isActive ? ' active' : ''}`
           }
           data-tooltip={collapsed ? item.label : undefined}
+          data-nav={item.to === '/tasks' ? 'tasks' : undefined}
         >
           <span className={variant === 'sidebar' ? 'app-sidebar-icon' : 'app-nav-icon'}>
             <item.icon size={variant === 'sidebar' ? 19 : 21} stroke={1.8} />
@@ -188,15 +199,18 @@ export function AppLayout() {
               <ShopTitle shopName={shopName} />
             </div>
           )}
-          <IconButton
-            variant="accent"
-            className="app-sidebar-toggle"
-            onClick={() => setCollapsed((v) => !v)}
-            aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
-            data-tooltip={collapsed ? 'Развернуть' : undefined}
-          >
-            {collapsed ? <IconChevronRight size={18} stroke={1.8} /> : <IconChevronLeft size={18} stroke={1.8} />}
-          </IconButton>
+          <div className="app-sidebar-top-actions">
+            <NotificationBell align="left" />
+            <IconButton
+              variant="accent"
+              className="app-sidebar-toggle"
+              onClick={() => setCollapsed((v) => !v)}
+              aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+              data-tooltip={collapsed ? 'Развернуть' : undefined}
+            >
+              {collapsed ? <IconChevronRight size={18} stroke={1.8} /> : <IconChevronLeft size={18} stroke={1.8} />}
+            </IconButton>
+          </div>
         </div>
 
         <UserBadge name={user?.name} role={user?.role} collapsed={collapsed} />
@@ -229,6 +243,7 @@ export function AppLayout() {
             <ShopTitle shopName={shopName} />
           </div>
           <div className="app-header-user">
+            <NotificationBell />
             <UserBadge name={user?.name} role={user?.role} />
             <Button variant="secondary" onClick={logout}>
               Выйти

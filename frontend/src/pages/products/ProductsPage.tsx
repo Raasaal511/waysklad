@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   listProducts,
@@ -11,13 +11,11 @@ import {
   createCategory,
   setProductPhoto,
   importProducts,
-  getProductHistory,
   exportProducts,
   type Product,
   type Unit,
   type Category,
   type VariantInput,
-  type ProductHistoryEntry,
   type ExportFormat,
 } from '../../entities/product/api'
 import { listWarehouses, listStock, type Warehouse, type StockItem } from '../../entities/inventory/api'
@@ -28,13 +26,9 @@ import {
   IconBarcode,
   IconUpload,
   IconDownload,
-  IconPencil,
-  IconCheck,
-  IconPhoto,
   IconChevronDown,
   IconTrash,
   IconRefresh,
-  type Icon as TablerIcon,
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
@@ -43,6 +37,7 @@ import { DropdownMenu } from '../../shared/ui/DropdownMenu'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
+import { ProductDetailCard } from '../../shared/ui/ProductDetailCard'
 import { isBarcodeScannerSupported } from '../../entities/barcode/barcodeSupport'
 import {
   formatMoney,
@@ -79,6 +74,7 @@ const BarcodeScanner = lazy(() =>
 )
 
 const PAGE_SIZE = 50
+const IMPORT_ERRORS_COLUMNS = '100px 1fr'
 
 type SortMode =
   | 'name'
@@ -97,18 +93,6 @@ const SORT_LABELS: Record<SortMode, string> = {
   stock_desc: 'По остатку',
   created_desc: 'Сначала новые',
   created_asc: 'Сначала старые',
-}
-
-const PRODUCT_HISTORY_ACTION_LABELS: Record<string, string> = {
-  'product.create': 'Товар создан',
-  'product.update': 'Изменены данные товара',
-  'product.set_photo': 'Обновлено фото',
-}
-
-const PRODUCT_HISTORY_ACTION_ICONS: Record<string, TablerIcon> = {
-  'product.create': IconCheck,
-  'product.update': IconPencil,
-  'product.set_photo': IconPhoto,
 }
 
 function generateSku(name: string): string {
@@ -162,10 +146,11 @@ export function ProductsPage() {
   const [importFormat, setImportFormat] = useState<'xlsx' | 'csv' | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [showEditProduct, setShowEditProduct] = useState(false)
 
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // переход с другой страницы (например «Остатки») на карточку конкретного товара
+  // переход с другой страницы (например «Склады») на карточку конкретного товара
   useEffect(() => {
     const openId = searchParams.get('open')
     if (!openId) return
@@ -377,7 +362,7 @@ export function ProductsPage() {
             Показано {filtered.length} из {total}
           </p>
           <div className="product-grid">
-            {filtered.map((p) => {
+            {filtered.map((p, i) => {
               const qty = stockFor(p.id)
               const out = isOutOfStock(qty)
               const low = isLowStock(qty, p.min_stock)
@@ -386,7 +371,8 @@ export function ProductsPage() {
                   key={p.id}
                   role="button"
                   tabIndex={0}
-                  className="product-tile"
+                  className="product-tile sale-history-row-in"
+                  style={{ '--row-delay': `${Math.min(i, 12) * 25}ms` } as CSSProperties}
                   onClick={() => setSelectedProduct(p)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -396,17 +382,24 @@ export function ProductsPage() {
                   }}
                 >
                   <ProductPhoto src={p.photo} />
-                  <span className="product-tile-name">{p.name}</span>
-                  <span className="product-tile-price">{formatMoney(p.retail_price)} ₽</span>
-                  <span
-                    className={`product-tile-stock${out ? ' product-tile-stock-out' : ' product-tile-stock-in'}`}
-                  >
-                    <span className="product-tile-stock-label">Остаток:</span>
-                    <span className="product-tile-stock-value">
-                      {formatQuantity(String(qty))} {unitName(p.unit_code)}
+                  <div className="product-tile-body">
+                    <span className="product-tile-name">{p.name}</span>
+                    <span className="product-tile-meta">
+                      <span className="product-tile-price-label">Цена за {unitName(p.unit_code)}:</span>
+                      <span className="product-tile-price">{formatMoney(p.retail_price)} ₽</span>
                     </span>
-                    {low && <StockWarningIcon />}
-                  </span>
+                    <span
+                      className={`product-tile-stock${out ? ' product-tile-stock-out' : ' product-tile-stock-in'}`}
+                    >
+                      <span className="product-tile-stock-label">Остаток:</span>
+                      <span className="product-tile-stock-value-wrap">
+                        <span className="product-tile-stock-value">
+                          {formatQuantity(String(qty))} {unitName(p.unit_code)}
+                        </span>
+                        {low && <StockWarningIcon />}
+                      </span>
+                    </span>
+                  </div>
                 </div>
               )
             })}
@@ -454,252 +447,33 @@ export function ProductsPage() {
           units={units}
           warehouses={warehouses}
           stock={stock}
-          canManage={canManage}
           onClose={() => setSelectedProduct(null)}
-          onUpdated={(updated) => {
-            setSelectedProduct(updated)
-            refreshAfterChange()
-          }}
-          onCategoriesChanged={setCategories}
-          onUnitsChanged={setUnits}
+          onEdit={canManage ? () => setShowEditProduct(true) : undefined}
         />
       )}
-    </div>
-  )
-}
 
-function ProductDetailCard({
-  product,
-  categories,
-  units,
-  warehouses,
-  stock,
-  canManage,
-  onClose,
-  onUpdated,
-  onCategoriesChanged,
-  onUnitsChanged,
-}: {
-  product: Product
-  categories: Category[]
-  units: Unit[]
-  warehouses: Warehouse[]
-  stock: StockItem[]
-  canManage: boolean
-  onClose: () => void
-  onUpdated: (product: Product) => void
-  onCategoriesChanged: (categories: Category[]) => void
-  onUnitsChanged: (units: Unit[]) => void
-}) {
-  const [showEdit, setShowEdit] = useState(false)
-  const [history, setHistory] = useState<ProductHistoryEntry[] | null>(null)
-  const [loadingHistory, setLoadingHistory] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
-
-  const unitName = (code: string) => units.find((u) => u.code === code)?.name ?? code
-  const categoryName = (id: number | null) =>
-    id == null ? null : categories.find((c) => c.id === id)?.name ?? `#${id}`
-
-  const stockByWarehouse = warehouses
-    .map((w) => ({
-      warehouse: w,
-      quantity: stock
-        .filter((s) => s.product_id === product.id && s.warehouse_id === w.id)
-        .reduce((sum, s) => sum + Number(s.quantity), 0),
-    }))
-    .filter((row) => row.quantity > 0 || warehouses.length <= 5)
-
-  async function toggleHistory() {
-    if (historyOpen) {
-      setHistoryOpen(false)
-      return
-    }
-    setHistoryOpen(true)
-    if (history !== null) return
-    setLoadingHistory(true)
-    try {
-      setHistory(await getProductHistory(product.id))
-    } catch {
-      setHistory([])
-    } finally {
-      setLoadingHistory(false)
-    }
-  }
-
-  return (
-    <Modal title={product.name} onClose={onClose} size="full">
-      <div className="stack">
-        <div className="product-detail-header">
-          {product.photo ? (
-            <img src={product.photo} alt="" className="product-detail-photo" />
-          ) : (
-            <div className="product-detail-photo product-detail-photo-empty">
-              <IconPhoto size={40} stroke={1.5} />
-            </div>
-          )}
-          <div className="product-detail-header-info">
-            <div className="row between">
-              <h3 className="product-detail-title">{product.name}</h3>
-              {canManage && (
-                <div className="sale-detail-actions">
-                  <IconButton
-                    variant="muted"
-                    size="lg"
-                    onClick={() => setShowEdit(true)}
-                    tooltip="Редактировать товар"
-                    aria-label="Редактировать товар"
-                  >
-                    <IconPencil size={22} stroke={1.8} />
-                  </IconButton>
-                </div>
-              )}
-            </div>
-            <div className="product-detail-header-tags">
-              {categoryName(product.category_id) && (
-                <span className="badge accent">{categoryName(product.category_id)}</span>
-              )}
-              {product.sku && <span className="product-detail-sku">Артикул {product.sku}</span>}
-            </div>
-            <span className="product-detail-price">{formatMoney(product.retail_price)} ₽</span>
-          </div>
-        </div>
-
-        <div className="sale-detail-meta">
-          <div className="sale-detail-meta-item">
-            <span className="text-muted">Штрихкод</span>
-            <span>{product.barcode || '—'}</span>
-          </div>
-          <div className="sale-detail-meta-item">
-            <span className="text-muted">Единица измерения</span>
-            <span>{unitName(product.unit_code)}</span>
-          </div>
-          {product.purchase_price !== null && (
-            <div className="sale-detail-meta-item">
-              <span className="text-muted">Закупочная цена</span>
-              <span>{formatMoney(product.purchase_price)} ₽</span>
-            </div>
-          )}
-          {product.margin !== null && (
-            <div className="sale-detail-meta-item">
-              <span className="text-muted">Маржа</span>
-              <span>{formatMoney(product.margin)} ₽</span>
-            </div>
-          )}
-          <div className="sale-detail-meta-item">
-            <span className="text-muted">Минимальный остаток</span>
-            <span>{formatQuantity(product.min_stock)} {unitName(product.unit_code)}</span>
-          </div>
-        </div>
-
-        <h3 className="sale-detail-section-title">Остатки по складам</h3>
-        {stockByWarehouse.length === 0 ? (
-          <p className="text-muted">Остатков нет</p>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Склад</th>
-                  <th>Остаток</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stockByWarehouse.map((row) => (
-                  <tr key={row.warehouse.id}>
-                    <td>{row.warehouse.name}</td>
-                    <td>{formatQuantity(String(row.quantity))} {unitName(product.unit_code)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {product.variants.length > 0 && (
-          <>
-            <h3 className="sale-detail-section-title">Варианты</h3>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Размер</th>
-                    <th>Цвет</th>
-                    <th>Штрихкод</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {product.variants.map((v) => (
-                    <tr key={v.id}>
-                      <td>{v.size || '—'}</td>
-                      <td>{v.color || '—'}</td>
-                      <td>{v.barcode || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        <div className="sale-detail-history">
-          <button
-            type="button"
-            className="disclosure-link"
-            onClick={toggleHistory}
-            disabled={loadingHistory}
-            aria-expanded={historyOpen}
-          >
-            {loadingHistory ? 'Загрузка…' : 'История изменений'}
-            <IconChevronDown size={14} stroke={1.8} />
-          </button>
-          {historyOpen &&
-            (history === null ? null : history.length === 0 ? (
-              <p className="text-muted">Изменений не было</p>
-            ) : (
-              <div className="sale-detail-history-list">
-                {history.map((entry) => {
-                  const HistoryIcon = PRODUCT_HISTORY_ACTION_ICONS[entry.action] ?? IconPencil
-                  return (
-                    <div key={entry.id} className="sale-detail-history-item">
-                      <span className="sale-detail-history-icon">
-                        <HistoryIcon size={15} stroke={1.8} />
-                      </span>
-                      <span className="sale-detail-history-label">
-                        {PRODUCT_HISTORY_ACTION_LABELS[entry.action] ?? entry.action}
-                      </span>
-                      <span className="sale-detail-history-time">
-                        {new Date(entry.created_at).toLocaleString('ru-RU', {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
-        </div>
-      </div>
-
-      {showEdit && (
-        <Modal title={`Редактировать: ${product.name}`} onClose={() => setShowEdit(false)} size="wide">
+      {selectedProduct && showEditProduct && (
+        <Modal
+          title={`Редактировать: ${selectedProduct.name}`}
+          onClose={() => setShowEditProduct(false)}
+          size="wide"
+        >
           <ProductForm
-            product={product}
+            product={selectedProduct}
             categories={categories}
             units={units}
             warehouses={warehouses}
-            onCategoriesChanged={onCategoriesChanged}
-            onUnitsChanged={onUnitsChanged}
+            onCategoriesChanged={setCategories}
+            onUnitsChanged={setUnits}
             onDone={(updated) => {
-              setShowEdit(false)
-              onUpdated(updated ?? product)
+              setShowEditProduct(false)
+              setSelectedProduct(updated ?? selectedProduct)
+              refreshAfterChange()
             }}
           />
         </Modal>
       )}
-    </Modal>
+    </div>
   )
 }
 
@@ -751,23 +525,19 @@ function ImportProductsModal({
           <div className="stack">
             <p>Создано товаров: {result.created}</p>
             {result.errors.length > 0 && (
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Строка</th>
-                      <th>Ошибка</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.errors.map((e, i) => (
-                      <tr key={i}>
-                        <td>{e.row}</td>
-                        <td>{e.message}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="data-table">
+                <div className="data-table-head" style={{ gridTemplateColumns: IMPORT_ERRORS_COLUMNS }}>
+                  <span>Строка</span>
+                  <span>Ошибка</span>
+                </div>
+                <div className="data-table-body">
+                  {result.errors.map((e, i) => (
+                    <div key={i} className="data-row" style={{ gridTemplateColumns: IMPORT_ERRORS_COLUMNS }}>
+                      <span>{e.row}</span>
+                      <span className="text-muted">{e.message}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

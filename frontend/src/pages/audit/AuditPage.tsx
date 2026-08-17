@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { IconHistory } from '@tabler/icons-react'
 import { listAudit, type AuditEntry } from '../../entities/audit/api'
 import { ApiError } from '../../shared/api/client'
@@ -54,6 +54,8 @@ function formatDateTime(value: string) {
   })
 }
 
+const AUDIT_COLUMNS = '1.2fr 1fr 1.6fr 1.4fr'
+
 export function AuditPage() {
   const [entries, setEntries] = useState<AuditEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -105,35 +107,38 @@ export function AuditPage() {
         <p className="text-muted">Действий пока нет</p>
       ) : (
         <>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Дата и время</th>
-                  <th>Сотрудник</th>
-                  <th>Действие</th>
-                  <th>Объект</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((entry) => (
-                  <tr key={entry.id}>
-                    <td>{formatDateTime(entry.created_at)}</td>
-                    <td>{entry.user_name ?? `#${entry.user_id}`}</td>
-                    <td>
-                      <span className="row" style={{ gap: 6 }}>
-                        <IconHistory size={16} stroke={1.8} />
-                        {actionLabel(entry.action)}
-                      </span>
-                    </td>
-                    <td className="text-muted">
-                      {entry.entity}
-                      {entry.entity_id != null ? ` #${entry.entity_id}` : ''}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="data-table">
+            <div className="data-table-head" style={{ gridTemplateColumns: AUDIT_COLUMNS }}>
+              <span>Дата и время</span>
+              <span>Сотрудник</span>
+              <span>Действие</span>
+              <span>Объект</span>
+            </div>
+            <div className="data-table-body">
+              {entries.map((entry, i) => (
+                <div
+                  key={entry.id}
+                  className="data-row sale-history-row-in"
+                  style={
+                    {
+                      gridTemplateColumns: AUDIT_COLUMNS,
+                      '--row-delay': `${Math.min(i, 12) * 25}ms`,
+                    } as CSSProperties
+                  }
+                >
+                  <span className="text-muted">{formatDateTime(entry.created_at)}</span>
+                  <span>{entry.user_name ?? `#${entry.user_id}`}</span>
+                  <span className="row" style={{ gap: 6 }}>
+                    <IconHistory size={16} stroke={1.8} />
+                    {actionLabel(entry.action)}
+                  </span>
+                  <span className="text-muted">
+                    {entry.entity}
+                    {entry.entity_id != null ? ` #${entry.entity_id}` : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
 
           {hasMore && (

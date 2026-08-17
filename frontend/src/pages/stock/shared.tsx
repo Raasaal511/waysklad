@@ -110,17 +110,15 @@ export function AssignedUsersField({
 export function NewWarehouseForm({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
-  const [assignedIds, setAssignedIds] = useState<number[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const candidates = useWarehouseManagerCandidates()
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setSaving(true)
     try {
-      await createWarehouse({ name, address, assigned_user_ids: assignedIds })
+      await createWarehouse({ name, address })
       onCreated()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось создать склад')
@@ -139,14 +137,9 @@ export function NewWarehouseForm({ onCreated }: { onCreated: () => void }) {
         Адрес
         <input value={address} onChange={(e) => setAddress(e.target.value)} />
       </label>
-      <label className="field">
-        Ответственные за склад
-        <AssignedUsersField
-          candidates={candidates}
-          selectedIds={assignedIds}
-          onChange={setAssignedIds}
-        />
-      </label>
+      <p className="text-muted">
+        Ответственных сотрудников можно назначить позже — на странице склада или в карточке сотрудника.
+      </p>
       {error && <p className="error">{error}</p>}
       <Button type="submit" disabled={saving}>
         {saving ? 'Сохранение…' : 'Создать склад'}
@@ -155,7 +148,7 @@ export function NewWarehouseForm({ onCreated }: { onCreated: () => void }) {
   )
 }
 
-interface MovementLine {
+export interface MovementLine {
   product: Product
   quantity: string
   cost: string
@@ -174,8 +167,10 @@ export function MovementForm({
   categories,
   stock,
   fixedWarehouseId,
-  initialProductId,
+  onLineRemoved,
   onDone,
+  lines: controlledLines,
+  onLinesChange,
 }: {
   mode: MovementMode
   products: Product[]
@@ -184,8 +179,10 @@ export function MovementForm({
   categories: Category[]
   stock: StockItem[]
   fixedWarehouseId?: number
-  initialProductId?: number
+  onLineRemoved?: (productId: number) => void
   onDone: () => void
+  lines?: MovementLine[]
+  onLinesChange?: (lines: MovementLine[]) => void
 }) {
   const otherWarehouses = fixedWarehouseId
     ? warehouses.filter((w) => w.id !== fixedWarehouseId)
@@ -195,7 +192,13 @@ export function MovementForm({
     fixedWarehouseId ?? warehouses[0]?.id ?? null,
   )
   const [toWarehouseId, setToWarehouseId] = useState<number | null>(otherWarehouses[0]?.id ?? null)
-  const [lines, setLines] = useState<MovementLine[]>([])
+  const [uncontrolledLines, setUncontrolledLines] = useState<MovementLine[]>(controlledLines ?? [])
+  const lines = controlledLines ?? uncontrolledLines
+  const setLines = (updater: (prev: MovementLine[]) => MovementLine[]) => {
+    const next = updater(lines)
+    if (onLinesChange) onLinesChange(next)
+    else setUncontrolledLines(next)
+  }
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [categoryId, setCategoryId] = useState<number | 'all'>('all')
@@ -209,23 +212,17 @@ export function MovementForm({
     return () => clearTimeout(timer)
   }, [query])
 
-  useEffect(() => {
-    if (initialProductId == null) return
-    const product = products.find((p) => p.id === initialProductId)
-    if (product) addLine(product)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialProductId])
-
   const unitName = (code: string) => units.find((u) => u.code === code)?.name ?? code
   const isFractional = (code: string) => units.find((u) => u.code === code)?.fractional ?? false
 
   // Для списания/перемещения нельзя увести больше, чем реально есть на складе-источнике;
   // приёмка ничем не ограничена — товар только поступает.
   const stockLimited = mode !== 'receive'
+  const movementColumns = mode === 'receive' ? '45% 30% 17% 8%' : '70% 22% 8%'
   const stockFor = (productId: number) =>
     warehouseId == null
       ? null
-      : Number(stock.find((s) => s.product_id === productId && s.warehouse_id === warehouseId)?.quantity ?? '0')
+      : Number(stock.find((s) => s.product_id === productId && s.warehouse_id === warehouseId)?.available ?? '0')
 
   const filtered = useMemo(() => {
     let list = products
@@ -281,7 +278,11 @@ export function MovementForm({
   }
 
   function removeLine(productId: number) {
+    // Уводим фокус с кнопки удаления заранее — иначе после удаления строки
+    // браузер прокручивает модалку, чтобы вернуть фокус в зону видимости.
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
     setLines((prev) => prev.filter((l) => l.product.id !== productId))
+    onLineRemoved?.(productId)
   }
 
   async function handleScan(code: string) {
@@ -392,7 +393,7 @@ export function MovementForm({
             {stockLimited ? 'На складе нет товаров, доступных для этой операции' : 'Ничего не найдено'}
           </p>
         ) : (
-          <div className="product-grid" style={{ maxHeight: 280, overflowY: 'auto' }}>
+          <div className="product-grid" style={{ maxHeight: 480, minHeight: 220, overflowY: 'auto' }}>
             {filtered.map((p) => {
               const inLineQty = lines.find((l) => l.product.id === p.id)?.quantity
               const available = stockFor(p.id)
@@ -410,12 +411,24 @@ export function MovementForm({
                     }
                   }}
                 >
+                  <ProductPhoto src={p.photo} />
+                  <div className="product-tile-body">
+                    <span className="product-tile-name">{p.name}</span>
+                    {available !== null && (
+                      <span className="product-tile-stock">
+                        <span className="product-tile-stock-label">Остаток:</span>
+                        <span className="product-tile-stock-value">
+                          {formatQuantity(available)} {unitName(p.unit_code)}
+                        </span>
+                      </span>
+                    )}
+                  </div>
                   <span
                     className={`product-tile-cart-badge${inLineQty ? '' : ' product-tile-cart-badge-hidden'}`}
                   >
                     {inLineQty ? (
                       <>
-                        {formatQuantity(inLineQty)} {unitName(p.unit_code)}
+                        {formatQuantity(inLineQty)}
                         <IconButton
                           className="product-tile-remove"
                           onClick={(e) => {
@@ -431,16 +444,6 @@ export function MovementForm({
                       ' '
                     )}
                   </span>
-                  <ProductPhoto src={p.photo} />
-                  <span className="product-tile-name">{p.name}</span>
-                  {available !== null && (
-                    <span className="product-tile-stock">
-                      <span className="product-tile-stock-label">Остаток:</span>
-                      <span className="product-tile-stock-value">
-                        {formatQuantity(available)} {unitName(p.unit_code)}
-                      </span>
-                    </span>
-                  )}
                 </div>
               )
             })}
@@ -463,94 +466,88 @@ export function MovementForm({
             <span className="text-muted">{lines.length} поз.</span>
           </div>
           <div className="table-wrap cart-table-wrap">
-            <table className="cart-table">
-              <colgroup>
-                <col style={{ width: mode === 'receive' ? '45%' : '70%' }} />
-                <col style={{ width: mode === 'receive' ? '30%' : '22%' }} />
-                {mode === 'receive' && <col style={{ width: '17%' }} />}
-                <col style={{ width: '8%' }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Товар</th>
-                  <th>Кол-во</th>
-                  {mode === 'receive' && <th>Закуп. цена</th>}
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((line) => {
-                  const available = stockFor(line.product.id)
-                  const overStock = stockLimited && available !== null && Number(line.quantity || 0) > available
-                  return (
-                    <tr key={line.product.id}>
-                      <td className="cart-table-name">
-                        <div>{line.product.name}</div>
-                        {available !== null && (
-                          <div className="cart-table-stock">
-                            Остаток: {formatQuantity(available)} {unitName(line.product.unit_code)}
-                          </div>
-                        )}
-                      </td>
-                      <td className="cart-table-qty-cell">
-                        <div className="cart-qty-stepper">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            className={overStock ? 'cart-input-warning' : undefined}
-                            value={line.quantity}
-                            onChange={(e) => updateLine(line.product.id, 'quantity', e.target.value)}
-                          />
-                          <div className="cart-qty-step-column">
-                            <IconButton
-                              variant="muted"
-                              className="cart-qty-step"
-                              onClick={() => addLine(line.product)}
-                              aria-label="Увеличить количество"
-                            >
-                              <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-up" />
-                            </IconButton>
-                            <IconButton
-                              variant="muted"
-                              className="cart-qty-step"
-                              onClick={() =>
-                                updateLine(line.product.id, 'quantity', String(Math.max(0, Number(line.quantity) - 1)))
-                              }
-                              aria-label="Уменьшить количество"
-                            >
-                              <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-down" />
-                            </IconButton>
-                          </div>
+            <div className="cart-table-head" style={{ gridTemplateColumns: movementColumns }}>
+              <span>Товар</span>
+              <span>Кол-во</span>
+              {mode === 'receive' && <span>Закуп. цена</span>}
+              <span />
+            </div>
+            <div>
+              {lines.map((line) => {
+                const available = stockFor(line.product.id)
+                const overStock = stockLimited && available !== null && Number(line.quantity || 0) > available
+                return (
+                  <div
+                    key={line.product.id}
+                    className="cart-table-row"
+                    style={{ gridTemplateColumns: movementColumns }}
+                  >
+                    <div className="cart-table-name">
+                      <div>{line.product.name}</div>
+                      {available !== null && (
+                        <div className="cart-table-stock">
+                          Остаток: {formatQuantity(available)} {unitName(line.product.unit_code)}
                         </div>
-                        {overStock && available !== null && (
-                          <div className="cart-table-warning">больше остатка ({formatQuantity(available)})</div>
-                        )}
-                      </td>
-                      {mode === 'receive' && (
-                        <td className="cart-table-price-cell">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={line.cost}
-                            onChange={(e) => updateLine(line.product.id, 'cost', e.target.value)}
-                          />
-                          <span className="cart-table-price-suffix">₽</span>
-                        </td>
                       )}
-                      <td>
-                        <IconButton
-                          variant="danger"
-                          onClick={() => removeLine(line.product.id)}
-                          aria-label="Убрать позицию"
-                        >
-                          <IconTrash size={16} stroke={1.8} />
-                        </IconButton>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                    </div>
+                    <div className="cart-table-qty-cell">
+                      <div className="cart-qty-stepper">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          className={overStock ? 'cart-input-warning' : undefined}
+                          value={line.quantity}
+                          onChange={(e) => updateLine(line.product.id, 'quantity', e.target.value)}
+                        />
+                        <div className="cart-qty-step-column">
+                          <IconButton
+                            variant="muted"
+                            className="cart-qty-step"
+                            onClick={() => addLine(line.product)}
+                            aria-label="Увеличить количество"
+                          >
+                            <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-up" />
+                          </IconButton>
+                          <IconButton
+                            variant="muted"
+                            className="cart-qty-step"
+                            onClick={() =>
+                              updateLine(line.product.id, 'quantity', String(Math.max(0, Number(line.quantity) - 1)))
+                            }
+                            aria-label="Уменьшить количество"
+                          >
+                            <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-down" />
+                          </IconButton>
+                        </div>
+                      </div>
+                      {overStock && available !== null && (
+                        <div className="cart-table-warning">больше остатка ({formatQuantity(available)})</div>
+                      )}
+                    </div>
+                    {mode === 'receive' && (
+                      <div className="cart-table-price-cell">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={line.cost}
+                          onChange={(e) => updateLine(line.product.id, 'cost', e.target.value)}
+                        />
+                        <span className="cart-table-price-suffix">₽</span>
+                      </div>
+                    )}
+                    <div>
+                      <IconButton
+                        variant="danger"
+                        onClick={() => removeLine(line.product.id)}
+                        aria-label="Убрать позицию"
+                      >
+                        <IconTrash size={16} stroke={1.8} />
+                      </IconButton>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
       )}

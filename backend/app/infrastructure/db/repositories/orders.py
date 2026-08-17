@@ -4,8 +4,10 @@ from app.domain.common.exceptions import NotFoundError
 from app.domain.orders.entities import Order, OrderStatus
 from app.domain.orders.repository import IOrderRepository
 from app.infrastructure.db.mappers.orders import OrderMapper
-from app.infrastructure.db.models.orders import OrderModel
+from app.infrastructure.db.models.orders import OrderLineModel, OrderModel
 from app.infrastructure.db.repositories.base import SqlAlchemyRepository
+
+_COMPLETED = (OrderStatus.ISSUED, OrderStatus.CANCELLED)
 
 
 class SqlAlchemyOrderRepository(SqlAlchemyRepository, IOrderRepository):
@@ -28,9 +30,22 @@ class SqlAlchemyOrderRepository(SqlAlchemyRepository, IOrderRepository):
         if model is None:
             raise NotFoundError(f"Заказ {order.id} не найден")
         model.status = order.status
+        model.warehouse_id = order.warehouse_id
+        model.source = order.source
         model.due_date = order.due_date
         model.prepayment = order.prepayment.amount
         model.note = order.note
+        model.sale_id = order.sale_id
+        model.lines = [
+            OrderLineModel(
+                tenant_id=self._tenant,
+                product_id=line.product_id,
+                variant_id=line.variant_id,
+                quantity=line.quantity.value,
+                price=line.price.amount,
+            )
+            for line in order.lines
+        ]
         await self._session.flush()
         return order
 
@@ -52,9 +67,22 @@ class SqlAlchemyOrderRepository(SqlAlchemyRepository, IOrderRepository):
                 select(OrderModel)
                 .where(
                     OrderModel.tenant_id == self._tenant,
-                    OrderModel.status != OrderStatus.ISSUED,
+                    OrderModel.status.not_in(_COMPLETED),
                 )
                 .order_by(OrderModel.due_date.nulls_last(), OrderModel.id)
+            )
+        ).scalars().all()
+        return [OrderMapper.to_entity(m, await self._line_units(m)) for m in models]
+
+    async def list_completed(self) -> list[Order]:
+        models = (
+            await self._session.execute(
+                select(OrderModel)
+                .where(
+                    OrderModel.tenant_id == self._tenant,
+                    OrderModel.status.in_(_COMPLETED),
+                )
+                .order_by(OrderModel.created_at.desc())
             )
         ).scalars().all()
         return [OrderMapper.to_entity(m, await self._line_units(m)) for m in models]

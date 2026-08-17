@@ -33,6 +33,9 @@ class Permission(StrEnum):
     ORDERS_VIEW = "orders.view"
     ORDERS_MANAGE = "orders.manage"
 
+    TASKS_VIEW = "tasks.view"
+    TASKS_MANAGE = "tasks.manage"  # свои задачи ведёт каждый сотрудник; чужие — owner/manager
+
     CLIENTS_VIEW = "clients.view"
     CLIENTS_MANAGE = "clients.manage"
     SUPPLIERS_MANAGE = "suppliers.manage"
@@ -56,6 +59,8 @@ _SELLER = {
     Permission.ORDERS_MANAGE,     # принимает заказы из переписки
     Permission.CLIENTS_VIEW,
     Permission.CLIENTS_MANAGE,    # заводит клиента при продаже
+    Permission.TASKS_VIEW,
+    Permission.TASKS_MANAGE,      # ведёт свои задачи на доске
 }
 
 _STOREKEEPER = {
@@ -67,6 +72,8 @@ _STOREKEEPER = {
     Permission.STOCK_TRANSFER,
     Permission.STOCK_TAKE,
     Permission.SUPPLIERS_MANAGE,
+    Permission.TASKS_VIEW,
+    Permission.TASKS_MANAGE,      # ведёт свои задачи на доске (в т.ч. дозаказ)
 }
 
 _ANALYST = {
@@ -78,6 +85,7 @@ _ANALYST = {
     Permission.CLIENTS_VIEW,
     Permission.ANALYTICS_VIEW,
     Permission.AUDIT_VIEW,
+    Permission.TASKS_VIEW,        # видит доску, но не ведёт задачи (read-only роль)
 }
 
 # управляющий = продавец + кладовщик + управление товарами/складами/сотрудниками + аналитика

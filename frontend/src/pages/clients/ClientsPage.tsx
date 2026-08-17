@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   searchClients,
@@ -11,11 +11,14 @@ import {
 import { listClientDebts, listSupplierDebts, type Debt } from '../../entities/debt/api'
 import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
-import { IconPlus } from '@tabler/icons-react'
+import { IconPlus, IconChevronRight } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
+
+const CLIENT_COLUMNS = '1.4fr 1fr 1fr 1fr 20px'
+const SUPPLIER_COLUMNS = '1.6fr 1.6fr 20px'
 
 export function ClientsPage() {
   const [searchParams] = useSearchParams()
@@ -28,7 +31,7 @@ export function ClientsPage() {
   const [showForm, setShowForm] = useState(false)
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
-  const highlightRef = useRef<HTMLTableRowElement>(null)
+  const highlightRef = useRef<HTMLButtonElement>(null)
 
   async function load() {
     setLoading(true)
@@ -111,54 +114,68 @@ export function ClientsPage() {
         clients.length === 0 ? (
           <p className="text-muted">Клиентов пока нет</p>
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Имя</th>
-                  <th>Телефон</th>
-                  <th>Город</th>
-                  <th>Лимит долга</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clients.map((c) => (
-                  <tr
-                    key={c.id}
-                    ref={String(c.id) === highlightId ? highlightRef : undefined}
-                    className={`client-row${String(c.id) === highlightId ? ' row-highlight' : ''}`}
-                    onClick={() => setSelectedClient(c)}
-                  >
-                    <td>{c.name}</td>
-                    <td>{c.phone || '—'}</td>
-                    <td>{c.city || '—'}</td>
-                    <td>{c.debt_limit ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="data-table">
+            <div className="data-table-head" style={{ gridTemplateColumns: CLIENT_COLUMNS }}>
+              <span>Имя</span>
+              <span>Телефон</span>
+              <span>Город</span>
+              <span>Лимит долга</span>
+              <span />
+            </div>
+            <div className="data-table-body">
+              {clients.map((c, i) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  ref={String(c.id) === highlightId ? highlightRef : undefined}
+                  className={`data-row data-row-link sale-history-row-in${String(c.id) === highlightId ? ' row-highlight' : ''}`}
+                  style={
+                    {
+                      gridTemplateColumns: CLIENT_COLUMNS,
+                      '--row-delay': `${Math.min(i, 12) * 25}ms`,
+                    } as CSSProperties
+                  }
+                  onClick={() => setSelectedClient(c)}
+                >
+                  <span className="data-row-name">{c.name}</span>
+                  <span className="text-muted">{c.phone || '—'}</span>
+                  <span className="text-muted">{c.city || '—'}</span>
+                  <span className="text-muted">{c.debt_limit ?? '—'}</span>
+                  <IconChevronRight size={16} stroke={1.8} className="data-row-chevron" />
+                </button>
+              ))}
+            </div>
           </div>
         )
       ) : suppliers.length === 0 ? (
         <p className="text-muted">Поставщиков пока нет</p>
       ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Название</th>
-                <th>Контакт</th>
-              </tr>
-            </thead>
-            <tbody>
-              {suppliers.map((s) => (
-                <tr key={s.id} className="client-row" onClick={() => setSelectedSupplier(s)}>
-                  <td>{s.name}</td>
-                  <td>{s.contact || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="data-table">
+          <div className="data-table-head" style={{ gridTemplateColumns: SUPPLIER_COLUMNS }}>
+            <span>Название</span>
+            <span>Контакт</span>
+            <span />
+          </div>
+          <div className="data-table-body">
+            {suppliers.map((s, i) => (
+              <button
+                key={s.id}
+                type="button"
+                className="data-row data-row-link sale-history-row-in"
+                style={
+                  {
+                    gridTemplateColumns: SUPPLIER_COLUMNS,
+                    '--row-delay': `${Math.min(i, 12) * 25}ms`,
+                  } as CSSProperties
+                }
+                onClick={() => setSelectedSupplier(s)}
+              >
+                <span className="data-row-name">{s.name}</span>
+                <span className="text-muted">{s.contact || '—'}</span>
+                <IconChevronRight size={16} stroke={1.8} className="data-row-chevron" />
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

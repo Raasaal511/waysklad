@@ -32,6 +32,7 @@ class SaleModel(Base, TenantMixin, TimestampMixin):
     note: Mapped[str] = mapped_column(Text, default="")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     cash_received: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), default=None)
+    order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"))
 
     lines: Mapped[list["SaleLineModel"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"

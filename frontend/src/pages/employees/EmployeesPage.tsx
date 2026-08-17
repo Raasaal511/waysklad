@@ -1,13 +1,12 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import { listEmployees, createEmployee, updateEmployee } from '../../entities/profile/api'
 import type { Role, User } from '../../entities/auth/api'
 import { listWarehouses, type Warehouse } from '../../entities/inventory/api'
 import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
 import { Modal } from '../../shared/ui/Modal'
-import { IconPlus, IconPencil } from '@tabler/icons-react'
+import { IconPlus, IconChevronRight } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
-import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
 
@@ -25,6 +24,8 @@ const ASSIGNABLE_ROLES: Role[] = ['manager', 'seller', 'storekeeper']
 
 // роли, для которых нужна привязка к складу (минимум один)
 const WAREHOUSE_SCOPED_ROLES: Role[] = ['manager', 'seller', 'storekeeper']
+
+const EMPLOYEE_COLUMNS = '1.2fr 1fr 1fr 1.4fr 20px'
 
 export function EmployeesPage() {
   const { user } = useAuth()
@@ -110,44 +111,48 @@ export function EmployeesPage() {
       ) : employees.length === 0 ? (
         <p className="text-muted">Кроме вас сотрудников пока нет</p>
       ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Имя</th>
-                <th>Телефон</th>
-                <th>Роль</th>
-                <th>Склады</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {employees.map((e) => (
-                <tr key={e.id}>
-                  <td>{e.name}</td>
-                  <td>{e.phone}</td>
-                  <td>{ROLE_LABELS[e.role]}</td>
-                  <td>
+        <div className="data-table">
+          <div className="data-table-head" style={{ gridTemplateColumns: EMPLOYEE_COLUMNS }}>
+            <span>Имя</span>
+            <span>Телефон</span>
+            <span>Роль</span>
+            <span>Склады</span>
+            <span />
+          </div>
+          <div className="data-table-body">
+            {employees.map((e, i) => {
+              const editable = e.role !== 'owner'
+              return (
+                <button
+                  key={e.id}
+                  type="button"
+                  className={`data-row sale-history-row-in${editable ? ' data-row-link' : ''}`}
+                  style={
+                    {
+                      gridTemplateColumns: EMPLOYEE_COLUMNS,
+                      '--row-delay': `${Math.min(i, 12) * 25}ms`,
+                    } as CSSProperties
+                  }
+                  disabled={!editable}
+                  onClick={() => editable && setEditingEmployee(e)}
+                >
+                  <span className="data-row-name">{e.name}</span>
+                  <span className="text-muted">{e.phone}</span>
+                  <span>{ROLE_LABELS[e.role]}</span>
+                  <span className="text-muted">
                     {e.role === 'owner'
                       ? 'Все склады'
                       : e.warehouse_ids.map((id) => warehouseNameById.get(id) ?? id).join(', ') || '—'}
-                  </td>
-                  <td>
-                    {e.role !== 'owner' && (
-                      <IconButton
-                        variant="muted"
-                        tooltip="Изменить сотрудника"
-                        aria-label="Изменить сотрудника"
-                        onClick={() => setEditingEmployee(e)}
-                      >
-                        <IconPencil size={16} stroke={1.8} />
-                      </IconButton>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </span>
+                  {editable ? (
+                    <IconChevronRight size={16} stroke={1.8} className="data-row-chevron" />
+                  ) : (
+                    <span />
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>

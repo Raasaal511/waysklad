@@ -36,8 +36,15 @@ from app.application.inventory.update_warehouse_details import (
     UpdateWarehouseDetailsUseCase,
 )
 from app.application.inventory.write_off import WriteOffUseCase
+from app.application.notifications.mark_read import (
+    MarkAllNotificationsReadUseCase,
+    MarkNotificationReadUseCase,
+)
+from app.application.orders.cancel_order import CancelOrderUseCase
 from app.application.orders.change_status import ChangeOrderStatusUseCase
 from app.application.orders.create_order import CreateOrderUseCase
+from app.application.orders.issue_order import IssueOrderUseCase
+from app.application.orders.update_order import UpdateOrderUseCase
 from app.application.products.create_category import CreateCategoryUseCase
 from app.application.products.create_product import CreateProductUseCase
 from app.application.products.create_unit import CreateUnitUseCase
@@ -49,6 +56,9 @@ from app.application.sales.delete_sale import DeleteSaleUseCase
 from app.application.sales.edit_sale import EditSaleUseCase
 from app.application.sales.return_sale import ReturnSaleUseCase
 from app.application.sync.apply_offline_ops import ApplyOfflineSalesUseCase
+from app.application.tasks.change_status import ChangeTaskStatusUseCase
+from app.application.tasks.create_task import CreateTaskUseCase
+from app.presentation.deps.notifier import NotifierDep
 from app.presentation.deps.security import FileStorageDep, HasherDep
 from app.presentation.deps.uow import PublicUowDep, UowDep
 
@@ -105,7 +115,10 @@ get_repay_debt = _with_uow(RepayDebtUseCase)
 get_create_installment = _with_uow(CreateInstallmentUseCase)
 get_extend_debt = _with_uow(ExtendDebtUseCase)
 get_create_order = _with_uow(CreateOrderUseCase)
+get_update_order = _with_uow(UpdateOrderUseCase)
 get_change_order_status = _with_uow(ChangeOrderStatusUseCase)
+get_cancel_order = _with_uow(CancelOrderUseCase)
+get_issue_order = _with_uow(IssueOrderUseCase)
 get_create_client = _with_uow(CreateClientUseCase)
 get_create_supplier = _with_uow(CreateSupplierUseCase)
 get_dashboard = _with_uow(GetDashboardUseCase)
@@ -117,6 +130,16 @@ get_restock_recommendations = _with_uow(GetRestockRecommendationsUseCase)
 get_apply_offline_sales = _with_uow(ApplyOfflineSalesUseCase)
 get_connect_telegram = _with_uow(ConnectTelegramUseCase)
 get_update_shop = _with_uow(UpdateShopUseCase)
+get_mark_notification_read = _with_uow(MarkNotificationReadUseCase)
+get_mark_all_notifications_read = _with_uow(MarkAllNotificationsReadUseCase)
+
+
+def get_create_task(uow: UowDep, notifier: NotifierDep) -> CreateTaskUseCase:
+    return CreateTaskUseCase(uow, notifier)
+
+
+def get_change_task_status(uow: UowDep, notifier: NotifierDep) -> ChangeTaskStatusUseCase:
+    return ChangeTaskStatusUseCase(uow, notifier)
 
 # готовые зависимости для сигнатур роутов
 RegisterShopDep = Annotated[RegisterShopUseCase, Depends(get_register_shop)]
@@ -152,7 +175,10 @@ RepayDebtDep = Annotated[RepayDebtUseCase, Depends(get_repay_debt)]
 CreateInstallmentDep = Annotated[CreateInstallmentUseCase, Depends(get_create_installment)]
 ExtendDebtDep = Annotated[ExtendDebtUseCase, Depends(get_extend_debt)]
 CreateOrderDep = Annotated[CreateOrderUseCase, Depends(get_create_order)]
+UpdateOrderDep = Annotated[UpdateOrderUseCase, Depends(get_update_order)]
 ChangeOrderStatusDep = Annotated[ChangeOrderStatusUseCase, Depends(get_change_order_status)]
+CancelOrderDep = Annotated[CancelOrderUseCase, Depends(get_cancel_order)]
+IssueOrderDep = Annotated[IssueOrderUseCase, Depends(get_issue_order)]
 CreateClientDep = Annotated[CreateClientUseCase, Depends(get_create_client)]
 CreateSupplierDep = Annotated[CreateSupplierUseCase, Depends(get_create_supplier)]
 GetDashboardDep = Annotated[GetDashboardUseCase, Depends(get_dashboard)]
@@ -169,4 +195,12 @@ ApplyOfflineSalesDep = Annotated[
 ConnectTelegramDep = Annotated[ConnectTelegramUseCase, Depends(get_connect_telegram)]
 UpdateShopDep = Annotated[UpdateShopUseCase, Depends(get_update_shop)]
 ChangePasswordDep = Annotated[ChangePasswordUseCase, Depends(get_change_password)]
+CreateTaskDep = Annotated[CreateTaskUseCase, Depends(get_create_task)]
+ChangeTaskStatusDep = Annotated[ChangeTaskStatusUseCase, Depends(get_change_task_status)]
+MarkNotificationReadDep = Annotated[
+    MarkNotificationReadUseCase, Depends(get_mark_notification_read)
+]
+MarkAllNotificationsReadDep = Annotated[
+    MarkAllNotificationsReadUseCase, Depends(get_mark_all_notifications_read)
+]
  

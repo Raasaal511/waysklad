@@ -22,11 +22,13 @@ from app.infrastructure.db.repositories.inventory import (
     SqlAlchemyStockDocumentRepository,
     SqlAlchemyStockRepository,
 )
+from app.infrastructure.db.repositories.notifications import SqlAlchemyNotificationRepository
 from app.infrastructure.db.repositories.orders import SqlAlchemyOrderRepository
 from app.infrastructure.db.repositories.sales import (
     SqlAlchemySaleRepository,
     SqlAlchemySaleReturnRepository,
 )
+from app.infrastructure.db.repositories.tasks import SqlAlchemyTaskRepository
 from app.infrastructure.db.session import SessionLocal
 
 
@@ -57,6 +59,8 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.sale_returns = SqlAlchemySaleReturnRepository(self)
         self.debts = SqlAlchemyDebtRepository(self)
         self.orders = SqlAlchemyOrderRepository(self)
+        self.tasks = SqlAlchemyTaskRepository(self)
+        self.notifications = SqlAlchemyNotificationRepository(self)
         self.audit = SqlAlchemyAuditRepository(self)
         self.analytics = SqlAlchemyAnalyticsRepository(self)
         return self

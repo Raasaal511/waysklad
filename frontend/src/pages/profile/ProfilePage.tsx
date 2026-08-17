@@ -233,20 +233,25 @@ function MyWarehouses() {
   return (
     <div className="stack">
       <h3>Ваши склады</h3>
-      <div className="warehouse-grid">
+      <div className="warehouse-tiles">
         {warehouses.map((w) => (
-          <Link key={w.id} to={`/stock/${w.id}`} className="card warehouse-card">
-            <div className="row between">
-              <div className="row" style={{ gap: 10 }}>
-                <span className="warehouse-card-icon">
-                  <IconBuildingWarehouse size={18} stroke={1.8} />
-                </span>
-                <strong>{w.name}</strong>
+          <Link key={w.id} to={`/stock/${w.id}`} className="warehouse-tile">
+            <div className="warehouse-tile-header">
+              <span className="warehouse-tile-icon">
+                <IconBuildingWarehouse size={26} stroke={1.6} />
+              </span>
+              <div className="warehouse-tile-heading">
+                <strong className="warehouse-tile-name">{w.name}</strong>
+                <span className="text-muted">{w.address || 'Без адреса'}</span>
               </div>
-              <IconChevronRight size={18} stroke={1.8} />
+              <IconChevronRight size={20} stroke={1.8} className="warehouse-tile-chevron" />
             </div>
-            {w.address && <span className="text-muted">{w.address}</span>}
-            <span className="badge accent">{itemCount(w.id)} позиций</span>
+            <div className="warehouse-tile-stats">
+              <div className="stat">
+                <span className="stat-label">Позиций</span>
+                <span className="stat-value">{itemCount(w.id)}</span>
+              </div>
+            </div>
           </Link>
         ))}
       </div>

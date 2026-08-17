@@ -18,6 +18,22 @@ class IStockRepository(Protocol):
         """Все ненулевые остатки по всем складам/товарам — для экрана «Остатки»."""
         ...
 
+    async def reserve(
+        self, product_id: int, warehouse_id: int, delta: Decimal, variant_id: int | None = None
+    ) -> Decimal:
+        """Изменить резерв (под заказ) на delta, вернуть новый reserved. Отрицательный
+        delta — снять резерв (отмена/выдача/редактирование заказа). Как и change(),
+        сам не проверяет превышение quantity — это делает вызывающий use case,
+        сверяя результат с uow.stock.get(...) (см. CreateOrderUseCase)."""
+        ...
+
+    async def get_reserved(
+        self, product_id: int, warehouse_id: int, variant_id: int | None = None
+    ) -> Decimal:
+        """Текущий резерв позиции — для проверки, что списание (продажа/списание/
+        перемещение) не уходит в товар, уже обещанный по заказу."""
+        ...
+
 
 class IStockDocumentRepository(Protocol):
     async def add(self, document: StockDocument) -> StockDocument: ...

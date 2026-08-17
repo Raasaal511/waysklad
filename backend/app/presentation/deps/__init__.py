@@ -13,6 +13,7 @@ from app.presentation.deps.security import (  # noqa: F401
     get_file_storage,
     get_password_hasher,
 )
+from app.presentation.deps.notifier import NotifierDep, get_notifier  # noqa: F401
 from app.presentation.deps.uow import (  # noqa: F401
     PublicUowDep,
     UowDep,
@@ -22,8 +23,10 @@ from app.presentation.deps.uow import (  # noqa: F401
 )
 from app.presentation.deps.use_cases import (  # noqa: F401
     ApplyOfflineSalesDep,
+    CancelOrderDep,
     ChangeOrderStatusDep,
     ChangePasswordDep,
+    ChangeTaskStatusDep,
     ConnectTelegramDep,
     CreateCategoryDep,
     CreateClientDep,
@@ -33,6 +36,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     CreateProductDep,
     CreateSaleDep,
     CreateSupplierDep,
+    CreateTaskDep,
     CreateUnitDep,
     CreateWarehouseDep,
     DeleteSaleDep,
@@ -46,8 +50,11 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     GetTopProductsDep,
     ImportProductsDep,
     IssueDebtDep,
+    IssueOrderDep,
     IssueSupplierDebtDep,
     LoginDep,
+    MarkAllNotificationsReadDep,
+    MarkNotificationReadDep,
     ReceiveGoodsDep,
     RegisterShopDep,
     RepayDebtDep,
@@ -57,6 +64,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     StocktakeDep,
     TransferDep,
     UpdateEmployeeDep,
+    UpdateOrderDep,
     UpdateProductDep,
     UpdateShopDep,
     UpdateWarehouseDetailsDep,

@@ -41,6 +41,7 @@ class Sale:
     note: str = ""
     deleted_at: datetime | None = None
     cash_received: Money | None = None  # сколько внёс клиент наличными (снимок на момент продажи)
+    order_id: int | None = None  # заполнен, если продажа — результат выдачи заказа
 
     @property
     def subtotal(self) -> Money:

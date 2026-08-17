@@ -34,6 +34,31 @@ class SqlAlchemyStockRepository(SqlAlchemyRepository, IStockRepository):
         await self._session.flush()
         return item.quantity
 
+    async def reserve(
+        self, product_id: int, warehouse_id: int, delta: Decimal, variant_id: int | None = None
+    ) -> Decimal:
+        item = await self._get_item(product_id, warehouse_id, variant_id, for_update=True)
+        if item is None:
+            item = StockItemModel(
+                tenant_id=self._tenant,
+                product_id=product_id,
+                variant_id=variant_id,
+                warehouse_id=warehouse_id,
+                quantity=Decimal("0"),
+                reserved=delta,
+            )
+            self._session.add(item)
+        else:
+            item.reserved = item.reserved + delta
+        await self._session.flush()
+        return item.reserved
+
+    async def get_reserved(
+        self, product_id: int, warehouse_id: int, variant_id: int | None = None
+    ) -> Decimal:
+        item = await self._get_item(product_id, warehouse_id, variant_id, for_update=False)
+        return item.reserved if item else Decimal("0")
+
     async def list_all(self) -> list[StockItem]:
         models = (
             await self._session.execute(
@@ -46,7 +71,7 @@ class SqlAlchemyStockRepository(SqlAlchemyRepository, IStockRepository):
         return [
             StockItem(
                 product_id=m.product_id, warehouse_id=m.warehouse_id,
-                quantity=m.quantity, variant_id=m.variant_id,
+                quantity=m.quantity, variant_id=m.variant_id, reserved=m.reserved,
             )
             for m in models
         ]

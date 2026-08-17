@@ -56,3 +56,8 @@ class StockItem:
     warehouse_id: int
     quantity: Decimal
     variant_id: int | None = None
+    reserved: Decimal = Decimal("0")  # зарезервировано активными заказами
+
+    @property
+    def available(self) -> Decimal:
+        return self.quantity - self.reserved

@@ -25,6 +25,7 @@ export interface Sale {
   created_at: string
   note: string
   deleted_at: string | null
+  order_id: number | null
   lines: SaleLine[]
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import {
   listDocuments,
@@ -168,7 +168,7 @@ export function MovementHistoryPage() {
   return (
     <div className="stack">
       <Link to="/stock" className="back-link">
-        <IconChevronLeft size={16} stroke={1.8} /> Остатки
+        <IconChevronLeft size={16} stroke={1.8} /> Склады
       </Link>
 
       <div className="section-title">
@@ -259,11 +259,15 @@ export function MovementHistoryPage() {
         </p>
       ) : (
         <div className="stack" style={{ gap: 10 }}>
-          {filtered.map((doc) => {
+          {filtered.map((doc, i) => {
             const expanded = expandedId === doc.id
             const total = documentTotal(doc)
             return (
-              <div key={doc.id} className="card card-full stack" style={{ gap: 10 }}>
+              <div
+                key={doc.id}
+                className="card card-full stack sale-history-row-in"
+                style={{ gap: 10, '--row-delay': `${Math.min(i, 12) * 25}ms` } as CSSProperties}
+              >
                 <button
                   type="button"
                   className="movement-history-summary"
@@ -296,31 +300,34 @@ export function MovementHistoryPage() {
 
                 {expanded && (
                   <>
-                    <div className="table-wrap">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Товар</th>
-                            <th>Кол-во</th>
-                            {doc.type === 'receipt' && <th>Закуп. цена</th>}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {doc.lines.map((line, i) => (
-                            <tr key={i}>
-                              <td>{productName(line.product_id)}</td>
-                              <td>
-                                {formatQuantity(line.quantity)} {unitName(productUnitCode(line.product_id))}
-                              </td>
-                              {doc.type === 'receipt' && (
-                                <td className="movement-history-money">
-                                  {line.cost ? `${formatMoney(line.cost)} ₽` : '—'}
-                                </td>
-                              )}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    <div className="data-table">
+                      <div
+                        className="data-table-head"
+                        style={{ gridTemplateColumns: doc.type === 'receipt' ? '2fr 1fr 1fr' : '2fr 1fr' }}
+                      >
+                        <span>Товар</span>
+                        <span>Кол-во</span>
+                        {doc.type === 'receipt' && <span>Закуп. цена</span>}
+                      </div>
+                      <div className="data-table-body">
+                        {doc.lines.map((line, i) => (
+                          <div
+                            key={i}
+                            className="data-row"
+                            style={{ gridTemplateColumns: doc.type === 'receipt' ? '2fr 1fr 1fr' : '2fr 1fr' }}
+                          >
+                            <span className="data-row-name">{productName(line.product_id)}</span>
+                            <span>
+                              {formatQuantity(line.quantity)} {unitName(productUnitCode(line.product_id))}
+                            </span>
+                            {doc.type === 'receipt' && (
+                              <span className="movement-history-money">
+                                {line.cost ? `${formatMoney(line.cost)} ₽` : '—'}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                     {doc.note && <span className="text-muted">{doc.note}</span>}
                   </>

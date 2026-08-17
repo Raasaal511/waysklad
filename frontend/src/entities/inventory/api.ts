@@ -12,6 +12,8 @@ export interface StockItem {
   variant_id: number | null
   warehouse_id: number
   quantity: string
+  reserved: string
+  available: string
 }
 
 export interface StockLine {

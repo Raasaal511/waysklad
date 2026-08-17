@@ -139,12 +139,15 @@ class StockItemResponse(BaseModel):
     variant_id: int | None
     warehouse_id: int
     quantity: Decimal
+    reserved: Decimal
+    available: Decimal
 
     @classmethod
     def from_entity(cls, item: StockItem) -> "StockItemResponse":
         return cls(
             product_id=item.product_id, variant_id=item.variant_id,
             warehouse_id=item.warehouse_id, quantity=item.quantity,
+            reserved=item.reserved, available=item.available,
         )
 
 

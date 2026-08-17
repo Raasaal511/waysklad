@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import {
   getDashboard,
   getTopProducts,
@@ -13,6 +13,10 @@ import {
 } from '../../entities/analytics/api'
 import { ApiError } from '../../shared/api/client'
 import { formatQuantity } from '../../shared/lib/format'
+
+const TOP_PRODUCTS_COLUMNS = '2fr 1fr 1fr'
+const CATEGORY_PROFIT_COLUMNS = '1.6fr 1fr 1fr 1fr'
+const DEAD_STOCK_COLUMNS = '2fr 1fr 1.2fr'
 
 export function AnalyticsPage() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
@@ -48,7 +52,7 @@ export function AnalyticsPage() {
 
       <div className="stack">
         <h3>Сегодня</h3>
-        <div className="grid-stats">
+        <div className="card card-full grid-stats">
           <Stat label="Продаж" value={String(dashboard.today.sales_count)} />
           <Stat label="Выручка" value={`${dashboard.today.revenue} ₽`} />
           <Stat label="Прибыль" value={`${dashboard.today.profit} ₽`} />
@@ -57,7 +61,7 @@ export function AnalyticsPage() {
 
       <div className="stack">
         <h3>Неделя</h3>
-        <div className="grid-stats">
+        <div className="card card-full grid-stats">
           <Stat label="Продаж" value={String(dashboard.week.sales_count)} />
           <Stat label="Выручка" value={`${dashboard.week.revenue} ₽`} />
           <Stat label="Прибыль" value={`${dashboard.week.profit} ₽`} />
@@ -66,7 +70,7 @@ export function AnalyticsPage() {
 
       <div className="stack">
         <h3>Месяц</h3>
-        <div className="grid-stats">
+        <div className="card card-full grid-stats">
           <Stat label="Продаж" value={String(dashboard.month.sales_count)} />
           <Stat label="Выручка" value={`${dashboard.month.revenue} ₽`} />
           <Stat label="Прибыль" value={`${dashboard.month.profit} ₽`} />
@@ -85,25 +89,30 @@ export function AnalyticsPage() {
         {topProducts.length === 0 ? (
           <p className="text-muted">Продаж за месяц пока нет</p>
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Товар</th>
-                  <th>Продано</th>
-                  <th>Выручка</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topProducts.map((p) => (
-                  <tr key={p.product_id}>
-                    <td>{p.product_name}</td>
-                    <td>{p.quantity_sold}</td>
-                    <td>{p.revenue} ₽</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="data-table">
+            <div className="data-table-head" style={{ gridTemplateColumns: TOP_PRODUCTS_COLUMNS }}>
+              <span>Товар</span>
+              <span>Продано</span>
+              <span>Выручка</span>
+            </div>
+            <div className="data-table-body">
+              {topProducts.map((p, i) => (
+                <div
+                  key={p.product_id}
+                  className="data-row sale-history-row-in"
+                  style={
+                    {
+                      gridTemplateColumns: TOP_PRODUCTS_COLUMNS,
+                      '--row-delay': `${Math.min(i, 12) * 25}ms`,
+                    } as CSSProperties
+                  }
+                >
+                  <span className="data-row-name">{p.product_name}</span>
+                  <span>{p.quantity_sold}</span>
+                  <span>{p.revenue} ₽</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -113,29 +122,38 @@ export function AnalyticsPage() {
         {categoryProfit.length === 0 ? (
           <p className="text-muted">Продаж за месяц пока нет</p>
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Категория</th>
-                  <th>Выручка</th>
-                  <th>Прибыль</th>
-                  <th>Маржа</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...categoryProfit]
-                  .sort((a, b) => Number(b.profit) - Number(a.profit))
-                  .map((c) => (
-                    <tr key={c.category_id ?? 'none'}>
-                      <td>{c.category_name}</td>
-                      <td>{c.revenue} ₽</td>
-                      <td>{c.profit} ₽</td>
-                      <td>{Number(c.revenue) > 0 ? `${((Number(c.profit) / Number(c.revenue)) * 100).toFixed(1)}%` : '—'}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+          <div className="data-table">
+            <div className="data-table-head" style={{ gridTemplateColumns: CATEGORY_PROFIT_COLUMNS }}>
+              <span>Категория</span>
+              <span>Выручка</span>
+              <span>Прибыль</span>
+              <span>Маржа</span>
+            </div>
+            <div className="data-table-body">
+              {[...categoryProfit]
+                .sort((a, b) => Number(b.profit) - Number(a.profit))
+                .map((c, i) => (
+                  <div
+                    key={c.category_id ?? 'none'}
+                    className="data-row sale-history-row-in"
+                    style={
+                      {
+                        gridTemplateColumns: CATEGORY_PROFIT_COLUMNS,
+                        '--row-delay': `${Math.min(i, 12) * 25}ms`,
+                      } as CSSProperties
+                    }
+                  >
+                    <span className="data-row-name">{c.category_name}</span>
+                    <span>{c.revenue} ₽</span>
+                    <span>{c.profit} ₽</span>
+                    <span>
+                      {Number(c.revenue) > 0
+                        ? `${((Number(c.profit) / Number(c.revenue)) * 100).toFixed(1)}%`
+                        : '—'}
+                    </span>
+                  </div>
+                ))}
+            </div>
           </div>
         )}
       </div>
@@ -145,25 +163,32 @@ export function AnalyticsPage() {
         {deadStock.length === 0 ? (
           <p className="text-muted">Залежавшихся товаров нет</p>
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Товар</th>
-                  <th>Остаток</th>
-                  <th>Последняя продажа</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deadStock.map((d) => (
-                  <tr key={d.product_id}>
-                    <td>{d.product_name}</td>
-                    <td>{formatQuantity(d.quantity)}</td>
-                    <td>{d.last_sale_at ? new Date(d.last_sale_at).toLocaleDateString('ru-RU') : 'никогда'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="data-table">
+            <div className="data-table-head" style={{ gridTemplateColumns: DEAD_STOCK_COLUMNS }}>
+              <span>Товар</span>
+              <span>Остаток</span>
+              <span>Последняя продажа</span>
+            </div>
+            <div className="data-table-body">
+              {deadStock.map((d, i) => (
+                <div
+                  key={d.product_id}
+                  className="data-row sale-history-row-in"
+                  style={
+                    {
+                      gridTemplateColumns: DEAD_STOCK_COLUMNS,
+                      '--row-delay': `${Math.min(i, 12) * 25}ms`,
+                    } as CSSProperties
+                  }
+                >
+                  <span className="data-row-name">{d.product_name}</span>
+                  <span>{formatQuantity(d.quantity)}</span>
+                  <span className="text-muted">
+                    {d.last_sale_at ? new Date(d.last_sale_at).toLocaleDateString('ru-RU') : 'никогда'}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -173,7 +198,7 @@ export function AnalyticsPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="card stat">
+    <div className="stat">
       <span className="stat-value">{value}</span>
       <span className="stat-label">{label}</span>
     </div>

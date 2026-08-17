@@ -526,6 +526,11 @@ async def test_order_full_lifecycle_via_api(client, owner_headers):
         json={"name": "Торт на заказ", "purchase_price": "1500", "retail_price": "3000"},
     )
     product_id = response.json()["id"]
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "1"}]},
+    )
 
     response = await client.post(
         "/api/counterparties/clients", headers=owner_headers, json={"name": "Милана"}
@@ -537,22 +542,38 @@ async def test_order_full_lifecycle_via_api(client, owner_headers):
         headers=owner_headers,
         json={
             "client_id": client_id,
+            "warehouse_id": 1,
             "items": [{"product_id": product_id, "quantity": "1", "price": "3000"}],
+            "due_date": date.today().isoformat(),
             "prepayment": "1000",
+            "source": "whatsapp",
             "note": "надпись «С юбилеем»",
         },
     )
     assert response.status_code == 201, response.text
     order = response.json()
     assert order["to_pay"] == "2000.00"
+    assert order["source"] == "whatsapp"
     order_id = order["id"]
+
+    # остаток зарезервирован под заказ — обычная продажа не пройдёт
+    response = await client.post(
+        "/api/sales",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1,
+            "payment_method": "cash",
+            "items": [{"product_id": product_id, "quantity": "1", "price": "3000"}],
+        },
+    )
+    assert response.status_code == 400
 
     response = await client.patch(
         f"/api/orders/{order_id}/status", headers=owner_headers, json={"new_status": "in_progress"}
     )
     assert response.status_code == 200
 
-    # нельзя перескочить сразу в "выдан" из "в работе"
+    # нельзя перескочить сразу в "выдан" из "в работе" сменой статуса — только через /issue
     response = await client.patch(
         f"/api/orders/{order_id}/status", headers=owner_headers, json={"new_status": "issued"}
     )
@@ -563,17 +584,246 @@ async def test_order_full_lifecycle_via_api(client, owner_headers):
     )
     assert response.status_code == 200
 
-    response = await client.patch(
-        f"/api/orders/{order_id}/status", headers=owner_headers, json={"new_status": "issued"}
+    response = await client.post(
+        f"/api/orders/{order_id}/issue",
+        headers=owner_headers,
+        json={"payment_method": "cash", "cash_received": "2000"},
     )
-    assert response.status_code == 200
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["sale"]["total"] == "2000.00"  # доплата, не полная сумма заказа
+    assert result["sale"]["change"] == "0.00"
+    assert result["order"]["status"] == "issued"
+    assert result["order"]["sale_id"] == result["sale"]["id"]
+    assert result["sale"]["order_id"] == order_id
 
     response = await client.get("/api/orders", headers=owner_headers)
     assert response.json() == []  # выданные заказы не входят в список активных
 
+    response = await client.get("/api/orders/completed", headers=owner_headers)
+    assert response.status_code == 200
+    completed = response.json()
+    assert len(completed) == 1
+    assert completed[0]["id"] == order_id
+    assert completed[0]["status"] == "issued"
+    assert completed[0]["number"] is not None
+
     response = await client.get(f"/api/orders/{order_id}", headers=owner_headers)
     assert response.status_code == 200
     assert response.json()["status"] == "issued"
+
+    response = await client.get(f"/api/orders/{order_id}/history", headers=owner_headers)
+    assert response.status_code == 200
+    actions = [e["action"] for e in response.json()]
+    assert "order.create" in actions
+    assert "order.issue" in actions
+
+    # остаток физически списан (весь куплен) — позиция с нулевым остатком не
+    # входит в список (GET /inventory/stock отдаёт только ненулевые остатки)
+    response = await client.get("/api/inventory/stock", headers=owner_headers)
+    assert all(i["product_id"] != product_id for i in response.json())
+
+
+async def test_order_edit_and_cancel_via_api(client, owner_headers):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Платье", "purchase_price": "1000", "retail_price": "2000"},
+    )
+    product_id = response.json()["id"]
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "5"}]},
+    )
+
+    response = await client.post(
+        "/api/counterparties/clients", headers=owner_headers, json={"name": "Хава"}
+    )
+    client_id = response.json()["id"]
+
+    response = await client.post(
+        "/api/orders",
+        headers=owner_headers,
+        json={
+            "client_id": client_id,
+            "warehouse_id": 1,
+            "items": [{"product_id": product_id, "quantity": "2", "price": "2000"}],
+            "due_date": date.today().isoformat(),
+        },
+    )
+    order_id = response.json()["id"]
+
+    # редактирование состава пересчитывает резерв
+    response = await client.patch(
+        f"/api/orders/{order_id}",
+        headers=owner_headers,
+        json={
+            "client_id": client_id,
+            "warehouse_id": 1,
+            "items": [{"product_id": product_id, "quantity": "4", "price": "2000"}],
+            "due_date": date.today().isoformat(),
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == "8000.00"
+
+    response = await client.get("/api/inventory/stock", headers=owner_headers)
+    stock = next(i for i in response.json() if i["product_id"] == product_id)
+    assert stock["reserved"] == "4.000"
+
+    # отмена освобождает резерв
+    response = await client.post(
+        f"/api/orders/{order_id}/cancel", headers=owner_headers, json={"reason": "передумала"}
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelled"
+
+    response = await client.get("/api/inventory/stock", headers=owner_headers)
+    stock = next(i for i in response.json() if i["product_id"] == product_id)
+    assert stock["reserved"] == "0.000"
+
+    response = await client.get("/api/orders/completed", headers=owner_headers)
+    completed = response.json()
+    assert len(completed) == 1
+    assert completed[0]["status"] == "cancelled"
+
+    # отменённый заказ нельзя редактировать/выдать
+    response = await client.patch(
+        f"/api/orders/{order_id}",
+        headers=owner_headers,
+        json={
+            "client_id": client_id,
+            "warehouse_id": 1,
+            "items": [{"product_id": product_id, "quantity": "1", "price": "2000"}],
+        },
+    )
+    assert response.status_code == 400
+
+
+async def test_task_full_lifecycle_via_api(client, owner_headers, random_phone):
+    # 1. сотрудник, которому назначим задачу
+    phone = random_phone()
+    response = await client.post(
+        "/api/auth/employees",
+        headers=owner_headers,
+        json={"name": "Хеда", "phone": phone, "password": "secret123", "role": "seller"},
+    )
+    assert response.status_code == 201, response.text
+    employee_id = response.json()["id"]
+
+    response = await client.post(
+        "/api/auth/login", json={"phone": phone, "password": "secret123"}
+    )
+    employee_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+    # 2. владелец ставит задачу сотруднику
+    response = await client.post(
+        "/api/tasks",
+        headers=owner_headers,
+        json={
+            "title": "Позвонить поставщику",
+            "assigned_user_id": employee_id,
+            "note": "по цементу",
+            "due_date": date.today().isoformat(),
+        },
+    )
+    assert response.status_code == 201, response.text
+    task = response.json()
+    task_id = task["id"]
+    assert task["status"] == "new"
+    assert task["number"] is not None
+    assert task["assigned_user_name"] == "Хеда"
+
+    # 3. уведомление о назначении пришло сотруднику, а не владельцу
+    response = await client.get("/api/notifications", headers=employee_headers)
+    assert response.status_code == 200
+    notifications = response.json()
+    assert notifications["unread"] == 1
+    assert notifications["items"][0]["kind"] == "task_assigned"
+
+    response = await client.get("/api/notifications", headers=owner_headers)
+    assert response.json()["unread"] == 0
+
+    # 4. сотрудник видит только свою задачу и ведёт её по доске
+    response = await client.get("/api/tasks", headers=employee_headers)
+    assert [t["id"] for t in response.json()] == [task_id]
+
+    response = await client.patch(
+        f"/api/tasks/{task_id}/status", headers=employee_headers, json={"new_status": "in_progress"}
+    )
+    assert response.status_code == 200
+
+    response = await client.patch(
+        f"/api/tasks/{task_id}/status", headers=employee_headers, json={"new_status": "done"}
+    )
+    assert response.status_code == 200
+
+    # done — терминальный статус
+    response = await client.patch(
+        f"/api/tasks/{task_id}/status", headers=employee_headers, json={"new_status": "new"}
+    )
+    assert response.status_code == 400
+
+    # 5. активные/завершённые списки и история
+    response = await client.get("/api/tasks", headers=owner_headers)
+    assert response.json() == []
+
+    response = await client.get("/api/tasks/completed", headers=owner_headers)
+    completed = response.json()
+    assert len(completed) == 1 and completed[0]["status"] == "done"
+
+    response = await client.get(f"/api/tasks/{task_id}/history", headers=owner_headers)
+    actions = [e["action"] for e in response.json()]
+    assert actions == ["task.status", "task.status", "task.create"]
+
+    # 6. автор получил уведомление о выполнении
+    response = await client.get("/api/notifications", headers=owner_headers)
+    owner_notifications = response.json()
+    assert owner_notifications["unread"] == 1
+    assert owner_notifications["items"][0]["kind"] == "task_done"
+    notification_id = owner_notifications["items"][0]["id"]
+
+    response = await client.post(
+        f"/api/notifications/{notification_id}/read", headers=owner_headers
+    )
+    assert response.status_code == 200
+    assert (await client.get("/api/notifications", headers=owner_headers)).json()["unread"] == 0
+
+
+async def test_seller_sees_only_own_tasks_via_api(client, owner_headers, random_phone):
+    phone = random_phone()
+    response = await client.post(
+        "/api/auth/employees",
+        headers=owner_headers,
+        json={"name": "Заур", "phone": phone, "password": "secret123", "role": "seller"},
+    )
+    assert response.status_code == 201, response.text
+
+    response = await client.post(
+        "/api/auth/login", json={"phone": phone, "password": "secret123"}
+    )
+    seller_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+    response = await client.post(
+        "/api/tasks", headers=owner_headers, json={"title": "Задача владельца себе"}
+    )
+    assert response.status_code == 201, response.text
+    owner_task_id = response.json()["id"]
+
+    response = await client.get("/api/tasks", headers=seller_headers)
+    assert response.json() == []
+
+    response = await client.get(f"/api/tasks/{owner_task_id}", headers=seller_headers)
+    assert response.status_code == 403
+
+    # продавцу нельзя назначать задачи другим (нет USERS_MANAGE)
+    response = await client.post(
+        "/api/tasks",
+        headers=seller_headers,
+        json={"title": "Чужая задача", "assigned_user_id": 1},
+    )
+    assert response.status_code == 403
 
 
 async def test_storekeeper_cannot_view_orders_via_api(client, owner_headers, random_phone):

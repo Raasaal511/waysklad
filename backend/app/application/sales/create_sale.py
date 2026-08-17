@@ -91,7 +91,10 @@ class CreateSaleUseCase:
                 new_quantity = await uow.stock.change(
                     line.product_id, sale.warehouse_id, -line.quantity.value, line.variant_id
                 )
-                if new_quantity < 0:
+                reserved = await uow.stock.get_reserved(
+                    line.product_id, sale.warehouse_id, line.variant_id
+                )
+                if new_quantity - reserved < 0:
                     raise InsufficientStockError(
                         f"Недостаточно остатка: {names[line.product_id]}"
                     )

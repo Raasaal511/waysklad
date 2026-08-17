@@ -20,6 +20,7 @@ from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.files import LocalFileStorage
 from app.infrastructure.security import BcryptPasswordHasher
 from app.main import app as fastapi_app
+from app.presentation.deps.notifier import get_notifier
 from app.presentation.deps.security import get_file_storage
 from app.presentation.deps.uow import get_session_factory
 
@@ -137,6 +138,7 @@ async def client(db_session_factory, tmp_path) -> AsyncIterator[AsyncClient]:
     """HTTP-клиент FastAPI-приложения с подменённой тестовой БД и хранилищем файлов."""
     fastapi_app.dependency_overrides[get_session_factory] = lambda: db_session_factory
     fastapi_app.dependency_overrides[get_file_storage] = lambda: LocalFileStorage(tmp_path)
+    fastapi_app.dependency_overrides[get_notifier] = lambda: None  # без реальных HTTP-запросов в Telegram
     transport = ASGITransport(app=fastapi_app)
     async with AsyncClient(transport=transport, base_url="http://test") as http:
         yield http

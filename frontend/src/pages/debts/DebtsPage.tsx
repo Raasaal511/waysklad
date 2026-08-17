@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   listActiveDebts,
@@ -33,6 +33,8 @@ const DEBT_HISTORY_ACTION_LABELS: Record<string, string> = {
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('ru-RU')
 }
+
+const URGENT_DEBT_COLUMNS = '1.4fr 1fr 1fr 1fr'
 
 export function DebtsPage() {
   const [searchParams] = useSearchParams()
@@ -113,31 +115,36 @@ export function DebtsPage() {
       {!loading && urgentDebts.length > 0 && (
         <div className="stack">
           <h3>Должны сегодня и просрочено</h3>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Контрагент</th>
-                  <th>Остаток</th>
-                  <th>Срок</th>
-                  <th>Статус</th>
-                </tr>
-              </thead>
-              <tbody>
-                {urgentDebts.map((d) => (
-                  <tr key={d.id}>
-                    <td>{counterpartyName(d)}</td>
-                    <td>{formatMoney(d.balance)} ₽</td>
-                    <td>{d.due_date ? formatDate(d.due_date) : '—'}</td>
-                    <td>
-                      <span className={DEBT_STATUS_BADGE_CLASS[d.status]}>
-                        {DEBT_STATUS_LABELS[d.status]}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="data-table">
+            <div className="data-table-head" style={{ gridTemplateColumns: URGENT_DEBT_COLUMNS }}>
+              <span>Контрагент</span>
+              <span>Остаток</span>
+              <span>Срок</span>
+              <span>Статус</span>
+            </div>
+            <div className="data-table-body">
+              {urgentDebts.map((d, i) => (
+                <div
+                  key={d.id}
+                  className="data-row sale-history-row-in"
+                  style={
+                    {
+                      gridTemplateColumns: URGENT_DEBT_COLUMNS,
+                      '--row-delay': `${Math.min(i, 12) * 25}ms`,
+                    } as CSSProperties
+                  }
+                >
+                  <span className="data-row-name">{counterpartyName(d)}</span>
+                  <span>{formatMoney(d.balance)} ₽</span>
+                  <span className="text-muted">{d.due_date ? formatDate(d.due_date) : '—'}</span>
+                  <span>
+                    <span className={DEBT_STATUS_BADGE_CLASS[d.status]}>
+                      {DEBT_STATUS_LABELS[d.status]}
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

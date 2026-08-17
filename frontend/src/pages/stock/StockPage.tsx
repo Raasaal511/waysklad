@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { listStock, listWarehouses, type StockItem, type Warehouse } from '../../entities/inventory/api'
 import { listAllProducts, type Product } from '../../entities/product/api'
@@ -6,6 +6,7 @@ import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
 import { IconPlus, IconBuildingWarehouse, IconChevronRight, IconHistory } from '@tabler/icons-react'
 import { IconButton } from '../../shared/ui/IconButton'
+import { Button } from '../../shared/ui/Button'
 import { isLowStock } from '../../shared/lib/format'
 import { NewWarehouseForm } from './shared'
 
@@ -17,8 +18,8 @@ export function StockPage() {
   const [error, setError] = useState<string | null>(null)
   const [showWarehouseForm, setShowWarehouseForm] = useState(false)
 
-  async function load() {
-    setLoading(true)
+  async function load(silent = false) {
+    if (!silent) setLoading(true)
     try {
       const [s, w, p] = await Promise.all([listStock(), listWarehouses(), listAllProducts()])
       setStock(s)
@@ -27,7 +28,7 @@ export function StockPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось загрузить остатки')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
@@ -48,21 +49,16 @@ export function StockPage() {
   return (
     <div className="stack">
       <div className="section-title">
-        <h2>Остатки</h2>
+        <h2>Склады</h2>
         <div className="row" style={{ gap: 8 }}>
           <Link to="/stock/history">
-            <IconButton variant="accent" size="lg" tooltip="История движения">
-              <IconHistory size={22} stroke={1.8} />
+            <IconButton variant="accent" tooltip="История движения" style={{ width: 40, height: 40 }}>
+              <IconHistory size={19} stroke={1.8} />
             </IconButton>
           </Link>
-          <IconButton
-            variant="accent"
-            size="lg"
-            tooltip="Новый склад"
-            onClick={() => setShowWarehouseForm(true)}
-          >
-            <IconPlus size={22} stroke={1.8} />
-          </IconButton>
+          <Button onClick={() => setShowWarehouseForm(true)}>
+            <IconPlus size={16} stroke={1.8} /> Склад
+          </Button>
         </div>
       </div>
 
@@ -71,7 +67,7 @@ export function StockPage() {
           <NewWarehouseForm
             onCreated={() => {
               setShowWarehouseForm(false)
-              load()
+              load(true)
             }}
           />
         </Modal>
@@ -103,31 +99,40 @@ export function StockPage() {
       ) : warehouses.length === 0 ? (
         <p className="text-muted">Складов пока нет</p>
       ) : (
-        <div className="warehouse-grid">
-          {warehouses.map((w) => {
+        <div className="warehouse-tiles">
+          {warehouses.map((w, i) => {
             const low = lowStockCount(w.id)
             return (
-              <Link key={w.id} to={`/stock/${w.id}`} className="card warehouse-card">
-                <div className="row between">
-                  <div className="row" style={{ gap: 10 }}>
-                    <span className="warehouse-card-icon">
-                      <IconBuildingWarehouse size={18} stroke={1.8} />
-                    </span>
-                    <strong>{w.name}</strong>
+              <Link
+                key={w.id}
+                to={`/stock/${w.id}`}
+                className="warehouse-tile sale-history-row-in"
+                style={{ '--row-delay': `${Math.min(i, 12) * 40}ms` } as CSSProperties}
+              >
+                <div className="warehouse-tile-header">
+                  <span className="warehouse-tile-icon">
+                    <IconBuildingWarehouse size={26} stroke={1.6} />
+                  </span>
+                  <div className="warehouse-tile-heading">
+                    <strong className="warehouse-tile-name">{w.name}</strong>
+                    <span className="text-muted">{w.address || 'Без адреса'}</span>
                   </div>
-                  <span className="warehouse-card-chevron">
-                    <IconChevronRight size={16} stroke={1.8} />
-                  </span>
+                  <IconChevronRight size={20} stroke={1.8} className="warehouse-tile-chevron" />
                 </div>
-                {w.address && <span className="text-muted">{w.address}</span>}
-                <div className="row wrap" style={{ gap: 6 }}>
-                  <span className="badge accent">{itemCount(w.id)} позиций</span>
-                  {low > 0 && <span className="badge warning">Заканчивается: {low}</span>}
-                  <span className="badge">
-                    {w.assigned_user_ids.length === 0
-                      ? 'Без ответственных'
-                      : `Ответственных: ${w.assigned_user_ids.length}`}
-                  </span>
+
+                <div className="warehouse-tile-stats">
+                  <div className="stat">
+                    <span className="stat-label">Позиций</span>
+                    <span className="stat-value">{itemCount(w.id)}</span>
+                  </div>
+                  <div className="stat">
+                    <span className="stat-label">Заканчивается</span>
+                    <span className={`stat-value${low > 0 ? ' stat-value-warning' : ''}`}>{low}</span>
+                  </div>
+                  <div className="stat">
+                    <span className="stat-label">Ответственных</span>
+                    <span className="stat-value">{w.assigned_user_ids.length}</span>
+                  </div>
                 </div>
               </Link>
             )

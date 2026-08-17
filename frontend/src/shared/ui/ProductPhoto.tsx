@@ -1,6 +1,6 @@
 import { IconPhoto } from '@tabler/icons-react'
 
-export function ProductPhoto({ src, size = 22 }: { src: string; size?: number }) {
+export function ProductPhoto({ src, size = 40 }: { src: string; size?: number }) {
   if (!src) {
     return (
       <div className="product-tile-photo product-tile-photo-empty">

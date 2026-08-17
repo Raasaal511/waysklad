@@ -37,6 +37,7 @@ class StockItemModel(Base, TenantMixin):
     variant_id: Mapped[int | None] = mapped_column(ForeignKey("product_variants.id", ondelete="CASCADE"))
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"))
     quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=0)
+    reserved: Mapped[Decimal] = mapped_column(Numeric(14, 3), server_default="0", default=0)
 
 
 class StockDocumentModel(Base, TenantMixin, TimestampMixin):

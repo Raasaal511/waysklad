@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   listAllProducts,
   getByBarcode,
@@ -63,6 +63,7 @@ import { queueSale } from '../../shared/offline/outbox'
 const BarcodeScanner = lazy(() =>
   import('../../entities/barcode/BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })),
 )
+import { useAnimatedNumber } from '../../shared/lib/useAnimatedNumber'
 import {
   formatQuantity,
   formatMoney,
@@ -77,6 +78,8 @@ import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt
 import { useAuth } from '../../app/AuthContext'
 
 const DRAFT_KEY = 'waysklad:sale-draft'
+const SALE_LINES_COLUMNS = '2fr 1fr 1fr 1fr'
+const CART_TABLE_COLUMNS = '40% 18% 17% 17% 8%'
 
 interface CartLine {
   product: Product
@@ -185,8 +188,19 @@ export function SalePage() {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showNewSale, setShowNewSale] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [showNewSale, setShowNewSale] = useState(() => searchParams.get('open') === '1')
   const [hasDraft] = useState(() => loadDraft() !== null)
+
+  useEffect(() => {
+    if (searchParams.get('open') !== '1') return
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete('open')
+      return next
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [period, setPeriod] = useState<PeriodFilter>('all')
   const [paymentFilter, setPaymentFilter] = useState<PaymentMethod | 'all'>('all')
   const [warehouseFilter, setWarehouseFilter] = useState<number | 'all'>('all')
@@ -286,6 +300,9 @@ export function SalePage() {
 
   const periodTotal = filteredSales.reduce((sum, s) => sum + Number(s.total), 0)
   const avgCheck = filteredSales.length > 0 ? periodTotal / filteredSales.length : 0
+  const animatedPeriodTotal = useAnimatedNumber(periodTotal)
+  const animatedSalesCount = useAnimatedNumber(filteredSales.length)
+  const animatedAvgCheck = useAnimatedNumber(avgCheck)
   const periodTotalAll = periodSales.reduce((sum, s) => sum + Number(s.total), 0)
   const paymentStats = periodSales.reduce(
     (acc, s) => {
@@ -380,7 +397,6 @@ export function SalePage() {
           </label>
           {activeFilterCount > 0 && (
             <ResetFiltersButton
-              className="sale-reset-link"
               onClick={() => {
                 setPaymentFilter('all')
                 setSortMode('date_desc')
@@ -394,26 +410,19 @@ export function SalePage() {
 
       {!loading && filteredSales.length > 0 && (
         <div className="card card-full sale-period-summary">
-          <h3 className="sale-period-summary-title">
-            Итого за «{PERIOD_LABELS[period]}»
-            {warehouseFilter !== 'all'
-              ? ` · ${warehouseName(warehouseFilter)}`
-              : warehouses.length > 1 && singleWarehouseId !== null && ` · ${warehouseName(singleWarehouseId)}`}
-            {paymentFilter !== 'all' && ` · ${PAYMENT_LABELS[paymentFilter]}`}
-            {clientQuery.trim() !== '' && ` · «${clientQuery.trim()}»`}
-          </h3>
+          <h3 className="sale-period-summary-title">Итого</h3>
           <div className="grid-stats">
             <div className="stat">
               <span className="stat-label">Выручка</span>
-              <span className="stat-value">{formatMoney(periodTotal)} ₽</span>
+              <span className="stat-value">{formatMoney(animatedPeriodTotal)} ₽</span>
             </div>
             <div className="stat">
               <span className="stat-label">Продаж</span>
-              <span className="stat-value">{filteredSales.length}</span>
+              <span className="stat-value">{Math.round(animatedSalesCount)}</span>
             </div>
             <div className="stat">
               <span className="stat-label">Средний чек</span>
-              <span className="stat-value">{formatMoney(avgCheck)} ₽</span>
+              <span className="stat-value">{formatMoney(animatedAvgCheck)} ₽</span>
             </div>
           </div>
           <div className="sale-payment-breakdown">
@@ -482,10 +491,15 @@ export function SalePage() {
                 </span>
               </div>
               <div className="sale-history">
-                {group.sales.map((s) => (
+                {group.sales.map((s, i) => (
                   <Button
-                    className="sale-history-row"
-                    style={{ '--history-row-columns': historyRowColumns } as CSSProperties}
+                    className="sale-history-row sale-history-row-in"
+                    style={
+                      {
+                        '--history-row-columns': historyRowColumns,
+                        '--row-delay': `${Math.min(i, 12) * 25}ms`,
+                      } as CSSProperties
+                    }
                     key={s.id}
                     onClick={() => setSelectedSale(s)}
                   >
@@ -690,7 +704,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const stockFor = (productId: number) =>
     warehouseId == null
       ? null
-      : stock.find((s) => s.product_id === productId && s.warehouse_id === warehouseId)?.quantity ?? '0'
+      : stock.find((s) => s.product_id === productId && s.warehouse_id === warehouseId)?.available ?? '0'
 
   const unitName = (code: string) => units.find((u) => u.code === code)?.name ?? code
   const isFractional = (code: string) => units.find((u) => u.code === code)?.fractional ?? false
@@ -1045,7 +1059,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
         ) : filtered.length === 0 ? (
           <p className="text-muted">Ничего не найдено</p>
         ) : (
-          <div className="product-grid" style={{ maxHeight: 280, overflowY: 'auto' }}>
+          <div className="product-grid" style={{ maxHeight: 480, minHeight: 220, overflowY: 'auto' }}>
             {filtered.map((p) => {
               const qty = stockFor(p.id)
               const inCartQty = cartQtyByProduct.get(p.id)
@@ -1063,10 +1077,33 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                     }
                   }}
                 >
+                  <ProductPhoto src={p.photo} />
+                  <div className="product-tile-body">
+                    <span className="product-tile-name">{p.name}</span>
+                    <span className="product-tile-meta">
+                      <span className="product-tile-price-label">Цена за {unitName(p.unit_code)}:</span>
+                      <span className="product-tile-price">{formatMoney(p.retail_price)} ₽</span>
+                    </span>
+                    {qty !== null && (
+                      <span
+                        className={`product-tile-stock${
+                          isOutOfStock(qty) ? ' product-tile-stock-out' : ' product-tile-stock-in'
+                        }`}
+                      >
+                        <span className="product-tile-stock-label">Остаток:</span>
+                        <span className="product-tile-stock-value-wrap">
+                          <span className="product-tile-stock-value">
+                            {formatQuantity(qty)} {unitName(p.unit_code)}
+                          </span>
+                          {isLowStock(qty, p.min_stock) && <StockWarningIcon />}
+                        </span>
+                      </span>
+                    )}
+                  </div>
                   <span className={`product-tile-cart-badge${inCartQty ? '' : ' product-tile-cart-badge-hidden'}`}>
                     {inCartQty ? (
                       <>
-                        {formatQuantity(inCartQty)} {unitName(p.unit_code)}
+                        {formatQuantity(inCartQty)}
                         <IconButton
                           className="product-tile-remove"
                           onClick={(e) => {
@@ -1082,22 +1119,6 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                       ' '
                     )}
                   </span>
-                  <ProductPhoto src={p.photo} />
-                  <span className="product-tile-name">{p.name}</span>
-                  <span className="product-tile-price">{formatMoney(p.retail_price)} ₽</span>
-                  {qty !== null && (
-                    <span
-                      className={`product-tile-stock${
-                        isOutOfStock(qty) ? ' product-tile-stock-out' : ' product-tile-stock-in'
-                      }`}
-                    >
-                      <span className="product-tile-stock-label">Остаток:</span>
-                      <span className="product-tile-stock-value">
-                        {formatQuantity(qty)} {unitName(p.unit_code)}
-                      </span>
-                      {isLowStock(qty, p.min_stock) && <StockWarningIcon />}
-                    </span>
-                  )}
                   {maxReachedProductId === p.id && (
                     <span className="product-tile-max-reached">Больше нет на складе</span>
                   )}
@@ -1124,99 +1145,92 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
           </div>
 
           <div className="table-wrap cart-table-wrap">
-            <table className="cart-table">
-              <colgroup>
-                <col style={{ width: '40%' }} />
-                <col style={{ width: '18%' }} />
-                <col style={{ width: '17%' }} />
-                <col style={{ width: '17%' }} />
-                <col style={{ width: '8%' }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Товар</th>
-                  <th>Кол-во</th>
-                  <th>Цена</th>
-                  <th>Сумма</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {cart.map((line) => {
-                  const lineTotal = centsToMoney(lineTotalCents(line.quantity, line.price))
-                  const available = stockFor(line.product.id)
-                  const availableNum = available !== null ? Number(available) : null
-                  const overStock = availableNum !== null && Number(line.quantity || 0) > availableNum
-                  return (
-                    <tr key={line.product.id}>
-                      <td className="cart-table-name">
-                        <div>{line.product.name}</div>
-                        {availableNum !== null && (
-                          <div className="cart-table-stock">
-                            Остаток: {formatQuantity(availableNum)} {unitName(line.product.unit_code)}
-                          </div>
-                        )}
-                      </td>
-                      <td className="cart-table-qty-cell">
-                        <div className="cart-qty-stepper">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            className={overStock ? 'cart-input-warning' : undefined}
-                            value={line.quantity}
-                            onChange={(e) => updateLine(line.product.id, 'quantity', e.target.value)}
-                          />
-                          <div className="cart-qty-step-column">
-                            <IconButton
-                              variant="muted"
-                              className="cart-qty-step"
-                              onClick={() => stepLineQuantity(line.product.id, 1, availableNum)}
-                              aria-label="Увеличить количество"
-                            >
-                              <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-up" />
-                            </IconButton>
-                            <IconButton
-                              variant="muted"
-                              className="cart-qty-step"
-                              onClick={() => stepLineQuantity(line.product.id, -1, availableNum)}
-                              aria-label="Уменьшить количество"
-                            >
-                              <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-down" />
-                            </IconButton>
-                          </div>
+            <div className="cart-table-head" style={{ gridTemplateColumns: CART_TABLE_COLUMNS }}>
+              <span>Товар</span>
+              <span>Кол-во</span>
+              <span>Цена</span>
+              <span>Сумма</span>
+              <span />
+            </div>
+            <div>
+              {cart.map((line) => {
+                const lineTotal = centsToMoney(lineTotalCents(line.quantity, line.price))
+                const available = stockFor(line.product.id)
+                const availableNum = available !== null ? Number(available) : null
+                const overStock = availableNum !== null && Number(line.quantity || 0) > availableNum
+                return (
+                  <div
+                    key={line.product.id}
+                    className="cart-table-row"
+                    style={{ gridTemplateColumns: CART_TABLE_COLUMNS }}
+                  >
+                    <div className="cart-table-name">
+                      <div>{line.product.name}</div>
+                      {availableNum !== null && (
+                        <div className="cart-table-stock">
+                          Остаток: {formatQuantity(availableNum)} {unitName(line.product.unit_code)}
                         </div>
-                        {overStock && availableNum !== null && (
-                          <div className="cart-table-warning">
-                            больше остатка ({formatQuantity(availableNum)})
-                          </div>
-                        )}
-                        {maxReachedProductId === line.product.id && (
-                          <div className="cart-table-max-reached">Больше нет на складе</div>
-                        )}
-                      </td>
-                      <td className="cart-table-price-cell">
+                      )}
+                    </div>
+                    <div className="cart-table-qty-cell">
+                      <div className="cart-qty-stepper">
                         <input
                           type="text"
                           inputMode="decimal"
-                          value={line.price}
-                          onChange={(e) => updateLine(line.product.id, 'price', e.target.value)}
+                          className={overStock ? 'cart-input-warning' : undefined}
+                          value={line.quantity}
+                          onChange={(e) => updateLine(line.product.id, 'quantity', e.target.value)}
                         />
-                        <span className="cart-table-price-suffix">₽</span>
-                      </td>
-                      <td className="cart-table-total">{formatMoney(lineTotal)} ₽</td>
-                      <td>
-                        <IconButton
-                          onClick={() => removeLine(line.product.id)}
-                          aria-label="Убрать из чека"
-                        >
-                          <IconX size={16} stroke={1.8} />
-                        </IconButton>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                        <div className="cart-qty-step-column">
+                          <IconButton
+                            variant="muted"
+                            className="cart-qty-step"
+                            onClick={() => stepLineQuantity(line.product.id, 1, availableNum)}
+                            aria-label="Увеличить количество"
+                          >
+                            <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-up" />
+                          </IconButton>
+                          <IconButton
+                            variant="muted"
+                            className="cart-qty-step"
+                            onClick={() => stepLineQuantity(line.product.id, -1, availableNum)}
+                            aria-label="Уменьшить количество"
+                          >
+                            <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-down" />
+                          </IconButton>
+                        </div>
+                      </div>
+                      {overStock && availableNum !== null && (
+                        <div className="cart-table-warning">
+                          больше остатка ({formatQuantity(availableNum)})
+                        </div>
+                      )}
+                      {maxReachedProductId === line.product.id && (
+                        <div className="cart-table-max-reached">Больше нет на складе</div>
+                      )}
+                    </div>
+                    <div className="cart-table-price-cell">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={line.price}
+                        onChange={(e) => updateLine(line.product.id, 'price', e.target.value)}
+                      />
+                      <span className="cart-table-price-suffix">₽</span>
+                    </div>
+                    <div className="cart-table-total">{formatMoney(lineTotal)} ₽</div>
+                    <div>
+                      <IconButton
+                        onClick={() => removeLine(line.product.id)}
+                        aria-label="Убрать из чека"
+                      >
+                        <IconX size={16} stroke={1.8} />
+                      </IconButton>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
           <div className="sale-checkout-grid">
@@ -1681,6 +1695,12 @@ function LastSaleCard({
             </div>
           </>
         )}
+        {sale.order_id != null && (
+          <div className="sale-detail-meta-item">
+            <span className="text-muted">Из заказа</span>
+            <Link to="/orders" className="badge accent">№{sale.order_id}</Link>
+          </div>
+        )}
       </div>
 
       {client && (
@@ -1724,29 +1744,34 @@ function LastSaleCard({
         Товары <span className="text-muted">· {sale.lines.length} поз.</span>
       </h3>
 
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Товар</th>
-              <th>Кол-во</th>
-              <th>Цена</th>
-              <th>Сумма</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sale.lines.map((line) => (
-              <tr key={line.id}>
-                <td>{productName(line.product_id)}</td>
-                <td>
-                  {formatQuantity(line.quantity)} {unitName(products.find((p) => p.id === line.product_id)?.unit_code ?? '')}
-                </td>
-                <td>{formatMoney(line.price)} ₽</td>
-                <td>{formatMoney(line.total)} ₽</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="data-table">
+        <div className="data-table-head" style={{ gridTemplateColumns: SALE_LINES_COLUMNS }}>
+          <span>Товар</span>
+          <span>Кол-во</span>
+          <span>Цена</span>
+          <span>Сумма</span>
+        </div>
+        <div className="data-table-body">
+          {sale.lines.map((line, i) => (
+            <div
+              key={line.id}
+              className="data-row sale-history-row-in"
+              style={
+                {
+                  gridTemplateColumns: SALE_LINES_COLUMNS,
+                  '--row-delay': `${Math.min(i, 12) * 25}ms`,
+                } as CSSProperties
+              }
+            >
+              <span className="data-row-name">{productName(line.product_id)}</span>
+              <span>
+                {formatQuantity(line.quantity)} {unitName(products.find((p) => p.id === line.product_id)?.unit_code ?? '')}
+              </span>
+              <span>{formatMoney(line.price)} ₽</span>
+              <span>{formatMoney(line.total)} ₽</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="sale-detail-totals">
@@ -1757,7 +1782,7 @@ function LastSaleCard({
               <span>{formatMoney(sale.subtotal)} ₽</span>
             </div>
             <div className="sale-detail-totals-row">
-              <span>Скидка</span>
+              <span>{sale.order_id != null ? 'Предоплата по заказу' : 'Скидка'}</span>
               <span>−{formatMoney(sale.discount)} ₽</span>
             </div>
           </>

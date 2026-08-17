@@ -131,6 +131,30 @@ async def test_stock_change_accumulates(make_uow, create_shop, create_product):
         await uow.commit()
 
 
+async def test_stock_reserve_and_release(make_uow, create_shop, create_product):
+    tenant_id, _, _ = await create_shop()
+
+    async with make_uow(tenant_id) as uow:
+        warehouse = await uow.warehouses.add(Warehouse(id=None, name="Основной"))
+        await uow.commit()
+        warehouse_id = warehouse.id
+
+    product = await create_product(tenant_id, name="Платье")
+
+    async with make_uow(tenant_id) as uow:
+        await uow.stock.change(product.id, warehouse_id, Decimal("5"))
+        reserved = await uow.stock.reserve(product.id, warehouse_id, Decimal("2"))
+        assert reserved == Decimal("2")
+        assert await uow.stock.get_reserved(product.id, warehouse_id) == Decimal("2")
+        # физический остаток не тронут резервом
+        assert await uow.stock.get(product.id, warehouse_id) == Decimal("5")
+
+        released = await uow.stock.reserve(product.id, warehouse_id, Decimal("-2"))
+        assert released == Decimal("0")
+        assert await uow.stock.get_reserved(product.id, warehouse_id) == Decimal("0")
+        await uow.commit()
+
+
 async def test_tenant_isolation(make_uow, create_shop, create_product):
     tenant_a, _, _ = await create_shop()
     tenant_b, _, _ = await create_shop()
@@ -241,16 +265,18 @@ async def test_debt_save_appends_repayment_and_replaces_schedule(make_uow, creat
         assert len(debt.repayments) == 1  # погашения не пострадали от замены графика
 
 
-async def test_order_save_updates_status_and_leaves_lines_intact(make_uow, create_shop, create_product):
+async def test_order_save_updates_status_and_lines(make_uow, create_shop, create_product):
     tenant_id, _, _ = await create_shop()
     product = await create_product(tenant_id, name="Торт на заказ")
 
     async with make_uow(tenant_id) as uow:
+        warehouse = await uow.warehouses.add(Warehouse(id=None, name="Склад"))
         client = await uow.clients.add(Client(id=None, name="Милана"))
         order = await uow.orders.add(
             Order(
                 id=None,
                 client_id=client.id,
+                warehouse_id=warehouse.id,
                 lines=[
                     OrderLine(
                         product_id=product.id,
@@ -258,6 +284,7 @@ async def test_order_save_updates_status_and_leaves_lines_intact(make_uow, creat
                         price=Money.of("3000"),
                     )
                 ],
+                due_date=date.today(),
             )
         )
         await uow.commit()
@@ -267,6 +294,13 @@ async def test_order_save_updates_status_and_leaves_lines_intact(make_uow, creat
         order = await uow.orders.get(order_id)
         order.change_status(OrderStatus.IN_PROGRESS)
         order.note = "готовим"
+        order.lines = [
+            OrderLine(
+                product_id=product.id,
+                quantity=Quantity(Decimal("2"), UNITS["pcs"]),
+                price=Money.of("3000"),
+            )
+        ]
         await uow.orders.save(order)
         await uow.commit()
 
@@ -274,7 +308,8 @@ async def test_order_save_updates_status_and_leaves_lines_intact(make_uow, creat
         order = await uow.orders.get(order_id)
         assert order.status is OrderStatus.IN_PROGRESS
         assert order.note == "готовим"
-        assert len(order.lines) == 1  # save() не трогает состав заказа
+        assert len(order.lines) == 1
+        assert order.lines[0].quantity.value == Decimal("2")  # save() теперь заменяет состав
 
 
 async def test_supplier_roundtrip(make_uow, create_shop):
