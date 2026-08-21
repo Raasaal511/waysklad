@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    environment:
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=und"
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    image: waysklad-backend-dev-deploy
+    env_file: .env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    volumes:
+      - uploads_data_dev:/app/uploads
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    image: waysklad-frontend-dev-deploy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.waysklad-dev.rule=Host(`dev.waysklad.gtestserver.ru`)"
+      - "traefik.http.services.waysklad-dev.loadbalancer.server.port=80"
+      - "traefik.docker.network=web"
+    networks:
+      - web
+      - default
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata_dev:
+  uploads_data_dev:
+
+networks:
+  web:
+    external: true
