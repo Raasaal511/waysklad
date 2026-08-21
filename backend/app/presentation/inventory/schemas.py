@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
@@ -43,9 +43,16 @@ class _DocumentRequest(BaseModel):
 
 
 class ReceiveRequest(_DocumentRequest):
+    supplier_id: int | None = None  # если указан — приёмка считается долгом поставщику
+    debt_due_date: date | None = None  # «долг до», обязателен при supplier_id
+
     def to_command(self) -> ReceiveGoodsCommand:
         return ReceiveGoodsCommand(
-            warehouse_id=self.warehouse_id, lines=self._lines(), note=self.note
+            warehouse_id=self.warehouse_id,
+            lines=self._lines(),
+            note=self.note,
+            supplier_id=self.supplier_id,
+            debt_due_date=self.debt_due_date,
         )
 
 
@@ -156,6 +163,7 @@ class DocumentResponse(BaseModel):
     type: StockDocType
     warehouse_id: int
     to_warehouse_id: int | None
+    supplier_id: int | None
     note: str
 
     @classmethod
@@ -165,6 +173,7 @@ class DocumentResponse(BaseModel):
             type=document.type,
             warehouse_id=document.warehouse_id,
             to_warehouse_id=document.to_warehouse_id,
+            supplier_id=document.supplier_id,
             note=document.note,
         )
 
@@ -191,6 +200,7 @@ class DocumentHistoryResponse(BaseModel):
     type: StockDocType
     warehouse_id: int
     to_warehouse_id: int | None
+    supplier_id: int | None
     author_id: int
     note: str
     created_at: datetime
@@ -204,6 +214,7 @@ class DocumentHistoryResponse(BaseModel):
             type=document.type,
             warehouse_id=document.warehouse_id,
             to_warehouse_id=document.to_warehouse_id,
+            supplier_id=document.supplier_id,
             author_id=document.author_id,
             note=document.note,
             created_at=document.created_at,

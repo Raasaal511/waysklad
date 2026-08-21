@@ -59,6 +59,7 @@ class Debt:
     supplier_id: int | None = None
     due_date: date | None = None  # «обещал вернуть до…»
     sale_id: int | None = None
+    receipt_document_id: int | None = None  # долг поставщику из приёмки товара
     note: str = ""
     schedule: list[InstallmentPayment] = field(default_factory=list)
     repayments: list[Repayment] = field(default_factory=list)

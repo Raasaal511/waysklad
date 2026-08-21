@@ -16,6 +16,7 @@ class DebtMapper:
             client_id=debt.client_id,
             supplier_id=debt.supplier_id,
             sale_id=debt.sale_id,
+            receipt_document_id=debt.receipt_document_id,
             amount=debt.amount.amount,
             issued_at=debt.issued_at,
             due_date=debt.due_date,
@@ -59,6 +60,7 @@ class DebtMapper:
             issued_at=model.issued_at,
             due_date=model.due_date,
             sale_id=model.sale_id,
+            receipt_document_id=model.receipt_document_id,
             note=model.note,
             schedule=[
                 InstallmentPayment(due_date=p.due_date, amount=Money(p.amount))

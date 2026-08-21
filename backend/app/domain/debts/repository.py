@@ -22,3 +22,7 @@ class IDebtRepository(Protocol):
     async def list_active(self) -> list[Debt]:
         """Все незакрытые долги арендатора (клиентские и поставщические) — для общего списка."""
         ...
+
+    async def list_closed(self) -> list[Debt]:
+        """Все погашенные долги арендатора — для вкладки «Погашен» в общем списке."""
+        ...

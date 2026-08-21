@@ -119,3 +119,13 @@ class SqlAlchemyDebtRepository(SqlAlchemyRepository, IDebtRepository):
             )
         ).scalars().all()
         return [debt for debt in map(DebtMapper.to_entity, models) if not debt.is_closed]
+
+    async def list_closed(self) -> list[Debt]:
+        models = (
+            await self._session.execute(
+                select(DebtModel)
+                .where(DebtModel.tenant_id == self._tenant)
+                .order_by(DebtModel.issued_at.desc())
+            )
+        ).scalars().all()
+        return [debt for debt in map(DebtMapper.to_entity, models) if debt.is_closed]

@@ -22,6 +22,7 @@ class DebtModel(Base, TenantMixin, TimestampMixin):
     client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), index=True)
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), index=True)
     sale_id: Mapped[int | None] = mapped_column(ForeignKey("sales.id"))  # долг из продажи
+    receipt_document_id: Mapped[int | None] = mapped_column(ForeignKey("stock_documents.id"))  # долг из приёмки
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     issued_at: Mapped[date] = mapped_column(Date)
     due_date: Mapped[date | None] = mapped_column(Date)  # «обещал вернуть до…», для напоминаний

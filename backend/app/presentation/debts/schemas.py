@@ -115,6 +115,7 @@ class DebtResponse(BaseModel):
     issued_at: date
     due_date: date | None
     sale_id: int | None
+    receipt_document_id: int | None
     note: str
     schedule: list[InstallmentResponse]
     repayments: list[RepaymentResponse]
@@ -134,6 +135,7 @@ class DebtResponse(BaseModel):
             issued_at=debt.issued_at,
             due_date=debt.due_date,
             sale_id=debt.sale_id,
+            receipt_document_id=debt.receipt_document_id,
             note=debt.note,
             schedule=[
                 InstallmentResponse(due_date=p.due_date, amount=p.amount.amount)

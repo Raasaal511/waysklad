@@ -13,7 +13,6 @@ from app.presentation.sales.router import router as sales_router
 from app.presentation.sync.router import router as sync_router
 from app.presentation.tasks.router import router as tasks_router
 
-# общий префикс /api задаётся один раз здесь — в роутерах категорий его нет
 router = APIRouter(prefix="/api")
 
 router.include_router(auth_router)

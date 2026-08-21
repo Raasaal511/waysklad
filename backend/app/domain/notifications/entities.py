@@ -6,6 +6,8 @@ from enum import StrEnum
 class NotificationKind(StrEnum):
     TASK_ASSIGNED = "task_assigned"
     TASK_DONE = "task_done"
+    DEBT_DUE_SOON = "debt_due_soon"
+    DEBT_OVERDUE = "debt_overdue"
 
 
 @dataclass

@@ -1,7 +1,9 @@
+from datetime import date, datetime, time, timezone
+
 from sqlalchemy import func, select, update
 
 from app.domain.common.exceptions import NotFoundError
-from app.domain.notifications.entities import Notification
+from app.domain.notifications.entities import Notification, NotificationKind
 from app.domain.notifications.repository import INotificationRepository
 from app.infrastructure.db.mappers.notifications import NotificationMapper
 from app.infrastructure.db.models.notifications import NotificationModel
@@ -61,6 +63,21 @@ class SqlAlchemyNotificationRepository(SqlAlchemyRepository, INotificationReposi
         )
         await self._session.flush()
         return result.rowcount or 0
+
+    async def exists_for_entity_on(
+        self, user_id: int, kind: NotificationKind, entity_id: int, on: date
+    ) -> bool:
+        day_start = datetime.combine(on, time.min, tzinfo=timezone.utc)
+        day_end = datetime.combine(on, time.max, tzinfo=timezone.utc)
+        stmt = select(func.count()).select_from(NotificationModel).where(
+            NotificationModel.tenant_id == self._tenant,
+            NotificationModel.user_id == user_id,
+            NotificationModel.kind == kind,
+            NotificationModel.entity_id == entity_id,
+            NotificationModel.created_at >= day_start,
+            NotificationModel.created_at <= day_end,
+        )
+        return (await self._session.execute(stmt)).scalar_one() > 0
 
     async def _get_model(self, notification_id: int) -> NotificationModel:
         model = (

@@ -48,6 +48,12 @@ async def list_active_debts(uow: UowDep) -> list[DebtResponse]:
         return [DebtResponse.from_entity(d) for d in await uow.debts.list_active()]
 
 
+@router.get("/closed", dependencies=[_view])
+async def list_closed_debts(uow: UowDep) -> list[DebtResponse]:
+    async with uow:
+        return [DebtResponse.from_entity(d) for d in await uow.debts.list_closed()]
+
+
 @router.get("/due", dependencies=[_view])
 async def list_due_debts(uow: UowDep, on: date | None = None) -> list[DebtResponse]:
     async with uow:

@@ -33,6 +33,7 @@ class StockDocument:
     author_id: int
     lines: list[StockLine] = field(default_factory=list)
     to_warehouse_id: int | None = None  # для перемещения
+    supplier_id: int | None = None  # для приёмки — у кого приняли товар
     note: str = ""
     posted: bool = False
     number: int | None = None  # заполняется репозиторием при add()/чтении, не при создании
