@@ -13,6 +13,7 @@ import { MovementHistoryPage } from './pages/stock/MovementHistoryPage'
 import { OrdersPage } from './pages/orders/OrdersPage'
 import { TasksPage } from './pages/tasks/TasksPage'
 import { DebtsPage } from './pages/debts/DebtsPage'
+import { DebtDetailPage } from './pages/debts/DebtDetailPage'
 import { ClientsPage } from './pages/clients/ClientsPage'
 import { AnalyticsPage } from './pages/analytics/AnalyticsPage'
 import { ProfilePage } from './pages/profile/ProfilePage'
@@ -43,6 +44,7 @@ export function App() {
               <Route path="/orders" element={<OrdersPage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/debts" element={<DebtsPage />} />
+              <Route path="/debts/:id" element={<DebtDetailPage />} />
               <Route path="/clients" element={<ClientsPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/employees" element={<EmployeesPage />} />

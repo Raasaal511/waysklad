@@ -1,10 +1,43 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { IconX } from '@tabler/icons-react'
 import { IconButton } from './IconButton'
 
+// Счётчик открытых модалок — блокируем скролл фона на первой и снимаем блокировку
+// только когда закрылась последняя (модалки бывают вложенные, см. OrderDetail).
+// Просто overflow:hidden на body не держит iOS Safari от прокрутки фона свайпом,
+// поэтому дополнительно "замораживаем" body через position:fixed с сохранением scrollY.
+let modalLockCount = 0
+let savedScrollY = 0
+
+function lockBodyScroll() {
+  if (modalLockCount === 0) {
+    savedScrollY = window.scrollY
+    const body = document.body
+    body.style.position = 'fixed'
+    body.style.top = `-${savedScrollY}px`
+    body.style.left = '0'
+    body.style.right = '0'
+    body.style.overflow = 'hidden'
+  }
+  modalLockCount++
+}
+
+function unlockBodyScroll() {
+  modalLockCount = Math.max(0, modalLockCount - 1)
+  if (modalLockCount === 0) {
+    const body = document.body
+    body.style.position = ''
+    body.style.top = ''
+    body.style.left = ''
+    body.style.right = ''
+    body.style.overflow = ''
+    window.scrollTo(0, savedScrollY)
+  }
+}
+
 interface ModalProps {
-  title: string
+  title: ReactNode
   onClose: () => void
   children: ReactNode
   wide?: boolean
@@ -15,6 +48,7 @@ interface ModalProps {
 
 export function Modal({ title, onClose, children, wide, size, footer, headerActions }: ModalProps) {
   const effectiveSize = size ?? (wide ? 'wide' : undefined)
+  const titleId = useId()
   const bodyRef = useRef<HTMLDivElement>(null)
   const [atBottom, setAtBottom] = useState(true)
 
@@ -23,10 +57,10 @@ export function Modal({ title, onClose, children, wide, size, footer, headerActi
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', handleKey)
-    document.body.style.overflow = 'hidden'
+    lockBodyScroll()
     return () => {
       document.removeEventListener('keydown', handleKey)
-      document.body.style.overflow = ''
+      unlockBodyScroll()
     }
   }, [onClose])
 
@@ -56,10 +90,10 @@ export function Modal({ title, onClose, children, wide, size, footer, headerActi
         className={`modal${effectiveSize ? ` modal-${effectiveSize}` : ''}`}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titleId}
       >
         <div className="modal-header">
-          <h3>{title}</h3>
+          <h3 id={titleId}>{title}</h3>
           <div className="modal-header-actions">
             {headerActions}
             <IconButton
@@ -67,7 +101,6 @@ export function Modal({ title, onClose, children, wide, size, footer, headerActi
               size="lg"
               className="modal-close"
               onClick={onClose}
-              tooltip="Закрыть"
               aria-label="Закрыть"
             >
               <IconX size={22} stroke={1.8} />

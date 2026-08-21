@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type DragEvent, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { createPortal } from 'react-dom'
 import {
   listActiveTasks,
   listCompletedTasks,
@@ -7,14 +7,17 @@ import {
   changeTaskStatus,
   getTaskHistory,
   type Task,
+  type TaskType,
   type TaskStatus,
   type TaskHistoryEntry,
 } from '../../entities/task/api'
+import { receiveGoods, listStock, listWarehouses, type StockItem, type Warehouse } from '../../entities/inventory/api'
+import { listAllProducts, listUnits, type Product, type Unit } from '../../entities/product/api'
 import { listEmployees } from '../../entities/profile/api'
 import type { User } from '../../entities/auth/api'
 import { useAuth } from '../../app/AuthContext'
-import { saveReceiveDraft } from '../stock/receiveDraft'
 import { ApiError } from '../../shared/api/client'
+import { formatQuantity, normalizeDecimalInput } from '../../shared/lib/format'
 import { Modal } from '../../shared/ui/Modal'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
@@ -30,6 +33,8 @@ import {
   IconTable,
   IconList,
   IconCalendar,
+  IconClipboardCheck,
+  IconX,
   type Icon as TablerIcon,
 } from '@tabler/icons-react'
 
@@ -116,6 +121,10 @@ export function TasksPage() {
   const [activeTasks, setActiveTasks] = useState<Task[]>([])
   const [completedTasks, setCompletedTasks] = useState<Task[]>([])
   const [employees, setEmployees] = useState<User[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const [units, setUnits] = useState<Unit[]>([])
+  const [stock, setStock] = useState<StockItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -127,24 +136,38 @@ export function TasksPage() {
   const [draggedId, setDraggedId] = useState<number | null>(null)
   const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-
-  const navigate = useNavigate()
+  const [doneToast, setDoneToast] = useState<string | null>(null)
+  const [completing, setCompleting] = useState<number | null>(null)
 
   useEffect(() => {
     localStorage.setItem(VIEW_MODE_KEY, viewMode)
   }, [viewMode])
 
+  useEffect(() => {
+    if (!doneToast) return
+    const timer = setTimeout(() => setDoneToast(null), 5000)
+    return () => clearTimeout(timer)
+  }, [doneToast])
+
   async function load(silent = false) {
     if (!silent) setLoading(true)
     try {
-      const [active, completed, emp] = await Promise.all([
+      const [active, completed, emp, p, w, u, s] = await Promise.all([
         listActiveTasks(),
         listCompletedTasks(),
         canAssignOthers ? listEmployees() : Promise.resolve<User[]>([]),
+        listAllProducts(),
+        listWarehouses(),
+        listUnits(),
+        listStock(),
       ])
       setActiveTasks(active)
       setCompletedTasks(completed)
       setEmployees(emp)
+      setProducts(p)
+      setWarehouses(w)
+      setUnits(u)
+      setStock(s)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось загрузить задачи')
     } finally {
@@ -167,14 +190,24 @@ export function TasksPage() {
     }
   }
 
-  function complete(task: Task) {
+  async function complete(task: Task) {
     if (task.type === 'restock' && task.product_id != null && task.warehouse_id != null) {
-      saveReceiveDraft({
-        warehouseId: task.warehouse_id,
-        lines: [{ productId: task.product_id, quantity: task.quantity ?? '1' }],
-        fromTaskId: task.id,
-      })
-      navigate(`/stock/${task.warehouse_id}?open=receive`)
+      if (completing === task.id) return
+      setCompleting(task.id)
+      try {
+        await receiveGoods({
+          warehouse_id: task.warehouse_id,
+          lines: [{ product_id: task.product_id, quantity: task.quantity ?? '1' }],
+        })
+        await changeTaskStatus(task.id, 'done')
+        const productName = task.title.replace(/^Дозаказать:\s*/, '')
+        setDoneToast(`«${productName}» оформлен на склад — ${formatQuantity(task.quantity ?? '1')} шт`)
+        load(true)
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'Не удалось оформить приёмку по дозаказу')
+      } finally {
+        setCompleting(null)
+      }
       return
     }
     moveTo(task, 'done')
@@ -229,6 +262,10 @@ export function TasksPage() {
             user={user}
             employees={employees}
             canAssignOthers={canAssignOthers}
+            products={products}
+            warehouses={warehouses}
+            units={units}
+            stock={stock}
             onDone={() => {
               setShowForm(false)
               load(true)
@@ -248,6 +285,8 @@ export function TasksPage() {
           />
         </Modal>
       )}
+
+      {doneToast && <RestockDoneToast message={doneToast} onClose={() => setDoneToast(null)} />}
 
       <div className="row between wrap" style={{ gap: 10 }}>
         <div className="sale-period-tabs">
@@ -307,6 +346,7 @@ export function TasksPage() {
                 onDrop={(e) => handleColumnDrop(e, status)}
               >
                 <div className="orders-board-column-head">
+                  <span className="orders-board-dot" />
                   <span>{STATUS_LABELS[status]}</span>
                   <span className="orders-board-column-count">{columnTasks.length}</span>
                 </div>
@@ -335,11 +375,14 @@ export function TasksPage() {
                           onDragEnd={handleDragEnd}
                           onClick={() => setSelectedTask(t)}
                         >
+                          <span className="orders-board-card-accent" />
                           <div className="orders-board-card-head">
-                            <span className="orders-board-card-number">№{t.number ?? t.id}</span>
+                            <span className="orders-board-card-number">
+                              №{t.number ?? t.id}
+                            </span>
                             {t.type === 'restock' && (
                               <span className="badge accent">
-                                <IconTruck size={12} stroke={1.8} /> Дозаказ
+                                <IconTruck size={12} stroke={1.8} /> Дозаказ ×{formatQuantity(t.quantity ?? '1')}
                               </span>
                             )}
                           </div>
@@ -397,6 +440,23 @@ export function TasksPage() {
   )
 }
 
+function RestockDoneToast({ message, onClose }: { message: string; onClose: () => void }) {
+  return createPortal(
+    <div className="restock-toast" role="status">
+      <span className="restock-toast-icon">
+        <IconClipboardCheck size={20} stroke={1.8} />
+      </span>
+      <div className="restock-toast-body">
+        <span className="restock-toast-title">{message}</span>
+      </div>
+      <button type="button" className="restock-toast-close" onClick={onClose} aria-label="Закрыть">
+        <IconX size={14} stroke={1.8} />
+      </button>
+    </div>,
+    document.body,
+  )
+}
+
 function TasksTableView({ tasks, onSelect }: { tasks: Task[]; onSelect: (task: Task) => void }) {
   if (tasks.length === 0) return <p className="text-muted">Активных задач пока нет</p>
   return (
@@ -430,7 +490,7 @@ function TasksTableView({ tasks, onSelect }: { tasks: Task[]; onSelect: (task: T
                 {t.title}
                 {t.type === 'restock' && (
                   <span className="badge accent" style={{ marginLeft: 6 }}>
-                    <IconTruck size={12} stroke={1.8} /> Дозаказ
+                    <IconTruck size={12} stroke={1.8} /> Дозаказ ×{formatQuantity(t.quantity ?? '1')}
                   </span>
                 )}
               </span>
@@ -467,7 +527,7 @@ function TaskListRow({
           <span>{task.title}</span>
           {task.type === 'restock' && (
             <span className="badge accent">
-              <IconTruck size={12} stroke={1.8} /> Дозаказ
+              <IconTruck size={12} stroke={1.8} /> Дозаказ ×{formatQuantity(task.quantity ?? '1')}
             </span>
           )}
         </div>
@@ -635,7 +695,11 @@ function TaskDetail({ task, onAdvance }: { task: Task; onAdvance?: (task: Task) 
       <div className="row between wrap" style={{ gap: 8 }}>
         <div className="row wrap" style={{ gap: 6 }}>
           <span className="badge accent">{STATUS_LABELS[task.status]}</span>
-          {task.type === 'restock' && <span className="badge">Дозаказ</span>}
+          {task.type === 'restock' && (
+            <span className="badge">
+              <IconTruck size={12} stroke={1.8} /> Дозаказ
+            </span>
+          )}
           {task.due_date && <span className="badge">до {task.due_date}</span>}
         </div>
         {next && onAdvance && (
@@ -644,6 +708,12 @@ function TaskDetail({ task, onAdvance }: { task: Task; onAdvance?: (task: Task) 
           </Button>
         )}
       </div>
+      {task.type === 'restock' && task.quantity != null && (
+        <div className="stack" style={{ gap: 2 }}>
+          <span className="field-label">Количество для дозаказа</span>
+          <strong>{formatQuantity(task.quantity)}</strong>
+        </div>
+      )}
       {task.assigned_user_name && (
         <div className="stack" style={{ gap: 2 }}>
           <span className="field-label">Исполнитель</span>
@@ -679,21 +749,38 @@ function TaskDetail({ task, onAdvance }: { task: Task; onAdvance?: (task: Task) 
   )
 }
 
+const TASK_TYPE_OPTIONS: { value: TaskType; label: string }[] = [
+  { value: 'general', label: 'Обычная' },
+  { value: 'restock', label: 'Дозаказ' },
+]
+
 function NewTaskForm({
   user,
   employees,
   canAssignOthers,
+  products,
+  warehouses,
+  units,
+  stock,
   onDone,
 }: {
   user: User | null
   employees: User[]
   canAssignOthers: boolean
+  products: Product[]
+  warehouses: Warehouse[]
+  units: Unit[]
+  stock: StockItem[]
   onDone: () => void
 }) {
+  const [type, setType] = useState<TaskType>('general')
   const [title, setTitle] = useState('')
   const [note, setNote] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [assignedUserId, setAssignedUserId] = useState<number | null>(user?.id ?? null)
+  const [productId, setProductId] = useState<number | null>(null)
+  const [warehouseId, setWarehouseId] = useState<number | null>(warehouses[0]?.id ?? null)
+  const [quantity, setQuantity] = useState('1')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -704,18 +791,48 @@ function NewTaskForm({
       ]
     : []
 
+  const productOptions = products.map((p) => ({ value: String(p.id), label: p.name }))
+  const warehouseOptions = warehouses.map((w) => ({ value: String(w.id), label: w.name }))
+
+  const selectedProduct = productId != null ? products.find((p) => p.id === productId) ?? null : null
+  const unitName = (code: string) => units.find((u) => u.code === code)?.name ?? code
+  const isFractional = selectedProduct ? units.find((u) => u.code === selectedProduct.unit_code)?.fractional ?? false : false
+  const availableQty =
+    productId != null && warehouseId != null
+      ? stock
+          .filter((s) => s.product_id === productId && s.warehouse_id === warehouseId)
+          .reduce((sum, s) => sum + Number(s.quantity), 0)
+      : null
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!title.trim()) return
+    if (type === 'restock') {
+      if (productId == null || warehouseId == null || !quantity.trim()) return
+    } else if (!title.trim()) {
+      return
+    }
     setError(null)
     setSaving(true)
     try {
-      await createTask({
-        title: title.trim(),
-        assigned_user_id: assignedUserId,
-        note,
-        due_date: dueDate || null,
-      })
+      if (type === 'restock' && selectedProduct) {
+        await createTask({
+          title: `Дозаказать: ${selectedProduct.name}`,
+          type: 'restock',
+          product_id: productId,
+          warehouse_id: warehouseId,
+          quantity,
+          assigned_user_id: assignedUserId,
+          note,
+          due_date: dueDate || null,
+        })
+      } else {
+        await createTask({
+          title: title.trim(),
+          assigned_user_id: assignedUserId,
+          note,
+          due_date: dueDate || null,
+        })
+      }
       onDone()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось создать задачу')
@@ -727,9 +844,64 @@ function NewTaskForm({
   return (
     <form className="form" onSubmit={handleSubmit}>
       <label className="field">
-        Название
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Позвонить поставщику" autoFocus />
+        Тип задачи
+        <Select
+          value={type}
+          onChange={(v) => setType(v as TaskType)}
+          options={TASK_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        />
       </label>
+      {type === 'restock' ? (
+        <>
+          <label className="field">
+            Товар
+            <Select
+              value={productId != null ? String(productId) : ''}
+              onChange={(v) => setProductId(Number(v))}
+              options={productOptions}
+              placeholder="Выберите товар"
+            />
+          </label>
+          <label className="field">
+            Склад
+            <Select
+              value={warehouseId != null ? String(warehouseId) : ''}
+              onChange={(v) => setWarehouseId(Number(v))}
+              options={warehouseOptions}
+              placeholder="Выберите склад"
+            />
+          </label>
+          <label className="field">
+            Количество
+            <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={quantity}
+                onChange={(e) => {
+                  const normalized = normalizeDecimalInput(e.target.value)
+                  if (normalized === null) return
+                  const value = !isFractional && normalized.includes('.') ? normalized.split('.')[0] || '0' : normalized
+                  setQuantity(value)
+                }}
+                style={{ maxWidth: 100 }}
+              />
+              {selectedProduct && <span className="text-muted">{unitName(selectedProduct.unit_code)}</span>}
+            </div>
+            {availableQty !== null && (
+              <span className="text-muted" style={{ fontSize: 12 }}>
+                Остаток на складе: {formatQuantity(String(availableQty))}{' '}
+                {selectedProduct ? unitName(selectedProduct.unit_code) : ''}
+              </span>
+            )}
+          </label>
+        </>
+      ) : (
+        <label className="field">
+          Название
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Позвонить поставщику" autoFocus />
+        </label>
+      )}
       {canAssignOthers && (
         <label className="field">
           Исполнитель
@@ -749,7 +921,10 @@ function NewTaskForm({
         <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="детали…" />
       </label>
       {error && <p className="error">{error}</p>}
-      <Button type="submit" disabled={saving || !title.trim()}>
+      <Button
+        type="submit"
+        disabled={saving || (type === 'restock' ? productId == null || warehouseId == null || !quantity.trim() : !title.trim())}
+      >
         {saving ? 'Сохранение…' : 'Создать задачу'}
       </Button>
     </form>

@@ -1,4 +1,5 @@
 import { useState, type CSSProperties } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   getProductHistory,
   type Product,
@@ -9,8 +10,16 @@ import {
 import type { Warehouse, StockItem } from '../../entities/inventory/api'
 import { Modal } from './Modal'
 import { IconButton } from './IconButton'
+import { InfoHint } from './InfoHint'
 import { formatMoney, formatQuantity } from '../lib/format'
-import { IconPencil, IconCheck, IconPhoto, IconChevronDown, type Icon as TablerIcon } from '@tabler/icons-react'
+import {
+  IconPencil,
+  IconCheck,
+  IconPhoto,
+  IconChevronDown,
+  IconChevronRight,
+  type Icon as TablerIcon,
+} from '@tabler/icons-react'
 
 const PRODUCT_HISTORY_ACTION_LABELS: Record<string, string> = {
   'product.create': 'Товар создан',
@@ -24,7 +33,7 @@ const PRODUCT_HISTORY_ACTION_ICONS: Record<string, TablerIcon> = {
   'product.set_photo': IconPhoto,
 }
 
-const STOCK_BY_WAREHOUSE_COLUMNS = '2fr 1fr'
+const STOCK_BY_WAREHOUSE_COLUMNS = '2fr 1fr 16px'
 const VARIANTS_COLUMNS = '1fr 1fr 1.4fr'
 
 export function ProductDetailCard({
@@ -44,6 +53,7 @@ export function ProductDetailCard({
   onClose: () => void
   onEdit?: () => void
 }) {
+  const navigate = useNavigate()
   const [history, setHistory] = useState<ProductHistoryEntry[] | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -158,24 +168,40 @@ export function ProductDetailCard({
             </div>
             <div className="data-table-body">
               {stockByWarehouse.map((row, i) => (
-                <div
+                <button
                   key={row.warehouse.id}
-                  className="data-row sale-history-row-in"
+                  type="button"
+                  className="data-row data-row-link sale-history-row-in"
                   style={
                     {
                       gridTemplateColumns: STOCK_BY_WAREHOUSE_COLUMNS,
                       '--row-delay': `${Math.min(i, 12) * 25}ms`,
                     } as CSSProperties
                   }
+                  onClick={() => {
+                    onClose()
+                    navigate(`/stock/${row.warehouse.id}`)
+                  }}
                 >
                   <span className="data-row-name">{row.warehouse.name}</span>
                   <span>
-                    {formatQuantity(String(row.quantity))} {unitName(product.unit_code)}
+                    {row.quantity === 0 ? (
+                      <span className="text-muted">Нет в наличии</span>
+                    ) : (
+                      <>
+                        {formatQuantity(String(row.quantity))} {unitName(product.unit_code)}
+                      </>
+                    )}
                     {row.reserved > 0 && (
-                      <span className="text-muted"> (резерв {formatQuantity(String(row.reserved))})</span>
+                      <span className="text-muted">
+                        {' '}
+                        (резерв {formatQuantity(String(row.reserved))})
+                        <InfoHint text="Зарезервировано под заказы клиентов и недоступно для продажи — освободится, когда заказ выдадут или отменят." />
+                      </span>
                     )}
                   </span>
-                </div>
+                  <IconChevronRight size={14} stroke={1.8} className="data-row-chevron" />
+                </button>
               ))}
             </div>
           </div>

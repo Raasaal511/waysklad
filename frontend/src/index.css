@@ -15,9 +15,9 @@
   --warning-bg: #fbf0dc;
   /* Цвета статусов канбан-досок (Заказы/Задачи) — не зависят от выбранного --accent,
      чтобы колонки читались одинаково при любой персонализации */
-  --board-new: #64748b;
-  --board-progress: #a3690a;
-  --board-ready: #2f6fb0;
+  --board-new: #5b6b93;
+  --board-progress: #c17d2e;
+  --board-ready: #2f8f5b;
   --radius: 10px;
   --radius-sm: 8px;
   font: 16px/1.4 system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -39,9 +39,9 @@
   --danger-bg: #3a1f1f;
   --warning: #e0ac4f;
   --warning-bg: #3a2f1a;
-  --board-new: #8b97a8;
-  --board-progress: #e0ac4f;
-  --board-ready: #5b8fd9;
+  --board-new: #8f9fc9;
+  --board-progress: #e0a750;
+  --board-ready: #4fbf85;
   color-scheme: dark;
 }
 
@@ -385,6 +385,20 @@ p {
   gap: 14px;
 }
 
+.form-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.form-fieldset:disabled {
+  opacity: 0.6;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -414,6 +428,26 @@ p {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
+}
+
+/* Лёгкий заголовок-разделитель секции внутри длинной формы — в отличие от
+   .field-group не рисует рамку-коробку, просто размечает начало новой смысловой
+   группы полей, чтобы форма не выглядела одной сплошной колонкой одинаковых полей */
+.form-section-title {
+  margin: 4px 0 -4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.form-section-title:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 input:not([type='checkbox']):not([type='radio']),
@@ -572,6 +606,14 @@ button:disabled {
   font-size: 14px;
 }
 
+.text-danger {
+  color: var(--danger);
+}
+
+.text-warning {
+  color: var(--warning);
+}
+
 .field-label {
   color: var(--text);
   font-size: 14px;
@@ -605,6 +647,26 @@ button:disabled {
   border-radius: var(--radius-sm);
   padding: 10px 12px;
   font-size: 14px;
+}
+
+.debt-extend-warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Сообщение о полном погашении долга платежом — хорошая новость, не
+   предупреждение, поэтому акцентный зелёный вместо тревожного жёлтого. */
+.debt-close-hint {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .stack {
@@ -669,11 +731,13 @@ button:disabled {
 
 .app-shop-name {
   font-weight: 700;
-  font-size: 17px;
+  font-size: 14px;
+  line-height: 1.25;
   color: var(--text);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .app-brand-tag {
@@ -695,6 +759,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
   min-width: 0;
   overflow: hidden;
 }
@@ -865,7 +930,7 @@ button:disabled {
   .app-sidebar {
     display: flex;
     flex-direction: column;
-    width: 240px;
+    width: 264px;
     flex-shrink: 0;
     border-right: 1px solid var(--border);
     padding: 16px 12px;
@@ -880,7 +945,7 @@ button:disabled {
   }
 
   .app-main {
-    margin-left: 240px;
+    margin-left: 264px;
     transition: margin-left 0.15s ease;
   }
 
@@ -1465,6 +1530,7 @@ a.badge:hover {
   justify-content: center;
   padding: 0;
   z-index: 100;
+  overscroll-behavior: contain;
   animation: modal-fade 0.15s ease;
 }
 
@@ -1562,6 +1628,16 @@ a.badge:hover {
   margin: 0;
 }
 
+/* Приглушённый подзаголовок модалки строкой ниже основного названия
+   (например, "сейчас до …") — меньше и без жирности. */
+.modal-title-sub {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 .modal-header-actions {
   display: flex;
   align-items: center;
@@ -1577,6 +1653,7 @@ a.badge:hover {
   padding: 16px;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 
 .modal-body .form {
@@ -1711,7 +1788,6 @@ a.badge:hover {
   background: var(--bg-muted);
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  border-top: 3px solid var(--col-accent, var(--border));
   transition: border-color 0.12s ease, background-color 0.12s ease;
 }
 
@@ -1729,7 +1805,15 @@ a.badge:hover {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--col-accent, var(--text-muted));
+  color: var(--text-muted);
+}
+
+.orders-board-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--col-accent, var(--text-muted));
 }
 
 .orders-board-column-count {
@@ -1755,6 +1839,20 @@ a.badge:hover {
   flex-direction: column;
   gap: 10px;
   min-height: 60px;
+}
+
+@media (min-width: 900px) {
+  .orders-board-column {
+    max-height: calc(100vh - 180px);
+  }
+
+  .orders-board-column-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+  }
 }
 
 .orders-board-empty {
@@ -1793,7 +1891,6 @@ a.badge:hover {
   padding: 14px;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--col-accent, var(--border));
   border-radius: var(--radius-sm);
   cursor: grab;
   transition: border-color 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease, transform 0.12s ease;
@@ -1801,7 +1898,6 @@ a.badge:hover {
 
 .orders-board-card:hover {
   border-color: var(--accent-border);
-  border-left-color: var(--col-accent, var(--accent-border));
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
   transform: translateY(-1px);
 }
@@ -1814,6 +1910,15 @@ a.badge:hover {
   opacity: 0.4;
 }
 
+.orders-board-card-accent {
+  align-self: flex-start;
+  width: 26px;
+  height: 3px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--col-accent, var(--border));
+}
+ 
 .orders-board-card-head {
   display: flex;
   align-items: center;
@@ -1821,6 +1926,9 @@ a.badge:hover {
 }
 
 .orders-board-card-number {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
@@ -2092,12 +2200,16 @@ a.badge:hover {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  width: 190px;
+  flex-shrink: 0;
 }
 
 .stat-value {
+  display: inline-block;
   font-size: 22px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .stat-label {
@@ -2376,6 +2488,52 @@ button.product-tile-remove:hover {
   font-weight: 600;
 }
 
+/* Строка "остаток/срок + иконка-пояснение" в шапке форм долга (оплата,
+   продление, рассрочка) — текст и InfoHint на одной линии. */
+.debt-form-hint-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Маленькая иконка-пояснение (например, про резерв остатка под заказ) */
+
+.info-hint-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  vertical-align: -2px;
+  transition: color 0.12s ease;
+}
+
+.info-hint-trigger:hover,
+.info-hint-trigger:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
+
+.info-hint-popover {
+  position: fixed;
+  z-index: 300;
+  padding: 10px 12px;
+  background: #1a1d21;
+  color: #e7e9ec;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
 .product-tile-stock-in .product-tile-stock-value {
   color: var(--accent);
   opacity: 1;
@@ -2615,9 +2773,9 @@ button.product-tile-remove:hover {
 }
 
 .restock-cart-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   padding: 8px 10px;
   border: 1px solid var(--border);
@@ -2626,7 +2784,6 @@ button.product-tile-remove:hover {
 }
 
 .restock-cart-row-name {
-  flex: 1;
   font-size: 13px;
   color: var(--text);
   min-width: 0;
@@ -2638,10 +2795,12 @@ button.product-tile-remove:hover {
   gap: 4px;
   flex-shrink: 0;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .restock-cart-row-qty input {
   width: 44px;
+  flex-shrink: 0;
   padding: 4px 6px;
   font: inherit;
   font-size: 13px;
@@ -3861,6 +4020,596 @@ input.input-required:not([type='checkbox']):not([type='radio']) {
   font-size: 13px;
 }
 
+/* Иконка направления долга (клиент/поставщик) — используется на детальной
+   странице долга и как маленький кружок в строке списка (.debt-row-icon). */
+.debt-group-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+}
+
+.debt-item-source {
+  font-size: 12.5px;
+}
+
+.debt-item-source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+}
+
+.debt-item-source-link:hover {
+  text-decoration: underline;
+}
+
+.debt-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Переключатель "Нам должны" / "Мы должны" — две отдельные кликабельные
+   карточки-вкладки вместо двух чисел в общей полосе статистики, чтобы списки
+   долгов клиентам и поставщикам не шли одним длинным потоком на странице. */
+.debt-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.debt-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-muted);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.debt-tab strong {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.debt-tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.debt-tab-owed-to-us .debt-tab-label {
+  color: var(--accent);
+}
+
+.debt-tab-we-owe .debt-tab-label {
+  color: var(--danger);
+}
+
+.debt-tab-active {
+  background: var(--bg);
+  border-color: var(--accent);
+}
+
+.debt-tab-we-owe.debt-tab-active {
+  border-color: var(--danger);
+}
+
+@media (max-width: 560px) {
+  .debt-tabs {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Кнопочный фильтр по статусу долга над плоским списком /debts. */
+.debt-status-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.debt-status-filter {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+/* Быстрые пресеты срока "Долг до" под полем даты в форме выдачи долга —
+   компактные чипсы, чтобы не пришлось открывать календарь ради типовых
+   сроков (неделя/несколько месяцев/год). */
+.debt-due-date-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -8px;
+}
+
+.debt-due-date-preset {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.debt-due-date-preset:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.debt-due-date-preset-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.debt-status-filter:hover {
+  border-color: var(--accent);
+}
+
+.debt-status-filter-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.debt-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+}
+
+.debt-schedule-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.debt-schedule-row-paid {
+  opacity: 0.6;
+}
+
+.debt-schedule-row-status {
+  flex-shrink: 0;
+}
+
+/* Кликабельная строка "Ближайшие выплаты" на /debts — ведёт на карточку долга. */
+.debt-upcoming-row {
+  grid-template-columns: 1fr auto;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 4px 0;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  border-radius: var(--radius-sm);
+}
+
+.debt-upcoming-row:hover {
+  background: var(--accent-soft);
+}
+
+.debt-schedule-edit-row {
+  display: grid;
+  grid-template-columns: 1fr 100px auto;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Список внесённых оплат — таймлайн из маркеров с датой/заметкой слева и
+   суммой акцентом справа, без техничных "#N"/скобок в заголовке. */
+.debt-payments-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.debt-payments-total {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.debt-payments-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.debt-payment-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.debt-payment-row:last-child {
+  border-bottom: none;
+}
+
+.debt-payment-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.debt-payment-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.debt-payment-date {
+  font-weight: 500;
+}
+
+.debt-payment-note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.debt-payment-amount {
+  flex-shrink: 0;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.debt-schedule-edit-row input[type='text'] {
+  width: 100%;
+  text-align: right;
+}
+
+/* График рассрочки: плановая дата vs фактическая дата оплаты рядом. */
+.debt-installment-list {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+}
+
+.debt-installment-head {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto;
+  gap: 10px;
+  padding: 8px 0 6px;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.debt-installment-head span:nth-child(3),
+.debt-installment-head span:nth-child(4) {
+  justify-self: end;
+}
+
+.debt-installment-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.debt-installment-cols > span:nth-child(3) {
+  justify-self: end;
+}
+
+.debt-installment-paid-on-diff {
+  color: var(--warning);
+}
+
+/* Строка платежа графика с действиями "Оплачено"/"Перенести" — один клик
+   вместо ручного ввода суммы и даты, которые и так известны из графика. */
+.debt-installment-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.debt-installment-row:last-child {
+  padding-bottom: 4px;
+  border-bottom: none;
+}
+
+.debt-installment-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Инлайн-форма отметки платежа оплаченным — сумма и дата предзаполнены
+   плановыми значениями, но их можно поправить перед сохранением. */
+.debt-installment-pay-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.debt-installment-pay-form .field {
+  flex: 1;
+  min-width: 120px;
+}
+
+.debt-installment-close-hint {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+/* Детальная страница одного долга (/debts/:id) */
+
+/* Минималистичный прогресс оплаты — ряд дробных сегментов (не сплошная
+   полоска), с точкой-целью в конце (срок выплаты). Используется и для
+   остатка долга, и для графика рассрочки. */
+.debt-pay-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.debt-pay-progress-dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.debt-pay-progress-dot {
+  flex: 1;
+  min-width: 3px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.debt-pay-progress-dot-filled {
+  background: var(--text-muted);
+}
+
+/* Разделитель между уже оплаченными сегментами и предстоящими выплатами. */
+.debt-pay-progress-divider {
+  flex-shrink: 0;
+  width: 1px;
+  height: 12px;
+  margin: 0 2px;
+  background: var(--text);
+  opacity: 0.4;
+}
+
+.debt-pay-progress-goal {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  color: transparent;
+}
+
+.debt-pay-progress-goal-reached {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.debt-pay-progress-paid {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.debt-pay-progress-labels {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.debt-pay-progress-balance {
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Горизонтальный ряд кнопок-действий вместо трёх всегда открытых форм —
+   каждая кнопка открывает свою форму в модалке. */
+.debt-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Сабмит формы внутри модалки — по размеру текста, а не на всю ширину. */
+.debt-detail-form {
+  align-items: flex-start;
+}
+
+.debt-detail-form .field,
+.debt-detail-form .row {
+  align-self: stretch;
+}
+
+/* Прогресс погашения на странице контрагента (/debts/:kind/:id) */
+
+.debt-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-muted);
+}
+
+.debt-progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.debt-progress-head strong {
+  font-size: 15px;
+  color: var(--text);
+}
+
+.debt-progress-track {
+  height: 16px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.debt-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width 0.3s ease;
+}
+
+/* Строка одного долга — плоский список /debts и вывод внутри карточки
+   контрагента, с мини-прогрессом погашения и цветным акцентом статуса. */
+.debt-row-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.debt-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--debt-accent, var(--border));
+  border-radius: var(--radius);
+  background: var(--bg-muted);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.debt-row:hover,
+.debt-row:focus-visible {
+  background: var(--accent-soft);
+}
+
+.debt-row-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.debt-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.debt-row-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.debt-row-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debt-row-top strong {
+  flex-shrink: 0;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.debt-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.debt-row-installment {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--accent);
+}
+
+.debt-row-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
 .telegram-steps {
   gap: 10px;
   background: var(--bg-muted);
@@ -3940,6 +4689,34 @@ input.input-required:not([type='checkbox']):not([type='radio']) {
   color: var(--text-muted);
 }
 
+.inline-popover-anchor {
+  display: contents;
+}
+
+.inline-popover {
+  position: fixed;
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  animation: modal-fade 0.12s ease;
+}
+
+.inline-popover-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.inline-popover .form {
+  gap: 10px;
+}
+
 .select-menu {
   position: fixed;
   z-index: 200;
@@ -3984,10 +4761,6 @@ input.input-required:not([type='checkbox']):not([type='radio']) {
 
 .date-input-trigger {
   gap: 8px;
-}
-
-.debt-repay-date {
-  width: 150px;
 }
 
 .date-input-icon {

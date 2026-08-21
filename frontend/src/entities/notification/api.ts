@@ -1,6 +1,6 @@
 import { api } from '../../shared/api/client'
 
-export type NotificationKind = 'task_assigned' | 'task_done'
+export type NotificationKind = 'task_assigned' | 'task_done' | 'debt_due_soon' | 'debt_overdue'
 
 export interface Notification {
   id: number

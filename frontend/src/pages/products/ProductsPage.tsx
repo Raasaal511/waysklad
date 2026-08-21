@@ -1,4 +1,13 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   listProducts,
@@ -34,8 +43,10 @@ import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
 import { DropdownMenu } from '../../shared/ui/DropdownMenu'
+import { InlinePopover } from '../../shared/ui/InlinePopover'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
+import { InfoHint } from '../../shared/ui/InfoHint'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
 import { ProductDetailCard } from '../../shared/ui/ProductDetailCard'
 import { isBarcodeScannerSupported } from '../../entities/barcode/barcodeSupport'
@@ -75,6 +86,7 @@ const BarcodeScanner = lazy(() =>
 
 const PAGE_SIZE = 50
 const IMPORT_ERRORS_COLUMNS = '100px 1fr'
+const PRODUCT_FORM_ID = 'product-form'
 
 type SortMode =
   | 'name'
@@ -139,6 +151,7 @@ export function ProductsPage() {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [categoryId, setCategoryId] = useState<number | 'all'>('all')
+  const [warehouseId, setWarehouseId] = useState<number | 'all'>('all')
   const [sortMode, setSortMode] = useState<SortMode>('name')
   const [inStockOnly, setInStockOnly] = useState(false)
 
@@ -147,6 +160,7 @@ export function ProductsPage() {
   const [exportError, setExportError] = useState<string | null>(null)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [showEditProduct, setShowEditProduct] = useState(false)
+  const [productFormSaving, setProductFormSaving] = useState(false)
 
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -242,7 +256,13 @@ export function ProductsPage() {
 
   const unitName = (code: string) => units.find((u) => u.code === code)?.name ?? code
   const stockFor = (productId: number) =>
-    stock.filter((s) => s.product_id === productId).reduce((sum, s) => sum + Number(s.quantity), 0)
+    stock
+      .filter((s) => s.product_id === productId && (warehouseId === 'all' || s.warehouse_id === warehouseId))
+      .reduce((sum, s) => sum + Number(s.quantity), 0)
+  const reservedFor = (productId: number) =>
+    stock
+      .filter((s) => s.product_id === productId && (warehouseId === 'all' || s.warehouse_id === warehouseId))
+      .reduce((sum, s) => sum + Number(s.reserved), 0)
 
   const filtered = useMemo(() => {
     let list = products
@@ -254,14 +274,17 @@ export function ProductsPage() {
     }
     return list
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, inStockOnly, sortMode, stock])
+  }, [products, inStockOnly, sortMode, stock, warehouseId])
 
   function refreshAfterChange() {
     loadProducts()
   }
 
   const activeFilterCount =
-    (categoryId !== 'all' ? 1 : 0) + (sortMode !== 'name' ? 1 : 0) + (inStockOnly ? 1 : 0)
+    (categoryId !== 'all' ? 1 : 0) +
+    (warehouseId !== 'all' ? 1 : 0) +
+    (sortMode !== 'name' ? 1 : 0) +
+    (inStockOnly ? 1 : 0)
 
   return (
     <div className="stack">
@@ -324,6 +347,18 @@ export function ProductsPage() {
               />
             </label>
           )}
+          {warehouses.length > 1 && (
+            <label className="filter-field">
+              <Select
+                value={warehouseId === 'all' ? 'all' : String(warehouseId)}
+                onChange={(v) => setWarehouseId(v === 'all' ? 'all' : Number(v))}
+                options={[
+                  { value: 'all', label: 'Все склады' },
+                  ...warehouses.map((w) => ({ value: String(w.id), label: w.name })),
+                ]}
+              />
+            </label>
+          )}
           <label className="filter-field">
             <Select
               value={sortMode}
@@ -343,6 +378,7 @@ export function ProductsPage() {
             <ResetFiltersButton
               onClick={() => {
                 setCategoryId('all')
+                setWarehouseId('all')
                 setSortMode('name')
                 setInStockOnly(false)
               }}
@@ -364,6 +400,7 @@ export function ProductsPage() {
           <div className="product-grid">
             {filtered.map((p, i) => {
               const qty = stockFor(p.id)
+              const reserved = reservedFor(p.id)
               const out = isOutOfStock(qty)
               const low = isLowStock(qty, p.min_stock)
               return (
@@ -391,7 +428,14 @@ export function ProductsPage() {
                     <span
                       className={`product-tile-stock${out ? ' product-tile-stock-out' : ' product-tile-stock-in'}`}
                     >
-                      <span className="product-tile-stock-label">Остаток:</span>
+                      <span className="product-tile-stock-label">
+                        Остаток:
+                        {reserved > 0 && (
+                          <InfoHint
+                            text={`${formatQuantity(String(reserved))} ${unitName(p.unit_code)} зарезервировано на заказы клиентов и недоступно для продажи — освободится, когда заказ выдадут или отменят.`}
+                          />
+                        )}
+                      </span>
                       <span className="product-tile-stock-value-wrap">
                         <span className="product-tile-stock-value">
                           {formatQuantity(String(qty))} {unitName(p.unit_code)}
@@ -413,7 +457,16 @@ export function ProductsPage() {
       )}
 
       {showForm && (
-        <Modal title="Новый товар" onClose={() => setShowForm(false)} size="wide">
+        <Modal
+          title="Новый товар"
+          onClose={() => setShowForm(false)}
+          size="wide"
+          footer={
+            <Button type="submit" form={PRODUCT_FORM_ID} disabled={productFormSaving}>
+              {productFormSaving ? 'Сохранение…' : 'Создать товар'}
+            </Button>
+          }
+        >
           <ProductForm
             product={null}
             categories={categories}
@@ -421,6 +474,7 @@ export function ProductsPage() {
             warehouses={warehouses}
             onCategoriesChanged={setCategories}
             onUnitsChanged={setUnits}
+            onSavingChange={setProductFormSaving}
             onDone={() => {
               setShowForm(false)
               refreshAfterChange()
@@ -457,6 +511,11 @@ export function ProductsPage() {
           title={`Редактировать: ${selectedProduct.name}`}
           onClose={() => setShowEditProduct(false)}
           size="wide"
+          footer={
+            <Button type="submit" form={PRODUCT_FORM_ID} disabled={productFormSaving}>
+              {productFormSaving ? 'Сохранение…' : 'Сохранить изменения'}
+            </Button>
+          }
         >
           <ProductForm
             product={selectedProduct}
@@ -465,6 +524,7 @@ export function ProductsPage() {
             warehouses={warehouses}
             onCategoriesChanged={setCategories}
             onUnitsChanged={setUnits}
+            onSavingChange={setProductFormSaving}
             onDone={(updated) => {
               setShowEditProduct(false)
               setSelectedProduct(updated ?? selectedProduct)
@@ -559,12 +619,16 @@ function ImportProductsModal({
 
 function QuickNewCategoryForm({
   categories,
+  open,
+  onOpenChange,
+  trigger,
   onCreated,
-  onClose,
 }: {
   categories: Category[]
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  trigger: ReactNode
   onCreated: (category: Category) => void
-  onClose: () => void
 }) {
   const [name, setName] = useState('')
   const [parentId, setParentId] = useState<number | null>(null)
@@ -578,6 +642,8 @@ function QuickNewCategoryForm({
     setSaving(true)
     try {
       const category = await createCategory({ name, parent_id: parentId })
+      setName('')
+      setParentId(null)
       onCreated(category)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось создать категорию')
@@ -587,7 +653,7 @@ function QuickNewCategoryForm({
   }
 
   return (
-    <Modal title="Новая категория" onClose={onClose}>
+    <InlinePopover title="Новая категория" trigger={trigger} open={open} onOpenChange={onOpenChange}>
       <form className="form" onSubmit={handleSubmit}>
         <label className="field">
           Название
@@ -606,16 +672,20 @@ function QuickNewCategoryForm({
           {saving ? 'Сохранение…' : 'Создать категорию'}
         </Button>
       </form>
-    </Modal>
+    </InlinePopover>
   )
 }
 
 function QuickNewUnitForm({
+  open,
+  onOpenChange,
+  trigger,
   onCreated,
-  onClose,
 }: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  trigger: ReactNode
   onCreated: (unit: Unit) => void
-  onClose: () => void
 }) {
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
@@ -630,6 +700,9 @@ function QuickNewUnitForm({
     setSaving(true)
     try {
       const unit = await createUnit({ code: code.trim(), name: name.trim(), fractional })
+      setCode('')
+      setName('')
+      setFractional(false)
       onCreated(unit)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось создать единицу измерения')
@@ -639,7 +712,7 @@ function QuickNewUnitForm({
   }
 
   return (
-    <Modal title="Новая единица измерения" onClose={onClose}>
+    <InlinePopover title="Новая единица измерения" trigger={trigger} open={open} onOpenChange={onOpenChange}>
       <form className="form" onSubmit={handleSubmit}>
         <label className="field">
           Код
@@ -675,7 +748,7 @@ function QuickNewUnitForm({
           {saving ? 'Сохранение…' : 'Создать единицу'}
         </Button>
       </form>
-    </Modal>
+    </InlinePopover>
   )
 }
 
@@ -686,6 +759,7 @@ function ProductForm({
   warehouses,
   onCategoriesChanged,
   onUnitsChanged,
+  onSavingChange,
   onDone,
 }: {
   product: Product | null
@@ -694,6 +768,7 @@ function ProductForm({
   warehouses: Warehouse[]
   onCategoriesChanged: (categories: Category[]) => void
   onUnitsChanged: (units: Unit[]) => void
+  onSavingChange?: (saving: boolean) => void
   onDone: (updated?: Product) => void
 }) {
   const [name, setName] = useState(product?.name ?? '')
@@ -749,6 +824,7 @@ function ProductForm({
     e.preventDefault()
     setError(null)
     setSaving(true)
+    onSavingChange?.(true)
     try {
       const payload = {
         name,
@@ -779,15 +855,156 @@ function ProductForm({
       setError(err instanceof ApiError ? err.message : 'Не удалось сохранить товар')
     } finally {
       setSaving(false)
+      onSavingChange?.(false)
     }
   }
 
   return (
-    <form className="form" onSubmit={handleSubmit}>
+    <form className="form" id={PRODUCT_FORM_ID} onSubmit={handleSubmit}>
+    <fieldset className="form-fieldset" disabled={saving}>
       <label className="field">
         Название
-        <input value={name} onChange={(e) => setName(e.target.value)} required />
+        <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
       </label>
+
+      <div className="row">
+        <label className="field" style={{ flex: 1 }}>
+          Закупочная цена
+          <input
+            type="text"
+            inputMode="decimal"
+            value={purchasePrice}
+            onChange={(e) => {
+              const normalized = normalizeDecimalInput(e.target.value)
+              if (normalized !== null) setPurchasePrice(normalized)
+            }}
+          />
+        </label>
+        <label className="field" style={{ flex: 1 }}>
+          Розничная цена
+          <input
+            type="text"
+            inputMode="decimal"
+            value={retailPrice}
+            onChange={(e) => {
+              const normalized = normalizeDecimalInput(e.target.value)
+              if (normalized !== null) setRetailPrice(normalized)
+            }}
+          />
+        </label>
+      </div>
+
+      <label className="field">
+        Категория
+        <div className="row">
+          <div style={{ flex: 1 }}>
+            <Select
+              value={categoryId ? String(categoryId) : ''}
+              onChange={(v) => setCategoryId(v ? Number(v) : null)}
+              options={[{ value: '', label: 'Без категории' }, ...categoryOptions(categories)]}
+            />
+          </div>
+          <QuickNewCategoryForm
+            categories={categories}
+            open={showNewCategory}
+            onOpenChange={setShowNewCategory}
+            trigger={
+              <Button variant="secondary" onClick={() => setShowNewCategory(true)}>
+                <IconPlus size={16} stroke={1.8} />
+              </Button>
+            }
+            onCreated={(category) => {
+              onCategoriesChanged([...categories, category])
+              setCategoryId(category.id)
+              setShowNewCategory(false)
+            }}
+          />
+        </div>
+      </label>
+
+      <h4 className="form-section-title">Учёт и остаток</h4>
+
+      <label className="field">
+        Единица измерения
+        <div className="row">
+          <div style={{ flex: 1 }}>
+            <Select
+              value={unitCode}
+              onChange={(code) => {
+                setUnitCode(code)
+                setMinStock((v) => clampToUnit(v, code))
+                setInitialStockQuantity((v) => clampToUnit(v, code))
+              }}
+              options={
+                units.length === 0
+                  ? [{ value: unitCode, label: unitCode }]
+                  : units.map((u) => ({ value: u.code, label: u.name }))
+              }
+            />
+          </div>
+          <QuickNewUnitForm
+            open={showNewUnit}
+            onOpenChange={setShowNewUnit}
+            trigger={
+              <Button variant="secondary" onClick={() => setShowNewUnit(true)}>
+                <IconPlus size={16} stroke={1.8} />
+              </Button>
+            }
+            onCreated={(unit) => {
+              onUnitsChanged([...units, unit])
+              setUnitCode(unit.code)
+              setShowNewUnit(false)
+            }}
+          />
+        </div>
+      </label>
+
+      {!product && warehouses.length > 0 && (
+        <div className="row">
+          <label className="field" style={{ flex: 1 }}>
+            Начальный остаток
+            <input
+              type="text"
+              inputMode="decimal"
+              value={initialStockQuantity}
+              onChange={(e) => {
+                const normalized = normalizeDecimalInput(e.target.value)
+                if (normalized !== null) setInitialStockQuantity(normalized)
+              }}
+              onBlur={() => setInitialStockQuantity((v) => clampToUnit(v, unitCode))}
+              placeholder="0 — если ещё не завезли"
+            />
+          </label>
+          {warehouses.length > 1 && (
+            <label className="field" style={{ flex: 1 }}>
+              На каком складе
+              <Select
+                value={String(initialStockWarehouseId ?? '')}
+                onChange={(v) => setInitialStockWarehouseId(Number(v))}
+                options={warehouses.map((w) => ({ value: String(w.id), label: w.name }))}
+              />
+            </label>
+          )}
+        </div>
+      )}
+
+      <label className="field">
+        Минимальный остаток
+        <span className="field-hint">Порог, при котором товар считается «заканчивается» — не текущее количество</span>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={minStock}
+          onChange={(e) => {
+            const normalized = normalizeDecimalInput(e.target.value)
+            if (normalized !== null) setMinStock(normalized)
+          }}
+          onBlur={() => setMinStock((v) => clampToUnit(v, unitCode))}
+        />
+      </label>
+
+      <h4 className="form-section-title">Идентификация</h4>
+
       <label className="field">
         Артикул
         <div className="row">
@@ -831,138 +1048,8 @@ function ProductForm({
           </Suspense>
         </Modal>
       )}
-      <label className="field">
-        Единица измерения
-        <div className="row">
-          <div style={{ flex: 1 }}>
-            <Select
-              value={unitCode}
-              onChange={(code) => {
-                setUnitCode(code)
-                setMinStock((v) => clampToUnit(v, code))
-                setInitialStockQuantity((v) => clampToUnit(v, code))
-              }}
-              options={
-                units.length === 0
-                  ? [{ value: unitCode, label: unitCode }]
-                  : units.map((u) => ({ value: u.code, label: u.name }))
-              }
-            />
-          </div>
-          <Button variant="secondary" onClick={() => setShowNewUnit(true)}>
-            <IconPlus size={16} stroke={1.8} />
-          </Button>
-        </div>
-      </label>
-      {showNewUnit && (
-        <QuickNewUnitForm
-          onClose={() => setShowNewUnit(false)}
-          onCreated={(unit) => {
-            onUnitsChanged([...units, unit])
-            setUnitCode(unit.code)
-            setShowNewUnit(false)
-          }}
-        />
-      )}
-      <div className="row">
-        <label className="field" style={{ flex: 1 }}>
-          Закупочная цена
-          <input
-            type="text"
-            inputMode="decimal"
-            value={purchasePrice}
-            onChange={(e) => {
-              const normalized = normalizeDecimalInput(e.target.value)
-              if (normalized !== null) setPurchasePrice(normalized)
-            }}
-          />
-        </label>
-        <label className="field" style={{ flex: 1 }}>
-          Розничная цена
-          <input
-            type="text"
-            inputMode="decimal"
-            value={retailPrice}
-            onChange={(e) => {
-              const normalized = normalizeDecimalInput(e.target.value)
-              if (normalized !== null) setRetailPrice(normalized)
-            }}
-          />
-        </label>
-      </div>
-      {!product && warehouses.length > 0 && (
-        <div className="field-group">
-          <span className="field-group-title">Сколько товара есть сейчас</span>
-          <div className="row">
-            <label className="field" style={{ flex: 1 }}>
-              Начальный остаток
-              <input
-                type="text"
-                inputMode="decimal"
-                value={initialStockQuantity}
-                onChange={(e) => {
-                  const normalized = normalizeDecimalInput(e.target.value)
-                  if (normalized !== null) setInitialStockQuantity(normalized)
-                }}
-                onBlur={() => setInitialStockQuantity((v) => clampToUnit(v, unitCode))}
-                placeholder="0 — если ещё не завезли"
-              />
-            </label>
-            {warehouses.length > 1 && (
-              <label className="field" style={{ flex: 1 }}>
-                На каком складе
-                <Select
-                  value={String(initialStockWarehouseId ?? '')}
-                  onChange={(v) => setInitialStockWarehouseId(Number(v))}
-                  options={warehouses.map((w) => ({ value: String(w.id), label: w.name }))}
-                />
-              </label>
-            )}
-          </div>
-        </div>
-      )}
 
-      <label className="field">
-        Минимальный остаток
-        <span className="field-hint">Порог, при котором товар считается «заканчивается» — не текущее количество</span>
-        <input
-          type="text"
-          inputMode="decimal"
-          value={minStock}
-          onChange={(e) => {
-            const normalized = normalizeDecimalInput(e.target.value)
-            if (normalized !== null) setMinStock(normalized)
-          }}
-          onBlur={() => setMinStock((v) => clampToUnit(v, unitCode))}
-        />
-      </label>
-
-      <label className="field">
-        Категория
-        <div className="row">
-          <div style={{ flex: 1 }}>
-            <Select
-              value={categoryId ? String(categoryId) : ''}
-              onChange={(v) => setCategoryId(v ? Number(v) : null)}
-              options={[{ value: '', label: 'Без категории' }, ...categoryOptions(categories)]}
-            />
-          </div>
-          <Button variant="secondary" onClick={() => setShowNewCategory(true)}>
-            <IconPlus size={16} stroke={1.8} />
-          </Button>
-        </div>
-      </label>
-      {showNewCategory && (
-        <QuickNewCategoryForm
-          categories={categories}
-          onClose={() => setShowNewCategory(false)}
-          onCreated={(category) => {
-            onCategoriesChanged([...categories, category])
-            setCategoryId(category.id)
-            setShowNewCategory(false)
-          }}
-        />
-      )}
+      <h4 className="form-section-title">Дополнительно</h4>
 
       <label className="field">
         Фото
@@ -1004,9 +1091,7 @@ function ProductForm({
       </div>
 
       {error && <p className="error">{error}</p>}
-      <Button type="submit" disabled={saving}>
-        {saving ? 'Сохранение…' : product ? 'Сохранить изменения' : 'Создать товар'}
-      </Button>
+    </fieldset>
     </form>
   )
 }

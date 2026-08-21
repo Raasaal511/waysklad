@@ -39,6 +39,7 @@ import { ProductDetailCard } from '../../shared/ui/ProductDetailCard'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
 import { formatQuantity, isLowStock, isOutOfStock, normalizeDecimalInput } from '../../shared/lib/format'
 import { loadReceiveDraft, clearReceiveDraft } from './receiveDraft'
+import { loadRestockCart, saveRestockCart } from './restockCart'
 import {
   AssignedUsersField,
   MODE_LABELS,
@@ -78,8 +79,10 @@ export function WarehouseDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<MovementMode | null>(null)
-  const [restockCartIds, setRestockCartIds] = useState<number[]>([])
-  const [restockCartQuantities, setRestockCartQuantities] = useState<Record<number, string>>({})
+  const [restockCartIds, setRestockCartIds] = useState<number[]>(() => loadRestockCart(warehouseId).ids)
+  const [restockCartQuantities, setRestockCartQuantities] = useState<Record<number, string>>(
+    () => loadRestockCart(warehouseId).quantities,
+  )
   const [restockNotice, setRestockNotice] = useState<string | null>(null)
   const [restockedProductIds, setRestockedProductIds] = useState<Set<number>>(new Set())
   const [showEdit, setShowEdit] = useState(false)
@@ -88,6 +91,7 @@ export function WarehouseDetailPage() {
   const [pendingTaskId, setPendingTaskId] = useState<number | null>(null)
   const [stockQuery, setStockQuery] = useState('')
   const [stockCategoryId, setStockCategoryId] = useState<number | 'all'>('all')
+  const [showAllProducts, setShowAllProducts] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
 
   async function load(silent = false) {
@@ -149,14 +153,47 @@ export function WarehouseDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [warehouseId])
 
+  // Список дозаказа — свой на каждый склад, переживает перезагрузку/переход между страницами
+  useEffect(() => {
+    const cart = loadRestockCart(warehouseId)
+    setRestockCartIds(cart.ids)
+    setRestockCartQuantities(cart.quantities)
+  }, [warehouseId])
+
+  useEffect(() => {
+    saveRestockCart(warehouseId, { ids: restockCartIds, quantities: restockCartQuantities })
+  }, [warehouseId, restockCartIds, restockCartQuantities])
+
   const productById = (pid: number) => products.find((p) => p.id === pid)
   const productName = (pid: number) => productById(pid)?.name ?? `#${pid}`
   const unitName = (code: string) => units.find((u) => u.code === code)?.name ?? code
   const employeeName = (uid: number) =>
     uid === user?.id ? `${user.name} (вы)` : employees.find((e) => e.id === uid)?.name ?? `#${uid}`
 
-  const stock = allStock
-    .filter((item) => item.warehouse_id === warehouseId)
+  const warehouseStock = allStock.filter((item) => item.warehouse_id === warehouseId)
+
+  // "Показать все товары" дополняет список нулевыми позициями для товаров, которые
+  // никогда не поступали на этот склад — иначе не видно, что товар вообще можно
+  // принять именно сюда (в списке его просто не было)
+  const stockWithZeros = showAllProducts
+    ? [
+        ...warehouseStock,
+        ...products
+          .filter((p) => !warehouseStock.some((item) => item.product_id === p.id))
+          .map(
+            (p): StockItem => ({
+              product_id: p.id,
+              variant_id: null,
+              warehouse_id: warehouseId,
+              quantity: '0',
+              reserved: '0',
+              available: '0',
+            }),
+          ),
+      ]
+    : warehouseStock
+
+  const stock = stockWithZeros
     .filter((item) => {
       if (stockCategoryId === 'all') return true
       return productById(item.product_id)?.category_id === stockCategoryId
@@ -171,6 +208,7 @@ export function WarehouseDetailPage() {
         (product?.barcode ?? '').toLowerCase().includes(q)
       )
     })
+    .sort((a, b) => Number(b.quantity) - Number(a.quantity) || productName(a.product_id).localeCompare(productName(b.product_id)))
 
   function openMode(m: MovementMode) {
     setMode(m)
@@ -319,8 +357,15 @@ export function WarehouseDetailPage() {
 
       {loading ? (
         <p className="text-muted">Загрузка…</p>
-      ) : !allStock.some((item) => item.warehouse_id === warehouseId) ? (
-        <p className="text-muted">На этом складе остатков пока нет</p>
+      ) : !allStock.some((item) => item.warehouse_id === warehouseId) && !showAllProducts ? (
+        <div className="stack" style={{ gap: 8 }}>
+          <p className="text-muted">На этом складе остатков пока нет</p>
+          {products.length > 0 && (
+            <button type="button" className="disclosure-link" onClick={() => setShowAllProducts(true)}>
+              Показать все товары компании, чтобы принять сюда
+            </button>
+          )}
+        </div>
       ) : (
         <div className="stack">
           <h3>Товары на складе</h3>
@@ -333,8 +378,8 @@ export function WarehouseDetailPage() {
                 onChange={(e) => setStockQuery(e.target.value)}
               />
             </div>
-            {categories.length > 0 && (
-              <div className="sale-filters-row">
+            <div className="sale-filters-row">
+              {categories.length > 0 && (
                 <label className="filter-field">
                   <Select
                     value={stockCategoryId === 'all' ? 'all' : String(stockCategoryId)}
@@ -345,16 +390,24 @@ export function WarehouseDetailPage() {
                     ]}
                   />
                 </label>
-                {(stockQuery.trim() || stockCategoryId !== 'all') && (
-                  <ResetFiltersButton
-                    onClick={() => {
-                      setStockQuery('')
-                      setStockCategoryId('all')
-                    }}
-                  />
-                )}
-              </div>
-            )}
+              )}
+              <label className="sale-checkbox">
+                <input
+                  type="checkbox"
+                  checked={showAllProducts}
+                  onChange={(e) => setShowAllProducts(e.target.checked)}
+                />
+                Все товары компании
+              </label>
+              {(stockQuery.trim() || stockCategoryId !== 'all') && (
+                <ResetFiltersButton
+                  onClick={() => {
+                    setStockQuery('')
+                    setStockCategoryId('all')
+                  }}
+                />
+              )}
+            </div>
           </div>
 
           {stock.length === 0 ? (

@@ -61,6 +61,7 @@ import { Select } from '../../shared/ui/Select'
 import { DateInput } from '../../shared/ui/DateInput'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
+import { InfoHint } from '../../shared/ui/InfoHint'
 import {
   formatMoney,
   formatQuantity,
@@ -442,6 +443,7 @@ export function OrdersPage() {
                 onDrop={(e) => handleColumnDrop(e, status)}
               >
                 <div className="orders-board-column-head">
+                  <span className="orders-board-dot" />
                   <span>{ORDER_STATUS_LABELS[status]}</span>
                   <span className="orders-board-column-count">{columnOrders.length}</span>
                   {status === 'new' && canManage && (
@@ -480,6 +482,7 @@ export function OrdersPage() {
                           onDragEnd={handleDragEnd}
                           onClick={() => setSelectedOrder(o)}
                         >
+                          <span className="orders-board-card-accent" />
                           <div className="orders-board-card-head">
                             <span className="orders-board-card-number">
                               №{o.number ?? o.id}{' '}
@@ -1256,6 +1259,10 @@ function NewOrderForm({
     warehouseId == null
       ? null
       : stock.find((s) => s.product_id === productId && s.warehouse_id === warehouseId)?.available ?? null
+  const reservedFor = (productId: number) =>
+    warehouseId == null
+      ? 0
+      : Number(stock.find((s) => s.product_id === productId && s.warehouse_id === warehouseId)?.reserved ?? '0')
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -1416,6 +1423,7 @@ function NewOrderForm({
             {filtered.map((p) => {
               const inLineQty = lines.find((l) => l.product.id === p.id)?.quantity
               const available = stockFor(p.id)
+              const reserved = reservedFor(p.id)
               return (
                 <div
                   key={p.id}
@@ -1441,7 +1449,14 @@ function NewOrderForm({
                           isOutOfStock(available) ? ' product-tile-stock-out' : ' product-tile-stock-in'
                         }`}
                       >
-                        <span className="product-tile-stock-label">Доступно:</span>
+                        <span className="product-tile-stock-label">
+                          Доступно:
+                          {reserved > 0 && (
+                            <InfoHint
+                              text={`${formatQuantity(String(reserved))} ${unitName(p.unit_code)} зарезервировано под другие заказы и недоступно для нового — освободится, когда те заказы выдадут или отменят.`}
+                            />
+                          )}
+                        </span>
                         <span className="product-tile-stock-value-wrap">
                           <span className="product-tile-stock-value">
                             {formatQuantity(available)} {unitName(p.unit_code)}

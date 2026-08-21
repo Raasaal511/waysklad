@@ -28,6 +28,7 @@ export interface StockDocument {
   type: string
   warehouse_id: number
   to_warehouse_id: number | null
+  supplier_id: number | null
   note: string
 }
 
@@ -44,6 +45,7 @@ export interface DocumentHistoryEntry {
   type: 'receipt' | 'write_off' | 'transfer' | 'stocktake'
   warehouse_id: number
   to_warehouse_id: number | null
+  supplier_id: number | null
   author_id: number
   note: string
   created_at: string
@@ -99,7 +101,13 @@ export function exportDocuments(format: ExportFormat) {
   return api.getBlob(`/inventory/documents/export.${format}`)
 }
 
-export function receiveGoods(input: { warehouse_id: number; lines: StockLine[]; note?: string }) {
+export function receiveGoods(input: {
+  warehouse_id: number
+  lines: StockLine[]
+  note?: string
+  supplier_id?: number | null
+  debt_due_date?: string | null
+}) {
   return api.post<StockDocument>('/inventory/receive', input)
 }
 

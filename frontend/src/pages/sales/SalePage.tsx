@@ -1,4 +1,14 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   listAllProducts,
@@ -20,6 +30,7 @@ import {
   getReceipt,
   getReceiptPdf,
   listSales,
+  getSale,
   editSale,
   deleteSale,
   getSaleHistory,
@@ -49,6 +60,7 @@ import {
 } from '@tabler/icons-react'
 import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
+import { InlinePopover } from '../../shared/ui/InlinePopover'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
@@ -56,6 +68,7 @@ import { DateInput } from '../../shared/ui/DateInput'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
+import { InfoHint } from '../../shared/ui/InfoHint'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
 import { isBarcodeScannerSupported } from '../../entities/barcode/barcodeSupport'
 import { queueSale } from '../../shared/offline/outbox'
@@ -199,6 +212,23 @@ export function SalePage() {
       next.delete('open')
       return next
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // переход с другой страницы (например «Долги») на карточку конкретной продажи
+  useEffect(() => {
+    const openSaleId = searchParams.get('openSale')
+    if (!openSaleId) return
+    getSale(Number(openSaleId))
+      .then(setSelectedSale)
+      .catch(() => {})
+      .finally(() => {
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('openSale')
+          return next
+        })
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const [period, setPeriod] = useState<PeriodFilter>('all')
@@ -705,6 +735,10 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
     warehouseId == null
       ? null
       : stock.find((s) => s.product_id === productId && s.warehouse_id === warehouseId)?.available ?? '0'
+  const reservedFor = (productId: number) =>
+    warehouseId == null
+      ? 0
+      : Number(stock.find((s) => s.product_id === productId && s.warehouse_id === warehouseId)?.reserved ?? '0')
 
   const unitName = (code: string) => units.find((u) => u.code === code)?.name ?? code
   const isFractional = (code: string) => units.find((u) => u.code === code)?.fractional ?? false
@@ -1062,6 +1096,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
           <div className="product-grid" style={{ maxHeight: 480, minHeight: 220, overflowY: 'auto' }}>
             {filtered.map((p) => {
               const qty = stockFor(p.id)
+              const reserved = reservedFor(p.id)
               const inCartQty = cartQtyByProduct.get(p.id)
               return (
                 <div
@@ -1090,7 +1125,14 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                           isOutOfStock(qty) ? ' product-tile-stock-out' : ' product-tile-stock-in'
                         }`}
                       >
-                        <span className="product-tile-stock-label">Остаток:</span>
+                        <span className="product-tile-stock-label">
+                          Остаток:
+                          {reserved > 0 && (
+                            <InfoHint
+                              text={`${formatQuantity(String(reserved))} ${unitName(p.unit_code)} зарезервировано на заказ клиента и недоступно для продажи — освободится, когда заказ выдадут или отменят.`}
+                            />
+                          )}
+                        </span>
                         <span className="product-tile-stock-value-wrap">
                           <span className="product-tile-stock-value">
                             {formatQuantity(qty)} {unitName(p.unit_code)}
@@ -1313,9 +1355,20 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                     ...clients.map((c) => ({ value: String(c.id), label: c.name })),
                   ]}
                 />
-                <Button variant="secondary" onClick={() => setShowNewClientForm(true)}>
-                  <IconPlus size={16} stroke={1.8} /> Клиент
-                </Button>
+                <QuickNewClientForm
+                  open={showNewClientForm}
+                  onOpenChange={setShowNewClientForm}
+                  trigger={
+                    <Button variant="secondary" onClick={() => setShowNewClientForm(true)}>
+                      <IconPlus size={16} stroke={1.8} /> Клиент
+                    </Button>
+                  }
+                  onCreated={(client) => {
+                    setClients((prev) => [...prev, client])
+                    setClientId(client.id)
+                    setShowNewClientForm(false)
+                  }}
+                />
               </div>
             </label>
 
@@ -1331,18 +1384,6 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
               </label>
             )}
           </div>
-
-          {showNewClientForm && (
-            <Modal title="Новый клиент" onClose={() => setShowNewClientForm(false)}>
-              <QuickNewClientForm
-                onCreated={(client) => {
-                  setClients((prev) => [...prev, client])
-                  setClientId(client.id)
-                  setShowNewClientForm(false)
-                }}
-              />
-            </Modal>
-          )}
 
           {error && <p className="error">{error}</p>}
         </div>
@@ -2030,7 +2071,17 @@ function SaleEditForm({
   )
 }
 
-function QuickNewClientForm({ onCreated }: { onCreated: (client: Client) => void }) {
+function QuickNewClientForm({
+  open,
+  onOpenChange,
+  trigger,
+  onCreated,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  trigger: ReactNode
+  onCreated: (client: Client) => void
+}) {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -2043,6 +2094,8 @@ function QuickNewClientForm({ onCreated }: { onCreated: (client: Client) => void
     setSaving(true)
     try {
       const client = await createClient({ name, phone })
+      setName('')
+      setPhone('')
       onCreated(client)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось добавить клиента')
@@ -2052,19 +2105,21 @@ function QuickNewClientForm({ onCreated }: { onCreated: (client: Client) => void
   }
 
   return (
-    <form className="form" onSubmit={handleSubmit}>
-      <label className="field">
-        Имя
-        <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
-      </label>
-      <label className="field">
-        Телефон
-        <PhoneInput value={phone} onChange={setPhone} />
-      </label>
-      {error && <p className="error">{error}</p>}
-      <Button type="submit" disabled={saving || !name.trim()}>
-        {saving ? 'Сохранение…' : 'Добавить и выбрать'}
-      </Button>
-    </form>
+    <InlinePopover title="Новый клиент" trigger={trigger} open={open} onOpenChange={onOpenChange}>
+      <form className="form" onSubmit={handleSubmit}>
+        <label className="field">
+          Имя
+          <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+        </label>
+        <label className="field">
+          Телефон
+          <PhoneInput value={phone} onChange={setPhone} />
+        </label>
+        {error && <p className="error">{error}</p>}
+        <Button type="submit" disabled={saving || !name.trim()}>
+          {saving ? 'Сохранение…' : 'Добавить и выбрать'}
+        </Button>
+      </form>
+    </InlinePopover>
   )
 }

@@ -9,6 +9,7 @@ import {
 } from '../../entities/inventory/api'
 import { getByBarcode, type Category, type Product, type Unit } from '../../entities/product/api'
 import { listEmployees } from '../../entities/profile/api'
+import { listSuppliers, type Supplier } from '../../entities/counterparty/api'
 import type { User } from '../../entities/auth/api'
 import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
@@ -17,6 +18,8 @@ import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
 import { Modal } from '../../shared/ui/Modal'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
+import { InfoHint } from '../../shared/ui/InfoHint'
+import { DateInput } from '../../shared/ui/DateInput'
 import { normalizeDecimalInput, formatQuantity } from '../../shared/lib/format'
 import { isBarcodeScannerSupported } from '../../entities/barcode/barcodeSupport'
 import {
@@ -206,6 +209,15 @@ export function MovementForm({
   const [scanError, setScanError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [withDebt, setWithDebt] = useState(false)
+  const [supplierId, setSupplierId] = useState<number | null>(null)
+  const [debtDueDate, setDebtDueDate] = useState('')
+
+  useEffect(() => {
+    if (mode === 'receive') listSuppliers().then(setSuppliers).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode])
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 300)
@@ -223,6 +235,10 @@ export function MovementForm({
     warehouseId == null
       ? null
       : Number(stock.find((s) => s.product_id === productId && s.warehouse_id === warehouseId)?.available ?? '0')
+  const reservedFor = (productId: number) =>
+    warehouseId == null
+      ? 0
+      : Number(stock.find((s) => s.product_id === productId && s.warehouse_id === warehouseId)?.reserved ?? '0')
 
   const filtered = useMemo(() => {
     let list = products
@@ -303,6 +319,10 @@ export function MovementForm({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!warehouseId || lines.length === 0) return
+    if (mode === 'receive' && withDebt && (!supplierId || !debtDueDate)) {
+      setError('Укажите поставщика и срок «Долг до»')
+      return
+    }
     setError(null)
     setSaving(true)
     try {
@@ -312,7 +332,12 @@ export function MovementForm({
         cost: mode === 'receive' ? l.cost || undefined : undefined,
       }))
       if (mode === 'receive') {
-        await receiveGoods({ warehouse_id: warehouseId, lines: payloadLines })
+        await receiveGoods({
+          warehouse_id: warehouseId,
+          lines: payloadLines,
+          supplier_id: withDebt ? supplierId : undefined,
+          debt_due_date: withDebt ? debtDueDate : undefined,
+        })
       } else if (mode === 'write_off') {
         await writeOff({ warehouse_id: warehouseId, lines: payloadLines })
       } else {
@@ -397,6 +422,7 @@ export function MovementForm({
             {filtered.map((p) => {
               const inLineQty = lines.find((l) => l.product.id === p.id)?.quantity
               const available = stockFor(p.id)
+              const reserved = reservedFor(p.id)
               return (
                 <div
                   key={p.id}
@@ -416,7 +442,14 @@ export function MovementForm({
                     <span className="product-tile-name">{p.name}</span>
                     {available !== null && (
                       <span className="product-tile-stock">
-                        <span className="product-tile-stock-label">Остаток:</span>
+                        <span className="product-tile-stock-label">
+                          Остаток:
+                          {reserved > 0 && (
+                            <InfoHint
+                              text={`${formatQuantity(String(reserved))} ${unitName(p.unit_code)} зарезервировано на заказы клиентов и недоступно для этой операции — освободится, когда заказ выдадут или отменят.`}
+                            />
+                          )}
+                        </span>
                         <span className="product-tile-stock-value">
                           {formatQuantity(available)} {unitName(p.unit_code)}
                         </span>
@@ -552,6 +585,35 @@ export function MovementForm({
         </div>
       )}
 
+      {mode === 'receive' && lines.length > 0 && (
+        <div className="stack" style={{ gap: 10 }}>
+          <label className="sale-checkbox">
+            <input type="checkbox" checked={withDebt} onChange={(e) => setWithDebt(e.target.checked)} />
+            Принять в долг поставщику
+          </label>
+          {withDebt && (
+            <div className="row">
+              <label className="field" style={{ flex: 1 }}>
+                Поставщик
+                <Select
+                  value={supplierId != null ? String(supplierId) : ''}
+                  onChange={(v) => setSupplierId(v ? Number(v) : null)}
+                  options={suppliers.map((s) => ({ value: String(s.id), label: s.name }))}
+                />
+              </label>
+              <label className="field" style={{ flex: 1 }}>
+                Долг до
+                <DateInput
+                  value={debtDueDate}
+                  min={new Date().toISOString().slice(0, 10)}
+                  onChange={setDebtDueDate}
+                />
+              </label>
+            </div>
+          )}
+        </div>
+      )}
+
       {error && <p className="error">{error}</p>}
       <Button
         type="submit"
@@ -560,6 +622,7 @@ export function MovementForm({
           !warehouseId ||
           lines.length === 0 ||
           (mode === 'transfer' && !toWarehouseId) ||
+          (mode === 'receive' && withDebt && (!supplierId || !debtDueDate)) ||
           lines.some((l) => Number(l.quantity) <= 0)
         }
       >

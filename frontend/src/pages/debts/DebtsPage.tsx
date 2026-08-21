@@ -1,64 +1,158 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   listActiveDebts,
-  listDueDebts,
+  listClosedDebts,
   issueDebt,
   issueSupplierDebt,
-  repayDebt,
-  extendDebt,
   createInstallment,
-  getDebtHistory,
+  repayDebt,
   type Debt,
-  type DebtHistoryEntry,
 } from '../../entities/debt/api'
 import { searchClients, listSuppliers, type Client, type Supplier } from '../../entities/counterparty/api'
+import {
+  type InstallmentPeriod,
+  INSTALLMENT_PERIOD_OPTIONS,
+  buildInstallmentSchedule,
+} from '../../entities/debt/installmentSchedule'
 import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
-import { IconPlus } from '@tabler/icons-react'
+import {
+  IconPlus,
+  IconChevronRight,
+  IconUser,
+  IconTruck,
+  IconArrowUpRight,
+  IconArrowDownLeft,
+  IconCalendarRepeat,
+} from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
 import { DateInput } from '../../shared/ui/DateInput'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
+import { daysOverdue, pluralDays } from '../../entities/debt/dueDate'
 
-const DEBT_HISTORY_ACTION_LABELS: Record<string, string> = {
-  'debt.issue': 'Долг выдан',
-  'debt.issue_supplier': 'Долг выдан поставщиком',
-  'debt.repay': 'Внесена оплата',
-  'debt.installment': 'Составлен график рассрочки',
-  'debt.extend': 'Срок продлён',
+// Порядок "серьёзности" статуса — просроченные и горящие сроком долги всегда
+// показываются выше спокойных, чтобы владелец сразу видел, кому звонить.
+const STATUS_SEVERITY: Record<Debt['status'], number> = {
+  overdue: 4,
+  due_soon: 3,
+  partially_paid: 2,
+  active: 1,
+  closed: 0,
 }
+
+// Цвет левой полоски карточки долга — тот же смысл, что у бейджа статуса,
+// но как акцент, по которому можно опознать "горящий" долг не читая текст.
+const DEBT_STATUS_ACCENT: Record<Debt['status'], string> = {
+  active: 'var(--border)',
+  due_soon: 'var(--warning)',
+  overdue: 'var(--danger)',
+  partially_paid: 'var(--warning)',
+  closed: 'var(--accent)',
+}
+
+const STATUS_FILTERS: { value: Debt['status'] | 'all'; label: string }[] = [
+  { value: 'all', label: 'Все' },
+  { value: 'overdue', label: 'Просрочен' },
+  { value: 'due_soon', label: 'Скоро срок' },
+  { value: 'partially_paid', label: 'Погашен частично' },
+  { value: 'active', label: 'Активен' },
+  { value: 'closed', label: 'Погашен' },
+]
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('ru-RU')
 }
 
-const URGENT_DEBT_COLUMNS = '1.4fr 1fr 1fr 1fr'
+const DUE_DATE_PRESETS: { label: string; days: number }[] = [
+  { label: 'Неделя', days: 7 },
+  { label: '2 мес.', days: 60 },
+  { label: '3 мес.', days: 90 },
+  { label: '4 мес.', days: 120 },
+  { label: 'Полгода', days: 182 },
+  { label: 'Год', days: 365 },
+]
+
+function addDays(days: number) {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+function DueDatePresets({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="debt-due-date-presets">
+      {DUE_DATE_PRESETS.map((p) => {
+        const presetValue = addDays(p.days)
+        return (
+          <button
+            key={p.label}
+            type="button"
+            className={`debt-due-date-preset${value === presetValue ? ' debt-due-date-preset-active' : ''}`}
+            onClick={() => onChange(presetValue)}
+          >
+            {p.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+interface UpcomingPayment {
+  debtId: number
+  dueDate: string
+  amount: string
+  name: string
+}
+
+// Ближайшие неоплаченные платежи графиков рассрочки по всем активным долгам —
+// та же эвристика "оплачено покрывает платежи по порядку", что и в карточке
+// долга: связи Repayment→InstallmentPayment в данных нет.
+function upcomingPayments(debts: Debt[], counterpartyName: (d: Debt) => string): UpcomingPayment[] {
+  const result: UpcomingPayment[] = []
+  for (const debt of debts) {
+    if (debt.schedule.length === 0) continue
+    let paidSoFar = debt.repayments.reduce((sum, r) => sum + Number(r.amount), 0)
+    for (const s of debt.schedule) {
+      const amount = Number(s.amount)
+      if (paidSoFar >= amount - 0.01) {
+        paidSoFar -= amount
+        continue
+      }
+      result.push({ debtId: debt.id, dueDate: s.due_date, amount: s.amount, name: counterpartyName(debt) })
+    }
+  }
+  return result.sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+}
 
 export function DebtsPage() {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const highlightId = searchParams.get('highlight')
   const [debts, setDebts] = useState<Debt[]>([])
-  const [dueDebts, setDueDebts] = useState<Debt[]>([])
+  const [closedDebts, setClosedDebts] = useState<Debt[] | null>(null)
+  const [loadingClosed, setLoadingClosed] = useState(false)
   const [clients, setClients] = useState<Client[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const highlightRef = useRef<HTMLDivElement>(null)
+  const [direction, setDirection] = useState<'clients' | 'suppliers'>('clients')
+  const [statusFilter, setStatusFilter] = useState<Debt['status'] | 'all'>('all')
+  const [query, setQuery] = useState('')
 
   async function load() {
     setLoading(true)
     try {
-      const [activeDebts, dueToday, clientList, supplierList] = await Promise.all([
+      const [activeDebts, clientList, supplierList] = await Promise.all([
         listActiveDebts(),
-        listDueDebts(),
         searchClients(),
         listSuppliers(),
       ])
       setDebts(activeDebts)
-      setDueDebts(dueToday)
       setClients(clientList)
       setSuppliers(supplierList)
     } catch (err) {
@@ -72,21 +166,60 @@ export function DebtsPage() {
     load()
   }, [])
 
+  // Погашенные долги не нужны по умолчанию — грузим только когда владелец
+  // действительно захочет их увидеть через фильтр "Погашен".
   useEffect(() => {
-    if (!loading && highlightId) {
-      highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-  }, [loading, highlightId])
+    if (statusFilter !== 'closed' || closedDebts !== null) return
+    setLoadingClosed(true)
+    listClosedDebts()
+      .then(setClosedDebts)
+      .catch((err) => setError(err instanceof ApiError ? err.message : 'Не удалось загрузить погашенные долги'))
+      .finally(() => setLoadingClosed(false))
+  }, [statusFilter, closedDebts])
 
   const counterpartyName = (debt: Debt) =>
     debt.client_id
       ? clients.find((c) => c.id === debt.client_id)?.name ?? `Клиент #${debt.client_id}`
       : suppliers.find((s) => s.id === debt.supplier_id)?.name ?? `Поставщик #${debt.supplier_id}`
 
-  // должны сегодня + уже просроченные — объединяем без дублей
-  const overdue = debts.filter((d) => d.status === 'overdue')
-  const dueTodayIds = new Set(dueDebts.map((d) => d.id))
-  const urgentDebts = [...dueDebts, ...overdue.filter((d) => !dueTodayIds.has(d.id))]
+  const clientDebts = useMemo(() => debts.filter((d) => d.client_id != null), [debts])
+  const supplierDebts = useMemo(() => debts.filter((d) => d.supplier_id != null), [debts])
+  const totalOwedToUs = clientDebts.reduce((sum, d) => sum + Number(d.balance), 0)
+  const totalWeOwe = supplierDebts.reduce((sum, d) => sum + Number(d.balance), 0)
+
+  const visibleDebts = useMemo(() => {
+    const source = statusFilter === 'closed' ? closedDebts ?? [] : debts
+    const byDirection = source.filter((d) =>
+      direction === 'clients' ? d.client_id != null : d.supplier_id != null,
+    )
+    const byStatus = statusFilter === 'all' ? byDirection : byDirection.filter((d) => d.status === statusFilter)
+    const trimmedQuery = query.trim().toLowerCase()
+    const filtered = trimmedQuery
+      ? byStatus.filter((d) => counterpartyName(d).toLowerCase().includes(trimmedQuery))
+      : byStatus
+    return [...filtered].sort((a, b) => {
+      const bySeverity = STATUS_SEVERITY[b.status] - STATUS_SEVERITY[a.status]
+      if (bySeverity !== 0) return bySeverity
+      return (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999')
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [direction, statusFilter, debts, closedDebts, query, clients, suppliers])
+
+  const upcoming = useMemo(
+    () => upcomingPayments(debts, counterpartyName).slice(0, 5),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [debts, clients, suppliers],
+  )
+
+  // Переход по ссылке "?highlight=id" (из уведомления, из продажи) — сразу
+  // открываем карточку конкретного долга.
+  useEffect(() => {
+    if (loading || !highlightId) return
+    const debt = debts.find((d) => String(d.id) === highlightId)
+    if (!debt) return
+    navigate(`/debts/${debt.id}`, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, highlightId, debts])
 
   return (
     <div className="stack">
@@ -112,58 +245,96 @@ export function DebtsPage() {
 
       {error && <p className="error">{error}</p>}
 
-      {!loading && urgentDebts.length > 0 && (
-        <div className="stack">
-          <h3>Должны сегодня и просрочено</h3>
-          <div className="data-table">
-            <div className="data-table-head" style={{ gridTemplateColumns: URGENT_DEBT_COLUMNS }}>
-              <span>Контрагент</span>
-              <span>Остаток</span>
-              <span>Срок</span>
-              <span>Статус</span>
-            </div>
-            <div className="data-table-body">
-              {urgentDebts.map((d, i) => (
-                <div
-                  key={d.id}
-                  className="data-row sale-history-row-in"
-                  style={
-                    {
-                      gridTemplateColumns: URGENT_DEBT_COLUMNS,
-                      '--row-delay': `${Math.min(i, 12) * 25}ms`,
-                    } as CSSProperties
-                  }
-                >
-                  <span className="data-row-name">{counterpartyName(d)}</span>
-                  <span>{formatMoney(d.balance)} ₽</span>
-                  <span className="text-muted">{d.due_date ? formatDate(d.due_date) : '—'}</span>
-                  <span>
-                    <span className={DEBT_STATUS_BADGE_CLASS[d.status]}>
-                      {DEBT_STATUS_LABELS[d.status]}
-                    </span>
-                  </span>
-                </div>
-              ))}
-            </div>
+      {!loading && upcoming.length > 0 && (
+        <div className="card card-full stack">
+          <h3>Ближайшие выплаты</h3>
+          <div className="debt-schedule">
+            {upcoming.map((p, i) => (
+              <button
+                key={i}
+                type="button"
+                className="debt-schedule-row debt-upcoming-row"
+                onClick={() => navigate(`/debts/${p.debtId}`)}
+              >
+                <span>
+                  {formatDate(p.dueDate)} <span className="text-muted">· {p.name}</span>
+                </span>
+                <span>{formatMoney(p.amount)} ₽</span>
+              </button>
+            ))}
           </div>
         </div>
       )}
 
-      {loading ? (
-        <p className="text-muted">Загрузка…</p>
-      ) : debts.length === 0 ? (
-        <p className="text-muted">Активных долгов нет</p>
-      ) : (
-        <div className="stack">
-          {debts.map((d) => (
-            <DebtCard
-              key={d.id}
-              debt={d}
-              name={counterpartyName(d)}
-              onChanged={load}
-              highlighted={String(d.id) === highlightId}
-              highlightRef={String(d.id) === highlightId ? highlightRef : undefined}
+      {!loading && (clientDebts.length > 0 || supplierDebts.length > 0) && (
+        <div className="debt-tabs">
+          <button
+            type="button"
+            className={`debt-tab debt-tab-owed-to-us${direction === 'clients' ? ' debt-tab-active' : ''}`}
+            onClick={() => setDirection('clients')}
+          >
+            <span className="debt-tab-label">
+              <IconArrowDownLeft size={14} stroke={2} /> Нам должны клиенты
+            </span>
+            <strong>{formatMoney(String(totalOwedToUs))} ₽</strong>
+            {clientDebts.length > 0 && <span className="count-badge">{clientDebts.length}</span>}
+          </button>
+          <button
+            type="button"
+            className={`debt-tab debt-tab-we-owe${direction === 'suppliers' ? ' debt-tab-active' : ''}`}
+            onClick={() => setDirection('suppliers')}
+          >
+            <span className="debt-tab-label">
+              <IconArrowUpRight size={14} stroke={2} /> Мы должны поставщикам
+            </span>
+            <strong>{formatMoney(String(totalWeOwe))} ₽</strong>
+            {supplierDebts.length > 0 && <span className="count-badge">{supplierDebts.length}</span>}
+          </button>
+        </div>
+      )}
+
+      {!loading && (clientDebts.length > 0 || supplierDebts.length > 0) && (
+        <div className="sale-search-panel">
+          <div className="sale-search-row">
+            <input
+              className="sale-search-input"
+              placeholder="Поиск по клиенту или поставщику…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
             />
+          </div>
+        </div>
+      )}
+
+      {!loading && (clientDebts.length > 0 || supplierDebts.length > 0) && (
+        <div className="debt-status-filters">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              className={`debt-status-filter${statusFilter === f.value ? ' debt-status-filter-active' : ''}`}
+              onClick={() => setStatusFilter(f.value)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {loading || (statusFilter === 'closed' && loadingClosed) ? (
+        <p className="text-muted">Загрузка…</p>
+      ) : visibleDebts.length === 0 ? (
+        <p className="text-muted">
+          {query.trim()
+            ? 'Ничего не найдено'
+            : statusFilter === 'all'
+              ? 'Долгов нет'
+              : 'Долгов с таким статусом нет'}
+        </p>
+      ) : (
+        <div className="debt-row-list">
+          {visibleDebts.map((d) => (
+            <DebtRow key={d.id} debt={d} name={counterpartyName(d)} onOpen={() => navigate(`/debts/${d.id}`)} />
           ))}
         </div>
       )}
@@ -171,265 +342,47 @@ export function DebtsPage() {
   )
 }
 
-function DebtCard({
-  debt,
-  name,
-  onChanged,
-  highlighted,
-  highlightRef,
-}: {
-  debt: Debt
-  name: string
-  onChanged: () => void
-  highlighted?: boolean
-  highlightRef?: React.RefObject<HTMLDivElement | null>
-}) {
-  const [amount, setAmount] = useState('')
-  const [paidOn, setPaidOn] = useState(new Date().toISOString().slice(0, 10))
-  const [note, setNote] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [repayError, setRepayError] = useState<string | null>(null)
-  const [showSchedule, setShowSchedule] = useState(false)
-  const [showExtend, setShowExtend] = useState(false)
-  const [history, setHistory] = useState<DebtHistoryEntry[] | null>(null)
-  const [loadingHistory, setLoadingHistory] = useState(false)
-
-  async function handleRepay() {
-    if (!amount) return
-    setSaving(true)
-    setRepayError(null)
-    try {
-      await repayDebt(debt.id, { amount, paid_on: paidOn, note })
-      setAmount('')
-      setNote('')
-      onChanged()
-    } catch (err) {
-      setRepayError(err instanceof ApiError ? err.message : 'Не удалось внести оплату')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function loadHistory() {
-    setLoadingHistory(true)
-    try {
-      setHistory(await getDebtHistory(debt.id))
-    } catch {
-      setHistory([])
-    } finally {
-      setLoadingHistory(false)
-    }
-  }
+function DebtRow({ debt, name, onOpen }: { debt: Debt; name: string; onOpen: () => void }) {
+  const Icon = debt.client_id != null ? IconUser : IconTruck
 
   return (
-    <div ref={highlightRef} className={`card card-full stack${highlighted ? ' row-highlight' : ''}`}>
-      <div className="row between wrap" style={{ gap: 8 }}>
-        <div className="stat">
-          <span>{name}</span>
-          <span className="text-muted">
-            Сумма {formatMoney(debt.amount)} ₽ · остаток {formatMoney(debt.balance)} ₽
-            {debt.due_date ? ` · до ${formatDate(debt.due_date)}` : ''}
-          </span>
+    <div
+      className="debt-row"
+      style={{ '--debt-accent': DEBT_STATUS_ACCENT[debt.status] } as CSSProperties}
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onOpen()
+      }}
+    >
+      <span className="debt-row-icon">
+        <Icon size={16} stroke={1.8} />
+      </span>
+      <div className="debt-row-main">
+        <div className="debt-row-top">
+          <span className="debt-row-name">{name}</span>
+          <strong>{formatMoney(debt.balance)} ₽</strong>
+          <span className={DEBT_STATUS_BADGE_CLASS[debt.status]}>{DEBT_STATUS_LABELS[debt.status]}</span>
         </div>
-        <div className="row wrap" style={{ gap: 8 }}>
-          <span className={DEBT_STATUS_BADGE_CLASS[debt.status]}>
-            {DEBT_STATUS_LABELS[debt.status]}
-          </span>
-          <Button variant="secondary" onClick={() => setShowExtend(true)}>
-            Продлить
-          </Button>
-          <Button variant="secondary" onClick={() => setShowSchedule(true)}>
-            Рассрочка
-          </Button>
+        <div className="debt-row-meta">
+          <span>Остаток из {formatMoney(debt.amount)} ₽</span>
+          {debt.due_date && !debt.is_closed && (
+            <span className={daysOverdue(debt.due_date) > 0 ? 'text-danger' : undefined}>
+              {daysOverdue(debt.due_date) > 0
+                ? `Просрочен на ${daysOverdue(debt.due_date)} ${pluralDays(daysOverdue(debt.due_date))}`
+                : `Срок до ${formatDate(debt.due_date)}`}
+            </span>
+          )}
+          {debt.schedule.length > 0 && (
+            <span className="debt-row-installment">
+              <IconCalendarRepeat size={13} stroke={1.8} /> Рассрочка на {debt.schedule.length}
+            </span>
+          )}
         </div>
       </div>
-
-      <div className="row wrap" style={{ gap: 8 }}>
-        <input
-          type="text"
-          inputMode="decimal"
-          placeholder="Сумма"
-          value={amount}
-          onChange={(e) => {
-            const normalized = normalizeDecimalInput(e.target.value)
-            if (normalized !== null) setAmount(normalized)
-          }}
-          style={{ width: 100 }}
-        />
-        <DateInput value={paidOn} onChange={setPaidOn} className="debt-repay-date" />
-        <input
-          placeholder="Комментарий"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          style={{ flex: 1, minWidth: 140 }}
-        />
-        <Button variant="secondary" onClick={handleRepay} disabled={saving}>
-          {saving ? 'Сохранение…' : 'Внести оплату'}
-        </Button>
-      </div>
-      {repayError && <p className="error">{repayError}</p>}
-
-      <div className="debt-history">
-        {history === null ? (
-          <Button variant="secondary" onClick={loadHistory} disabled={loadingHistory}>
-            {loadingHistory ? 'Загрузка…' : 'История платежей и изменений'}
-          </Button>
-        ) : history.length === 0 ? (
-          <p className="text-muted">История пуста</p>
-        ) : (
-          <div className="stack" style={{ gap: 4 }}>
-            {history.map((entry) => (
-              <div key={entry.id} className="debt-history-item">
-                <span>{DEBT_HISTORY_ACTION_LABELS[entry.action] ?? entry.action}</span>
-                <span className="text-muted">{formatDate(entry.created_at)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {showSchedule && (
-        <Modal title={`Рассрочка · ${name}`} onClose={() => setShowSchedule(false)}>
-          <InstallmentForm
-            debtId={debt.id}
-            balance={debt.balance}
-            onDone={() => {
-              setShowSchedule(false)
-              onChanged()
-            }}
-          />
-        </Modal>
-      )}
-
-      {showExtend && (
-        <Modal title={`Продлить долг · ${name}`} onClose={() => setShowExtend(false)}>
-          <ExtendDebtForm
-            debtId={debt.id}
-            currentDueDate={debt.due_date}
-            onDone={() => {
-              setShowExtend(false)
-              onChanged()
-            }}
-          />
-        </Modal>
-      )}
+      <IconChevronRight size={18} stroke={1.8} className="debt-row-chevron" />
     </div>
-  )
-}
-
-function ExtendDebtForm({
-  debtId,
-  currentDueDate,
-  onDone,
-}: {
-  debtId: number
-  currentDueDate: string | null
-  onDone: () => void
-}) {
-  const [newDueDate, setNewDueDate] = useState(currentDueDate ?? '')
-  const [reason, setReason] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (!newDueDate) return
-    setError(null)
-    setSaving(true)
-    try {
-      await extendDebt(debtId, { new_due_date: newDueDate, reason })
-      onDone()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось продлить долг')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <form className="form" onSubmit={handleSubmit}>
-      {currentDueDate && (
-        <p className="text-muted">Текущий срок: {formatDate(currentDueDate)}</p>
-      )}
-      <label className="field">
-        Новый срок «Долг до»
-        <DateInput value={newDueDate} onChange={setNewDueDate} required />
-      </label>
-      <label className="field">
-        Причина
-        <input
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="Например: попросил ещё неделю"
-        />
-      </label>
-      {error && <p className="error">{error}</p>}
-      <Button type="submit" disabled={saving}>
-        {saving ? 'Сохранение…' : 'Продлить'}
-      </Button>
-    </form>
-  )
-}
-
-function InstallmentForm({
-  debtId,
-  balance,
-  onDone,
-}: {
-  debtId: number
-  balance: string
-  onDone: () => void
-}) {
-  const [parts, setParts] = useState(3)
-  const [firstDate, setFirstDate] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (!firstDate) return
-    setError(null)
-    setSaving(true)
-    try {
-      const total = Number(balance)
-      const perPart = (total / parts).toFixed(2)
-      const schedule = Array.from({ length: parts }, (_, i) => {
-        const date = new Date(firstDate)
-        date.setMonth(date.getMonth() + i)
-        return { due_date: date.toISOString().slice(0, 10), amount: perPart }
-      })
-      await createInstallment(debtId, schedule)
-      onDone()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось составить график')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <form className="form" onSubmit={handleSubmit}>
-      <div className="row">
-        <label className="field" style={{ flex: 1 }}>
-          Платежей
-          <input
-            type="number"
-            min={2}
-            max={12}
-            value={parts}
-            onChange={(e) => setParts(Number(e.target.value))}
-          />
-        </label>
-        <label className="field" style={{ flex: 1 }}>
-          Первый платёж
-          <DateInput value={firstDate} onChange={setFirstDate} />
-        </label>
-      </div>
-      {error && <p className="error">{error}</p>}
-      <Button type="submit" disabled={saving}>
-        {saving ? 'Сохранение…' : `Разбить на ${parts} платежа по ${(Number(balance) / parts).toFixed(2)} ₽`}
-      </Button>
-    </form>
   )
 }
 
@@ -448,8 +401,17 @@ function IssueDebtForm({
   const [amount, setAmount] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [note, setNote] = useState('')
+  const [withInstallment, setWithInstallment] = useState(false)
+  const [downPayment, setDownPayment] = useState('')
+  const [parts, setParts] = useState(3)
+  const [period, setPeriod] = useState<InstallmentPeriod>('month')
+  const [firstPaymentDate, setFirstPaymentDate] = useState(new Date().toISOString().slice(0, 10))
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  const downPaymentNum = Number(downPayment || '0')
+  const downPaymentInvalid = downPaymentNum < 0 || (amount !== '' && downPaymentNum >= Number(amount))
+  const remainingAfterDownPayment = Math.max(Number(amount || '0') - downPaymentNum, 0).toFixed(2)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -457,15 +419,30 @@ function IssueDebtForm({
       setError('Укажите срок «Долг до»')
       return
     }
+    if (withInstallment && !firstPaymentDate) {
+      setError('Укажите дату первого платежа рассрочки')
+      return
+    }
+    if (withInstallment && downPaymentInvalid) {
+      setError('Первый взнос должен быть меньше суммы долга')
+      return
+    }
     setError(null)
     setSaving(true)
     try {
-      if (kind === 'client') {
-        if (!clientId) return
-        await issueDebt({ client_id: clientId, amount, due_date: dueDate, note })
-      } else {
-        if (!supplierId) return
-        await issueSupplierDebt({ supplier_id: supplierId, amount, due_date: dueDate, note })
+      const debt =
+        kind === 'client'
+          ? clientId && (await issueDebt({ client_id: clientId, amount, due_date: dueDate, note }))
+          : supplierId && (await issueSupplierDebt({ supplier_id: supplierId, amount, due_date: dueDate, note }))
+      if (!debt) return
+      if (withInstallment) {
+        if (downPaymentNum > 0) {
+          await repayDebt(debt.id, { amount: downPayment, paid_on: firstPaymentDate, note: 'Первый взнос' })
+        }
+        await createInstallment(
+          debt.id,
+          buildInstallmentSchedule(remainingAfterDownPayment, parts, firstPaymentDate, period),
+        )
       }
       onDone()
     } catch (err) {
@@ -528,12 +505,83 @@ function IssueDebtForm({
           required
         />
       </label>
+      <DueDatePresets value={dueDate} onChange={setDueDate} />
       <label className="field">
         Заметка
         <input value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
+
+      <label className="sale-checkbox">
+        <input
+          type="checkbox"
+          checked={withInstallment}
+          onChange={(e) => setWithInstallment(e.target.checked)}
+        />
+        С рассрочкой
+      </label>
+
+      {withInstallment && (
+        <div className="stack" style={{ gap: 14 }}>
+          <label className="field">
+            Первый взнос (необязательно)
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="0"
+              value={downPayment}
+              onChange={(e) => {
+                const normalized = normalizeDecimalInput(e.target.value)
+                if (normalized !== null) setDownPayment(normalized)
+              }}
+            />
+          </label>
+          {downPaymentNum > 0 && (
+            <p className={downPaymentInvalid ? 'error' : 'text-muted'}>
+              {downPaymentInvalid
+                ? 'Первый взнос должен быть меньше суммы долга'
+                : `В рассрочку пойдёт ${formatMoney(remainingAfterDownPayment)} ₽`}
+            </p>
+          )}
+          <div className="row">
+            <label className="field" style={{ flex: 1 }}>
+              Платежей
+              <input
+                type="number"
+                min={2}
+                max={12}
+                value={parts}
+                onChange={(e) => setParts(Number(e.target.value))}
+              />
+            </label>
+            <label className="field" style={{ flex: 1 }}>
+              Периодичность
+              <Select
+                value={period}
+                onChange={(v) => setPeriod(v as InstallmentPeriod)}
+                options={INSTALLMENT_PERIOD_OPTIONS}
+              />
+            </label>
+          </div>
+          <label className="field">
+            {downPaymentNum > 0 ? 'Дата первого взноса и старт графика' : 'Первый платёж'}
+            <DateInput
+              value={firstPaymentDate}
+              min={new Date().toISOString().slice(0, 10)}
+              onChange={setFirstPaymentDate}
+            />
+          </label>
+        </div>
+      )}
+
       {error && <p className="error">{error}</p>}
-      <Button type="submit" disabled={saving || (kind === 'client' ? !clientId : !supplierId)}>
+      <Button
+        type="submit"
+        disabled={
+          saving ||
+          (kind === 'client' ? !clientId : !supplierId) ||
+          (withInstallment && downPaymentInvalid)
+        }
+      >
         {saving ? 'Сохранение…' : 'Выдать долг'}
       </Button>
     </form>

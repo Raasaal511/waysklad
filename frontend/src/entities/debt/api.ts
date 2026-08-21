@@ -34,6 +34,7 @@ export interface Debt {
   issued_at: string
   due_date: string | null
   sale_id: number | null
+  receipt_document_id: number | null
   note: string
   schedule: DebtInstallment[]
   repayments: DebtRepayment[]
@@ -89,6 +90,10 @@ export function getDebtHistory(debtId: number) {
 
 export function listActiveDebts() {
   return api.get<Debt[]>('/debts')
+}
+
+export function listClosedDebts() {
+  return api.get<Debt[]>('/debts/closed')
 }
 
 export function listClientDebts(clientId: number) {
