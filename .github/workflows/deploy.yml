@@ -22,7 +22,7 @@ jobs:
           username: rasul
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd ~/waysklad
+            cd ~/servers/waysklad
             git fetch origin
             git checkout ${{ github.ref_name }}
             git reset --hard origin/${{ github.ref_name }}
