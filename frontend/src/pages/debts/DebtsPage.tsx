@@ -35,6 +35,8 @@ import { QuickNewClientForm } from '../../shared/ui/QuickNewClientForm'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
 import { daysOverdue, pluralDays } from '../../entities/debt/dueDate'
+import layoutStyles from '../../shared/ui/Layout.module.css'
+import styles from './DebtsPage.module.css'
 
 // Порядок "серьёзности" статуса — просроченные и горящие сроком долги всегда
 // показываются выше спокойных, чтобы владелец сразу видел, кому звонить.
@@ -98,14 +100,17 @@ function addDays(days: number) {
 
 function DueDatePresets({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <div className="debt-due-date-presets">
+    <div className={styles['debt-due-date-presets']}>
       {DUE_DATE_PRESETS.map((p) => {
         const presetValue = addDays(p.days)
         return (
           <button
             key={p.label}
             type="button"
-            className={`debt-due-date-preset${value === presetValue ? ' debt-due-date-preset-active' : ''}`}
+            className={[
+              styles['debt-due-date-preset'],
+              value === presetValue && styles['debt-due-date-preset-active'],
+            ].filter(Boolean).join(' ')}
             onClick={() => onChange(presetValue)}
           >
             {p.label}
@@ -256,14 +261,14 @@ export function DebtsPage() {
   }, [loading, highlightId, debts])
 
   return (
-    <div className="stack">
-      <div className="section-title">
+    <div className={layoutStyles.stack}>
+      <div className={layoutStyles.sectionTitle}>
         <h2>Долги</h2>
-        <div className="row" style={{ gap: 8 }}>
+        <div className={layoutStyles.row} style={{ gap: 8 }}>
           {upcoming.length > 0 && (
             <Button variant="secondary" onClick={() => setShowUpcoming(true)}>
               <IconClockHour4 size={16} stroke={1.8} /> Выплаты
-              <span className="count-badge">{upcoming.length}</span>
+              <span className={layoutStyles.countBadge}>{upcoming.length}</span>
             </Button>
           )}
           <Button onClick={() => setShowForm(true)}>
@@ -286,34 +291,38 @@ export function DebtsPage() {
         </Modal>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
 
       {showUpcoming && (
         <Modal title="Ближайшие выплаты" onClose={() => setShowUpcoming(false)}>
-          <div className="debt-upcoming-list debt-upcoming-list-modal">
+          <div className={`${styles['debt-upcoming-list']} ${styles['debt-upcoming-list-modal']}`}>
             {upcoming.map((p, i) => {
               const overdue = daysOverdue(p.dueDate) > 0
               return (
                 <button
                   key={i}
                   type="button"
-                  className="debt-upcoming-row"
+                  className={styles['debt-upcoming-row']}
                   onClick={() => {
                     setShowUpcoming(false)
                     navigate(`/debts/${p.debtId}`)
                   }}
                 >
-                  <span className={`debt-upcoming-date${overdue ? ' text-danger' : ''}`}>
+                  <span
+                    className={[styles['debt-upcoming-date'], overdue && layoutStyles.textDanger]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
                     {formatDate(p.dueDate)}
                   </span>
-                  <span className="debt-upcoming-name">{p.name}</span>
+                  <span className={styles['debt-upcoming-name']}>{p.name}</span>
                   {overdue && (
-                    <span className="text-danger debt-upcoming-overdue">
+                    <span className={`${layoutStyles.textDanger} ${styles['debt-upcoming-overdue']}`}>
                       просрочен на {daysOverdue(p.dueDate)} {pluralDays(daysOverdue(p.dueDate))}
                     </span>
                   )}
-                  <strong className="debt-upcoming-amount">{formatMoney(p.amount)} ₽</strong>
-                  <IconChevronRight size={16} stroke={1.8} className="data-row-chevron" />
+                  <strong className={styles['debt-upcoming-amount']}>{formatMoney(p.amount)} ₽</strong>
+                  <IconChevronRight size={16} stroke={1.8} className={layoutStyles.dataRowChevron} />
                 </button>
               )
             })}
@@ -331,28 +340,36 @@ export function DebtsPage() {
       </div>
 
       {!loading && view === 'active' && (
-        <div className="debt-tabs">
+        <div className={styles['debt-tabs']}>
           <button
             type="button"
-            className={`debt-tab debt-tab-owed-to-us${direction === 'clients' ? ' debt-tab-active' : ''}`}
+            className={[
+              styles['debt-tab'],
+              styles['debt-tab-owed-to-us'],
+              direction === 'clients' && styles['debt-tab-active'],
+            ].filter(Boolean).join(' ')}
             onClick={() => setDirection('clients')}
           >
-            <span className="debt-tab-label">
+            <span className={styles['debt-tab-label']}>
               <IconArrowDownLeft size={14} stroke={2} /> Нам должны клиенты
             </span>
             <strong>{formatMoney(String(totalOwedToUs))} ₽</strong>
-            {clientDebts.length > 0 && <span className="count-badge">{clientDebts.length}</span>}
+            {clientDebts.length > 0 && <span className={layoutStyles.countBadge}>{clientDebts.length}</span>}
           </button>
           <button
             type="button"
-            className={`debt-tab debt-tab-we-owe${direction === 'suppliers' ? ' debt-tab-active' : ''}`}
+            className={[
+              styles['debt-tab'],
+              styles['debt-tab-we-owe'],
+              direction === 'suppliers' && styles['debt-tab-active'],
+            ].filter(Boolean).join(' ')}
             onClick={() => setDirection('suppliers')}
           >
-            <span className="debt-tab-label">
+            <span className={styles['debt-tab-label']}>
               <IconArrowUpRight size={14} stroke={2} /> Мы должны поставщикам
             </span>
             <strong>{formatMoney(String(totalWeOwe))} ₽</strong>
-            {supplierDebts.length > 0 && <span className="count-badge">{supplierDebts.length}</span>}
+            {supplierDebts.length > 0 && <span className={layoutStyles.countBadge}>{supplierDebts.length}</span>}
           </button>
         </div>
       )}
@@ -372,12 +389,15 @@ export function DebtsPage() {
       )}
 
       {!loading && view === 'active' && (
-        <div className="debt-status-filters">
+        <div className={styles['debt-status-filters']}>
           {STATUS_FILTERS.map((f) => (
             <button
               key={f.value}
               type="button"
-              className={`debt-status-filter${statusFilter === f.value ? ' debt-status-filter-active' : ''}`}
+              className={[
+                styles['debt-status-filter'],
+                statusFilter === f.value && styles['debt-status-filter-active'],
+              ].filter(Boolean).join(' ')}
               onClick={() => setStatusFilter(f.value)}
             >
               {f.label}
@@ -388,9 +408,9 @@ export function DebtsPage() {
 
       {view === 'active' ? (
         loading ? (
-          <p className="text-muted">Загрузка…</p>
+          <p className={layoutStyles.textMuted}>Загрузка…</p>
         ) : visibleDebts.length === 0 ? (
-          <p className="text-muted">
+          <p className={layoutStyles.textMuted}>
             {query.trim()
               ? 'Ничего не найдено'
               : statusFilter === 'all'
@@ -398,25 +418,25 @@ export function DebtsPage() {
                 : 'Долгов с таким статусом нет'}
           </p>
         ) : (
-          <div className="debt-row-list">
+          <div className={styles['debt-row-list']}>
             {visibleDebts.map((d) => (
               <DebtRow key={d.id} debt={d} name={counterpartyName(d)} onOpen={() => navigate(`/debts/${d.id}`)} />
             ))}
           </div>
         )
       ) : loadingClosed ? (
-        <p className="text-muted">Загрузка…</p>
+        <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : closedGroups.length === 0 ? (
-        <p className="text-muted">{query.trim() ? 'Ничего не найдено' : 'Погашенных долгов нет'}</p>
+        <p className={layoutStyles.textMuted}>{query.trim() ? 'Ничего не найдено' : 'Погашенных долгов нет'}</p>
       ) : (
-        <div className="stack">
+        <div className={layoutStyles.stack}>
           {closedGroups.map((group) => (
-            <div key={group.label} className="debt-closed-group">
-              <div className="debt-closed-group-head">
+            <div key={group.label} className={styles['debt-closed-group']}>
+              <div className={styles['debt-closed-group-head']}>
                 <span>{group.label}</span>
-                <span className="text-muted">{group.items.length}</span>
+                <span className={layoutStyles.textMuted}>{group.items.length}</span>
               </div>
-              <div className="debt-row-list">
+              <div className={styles['debt-row-list']}>
                 {group.items.map((d) => (
                   <DebtRow key={d.id} debt={d} name={counterpartyName(d)} onOpen={() => navigate(`/debts/${d.id}`)} />
                 ))}
@@ -434,7 +454,7 @@ function DebtRow({ debt, name, onOpen }: { debt: Debt; name: string; onOpen: () 
 
   return (
     <div
-      className="debt-row"
+      className={styles['debt-row']}
       style={{ '--debt-accent': DEBT_STATUS_ACCENT[debt.status] } as CSSProperties}
       role="button"
       tabIndex={0}
@@ -443,32 +463,32 @@ function DebtRow({ debt, name, onOpen }: { debt: Debt; name: string; onOpen: () 
         if (e.key === 'Enter' || e.key === ' ') onOpen()
       }}
     >
-      <span className="debt-row-icon">
+      <span className={styles['debt-row-icon']}>
         <Icon size={16} stroke={1.8} />
       </span>
-      <div className="debt-row-main">
-        <div className="debt-row-top">
-          <span className="debt-row-name">{name}</span>
+      <div className={styles['debt-row-main']}>
+        <div className={styles['debt-row-top']}>
+          <span className={styles['debt-row-name']}>{name}</span>
           <strong>{formatMoney(debt.balance)} ₽</strong>
           <span className={DEBT_STATUS_BADGE_CLASS[debt.status]}>{DEBT_STATUS_LABELS[debt.status]}</span>
         </div>
-        <div className="debt-row-meta">
+        <div className={styles['debt-row-meta']}>
           <span>Остаток из {formatMoney(debt.amount)} ₽</span>
           {debt.due_date && !debt.is_closed && (
-            <span className={daysOverdue(debt.due_date) > 0 ? 'text-danger' : undefined}>
+            <span className={daysOverdue(debt.due_date) > 0 ? layoutStyles.textDanger : undefined}>
               {daysOverdue(debt.due_date) > 0
                 ? `Просрочен на ${daysOverdue(debt.due_date)} ${pluralDays(daysOverdue(debt.due_date))}`
                 : `Срок до ${formatDate(debt.due_date)}`}
             </span>
           )}
           {debt.schedule.length > 0 && (
-            <span className="debt-row-installment">
+            <span className={styles['debt-row-installment']}>
               <IconCalendarRepeat size={13} stroke={1.8} /> Рассрочка на {debt.schedule.length}
             </span>
           )}
         </div>
       </div>
-      <IconChevronRight size={18} stroke={1.8} className="debt-row-chevron" />
+      <IconChevronRight size={18} stroke={1.8} className={styles['debt-row-chevron']} />
     </div>
   )
 }
@@ -543,8 +563,8 @@ function IssueDebtForm({
   }
 
   return (
-    <form className="form" onSubmit={handleSubmit}>
-      <div className="row">
+    <form className={layoutStyles.form} onSubmit={handleSubmit}>
+      <div className={layoutStyles.row}>
         <Button variant={kind === 'client' ? 'primary' : 'secondary'} onClick={() => setKind('client')}>
           Клиенту (нам должны)
         </Button>
@@ -554,7 +574,7 @@ function IssueDebtForm({
       </div>
 
       {kind === 'client' ? (
-        <label className="field">
+        <label className={layoutStyles.field}>
           Клиент
           <div className="sale-client-row">
             <Select
@@ -579,7 +599,7 @@ function IssueDebtForm({
           </div>
         </label>
       ) : (
-        <label className="field">
+        <label className={layoutStyles.field}>
           Поставщик
           <Select
             value={supplierId != null ? String(supplierId) : ''}
@@ -589,7 +609,7 @@ function IssueDebtForm({
         </label>
       )}
 
-      <label className="field">
+      <label className={layoutStyles.field}>
         Сумма
         <input
           type="text"
@@ -602,7 +622,7 @@ function IssueDebtForm({
           required
         />
       </label>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Долг до
         <DateInput
           value={dueDate}
@@ -612,7 +632,7 @@ function IssueDebtForm({
         />
       </label>
       <DueDatePresets value={dueDate} onChange={setDueDate} />
-      <label className="field">
+      <label className={layoutStyles.field}>
         Заметка
         <input value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
@@ -627,8 +647,8 @@ function IssueDebtForm({
       </label>
 
       {withInstallment && (
-        <div className="stack" style={{ gap: 14 }}>
-          <label className="field">
+        <div className={layoutStyles.stack} style={{ gap: 14 }}>
+          <label className={layoutStyles.field}>
             Первый взнос (необязательно)
             <input
               type="text"
@@ -642,14 +662,14 @@ function IssueDebtForm({
             />
           </label>
           {downPaymentNum > 0 && (
-            <p className={downPaymentInvalid ? 'error' : 'text-muted'}>
+            <p className={downPaymentInvalid ? layoutStyles.error : layoutStyles.textMuted}>
               {downPaymentInvalid
                 ? 'Первый взнос должен быть меньше суммы долга'
                 : `В рассрочку пойдёт ${formatMoney(remainingAfterDownPayment)} ₽`}
             </p>
           )}
-          <div className="row">
-            <label className="field" style={{ flex: 1 }}>
+          <div className={layoutStyles.row}>
+            <label className={layoutStyles.field} style={{ flex: 1 }}>
               Платежей
               <input
                 type="number"
@@ -659,7 +679,7 @@ function IssueDebtForm({
                 onChange={(e) => setParts(Number(e.target.value))}
               />
             </label>
-            <label className="field" style={{ flex: 1 }}>
+            <label className={layoutStyles.field} style={{ flex: 1 }}>
               Периодичность
               <Select
                 value={period}
@@ -668,7 +688,7 @@ function IssueDebtForm({
               />
             </label>
           </div>
-          <label className="field">
+          <label className={layoutStyles.field}>
             {downPaymentNum > 0 ? 'Дата первого взноса и старт графика' : 'Первый платёж'}
             <DateInput
               value={firstPaymentDate}
@@ -679,7 +699,7 @@ function IssueDebtForm({
         </div>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       <Button
         type="submit"
         disabled={

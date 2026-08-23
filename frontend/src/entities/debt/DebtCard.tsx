@@ -11,6 +11,7 @@ import {
   buildInstallmentSchedule,
 } from './installmentSchedule'
 import { ApiError } from '../../shared/api/client'
+import layoutStyles from '../../shared/ui/Layout.module.css'
 import { Modal } from '../../shared/ui/Modal'
 import {
   IconUser,
@@ -30,6 +31,7 @@ import { InfoHint } from '../../shared/ui/InfoHint'
 import { formatMoney, formatQuantity, normalizeDecimalInput } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from './debtStatus'
 import { daysOverdue, pluralDays } from './dueDate'
+import styles from './DebtCard.module.css'
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('ru-RU')
@@ -88,13 +90,13 @@ function DueDateLabel({ dueDate, prefix = 'срок до' }: { dueDate: string; 
   const overdue = daysOverdue(dueDate)
   if (overdue > 0) {
     return (
-      <span className="text-danger">
+      <span className={layoutStyles.textDanger}>
         просрочен на {overdue} {pluralDays(overdue)}
       </span>
     )
   }
   if (overdue === 0) {
-    return <span className="text-warning">срок сегодня</span>
+    return <span className={layoutStyles.textWarning}>срок сегодня</span>
   }
   return (
     <span>
@@ -123,21 +125,25 @@ function DottedProgress({
   const percent = segments > 0 ? Math.min(100, Math.max(0, (filled / segments) * 100)) : 0
   const segmentWidth = segments > 0 ? 100 / segments : 0
   return (
-    <div className="debt-pay-progress-dots">
-      <div className="debt-pay-progress-track">
-        <div className="debt-pay-progress-fill" style={{ width: `${percent}%` }} />
+    <div className={styles['debt-pay-progress-dots']}>
+      <div className={styles['debt-pay-progress-track']}>
+        <div className={styles['debt-pay-progress-fill']} style={{ width: `${percent}%` }} />
         {showSegments &&
           segments > 1 &&
           Array.from({ length: segments - 1 }, (_, i) => (
             <span
               key={i}
-              className={`debt-pay-progress-tick${i < filled ? ' debt-pay-progress-tick-filled' : ''}`}
+              className={[styles['debt-pay-progress-tick'], i < filled && styles['debt-pay-progress-tick-filled']]
+                .filter(Boolean)
+                .join(' ')}
               style={{ left: `${segmentWidth * (i + 1)}%` }}
             />
           ))}
       </div>
       <span
-        className={`debt-pay-progress-goal${filled >= segments ? ' debt-pay-progress-goal-reached' : ''}`}
+        className={[styles['debt-pay-progress-goal'], filled >= segments && styles['debt-pay-progress-goal-reached']]
+          .filter(Boolean)
+          .join(' ')}
         title={dueDate ? `Срок ${formatDate(dueDate)}` : 'Полное погашение'}
       >
         {filled >= segments && <IconCheck size={8} stroke={3} />}
@@ -184,18 +190,18 @@ export function DebtCard({
   const Icon = debt.client_id != null ? IconUser : IconTruck
 
   return (
-    <div className="stack">
+    <div className={layoutStyles.stack}>
       {showHeader && (
-        <div className="section-title">
-          <div className="stack" style={{ gap: 2 }}>
-            <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-              <span className="debt-group-icon">
+        <div className={layoutStyles.sectionTitle}>
+          <div className={layoutStyles.stack} style={{ gap: 2 }}>
+            <div className={layoutStyles.row} style={{ gap: 8, alignItems: 'center' }}>
+              <span className={styles['debt-group-icon']}>
                 <Icon size={18} stroke={1.8} />
               </span>
               <h2>{counterpartyName(debt)}</h2>
               <span className={DEBT_STATUS_BADGE_CLASS[debt.status]}>{DEBT_STATUS_LABELS[debt.status]}</span>
             </div>
-            <span className="text-muted">
+            <span className={layoutStyles.textMuted}>
               {debt.client_id != null ? 'Должен нам' : 'Мы должны'} · выдан {formatDate(debt.issued_at)}
               {debt.due_date && !debt.is_closed && (
                 <>
@@ -209,16 +215,16 @@ export function DebtCard({
         </div>
       )}
 
-      <div className="debt-pay-progress">
-        <span className="debt-pay-progress-paid">Оплачено {formatMoney(debt.repaid)} ₽</span>
+      <div className={styles['debt-pay-progress']}>
+        <span className={styles['debt-pay-progress-paid']}>Оплачено {formatMoney(debt.repaid)} ₽</span>
         {!debt.is_closed && (
-          <div className="debt-pay-progress-labels">
-            <span className="debt-pay-progress-balance">
+          <div className={styles['debt-pay-progress-labels']}>
+            <span className={styles['debt-pay-progress-balance']}>
               Остаток {formatMoney(debt.balance)} ₽{' '}
-              <span className="text-muted">из {formatMoney(debt.amount)} ₽</span>
+              <span className={layoutStyles.textMuted}>из {formatMoney(debt.amount)} ₽</span>
             </span>
             {nextPaymentDue(debt) && (
-              <span className="debt-pay-progress-next text-muted">
+              <span className={[styles['debt-pay-progress-next'], layoutStyles.textMuted].join(' ')}>
                 Следующая оплата · {formatDate(nextPaymentDue(debt)!)}
               </span>
             )}
@@ -226,46 +232,46 @@ export function DebtCard({
         )}
       </div>
 
-      <span className="debt-item-source">
+      <span className={styles['debt-item-source']}>
         {debt.sale_id != null ? (
-          <Link to={`/?openSale=${debt.sale_id}`} className="debt-item-source-link">
+          <Link to={`/?openSale=${debt.sale_id}`} className={styles['debt-item-source-link']}>
             <IconReceipt size={13} stroke={1.8} /> Из продажи №{debt.sale_id}
           </Link>
         ) : debt.receipt_document_id != null ? (
-          <span className="text-muted">
+          <span className={layoutStyles.textMuted}>
             <IconReceipt size={13} stroke={1.8} /> Из приёмки №
             {receiptDocument?.number ?? debt.receipt_document_id}
           </span>
         ) : debt.note ? (
-          <span className="text-muted">{debt.note}</span>
+          <span className={layoutStyles.textMuted}>{debt.note}</span>
         ) : (
-          <span className="text-muted">Выдан вручную</span>
+          <span className={layoutStyles.textMuted}>Выдан вручную</span>
         )}
       </span>
 
       {sale && sale.lines.length > 0 && (
-        <div className="card card-full stack">
-          <div className="debt-receipt-header">
+        <div className={[layoutStyles.card, layoutStyles.cardFull, layoutStyles.stack].join(' ')}>
+          <div className={styles['debt-receipt-header']}>
             <h3>Товары из продажи</h3>
-            <span className="debt-receipt-count">
+            <span className={styles['debt-receipt-count']}>
               {sale.lines.length} {pluralItems(sale.lines.length)}
             </span>
           </div>
-          <div className="debt-receipt">
+          <div className={styles['debt-receipt']}>
             {sale.lines.map((line) => (
-              <div key={line.id} className="debt-receipt-row">
-                <span className="debt-receipt-name">
+              <div key={line.id} className={styles['debt-receipt-row']}>
+                <span className={styles['debt-receipt-name']}>
                   {products.find((p) => p.id === line.product_id)?.name ?? `Товар #${line.product_id}`}
                 </span>
-                <span className="debt-receipt-qty">
+                <span className={styles['debt-receipt-qty']}>
                   × {formatQuantity(line.quantity)} {unitName(line.product_id)}
                 </span>
-                <span className="debt-receipt-leader" />
-                <span className="debt-receipt-sum">{formatMoney(line.total)} ₽</span>
+                <span className={styles['debt-receipt-leader']} />
+                <span className={styles['debt-receipt-sum']}>{formatMoney(line.total)} ₽</span>
               </div>
             ))}
           </div>
-          <div className="debt-receipt-total">
+          <div className={styles['debt-receipt-total']}>
             <span>Итого</span>
             <strong>{formatMoney(String(sale.lines.reduce((sum, l) => sum + Number(l.total), 0)))} ₽</strong>
           </div>
@@ -273,24 +279,24 @@ export function DebtCard({
       )}
 
       {receiptDocument && receiptDocument.lines.length > 0 && (
-        <div className="card card-full stack">
-          <div className="debt-receipt-header">
+        <div className={[layoutStyles.card, layoutStyles.cardFull, layoutStyles.stack].join(' ')}>
+          <div className={styles['debt-receipt-header']}>
             <h3>Товары из приёмки</h3>
-            <span className="debt-receipt-count">
+            <span className={styles['debt-receipt-count']}>
               {receiptDocument.lines.length} {pluralItems(receiptDocument.lines.length)}
             </span>
           </div>
-          <div className="debt-receipt">
+          <div className={styles['debt-receipt']}>
             {receiptDocument.lines.map((line, i) => (
-              <div key={i} className="debt-receipt-row">
-                <span className="debt-receipt-name">
+              <div key={i} className={styles['debt-receipt-row']}>
+                <span className={styles['debt-receipt-name']}>
                   {products.find((p) => p.id === line.product_id)?.name ?? `Товар #${line.product_id}`}
                 </span>
-                <span className="debt-receipt-qty">
+                <span className={styles['debt-receipt-qty']}>
                   × {formatQuantity(line.quantity)} {unitName(line.product_id)}
                 </span>
-                <span className="debt-receipt-leader" />
-                <span className="debt-receipt-sum">
+                <span className={styles['debt-receipt-leader']} />
+                <span className={styles['debt-receipt-sum']}>
                   {line.cost != null ? `${formatMoney(String(Number(line.cost) * Number(line.quantity)))} ₽` : '—'}
                 </span>
               </div>
@@ -300,7 +306,7 @@ export function DebtCard({
       )}
 
       {!debt.is_closed && (
-        <div className="debt-detail-actions">
+        <div className={styles['debt-detail-actions']}>
           {debt.schedule.length === 0 && (
             <Button variant="secondary" onClick={() => setShowRepay(true)}>
               <IconCash size={15} stroke={1.8} /> Внести оплату
@@ -335,7 +341,7 @@ export function DebtCard({
             debt.due_date ? (
               <>
                 Продлить срок
-                <span className="modal-title-sub">сейчас до {formatDate(debt.due_date)}</span>
+                <span className={styles['modal-title-sub']}>сейчас до {formatDate(debt.due_date)}</span>
               </>
             ) : (
               'Продлить срок'
@@ -373,38 +379,38 @@ export function DebtCard({
       )}
 
       {debt.schedule.length > 0 && (
-        <div className="card card-full stack">
+        <div className={[layoutStyles.card, layoutStyles.cardFull, layoutStyles.stack].join(' ')}>
           <h3>График рассрочки</h3>
           <InstallmentSchedule debt={debt} onDone={onReload} />
         </div>
       )}
 
       {debt.schedule.length === 0 && debt.repayments.length > 0 && (
-        <div className="card card-full stack">
-          <div className="debt-payments-header">
-            <span className="row" style={{ gap: 8 }}>
+        <div className={[layoutStyles.card, layoutStyles.cardFull, layoutStyles.stack].join(' ')}>
+          <div className={styles['debt-payments-header']}>
+            <span className={layoutStyles.row} style={{ gap: 8 }}>
               <h3>Оплаты</h3>
-              <span className="text-muted">
+              <span className={layoutStyles.textMuted}>
                 {debt.repayments.length} {pluralPayments(debt.repayments.length)}
               </span>
             </span>
-            <span className="debt-payments-total">
+            <span className={styles['debt-payments-total']}>
               {formatMoney(String(debt.repayments.reduce((sum, r) => sum + Number(r.amount), 0)))} ₽
             </span>
           </div>
-          <div className="debt-payments-list">
+          <div className={styles['debt-payments-list']}>
             {[...debt.repayments]
               .sort((a, b) => b.on.localeCompare(a.on))
               .map((r, i) => (
-                <div key={i} className="debt-payment-row">
-                  <span className="debt-payment-check">
+                <div key={i} className={styles['debt-payment-row']}>
+                  <span className={styles['debt-payment-check']}>
                     <IconCheck size={12} stroke={2.5} />
                   </span>
-                  <div className="debt-payment-main">
-                    <span className="debt-payment-date">{formatPayDate(r.on)}</span>
-                    {r.note && <span className="debt-payment-note">{r.note}</span>}
+                  <div className={styles['debt-payment-main']}>
+                    <span className={styles['debt-payment-date']}>{formatPayDate(r.on)}</span>
+                    {r.note && <span className={styles['debt-payment-note']}>{r.note}</span>}
                   </div>
-                  <strong className="debt-payment-amount">{formatMoney(r.amount)} ₽</strong>
+                  <strong className={styles['debt-payment-amount']}>{formatMoney(r.amount)} ₽</strong>
                 </div>
               ))}
           </div>
@@ -449,15 +455,15 @@ function RepayDebtForm({
   }
 
   return (
-    <form className="form debt-detail-form" onSubmit={handleSubmit}>
-      <div className="debt-form-balance">
+    <form className={[layoutStyles.form, styles['debt-detail-form']].join(' ')} onSubmit={handleSubmit}>
+      <div className={styles['debt-form-balance']}>
         <span>Остаток долга</span>
         <strong>{formatMoney(balance)} ₽</strong>
       </div>
-      <p className="debt-form-explainer">
+      <p className={styles['debt-form-explainer']}>
         Разовый платёж без графика — просто уменьшает долг на внесённую сумму.
       </p>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Сумма
         <input
           type="text"
@@ -471,19 +477,19 @@ function RepayDebtForm({
           required
         />
       </label>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Дата оплаты
         <DateInput value={paidOn} onChange={setPaidOn} max={new Date().toISOString().slice(0, 10)} />
-        <span className="field-hint">Если оплату уже получили раньше — укажите тот день, а не сегодня</span>
+        <span className={layoutStyles.fieldHint}>Если оплату уже получили раньше — укажите тот день, а не сегодня</span>
       </label>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Комментарий
         <input placeholder="Необязательно" value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
       {willClose && (
-        <p className="debt-close-hint">Этой суммой долг будет погашен полностью — статус станет «Погашен».</p>
+        <p className={styles['debt-close-hint']}>Этой суммой долг будет погашен полностью — статус станет «Погашен».</p>
       )}
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       <Button type="submit" disabled={saving || !amount}>
         {saving ? 'Сохранение…' : willClose ? 'Погасить долг' : 'Сохранить'}
       </Button>
@@ -589,63 +595,76 @@ function InstallmentSchedule({ debt, onDone }: { debt: Debt; onDone: () => void 
   }
 
   return (
-    <div className="stack">
-      <div className="debt-pay-progress">
+    <div className={layoutStyles.stack}>
+      <div className={styles['debt-pay-progress']}>
         <DottedProgress
           segments={rows.length}
           filled={paidCount}
           dueDate={rows[rows.length - 1]?.due_date}
           showSegments
         />
-        <div className="debt-pay-progress-labels">
-          <span className="debt-pay-progress-paid">Оплачено {paidCount} из {rows.length}</span>
+        <div className={styles['debt-pay-progress-labels']}>
+          <span className={styles['debt-pay-progress-paid']}>Оплачено {paidCount} из {rows.length}</span>
         </div>
       </div>
 
-      <div className="debt-installment-list">
+      <div className={styles['debt-installment-list']}>
         {rows.map((s, i) => (
           <div
             key={i}
-            className={`debt-installment-row${s.paid ? ' debt-installment-row-paid' : !s.paid && daysOverdue(s.due_date) > 0 ? ' debt-installment-row-overdue' : ''}`}
+            className={[
+              styles['debt-installment-row'],
+              s.paid
+                ? styles['debt-installment-row-paid']
+                : !s.paid && daysOverdue(s.due_date) > 0 && styles['debt-installment-row-overdue'],
+            ]
+              .filter(Boolean)
+              .join(' ')}
           >
-            <div className="debt-installment-cols">
-              <span className="debt-installment-check">
+            <div className={styles['debt-installment-cols']}>
+              <span className={styles['debt-installment-check']}>
                 {s.paid ? (
                   <IconCheck size={12} stroke={2.5} />
                 ) : daysOverdue(s.due_date) > 0 ? (
                   <IconClockExclamation size={12} stroke={2} />
                 ) : (
-                  <span className="debt-installment-check-dot" />
+                  <span className={styles['debt-installment-check-dot']} />
                 )}
               </span>
-              <span className="debt-installment-main">
-                <span className="debt-installment-date">
+              <span className={styles['debt-installment-main']}>
+                <span className={styles['debt-installment-date']}>
                   {formatDate(s.due_date)}
-                  {!s.paid && i === nextUnpaidIndex && <span className="badge accent">Следующий</span>}
+                  {!s.paid && i === nextUnpaidIndex && (
+                    <span className={[layoutStyles.badge, layoutStyles.accent].join(' ')}>Следующий</span>
+                  )}
                   {!s.paid && daysOverdue(s.due_date) > 0 && (
-                    <span className="text-danger">
+                    <span className={layoutStyles.textDanger}>
                       просрочен на {daysOverdue(s.due_date)} {pluralDays(daysOverdue(s.due_date))}
                     </span>
                   )}
                 </span>
                 {s.paidOn && (
-                  <span className={s.paidOn !== s.due_date ? 'debt-installment-paid-on-diff' : 'text-muted'}>
+                  <span
+                    className={
+                      s.paidOn !== s.due_date ? styles['debt-installment-paid-on-diff'] : layoutStyles.textMuted
+                    }
+                  >
                     Оплачен {formatDate(s.paidOn)}
                     {s.paidOn !== s.due_date &&
                       (s.paidOn < s.due_date ? ' · раньше срока' : ' · позже срока')}
                   </span>
                 )}
               </span>
-              <strong className="debt-installment-sum">
+              <strong className={styles['debt-installment-sum']}>
                 {!s.paid && s.remaining < Number(s.amount) - 0.01 && (
-                  <span className="debt-installment-sum-original">{formatMoney(s.amount)} ₽</span>
+                  <span className={styles['debt-installment-sum-original']}>{formatMoney(s.amount)} ₽</span>
                 )}
                 {formatMoney(String(s.paid ? s.amount : s.remaining))} ₽
               </strong>
             </div>
             {!s.paid && payingIndex === i && (
-              <div className="debt-installment-pay-form">
-                <label className="field">
+              <div className={styles['debt-installment-pay-form']}>
+                <label className={layoutStyles.field}>
                   Сумма
                   <input
                     type="text"
@@ -657,26 +676,26 @@ function InstallmentSchedule({ debt, onDone }: { debt: Debt; onDone: () => void 
                     }}
                   />
                 </label>
-                <label className="field">
+                <label className={layoutStyles.field}>
                   Дата оплаты
                   <DateInput value={payDate} onChange={setPayDate} max={new Date().toISOString().slice(0, 10)} />
                 </label>
                 {debtWillClose(i) ? (
-                  <p className="debt-close-hint debt-installment-close-hint">
+                  <p className={[styles['debt-close-hint'], styles['debt-installment-close-hint']].join(' ')}>
                     Этой суммой долг будет погашен полностью — статус станет «Погашен».
                   </p>
                 ) : (
                   payAmount &&
                   Math.abs(Number(payAmount) - s.remaining) > 0.01 && (
-                    <p className="debt-close-hint debt-installment-close-hint">
+                    <p className={[styles['debt-close-hint'], styles['debt-installment-close-hint']].join(' ')}>
                       {Number(payAmount) > s.remaining
                         ? `Платёж больше на ${formatMoney(String(Number(payAmount) - s.remaining))} ₽ — излишек пойдёт в счёт следующих платежей.`
                         : `Платёж меньше на ${formatMoney(String(s.remaining - Number(payAmount)))} ₽ — нехватка перейдёт на следующий платёж.`}
                     </p>
                   )
                 )}
-                {error && <p className="error debt-installment-error">{error}</p>}
-                <div className="debt-installment-row-actions">
+                {error && <p className={layoutStyles.error}>{error}</p>}
+                <div className={styles['debt-installment-row-actions']}>
                   <Button onClick={() => markPaid(i)} disabled={!payAmount || !payDate || savingIndex === i}>
                     {savingIndex === i ? 'Сохранение…' : 'Подтвердить'}
                   </Button>
@@ -693,7 +712,7 @@ function InstallmentSchedule({ debt, onDone }: { debt: Debt; onDone: () => void 
               </div>
             )}
             {!s.paid && payingIndex !== i && (
-              <div className="debt-installment-row-actions">
+              <div className={styles['debt-installment-row-actions']}>
                 <Button
                   variant="secondary"
                   onClick={() => {
@@ -773,19 +792,19 @@ function ExtendDebtForm({
   }
 
   return (
-    <form className="form debt-detail-form" onSubmit={handleSubmit}>
-      <p className="text-muted debt-form-hint-row">
+    <form className={[layoutStyles.form, styles['debt-detail-form']].join(' ')} onSubmit={handleSubmit}>
+      <p className={[layoutStyles.textMuted, styles['debt-form-hint-row']].join(' ')}>
         Текущий остаток долга: {formatMoney(balance)} ₽
         <InfoHint text="Переносит общий срок «Долг до» на другую дату." />
       </p>
       {hasSchedule && (
-        <p className="debt-extend-warning">
+        <p className={styles['debt-extend-warning']}>
           У долга есть график рассрочки — продление меняет только общий срок «Долг до», сроки
           отдельных платежей графика останутся прежними. Перенести конкретный платёж можно
           в самом графике.
         </p>
       )}
-      <label className="field">
+      <label className={layoutStyles.field}>
         Новый срок «Долг до»
         <DateInput
           value={newDueDate}
@@ -794,7 +813,7 @@ function ExtendDebtForm({
           required
         />
       </label>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Причина
         <input
           value={reason}
@@ -802,7 +821,7 @@ function ExtendDebtForm({
           placeholder="Например: попросил ещё неделю"
         />
       </label>
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       <Button type="submit" disabled={saving}>
         {saving ? 'Сохранение…' : 'Продлить'}
       </Button>
@@ -868,12 +887,12 @@ function InstallmentForm({
   }
 
   return (
-    <form className="form debt-detail-form" onSubmit={handleSubmit}>
-      <p className="text-muted debt-form-hint-row">
+    <form className={[layoutStyles.form, styles['debt-detail-form']].join(' ')} onSubmit={handleSubmit}>
+      <p className={[layoutStyles.textMuted, styles['debt-form-hint-row']].join(' ')}>
         Остаток к разбивке: {formatMoney(balance)} ₽
         <InfoHint text="Разбивает остаток на платежи по датам — чтобы видеть график и не забыть сроки." />
       </p>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Первый взнос (необязательно)
         <input
           type="text"
@@ -889,14 +908,14 @@ function InstallmentForm({
         />
       </label>
       {downPaymentNum > 0 && (
-        <p className={downPaymentInvalid ? 'error' : 'text-muted'}>
+        <p className={downPaymentInvalid ? layoutStyles.error : layoutStyles.textMuted}>
           {downPaymentInvalid
             ? 'Первый взнос должен быть меньше остатка долга'
             : `В рассрочку пойдёт ${formatMoney(remainingBalance)} ₽`}
         </p>
       )}
-      <div className="row">
-        <label className="field" style={{ flex: 1 }}>
+      <div className={layoutStyles.row}>
+        <label className={layoutStyles.field} style={{ flex: 1 }}>
           Платежей
           <input
             type="number"
@@ -909,7 +928,7 @@ function InstallmentForm({
             }}
           />
         </label>
-        <label className="field" style={{ flex: 1 }}>
+        <label className={layoutStyles.field} style={{ flex: 1 }}>
           Периодичность
           <Select
             value={period}
@@ -921,7 +940,7 @@ function InstallmentForm({
           />
         </label>
       </div>
-      <label className="field">
+      <label className={layoutStyles.field}>
         {downPaymentNum > 0 ? 'Дата первого взноса и старт графика' : 'Первый платёж'}
         <DateInput
           value={firstDate}
@@ -939,10 +958,10 @@ function InstallmentForm({
         </Button>
       ) : (
         <>
-          <div className="debt-schedule">
-            <span className="field-group-title">График (можно поправить вручную)</span>
+          <div className={styles['debt-schedule']}>
+            <span className={styles['field-group-title']}>График (можно поправить вручную)</span>
             {rows.map((row, i) => (
-              <div key={i} className="debt-schedule-edit-row">
+              <div key={i} className={styles['debt-schedule-edit-row']}>
                 <DateInput
                   value={row.due_date}
                   min={new Date().toISOString().slice(0, 10)}
@@ -958,18 +977,18 @@ function InstallmentForm({
                     setRows((prev) => prev!.map((r, j) => (j === i ? { ...r, amount: normalized } : r)))
                   }}
                 />
-                <span className="text-muted">₽</span>
+                <span className={layoutStyles.textMuted}>₽</span>
               </div>
             ))}
           </div>
-          <p className={balanceMismatch ? 'error' : 'text-muted'}>
+          <p className={balanceMismatch ? layoutStyles.error : layoutStyles.textMuted}>
             Сумма графика: {formatMoney(String(rowsTotal))} ₽
             {balanceMismatch && ` — должна совпадать с остатком ${formatMoney(remainingBalance)} ₽`}
           </p>
         </>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       <Button type="submit" disabled={saving || !rows || balanceMismatch}>
         {saving
           ? 'Сохранение…'

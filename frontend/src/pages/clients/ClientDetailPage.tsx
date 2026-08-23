@@ -30,6 +30,9 @@ import { PhoneInput } from '../../shared/ui/PhoneInput'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
 import { daysOverdue, pluralDays } from '../../entities/debt/dueDate'
+import layoutStyles from '../../shared/ui/Layout.module.css'
+import debtsStyles from '../debts/DebtsPage.module.css'
+import styles from './ClientDetailPage.module.css'
 
 const DEBT_STATUS_ACCENT: Record<Debt['status'], string> = {
   active: 'var(--border)',
@@ -237,33 +240,33 @@ export function ClientDetailPage() {
 
   if (!loading && !client) {
     return (
-      <div className="stack">
+      <div className={layoutStyles.stack}>
         <Link to="/clients" className="back-link">
           <IconChevronLeft size={16} stroke={1.8} /> Все контрагенты
         </Link>
-        <p className="error">{error ?? 'Клиент не найден'}</p>
+        <p className={layoutStyles.error}>{error ?? 'Клиент не найден'}</p>
       </div>
     )
   }
 
   return (
-    <div className="stack">
+    <div className={layoutStyles.stack}>
       <Link to="/clients" className="back-link">
         <IconChevronLeft size={16} stroke={1.8} /> Все контрагенты
       </Link>
 
       {!client ? (
-        <p className="text-muted">Загрузка…</p>
+        <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : (
         <>
-          <div className="client-detail-header">
-            <span className="client-detail-avatar">
+          <div className={styles['client-detail-header']}>
+            <span className={styles['client-detail-avatar']}>
               <IconUser size={22} stroke={1.8} />
             </span>
-            <div className="client-detail-heading">
-              <div className="row" style={{ gap: 6 }}>
+            <div className={styles['client-detail-heading']}>
+              <div className={layoutStyles.row} style={{ gap: 6 }}>
                 <h2>{client.name}</h2>
-                {!client.is_active && <span className="badge">Неактивен</span>}
+                {!client.is_active && <span className={layoutStyles.badge}>Неактивен</span>}
                 <IconButton
                   variant="muted"
                   tooltip="Изменить клиента"
@@ -273,7 +276,7 @@ export function ClientDetailPage() {
                   <IconPencil size={16} stroke={1.8} />
                 </IconButton>
               </div>
-              <div className="client-detail-contacts">
+              <div className={styles['client-detail-contacts']}>
                 {client.phone && (
                   <span>
                     <IconPhone size={13} stroke={1.8} /> {client.phone}
@@ -287,46 +290,46 @@ export function ClientDetailPage() {
                 {client.debt_limit && <span>Лимит долга: {formatMoney(client.debt_limit)} ₽</span>}
               </div>
             </div>
-            <div className={`client-reputation client-reputation-${reputation.level}`}>
+            <div className={`${styles['client-reputation']} ${styles[`client-reputation-${reputation.level}`]}`}>
               <ReputationIcon size={18} stroke={1.8} />
-              <div className="client-reputation-text">
+              <div className={styles['client-reputation-text']}>
                 <strong>{reputation.label}</strong>
                 <span>{reputation.hint}</span>
               </div>
             </div>
           </div>
 
-          <div className="client-metrics">
-            <div className="client-metric">
-              <span className="client-metric-icon">
+          <div className={styles['client-metrics']}>
+            <div className={styles['client-metric']}>
+              <span className={styles['client-metric-icon']}>
                 <IconWallet size={16} stroke={1.8} />
               </span>
-              <div className="client-metric-body">
+              <div className={styles['client-metric-body']}>
                 <strong>{formatMoney(totalBalance)} ₽</strong>
                 <span>Долг сейчас{activeDebts.length > 0 ? ` · ${activeDebts.length} шт.` : ''}</span>
               </div>
             </div>
-            <div className="client-metric">
-              <span className="client-metric-icon">
+            <div className={styles['client-metric']}>
+              <span className={styles['client-metric-icon']}>
                 <IconReceipt2 size={16} stroke={1.8} />
               </span>
-              <div className="client-metric-body">
+              <div className={styles['client-metric-body']}>
                 <strong>{formatMoney(totalPurchased)} ₽</strong>
                 <span>Куплено всего{sales ? ` · ${sales.length} продаж` : ''}</span>
               </div>
             </div>
-            <div className="client-metric">
-              <span className="client-metric-icon">
+            <div className={styles['client-metric']}>
+              <span className={styles['client-metric-icon']}>
                 <IconClockHour4 size={16} stroke={1.8} />
               </span>
-              <div className="client-metric-body">
+              <div className={styles['client-metric-body']}>
                 <strong>{closedDebts.length}</strong>
                 <span>Долгов закрыто</span>
               </div>
             </div>
           </div>
 
-          <div className="row sale-period-tabs">
+          <div className="sale-period-tabs">
             <Button variant="secondary" active={tab === 'debts'} onClick={() => setTab('debts')}>
               Долги{debts ? ` ${debts.length}` : ''}
             </Button>
@@ -338,23 +341,23 @@ export function ClientDetailPage() {
             </Button>
           </div>
 
-          {error && <p className="error">{error}</p>}
+          {error && <p className={layoutStyles.error}>{error}</p>}
 
           {tab === 'debts' &&
             (debts === null ? (
-              <p className="text-muted">Загрузка…</p>
+              <p className={layoutStyles.textMuted}>Загрузка…</p>
             ) : debts.length === 0 ? (
-              <p className="text-muted">Долгов пока нет</p>
+              <p className={layoutStyles.textMuted}>Долгов пока нет</p>
             ) : (
-              <div className="stack" style={{ gap: 16 }}>
-                <div className="debt-closed-group">
-                  <div className="debt-closed-group-head">
+              <div className={layoutStyles.stack} style={{ gap: 16 }}>
+                <div className={debtsStyles['debt-closed-group']}>
+                  <div className={debtsStyles['debt-closed-group-head']}>
                     Текущие долги{activeDebts.length > 0 ? ` · ${activeDebts.length}` : ''}
                   </div>
                   {activeDebts.length === 0 ? (
-                    <p className="text-muted">Активных долгов нет</p>
+                    <p className={layoutStyles.textMuted}>Активных долгов нет</p>
                   ) : (
-                    <div className="debt-row-list">
+                    <div className={debtsStyles['debt-row-list']}>
                       {activeDebts.map((d) => (
                         <DebtRow key={d.id} debt={d} onClick={() => openDebt(d.id)} />
                       ))}
@@ -362,9 +365,9 @@ export function ClientDetailPage() {
                   )}
                 </div>
                 {closedDebts.length > 0 && (
-                  <div className="debt-closed-group">
-                    <div className="debt-closed-group-head">Погашенные · {closedDebts.length}</div>
-                    <div className="debt-row-list">
+                  <div className={debtsStyles['debt-closed-group']}>
+                    <div className={debtsStyles['debt-closed-group-head']}>Погашенные · {closedDebts.length}</div>
+                    <div className={debtsStyles['debt-row-list']}>
                       {closedDebts.map((d) => (
                         <DebtRow key={d.id} debt={d} onClick={() => openDebt(d.id)} />
                       ))}
@@ -376,23 +379,23 @@ export function ClientDetailPage() {
 
           {tab === 'sales' &&
             (sales === null ? (
-              <p className="text-muted">Загрузка…</p>
+              <p className={layoutStyles.textMuted}>Загрузка…</p>
             ) : sales.length === 0 ? (
-              <p className="text-muted">Покупок пока нет</p>
+              <p className={layoutStyles.textMuted}>Покупок пока нет</p>
             ) : (
-              <div className="data-table">
-                <div className="data-table-head" style={{ gridTemplateColumns: '1fr 1fr 1fr 20px' }}>
+              <div className={layoutStyles.dataTable}>
+                <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: '1fr 1fr 1fr 20px' }}>
                   <span>Дата</span>
                   <span>Сумма</span>
                   <span>Оплата</span>
                   <span />
                 </div>
-                <div className="data-table-body">
+                <div className={layoutStyles.dataTableBody}>
                   {sales.map((s) => (
-                    <div key={s.id} className="data-row" style={{ gridTemplateColumns: '1fr 1fr 1fr 20px' }}>
-                      <span className="text-muted">{formatDateTime(s.created_at)}</span>
-                      <span className="data-row-name">{formatMoney(s.total)} ₽</span>
-                      <span className="text-muted">
+                    <div key={s.id} className={layoutStyles.dataRow} style={{ gridTemplateColumns: '1fr 1fr 1fr 20px' }}>
+                      <span className={layoutStyles.textMuted}>{formatDateTime(s.created_at)}</span>
+                      <span className={layoutStyles.dataRowName}>{formatMoney(s.total)} ₽</span>
+                      <span className={layoutStyles.textMuted}>
                         {s.payment_method === 'cash' ? 'Наличные' : s.payment_method === 'transfer' ? 'Перевод' : 'В долг'}
                       </span>
                       <span />
@@ -404,21 +407,21 @@ export function ClientDetailPage() {
 
           {tab === 'history' &&
             (debts === null || sales === null ? (
-              <p className="text-muted">Загрузка…</p>
+              <p className={layoutStyles.textMuted}>Загрузка…</p>
             ) : history.length === 0 ? (
-              <p className="text-muted">Событий пока нет</p>
+              <p className={layoutStyles.textMuted}>Событий пока нет</p>
             ) : (
-              <div className="client-history-list">
+              <div className={styles['client-history-list']}>
                 {history.map((ev, i) => {
                   const Icon =
                     ev.kind === 'sale' ? IconReceipt2 : ev.kind === 'repay' ? IconCash : IconCalendarRepeat
                   const clickable = ev.debtId != null || ev.saleId != null
                   const content = (
                     <>
-                      <span className="client-history-icon">
+                      <span className={styles['client-history-icon']}>
                         <Icon size={14} stroke={1.8} />
                       </span>
-                      <div className="client-history-body">
+                      <div className={styles['client-history-body']}>
                         <span>
                           {ev.kind === 'issue' && <>Выдан долг на {formatMoney(ev.amount ?? '0')} ₽</>}
                           {ev.kind === 'repay' && (
@@ -429,9 +432,11 @@ export function ClientDetailPage() {
                           {ev.kind === 'extend' && <>Продление срока — {ev.note}</>}
                           {ev.kind === 'sale' && <>Покупка на {formatMoney(ev.amount ?? '0')} ₽</>}
                         </span>
-                        <span className="text-muted">{formatDate(ev.at)}</span>
+                        <span className={layoutStyles.textMuted}>{formatDate(ev.at)}</span>
                       </div>
-                      {clickable && <IconChevronRight size={16} stroke={1.8} className="data-row-chevron" />}
+                      {clickable && (
+                        <IconChevronRight size={16} stroke={1.8} className={layoutStyles.dataRowChevron} />
+                      )}
                     </>
                   )
                   if (ev.saleId != null) {
@@ -439,7 +444,7 @@ export function ClientDetailPage() {
                       <Link
                         key={i}
                         to={`/?openSale=${ev.saleId}`}
-                        className="client-history-row client-history-row-link"
+                        className={`${styles['client-history-row']} ${styles['client-history-row-link']}`}
                       >
                         {content}
                       </Link>
@@ -448,7 +453,10 @@ export function ClientDetailPage() {
                   return (
                     <div
                       key={i}
-                      className={`client-history-row${clickable ? ' client-history-row-link' : ''}`}
+                      className={[
+                        styles['client-history-row'],
+                        clickable && styles['client-history-row-link'],
+                      ].filter(Boolean).join(' ')}
                       role={clickable ? 'button' : undefined}
                       tabIndex={clickable ? 0 : undefined}
                       onClick={clickable ? () => openDebt(ev.debtId!) : undefined}
@@ -465,7 +473,7 @@ export function ClientDetailPage() {
       {openDebtId != null && (
         <Modal title="Долг" onClose={() => setOpenDebtId(null)}>
           {debtLoading ? (
-            <p className="text-muted">Загрузка…</p>
+            <p className={layoutStyles.textMuted}>Загрузка…</p>
           ) : (
             (() => {
               const openDebtEntity = (debts ?? []).find((d) => d.id === openDebtId)
@@ -482,7 +490,7 @@ export function ClientDetailPage() {
                   showHeader={false}
                 />
               ) : (
-                <p className="error">Долг не найден</p>
+                <p className={layoutStyles.error}>Долг не найден</p>
               )
             })()
           )}
@@ -534,20 +542,20 @@ function EditClientForm({ client, onDone }: { client: Client; onDone: () => void
   }
 
   return (
-    <form className="form" onSubmit={handleSubmit}>
-      <label className="field">
+    <form className={layoutStyles.form} onSubmit={handleSubmit}>
+      <label className={layoutStyles.field}>
         Имя
         <input value={name} onChange={(e) => setName(e.target.value)} required />
       </label>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Телефон
         <PhoneInput value={phone} onChange={setPhone} />
       </label>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Город
         <input value={city} onChange={(e) => setCity(e.target.value)} />
       </label>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Лимит долга
         <input
           type="text"
@@ -559,11 +567,11 @@ function EditClientForm({ client, onDone }: { client: Client; onDone: () => void
           }}
         />
       </label>
-      <label className="row" style={{ gap: 8 }}>
+      <label className={layoutStyles.row} style={{ gap: 8 }}>
         <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
         Активен
       </label>
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       <Button type="submit" disabled={saving}>
         {saving ? 'Сохранение…' : 'Сохранить'}
       </Button>
@@ -575,23 +583,23 @@ function DebtRow({ debt, onClick }: { debt: Debt; onClick: () => void }) {
   return (
     <button
       type="button"
-      className="debt-row"
+      className={debtsStyles['debt-row']}
       style={{ '--debt-accent': DEBT_STATUS_ACCENT[debt.status] } as CSSProperties}
       onClick={onClick}
     >
-      <span className="debt-row-icon">
+      <span className={debtsStyles['debt-row-icon']}>
         <IconUser size={16} stroke={1.8} />
       </span>
-      <div className="debt-row-main">
-        <div className="debt-row-top">
-          <span className="debt-row-name">{formatDate(debt.issued_at)}</span>
+      <div className={debtsStyles['debt-row-main']}>
+        <div className={debtsStyles['debt-row-top']}>
+          <span className={debtsStyles['debt-row-name']}>{formatDate(debt.issued_at)}</span>
           <strong>{formatMoney(debt.balance)} ₽</strong>
           <span className={DEBT_STATUS_BADGE_CLASS[debt.status]}>{DEBT_STATUS_LABELS[debt.status]}</span>
         </div>
-        <div className="debt-row-meta">
+        <div className={debtsStyles['debt-row-meta']}>
           <span>Остаток из {formatMoney(debt.amount)} ₽</span>
           {debt.due_date && !debt.is_closed && (
-            <span className={daysOverdue(debt.due_date) > 0 ? 'text-danger' : undefined}>
+            <span className={daysOverdue(debt.due_date) > 0 ? layoutStyles.textDanger : undefined}>
               {daysOverdue(debt.due_date) > 0
                 ? `Просрочен на ${daysOverdue(debt.due_date)} ${pluralDays(daysOverdue(debt.due_date))}`
                 : `Срок до ${formatDate(debt.due_date)}`}
@@ -599,7 +607,7 @@ function DebtRow({ debt, onClick }: { debt: Debt; onClick: () => void }) {
           )}
         </div>
       </div>
-      <IconChevronRight size={18} stroke={1.8} className="debt-row-chevron" />
+      <IconChevronRight size={18} stroke={1.8} className={debtsStyles['debt-row-chevron']} />
     </button>
   )
 }

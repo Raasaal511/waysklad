@@ -8,6 +8,7 @@ import { listAllProducts, listUnits, type Product, type Unit } from '../../entit
 import { DebtCard } from '../../entities/debt/DebtCard'
 import { ApiError } from '../../shared/api/client'
 import { IconChevronLeft } from '@tabler/icons-react'
+import layoutStyles from '../../shared/ui/Layout.module.css'
 
 export function DebtDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -68,23 +69,23 @@ export function DebtDetailPage() {
 
   if (!loading && !debt) {
     return (
-      <div className="stack">
+      <div className={layoutStyles.stack}>
         <Link to="/debts" className="back-link">
           <IconChevronLeft size={16} stroke={1.8} /> Все долги
         </Link>
-        <p className="error">{error ?? 'Долг не найден'}</p>
+        <p className={layoutStyles.error}>{error ?? 'Долг не найден'}</p>
       </div>
     )
   }
 
   return (
-    <div className="stack">
+    <div className={layoutStyles.stack}>
       <Link to="/debts" className="back-link">
         <IconChevronLeft size={16} stroke={1.8} /> Все долги
       </Link>
 
       {!debt ? (
-        <p className="text-muted">Загрузка…</p>
+        <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : (
         <DebtCard
           debt={debt}
