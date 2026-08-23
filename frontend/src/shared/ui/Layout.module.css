@@ -1,0 +1,337 @@
+/* Общие layout- и утилитарные классы, используемые на множестве разных
+   страниц и shared/ui-компонентов. Перенесено из src/index.css.
+   Глобальные переменные темы (--bg, --text, --accent и т.д.) остаются
+   в index.css — здесь только их использование через var(...). */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.between {
+  justify-content: space-between;
+}
+
+.wrap {
+  flex-wrap: wrap;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.cardFull {
+  max-width: none;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.fieldLabel {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.fieldHint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+.error {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.textMuted {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.textDanger {
+  color: var(--danger);
+}
+
+.textWarning {
+  color: var(--warning);
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+a.badge:hover {
+  filter: brightness(0.94);
+}
+
+.badge.accent {
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-muted));
+  color: var(--accent);
+}
+
+.badge.danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.badge.warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.countBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  margin-left: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Универсальный паттерн "табличного" списка на div/grid вместо голого
+ * <table> — даёт живой hover/анимации, которые border-collapse ломает
+ * на настоящих таблицах. Колонки задаются через inline
+ * style={{ gridTemplateColumns: '...' }} на .dataTableHead и .dataRow
+ * (одинаковое значение на обоих, чтобы колонки шапки и строк совпадали).
+ */
+
+.dataTable {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.dataTableHead,
+.dataRow {
+  display: grid;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+}
+
+.dataTableHead {
+  padding: 12px 14px;
+  background: var(--bg-muted);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.dataTableBody {
+  display: flex;
+  flex-direction: column;
+}
+
+.dataRow {
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.dataRow:first-child {
+  border-top: none;
+}
+
+.dataRowLink {
+  cursor: pointer;
+}
+
+.dataRowLink:hover {
+  background: var(--accent-soft);
+}
+
+.dataRowLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.dataRowName {
+  font-weight: 600;
+  color: var(--text);
+  white-space: normal;
+}
+
+.dataRowQty {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.dataRowQtyLow {
+  color: var(--warning);
+}
+
+.dataRowQtyOut {
+  color: var(--danger);
+}
+
+.dataRowChevron {
+  justify-self: end;
+  color: var(--text-muted);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.dataRowLink:hover .dataRowChevron {
+  transform: translateX(3px);
+  color: var(--accent);
+}
+
+.dataRow:disabled {
+  cursor: default;
+}
+
+/* Select trigger — общая "коробка"-триггер для Select.tsx и DateInput.tsx */
+.selectTrigger {
+  font: inherit;
+  font-weight: 400;
+  color: var(--text);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.selectTrigger:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.selectTrigger:focus-visible,
+.selectTrigger[aria-expanded='true'] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.selectTrigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.selectTriggerValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectTriggerPlaceholder {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectTriggerIcon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+/* Select menu — общий выпадающий список для Select.tsx и DropdownMenu.tsx */
+.selectMenu {
+  position: fixed;
+  z-index: 200;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  max-height: 260px;
+  max-width: calc(100vw - 24px);
+  overflow-y: auto;
+  padding: 4px;
+  list-style: none;
+  margin: 0;
+}
+
+.selectMenuItem {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.selectMenuItemHighlighted {
+  background: var(--bg-muted);
+}
+
+.selectMenuItemSelected {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.selectMenuItemDisabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import styles from './InlinePopover.module.css'
 
 const POPOVER_WIDTH = 280
 
@@ -66,7 +67,7 @@ export function InlinePopover({
   }, [open, onOpenChange])
 
   return (
-    <div ref={anchorRef} className="inline-popover-anchor">
+    <div ref={anchorRef} className={styles['inline-popover-anchor']}>
       {trigger}
       {open &&
         pos &&
@@ -75,10 +76,10 @@ export function InlinePopover({
             ref={panelRef}
             role="dialog"
             aria-label={title}
-            className="inline-popover"
+            className={styles['inline-popover']}
             style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
           >
-            <div className="inline-popover-title">{title}</div>
+            <div className={styles['inline-popover-title']}>{title}</div>
             {children}
           </div>,
           document.body,

@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconCalendar, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
+import layoutStyles from './Layout.module.css'
+import styles from './DateInput.module.css'
 
 interface DateInputProps {
   value: string
@@ -67,7 +69,7 @@ export function DateInput({ value, onChange, min, max, className, disabled, requ
       const trigger = triggerRef.current
       if (!trigger) return
       const rect = trigger.getBoundingClientRect()
-      const menuWidth = 280 // совпадает с шириной .date-picker в index.css
+      const menuWidth = 280 // совпадает с шириной .date-picker в DateInput.module.css
       const menuHeight = menuRef.current?.offsetHeight ?? 340
       const margin = 8
       const left = Math.min(
@@ -167,7 +169,7 @@ export function DateInput({ value, onChange, min, max, className, disabled, requ
     triggerRef.current?.focus()
   }
 
-  const classes = ['select-trigger', 'date-input-trigger']
+  const classes = [layoutStyles.selectTrigger, styles['date-input-trigger']]
   if (required && !value) classes.push('input-required')
   if (className) classes.push(className)
 
@@ -185,8 +187,8 @@ export function DateInput({ value, onChange, min, max, className, disabled, requ
         aria-expanded={open}
         onClick={() => !disabled && setOpen((v) => !v)}
       >
-        <IconCalendar size={16} stroke={1.8} className="date-input-icon" />
-        <span className={value ? 'select-trigger-value' : 'select-trigger-placeholder'}>
+        <IconCalendar size={16} stroke={1.8} className={styles['date-input-icon']} />
+        <span className={value ? layoutStyles.selectTriggerValue : layoutStyles.selectTriggerPlaceholder}>
           {value ? formatDisplay(value) : 'Выберите дату'}
         </span>
       </button>
@@ -197,42 +199,48 @@ export function DateInput({ value, onChange, min, max, className, disabled, requ
           <div
             ref={menuRef}
             role="dialog"
-            className="date-picker"
+            className={styles['date-picker']}
             style={{ top: menuStyle.top, left: menuStyle.left }}
           >
-            <div className="date-picker-header">
+            <div className={styles['date-picker-header']}>
               <button
                 type="button"
-                className="date-picker-nav"
+                className={styles['date-picker-nav']}
                 onClick={goToPrevMonth}
                 aria-label="Предыдущий месяц"
               >
                 <IconChevronLeft size={16} stroke={1.8} />
               </button>
-              <span className="date-picker-title">
+              <span className={styles['date-picker-title']}>
                 {MONTHS[viewMonth]} {viewYear}
               </span>
               <button
                 type="button"
-                className="date-picker-nav"
+                className={styles['date-picker-nav']}
                 onClick={goToNextMonth}
                 aria-label="Следующий месяц"
               >
                 <IconChevronRight size={16} stroke={1.8} />
               </button>
             </div>
-            <div className="date-picker-weekdays">
+            <div className={styles['date-picker-weekdays']}>
               {WEEKDAYS.map((w) => (
                 <span key={w}>{w}</span>
               ))}
             </div>
-            <div className="date-picker-grid">
+            <div className={styles['date-picker-grid']}>
               {cells.map((date, i) =>
                 date ? (
                   <button
                     key={i}
                     type="button"
-                    className={`date-picker-day${selected && isSameDay(date, selected) ? ' date-picker-day-selected' : ''}${isSameDay(date, new Date()) ? ' date-picker-day-today' : ''}`}
+                    className={[
+                      styles['date-picker-day'],
+                      selected && isSameDay(date, selected) ? styles['date-picker-day-selected'] : '',
+                      isSameDay(date, new Date()) ? styles['date-picker-day-today'] : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
                     disabled={isDisabled(date)}
                     onClick={() => commit(date)}
                   >

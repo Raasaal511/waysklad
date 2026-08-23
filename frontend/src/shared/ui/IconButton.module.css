@@ -1,0 +1,60 @@
+/* IconButton — src/shared/ui/IconButton.tsx */
+
+.icon-button {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.icon-button-danger {
+  color: var(--danger);
+}
+
+.icon-button-danger:hover:not(:disabled) {
+  background: var(--danger-bg);
+}
+
+.icon-button-muted {
+  color: var(--text-muted);
+}
+
+.icon-button-muted:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.icon-button-accent {
+  color: var(--accent);
+}
+
+.icon-button-accent:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.icon-button-neutral {
+  color: var(--text-muted);
+}
+
+.icon-button-neutral:hover:not(:disabled) {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.icon-button-lg {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 10px;
+}
+
+/* .has-hint остаётся глобальным литеральным классом в index.css (общий со
+   StockWarningIcon), поэтому здесь он подключается через :global(). */
+.icon-button-danger:global(.has-hint)::after,
+.icon-button-neutral:global(.has-hint)::after {
+  background: var(--danger);
+}

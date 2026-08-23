@@ -1,0 +1,37 @@
+/* PhoneInput — src/shared/ui/PhoneInput.tsx */
+
+.phone-input {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.phone-input:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.phone-input-prefix {
+  display: flex;
+  align-items: center;
+  padding: 10px 0 10px 12px;
+  color: var(--text-muted);
+  font: inherit;
+  user-select: none;
+}
+
+.phone-input-field {
+  flex: 1;
+  min-width: 0;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  padding-left: 4px !important;
+}
+
+.phone-input:focus-within .phone-input-field {
+  outline: none !important;
+}

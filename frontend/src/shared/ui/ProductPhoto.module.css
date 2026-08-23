@@ -1,0 +1,20 @@
+/* ProductPhoto — src/shared/ui/ProductPhoto.tsx */
+
+.product-tile-photo {
+  width: 84px;
+  height: 84px;
+  flex-shrink: 0;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+}
+
+.product-tile-photo-empty {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+}

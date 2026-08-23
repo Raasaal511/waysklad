@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconChevronDown } from '@tabler/icons-react'
+import layoutStyles from './Layout.module.css'
 
 export interface SelectOption {
   value: string
@@ -116,7 +117,7 @@ export function Select({
     }
   }
 
-  const classes = ['select-trigger']
+  const classes = [layoutStyles.selectTrigger]
   if (required && !value) classes.push('input-required')
   if (className) classes.push(className)
 
@@ -134,10 +135,10 @@ export function Select({
         onClick={() => !disabled && setOpen((v) => !v)}
         onKeyDown={handleTriggerKeyDown}
       >
-        <span className={selected ? 'select-trigger-value' : 'select-trigger-placeholder'}>
+        <span className={selected ? layoutStyles.selectTriggerValue : layoutStyles.selectTriggerPlaceholder}>
           {selected ? selected.label : placeholder ?? ' '}
         </span>
-        <IconChevronDown size={16} stroke={1.8} className="select-trigger-icon" />
+        <IconChevronDown size={16} stroke={1.8} className={layoutStyles.selectTriggerIcon} />
       </button>
 
       {open &&
@@ -146,7 +147,7 @@ export function Select({
           <ul
             ref={menuRef}
             role="listbox"
-            className="select-menu"
+            className={layoutStyles.selectMenu}
             style={{ top: menuStyle.top, left: menuStyle.left, minWidth: menuStyle.width }}
           >
             {options.map((option, i) => (
@@ -154,7 +155,14 @@ export function Select({
                 key={option.value}
                 role="option"
                 aria-selected={option.value === value}
-                className={`select-menu-item${i === highlighted ? ' select-menu-item-highlighted' : ''}${option.value === value ? ' select-menu-item-selected' : ''}${option.disabled ? ' select-menu-item-disabled' : ''}`}
+                className={[
+                  layoutStyles.selectMenuItem,
+                  i === highlighted ? layoutStyles.selectMenuItemHighlighted : '',
+                  option.value === value ? layoutStyles.selectMenuItemSelected : '',
+                  option.disabled ? layoutStyles.selectMenuItemDisabled : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 onMouseEnter={() => setHighlighted(i)}
                 onClick={() => commit(option)}
               >

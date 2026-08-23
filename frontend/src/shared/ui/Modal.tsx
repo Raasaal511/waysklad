@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { IconX } from '@tabler/icons-react'
 import { IconButton } from './IconButton'
+import styles from './Modal.module.css'
 
 // Счётчик открытых модалок — блокируем скролл фона на первой и снимаем блокировку
 // только когда закрылась последняя (модалки бывают вложенные, см. OrderDetail).
@@ -85,21 +86,23 @@ export function Modal({ title, onClose, children, wide, size, footer, headerActi
   }, [footer, children])
 
   return createPortal(
-    <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className={styles['modal-overlay']} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
-        className={`modal${effectiveSize ? ` modal-${effectiveSize}` : ''}`}
+        className={[styles.modal, effectiveSize ? styles[`modal-${effectiveSize}`] : '']
+          .filter(Boolean)
+          .join(' ')}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
       >
-        <div className="modal-header">
+        <div className={styles['modal-header']}>
           <h3 id={titleId}>{title}</h3>
-          <div className="modal-header-actions">
+          <div className={styles['modal-header-actions']}>
             {headerActions}
             <IconButton
               variant="neutral"
               size="lg"
-              className="modal-close"
+              className={styles['modal-close']}
               onClick={onClose}
               aria-label="Закрыть"
             >
@@ -107,11 +110,17 @@ export function Modal({ title, onClose, children, wide, size, footer, headerActi
             </IconButton>
           </div>
         </div>
-        <div className="modal-body" ref={bodyRef}>
+        <div className={styles['modal-body']} ref={bodyRef}>
           {children}
         </div>
         {footer && (
-          <div className={`modal-footer${atBottom ? ' modal-footer-flush' : ''}`}>{footer}</div>
+          <div
+            className={[styles['modal-footer'], atBottom ? styles['modal-footer-flush'] : '']
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {footer}
+          </div>
         )}
       </div>
     </div>,

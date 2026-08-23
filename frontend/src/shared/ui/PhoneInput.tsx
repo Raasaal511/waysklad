@@ -1,4 +1,5 @@
 import { forwardRef, useMemo, type ChangeEvent, type KeyboardEvent } from 'react'
+import styles from './PhoneInput.module.css'
 
 interface PhoneInputProps {
   value: string
@@ -91,15 +92,15 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(function
   }
 
   return (
-    <div className="phone-input">
-      <span className="phone-input-prefix">+7</span>
+    <div className={styles['phone-input']}>
+      <span className={styles['phone-input-prefix']}>+7</span>
       <input
         ref={ref}
         id={id}
         type="tel"
         inputMode="numeric"
         autoComplete="tel"
-        className="phone-input-field"
+        className={styles['phone-input-field']}
         value={formatted}
         onChange={handleChange}
         onKeyDown={handleKeyDown}

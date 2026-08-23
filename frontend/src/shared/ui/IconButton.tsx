@@ -1,4 +1,5 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react'
+import styles from './IconButton.module.css'
 
 export type IconButtonVariant = 'danger' | 'muted' | 'accent' | 'neutral'
 export type IconButtonSize = 'md' | 'lg'
@@ -13,8 +14,10 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   { variant = 'danger', size = 'md', tooltip, className, type = 'button', ...rest },
   ref,
 ) {
-  const classes = ['icon-button', `icon-button-${variant}`]
-  if (size === 'lg') classes.push('icon-button-lg')
+  const classes = [styles['icon-button'], styles[`icon-button-${variant}`]]
+  if (size === 'lg') classes.push(styles['icon-button-lg'])
+  // 'has-hint' — общий глобальный класс тултипа (см. index.css), используется
+  // и IconButton, и StockWarningIcon, поэтому не переносится в CSS-модуль.
   if (tooltip) classes.push('has-hint')
   if (className) classes.push(className)
 

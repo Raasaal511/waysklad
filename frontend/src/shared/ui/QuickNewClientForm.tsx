@@ -40,6 +40,9 @@ export function QuickNewClientForm({
 
   return (
     <InlinePopover title="Новый клиент" trigger={trigger} open={open} onOpenChange={onOpenChange}>
+      {/* form/field/error — общие глобальные утилитарные классы (см. index.css /
+          Layout.module.css), оставлены литеральными строками, т.к. используются
+          на десятках ещё не мигрированных страниц с тем же именем класса. */}
       <form className="form" onSubmit={handleSubmit}>
         <label className="field">
           Имя

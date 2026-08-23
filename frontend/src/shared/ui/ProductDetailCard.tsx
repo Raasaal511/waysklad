@@ -12,6 +12,8 @@ import { Modal } from './Modal'
 import { IconButton } from './IconButton'
 import { InfoHint } from './InfoHint'
 import { formatMoney, formatQuantity } from '../lib/format'
+import layoutStyles from './Layout.module.css'
+import styles from './ProductDetailCard.module.css'
 import {
   IconPencil,
   IconCheck,
@@ -92,18 +94,18 @@ export function ProductDetailCard({
 
   return (
     <Modal title={product.name} onClose={onClose} size="full">
-      <div className="stack">
-        <div className="product-detail-header">
+      <div className={layoutStyles.stack}>
+        <div className={styles['product-detail-header']}>
           {product.photo ? (
-            <img src={product.photo} alt="" className="product-detail-photo" />
+            <img src={product.photo} alt="" className={styles['product-detail-photo']} />
           ) : (
-            <div className="product-detail-photo product-detail-photo-empty">
+            <div className={`${styles['product-detail-photo']} ${styles['product-detail-photo-empty']}`}>
               <IconPhoto size={40} stroke={1.5} />
             </div>
           )}
-          <div className="product-detail-header-info">
-            <div className="row between">
-              <h3 className="product-detail-title">{product.name}</h3>
+          <div className={styles['product-detail-header-info']}>
+            <div className={`${layoutStyles.row} ${layoutStyles.between}`}>
+              <h3 className={styles['product-detail-title']}>{product.name}</h3>
               {onEdit && (
                 <div className="sale-detail-actions">
                   <IconButton
@@ -118,39 +120,41 @@ export function ProductDetailCard({
                 </div>
               )}
             </div>
-            <div className="product-detail-header-tags">
+            <div className={styles['product-detail-header-tags']}>
               {categoryName(product.category_id) && (
-                <span className="badge accent">{categoryName(product.category_id)}</span>
+                <span className={`${layoutStyles.badge} ${layoutStyles.accent}`}>
+                  {categoryName(product.category_id)}
+                </span>
               )}
-              {product.sku && <span className="product-detail-sku">Артикул {product.sku}</span>}
+              {product.sku && <span className={styles['product-detail-sku']}>Артикул {product.sku}</span>}
             </div>
-            <span className="product-detail-price">{formatMoney(product.retail_price)} ₽</span>
+            <span className={styles['product-detail-price']}>{formatMoney(product.retail_price)} ₽</span>
           </div>
         </div>
 
         <div className="sale-detail-meta">
           <div className="sale-detail-meta-item">
-            <span className="text-muted">Штрихкод</span>
+            <span className={layoutStyles.textMuted}>Штрихкод</span>
             <span>{product.barcode || '—'}</span>
           </div>
           <div className="sale-detail-meta-item">
-            <span className="text-muted">Единица измерения</span>
+            <span className={layoutStyles.textMuted}>Единица измерения</span>
             <span>{unitName(product.unit_code)}</span>
           </div>
           {product.purchase_price !== null && (
             <div className="sale-detail-meta-item">
-              <span className="text-muted">Закупочная цена</span>
+              <span className={layoutStyles.textMuted}>Закупочная цена</span>
               <span>{formatMoney(product.purchase_price)} ₽</span>
             </div>
           )}
           {product.margin !== null && (
             <div className="sale-detail-meta-item">
-              <span className="text-muted">Маржа</span>
+              <span className={layoutStyles.textMuted}>Маржа</span>
               <span>{formatMoney(product.margin)} ₽</span>
             </div>
           )}
           <div className="sale-detail-meta-item">
-            <span className="text-muted">Минимальный остаток</span>
+            <span className={layoutStyles.textMuted}>Минимальный остаток</span>
             <span>
               {formatQuantity(product.min_stock)} {unitName(product.unit_code)}
             </span>
@@ -159,19 +163,22 @@ export function ProductDetailCard({
 
         <h3 className="sale-detail-section-title">Остатки по складам</h3>
         {stockByWarehouse.length === 0 ? (
-          <p className="text-muted">Остатков нет</p>
+          <p className={layoutStyles.textMuted}>Остатков нет</p>
         ) : (
-          <div className="data-table">
-            <div className="data-table-head" style={{ gridTemplateColumns: STOCK_BY_WAREHOUSE_COLUMNS }}>
+          <div className={layoutStyles.dataTable}>
+            <div
+              className={layoutStyles.dataTableHead}
+              style={{ gridTemplateColumns: STOCK_BY_WAREHOUSE_COLUMNS }}
+            >
               <span>Склад</span>
               <span>Остаток</span>
             </div>
-            <div className="data-table-body">
+            <div className={layoutStyles.dataTableBody}>
               {stockByWarehouse.map((row, i) => (
                 <button
                   key={row.warehouse.id}
                   type="button"
-                  className="data-row data-row-link sale-history-row-in"
+                  className={`${layoutStyles.dataRow} ${layoutStyles.dataRowLink} sale-history-row-in`}
                   style={
                     {
                       gridTemplateColumns: STOCK_BY_WAREHOUSE_COLUMNS,
@@ -183,24 +190,24 @@ export function ProductDetailCard({
                     navigate(`/stock/${row.warehouse.id}`)
                   }}
                 >
-                  <span className="data-row-name">{row.warehouse.name}</span>
+                  <span className={layoutStyles.dataRowName}>{row.warehouse.name}</span>
                   <span>
                     {row.quantity === 0 ? (
-                      <span className="text-muted">Нет в наличии</span>
+                      <span className={layoutStyles.textMuted}>Нет в наличии</span>
                     ) : (
                       <>
                         {formatQuantity(String(row.quantity))} {unitName(product.unit_code)}
                       </>
                     )}
                     {row.reserved > 0 && (
-                      <span className="text-muted">
+                      <span className={layoutStyles.textMuted}>
                         {' '}
                         (резерв {formatQuantity(String(row.reserved))})
                         <InfoHint text="Зарезервировано под заказы клиентов и недоступно для продажи — освободится, когда заказ выдадут или отменят." />
                       </span>
                     )}
                   </span>
-                  <IconChevronRight size={14} stroke={1.8} className="data-row-chevron" />
+                  <IconChevronRight size={14} stroke={1.8} className={layoutStyles.dataRowChevron} />
                 </button>
               ))}
             </div>
@@ -210,17 +217,17 @@ export function ProductDetailCard({
         {product.variants.length > 0 && (
           <>
             <h3 className="sale-detail-section-title">Варианты</h3>
-            <div className="data-table">
-              <div className="data-table-head" style={{ gridTemplateColumns: VARIANTS_COLUMNS }}>
+            <div className={layoutStyles.dataTable}>
+              <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: VARIANTS_COLUMNS }}>
                 <span>Размер</span>
                 <span>Цвет</span>
                 <span>Штрихкод</span>
               </div>
-              <div className="data-table-body">
+              <div className={layoutStyles.dataTableBody}>
                 {product.variants.map((v, i) => (
                   <div
                     key={v.id}
-                    className="data-row sale-history-row-in"
+                    className={`${layoutStyles.dataRow} sale-history-row-in`}
                     style={
                       {
                         gridTemplateColumns: VARIANTS_COLUMNS,
@@ -230,7 +237,7 @@ export function ProductDetailCard({
                   >
                     <span>{v.size || '—'}</span>
                     <span>{v.color || '—'}</span>
-                    <span className="text-muted">{v.barcode || '—'}</span>
+                    <span className={layoutStyles.textMuted}>{v.barcode || '—'}</span>
                   </div>
                 ))}
               </div>
@@ -251,7 +258,7 @@ export function ProductDetailCard({
           </button>
           {historyOpen &&
             (history === null ? null : history.length === 0 ? (
-              <p className="text-muted">Изменений не было</p>
+              <p className={layoutStyles.textMuted}>Изменений не было</p>
             ) : (
               <div className="sale-detail-history-list">
                 {history.map((entry) => {

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import layoutStyles from './Layout.module.css'
 
 export interface DropdownMenuItem {
   key: string
@@ -83,14 +84,19 @@ export function DropdownMenu({ trigger, items, align = 'left' }: DropdownMenuPro
           <ul
             ref={menuRef}
             role="menu"
-            className="select-menu"
+            className={layoutStyles.selectMenu}
             style={{ top: menuStyle.top, left: menuStyle.left }}
           >
             {items.map((item) => (
               <li
                 key={item.key}
                 role="menuitem"
-                className={`select-menu-item${item.disabled ? ' select-menu-item-disabled' : ''}`}
+                className={[
+                  layoutStyles.selectMenuItem,
+                  item.disabled ? layoutStyles.selectMenuItemDisabled : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 onClick={() => commit(item)}
               >
                 {item.label}

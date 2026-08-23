@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconInfoCircle } from '@tabler/icons-react'
+import styles from './InfoHint.module.css'
 
 const POPOVER_WIDTH = 300
 
@@ -51,7 +52,7 @@ export function InfoHint({ text }: { text: string }) {
       <button
         ref={triggerRef}
         type="button"
-        className="info-hint-trigger"
+        className={styles['info-hint-trigger']}
         aria-label="Пояснение"
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
@@ -70,7 +71,7 @@ export function InfoHint({ text }: { text: string }) {
           <div
             ref={popoverRef}
             role="tooltip"
-            className="info-hint-popover"
+            className={styles['info-hint-popover']}
             style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
             onClick={(e) => e.stopPropagation()}
           >
