@@ -16,6 +16,8 @@ import { Button } from '../../shared/ui/Button'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
+import layoutStyles from '../../shared/ui/Layout.module.css'
+import styles from './ClientsPage.module.css'
 
 export function ClientsPage() {
   const navigate = useNavigate()
@@ -54,15 +56,15 @@ export function ClientsPage() {
   }, [loading, highlightId])
 
   return (
-    <div className="stack">
-      <div className="section-title">
+    <div className={layoutStyles.stack}>
+      <div className={layoutStyles.sectionTitle}>
         <h2>Контрагенты</h2>
         <Button onClick={() => setShowForm(true)}>
           <IconPlus size={16} stroke={1.8} /> {tab === 'clients' ? 'Клиент' : 'Поставщик'}
         </Button>
       </div>
 
-      <div className="row">
+      <div className={layoutStyles.row}>
         <Button variant={tab === 'clients' ? 'primary' : 'secondary'} onClick={() => setTab('clients')}>
           Клиенты
         </Button>
@@ -98,32 +100,36 @@ export function ClientsPage() {
         </Modal>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : tab === 'clients' ? (
         clients.length === 0 ? (
-          <p className="text-muted">Клиентов пока нет</p>
+          <p className={layoutStyles.textMuted}>Клиентов пока нет</p>
         ) : (
-          <div className="contact-row-list">
+          <div className={styles['contact-row-list']}>
             {clients.map((c, i) => (
               <button
                 key={c.id}
                 type="button"
                 ref={String(c.id) === highlightId ? highlightRef : undefined}
-                className={`contact-row sale-history-row-in${String(c.id) === highlightId ? ' row-highlight' : ''}`}
+                className={[
+                  styles['contact-row'],
+                  'sale-history-row-in',
+                  String(c.id) === highlightId && styles['row-highlight'],
+                ].filter(Boolean).join(' ')}
                 style={{ '--row-delay': `${Math.min(i, 12) * 25}ms` } as CSSProperties}
                 onClick={() => navigate(`/clients/${c.id}`)}
               >
-                <span className="contact-row-icon">
+                <span className={styles['contact-row-icon']}>
                   <IconUser size={16} stroke={1.8} />
                 </span>
-                <div className="contact-row-main">
-                  <div className="contact-row-top">
-                    <span className="contact-row-name">{c.name}</span>
-                    {!c.is_active && <span className="badge">Неактивен</span>}
+                <div className={styles['contact-row-main']}>
+                  <div className={styles['contact-row-top']}>
+                    <span className={styles['contact-row-name']}>{c.name}</span>
+                    {!c.is_active && <span className={layoutStyles.badge}>Неактивен</span>}
                   </div>
-                  <div className="contact-row-meta">
+                  <div className={styles['contact-row-meta']}>
                     {c.phone && (
                       <span>
                         <IconPhone size={13} stroke={1.8} /> {c.phone}
@@ -137,33 +143,33 @@ export function ClientsPage() {
                     {c.debt_limit && <span>Лимит долга: {formatMoney(c.debt_limit)} ₽</span>}
                   </div>
                 </div>
-                <IconChevronRight size={18} stroke={1.8} className="contact-row-chevron" />
+                <IconChevronRight size={18} stroke={1.8} className={styles['contact-row-chevron']} />
               </button>
             ))}
           </div>
         )
       ) : suppliers.length === 0 ? (
-        <p className="text-muted">Поставщиков пока нет</p>
+        <p className={layoutStyles.textMuted}>Поставщиков пока нет</p>
       ) : (
-        <div className="contact-row-list">
+        <div className={styles['contact-row-list']}>
           {suppliers.map((s, i) => (
             <button
               key={s.id}
               type="button"
-              className="contact-row sale-history-row-in"
+              className={`${styles['contact-row']} sale-history-row-in`}
               style={{ '--row-delay': `${Math.min(i, 12) * 25}ms` } as CSSProperties}
               onClick={() => setSelectedSupplier(s)}
             >
-              <span className="contact-row-icon">
+              <span className={styles['contact-row-icon']}>
                 <IconTruck size={16} stroke={1.8} />
               </span>
-              <div className="contact-row-main">
-                <div className="contact-row-top">
-                  <span className="contact-row-name">{s.name}</span>
+              <div className={styles['contact-row-main']}>
+                <div className={styles['contact-row-top']}>
+                  <span className={styles['contact-row-name']}>{s.name}</span>
                 </div>
-                {s.contact && <div className="contact-row-meta">{s.contact}</div>}
+                {s.contact && <div className={styles['contact-row-meta']}>{s.contact}</div>}
               </div>
-              <IconChevronRight size={18} stroke={1.8} className="contact-row-chevron" />
+              <IconChevronRight size={18} stroke={1.8} className={styles['contact-row-chevron']} />
             </button>
           ))}
         </div>
@@ -187,29 +193,29 @@ function SupplierDebtsSummary({ supplier }: { supplier: Supplier }) {
   const totalBalance = active.reduce((sum, d) => sum + Number(d.balance), 0)
 
   return (
-    <div className="stack">
-      <div className="row wrap" style={{ gap: 12 }}>
-        {supplier.contact && <span className="text-muted">{supplier.contact}</span>}
-        {supplier.note && <span className="text-muted">{supplier.note}</span>}
+    <div className={layoutStyles.stack}>
+      <div className={`${layoutStyles.row} ${layoutStyles.wrap}`} style={{ gap: 12 }}>
+        {supplier.contact && <span className={layoutStyles.textMuted}>{supplier.contact}</span>}
+        {supplier.note && <span className={layoutStyles.textMuted}>{supplier.note}</span>}
       </div>
 
       <h3>Долги (мы должны)</h3>
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       {debts === null ? (
-        <p className="text-muted">Загрузка…</p>
+        <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : debts.length === 0 ? (
-        <p className="text-muted">Долгов нет</p>
+        <p className={layoutStyles.textMuted}>Долгов нет</p>
       ) : (
-        <div className="stack" style={{ gap: 8 }}>
+        <div className={layoutStyles.stack} style={{ gap: 8 }}>
           {active.length > 0 && (
-            <p className="text-muted">Активных долгов на {formatMoney(totalBalance)} ₽</p>
+            <p className={layoutStyles.textMuted}>Активных долгов на {formatMoney(totalBalance)} ₽</p>
           )}
           {[...active, ...closed].map((d) => (
-            <div key={d.id} className="client-debt-item">
+            <div key={d.id} className={styles['client-debt-item']}>
               <span className={DEBT_STATUS_BADGE_CLASS[d.status]}>{DEBT_STATUS_LABELS[d.status]}</span>
               <span>{formatMoney(d.balance)} ₽ из {formatMoney(d.amount)} ₽</span>
               {d.due_date && (
-                <span className="text-muted">до {new Date(d.due_date).toLocaleDateString('ru-RU')}</span>
+                <span className={layoutStyles.textMuted}>до {new Date(d.due_date).toLocaleDateString('ru-RU')}</span>
               )}
             </div>
           ))}
@@ -242,20 +248,20 @@ function NewClientForm({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <form className="form" onSubmit={handleSubmit}>
-      <label className="field">
+    <form className={layoutStyles.form} onSubmit={handleSubmit}>
+      <label className={layoutStyles.field}>
         Имя
         <input value={name} onChange={(e) => setName(e.target.value)} required />
       </label>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Телефон
         <PhoneInput value={phone} onChange={setPhone} />
       </label>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Город
         <input value={city} onChange={(e) => setCity(e.target.value)} />
       </label>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Лимит долга
         <input
           type="text"
@@ -267,7 +273,7 @@ function NewClientForm({ onDone }: { onDone: () => void }) {
           }}
         />
       </label>
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       <Button type="submit" disabled={saving}>
         {saving ? 'Сохранение…' : 'Добавить клиента'}
       </Button>
@@ -296,16 +302,16 @@ function NewSupplierForm({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <form className="form" onSubmit={handleSubmit}>
-      <label className="field">
+    <form className={layoutStyles.form} onSubmit={handleSubmit}>
+      <label className={layoutStyles.field}>
         Название
         <input value={name} onChange={(e) => setName(e.target.value)} required />
       </label>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Контакт
         <input value={contact} onChange={(e) => setContact(e.target.value)} />
       </label>
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       <Button type="submit" disabled={saving}>
         {saving ? 'Сохранение…' : 'Добавить поставщика'}
       </Button>

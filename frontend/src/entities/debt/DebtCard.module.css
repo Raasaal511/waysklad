@@ -1,0 +1,506 @@
+/* DebtCard — src/entities/debt/DebtCard.tsx
+   Карточка долга: прогресс оплаты, товары из продажи/приёмки, действия,
+   график рассрочки, список оплат. Классы .badge/.card/.stack/.row/.error/
+   .text-muted/.field и т.п. — общие утилиты из shared/ui/Layout.module.css,
+   сюда не переносились. */
+
+.debt-group-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+}
+
+.debt-item-source {
+  font-size: 12.5px;
+}
+
+.debt-item-source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+}
+
+.debt-item-source-link:hover {
+  text-decoration: underline;
+}
+
+.modal-title-sub {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Товары из продажи/приёмки — оформлены как настоящий чек: жирное название,
+   дробная линия-«лидер» до суммы, а не скучная таблица. */
+.debt-receipt-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.debt-receipt-count {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.debt-receipt {
+  display: flex;
+  flex-direction: column;
+}
+
+.debt-receipt-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 7px 0;
+}
+
+.debt-receipt-name {
+  flex-shrink: 0;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.debt-receipt-qty {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.debt-receipt-leader {
+  flex: 1;
+  min-width: 12px;
+  border-bottom: 1px dotted var(--border);
+  margin-bottom: 4px;
+}
+
+.debt-receipt-sum {
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.debt-receipt-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.debt-receipt-total strong {
+  font-size: 17px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Горизонтальный ряд кнопок-действий вместо трёх всегда открытых форм —
+   каждая кнопка открывает свою форму в модалке. */
+.debt-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Сабмит формы внутри модалки — по размеру текста, а не на всю ширину. */
+.debt-detail-form {
+  align-items: flex-start;
+}
+
+.debt-detail-form :global(.field),
+.debt-detail-form :global(.row) {
+  align-self: stretch;
+}
+
+/* Список внесённых оплат — таймлайн из маркеров с датой/заметкой слева и
+   суммой акцентом справа, без техничных "#N"/скобок в заголовке. */
+.debt-payments-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.debt-payments-total {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.debt-payments-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.debt-payment-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.debt-payment-row:last-child {
+  border-bottom: none;
+}
+
+.debt-payment-check {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+}
+
+.debt-payment-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.debt-payment-date {
+  font-weight: 500;
+}
+
+.debt-payment-note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.debt-payment-amount {
+  flex-shrink: 0;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+/* График рассрочки: плановая дата vs фактическая дата оплаты рядом. */
+.debt-installment-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.debt-installment-cols {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.debt-installment-check {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--text-muted);
+}
+
+.debt-installment-row-paid .debt-installment-check {
+  background: var(--accent);
+  color: #fff;
+}
+
+.debt-installment-row-overdue .debt-installment-check {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.debt-installment-check-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.debt-installment-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.debt-installment-date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.debt-installment-row-paid .debt-installment-date {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.debt-installment-sum {
+  flex-shrink: 0;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Показывается, когда переплата с прошлой строки уменьшила реальный долг
+   по этой — план (зачёркнут) рядом с тем, что действительно нужно внести. */
+.debt-installment-sum-original {
+  margin-right: 6px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.debt-installment-row-paid .debt-installment-sum {
+  color: var(--text-muted);
+}
+
+.debt-installment-paid-on-diff {
+  color: var(--warning);
+}
+
+/* Строка платежа графика с действиями "Оплачено"/"Перенести" — один клик
+   вместо ручного ввода суммы и даты, которые и так известны из графика. */
+.debt-installment-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.debt-installment-row:last-child {
+  padding-bottom: 4px;
+  border-bottom: none;
+}
+
+.debt-installment-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Инлайн-форма отметки платежа оплаченным — сумма и дата предзаполнены
+   плановыми значениями, но их можно поправить перед сохранением. */
+.debt-installment-pay-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.debt-installment-pay-form :global(.field) {
+  flex: 1;
+  min-width: 120px;
+}
+
+.debt-installment-close-hint {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+/* Минималистичный прогресс оплаты — единая залитая полоса с точками-стыками
+   для рассрочки и точкой-целью в конце (срок выплаты). */
+.debt-pay-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.debt-pay-progress-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.debt-pay-progress-track {
+  position: relative;
+  flex: 1;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.debt-pay-progress-fill {
+  position: relative;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-hover), var(--accent));
+  box-shadow: 0 0 8px 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: width 0.25s ease;
+}
+
+/* Точки-стыки между сегментами рассрочки — поверх полосы, по центру высоты
+   трека; закрашиваются, когда стык уже пройден залитой частью. */
+.debt-pay-progress-tick {
+  position: absolute;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid color-mix(in srgb, var(--text) 30%, var(--border));
+  transform: translateY(-50%);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.debt-pay-progress-tick-filled {
+  background: var(--bg);
+  border-color: var(--accent);
+}
+
+.debt-pay-progress-goal {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  border-radius: 50%;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  color: transparent;
+}
+
+.debt-pay-progress-goal-reached {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.debt-pay-progress-paid {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.debt-pay-progress-labels {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.debt-pay-progress-balance {
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.debt-pay-progress-next {
+  font-size: 13px;
+}
+
+.debt-extend-warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Сообщение о полном погашении долга платежом — хорошая новость, не
+   предупреждение, поэтому акцентный зелёный вместо тревожного жёлтого. */
+.debt-close-hint {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Строка "остаток/срок + иконка-пояснение" в шапке форм долга (оплата,
+   продление, рассрочка) — текст и InfoHint на одной линии. */
+.debt-form-hint-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Остаток долга в форме оплаты — ключевой контекст для суммы, поэтому
+   не приглушённый text-muted, а обычный текст с акцентной суммой. */
+.debt-form-balance {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.debt-form-balance strong {
+  font-size: 16px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.debt-form-explainer {
+  margin-top: -6px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.field-group-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.debt-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+}
+
+.debt-schedule-edit-row {
+  display: grid;
+  grid-template-columns: 1fr 100px auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.debt-schedule-edit-row input[type='text'] {
+  width: 100%;
+  text-align: right;
+}

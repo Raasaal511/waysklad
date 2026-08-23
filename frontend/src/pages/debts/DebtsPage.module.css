@@ -1,0 +1,320 @@
+.debt-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.debt-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, var(--border));
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 6%, transparent);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.debt-tab strong {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.debt-tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.debt-tab-owed-to-us .debt-tab-label {
+  color: var(--accent);
+}
+
+.debt-tab-we-owe .debt-tab-label {
+  color: var(--danger);
+}
+
+.debt-tab-active {
+  background: var(--bg);
+  border-color: var(--accent);
+}
+
+.debt-tab-we-owe.debt-tab-active {
+  border-color: var(--danger);
+}
+
+@media (max-width: 560px) {
+  .debt-tabs {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Кнопочный фильтр по статусу долга над плоским списком /debts. */
+.debt-status-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.debt-status-filter {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.debt-status-filter:hover {
+  border-color: var(--accent);
+}
+
+.debt-status-filter-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Быстрые пресеты срока "Долг до" под полем даты в форме выдачи долга —
+   компактные чипсы, чтобы не пришлось открывать календарь ради типовых
+   сроков (неделя/несколько месяцев/год). */
+.debt-due-date-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -8px;
+}
+
+.debt-due-date-preset {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.debt-due-date-preset:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.debt-due-date-preset-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* "Ближайшие выплаты" на /debts — кнопка в шапке страницы (Button, не
+   растёт по высоте), полный список — в модалке по клику. */
+.debt-upcoming-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.debt-upcoming-list-modal {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.debt-upcoming-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, var(--border));
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 6%, transparent);
+  font-family: inherit;
+  font-size: 13px;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.debt-upcoming-row:hover,
+.debt-upcoming-row:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.debt-upcoming-row:hover .data-row-chevron {
+  transform: translateX(3px);
+  color: var(--accent);
+}
+
+.debt-upcoming-date {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.debt-upcoming-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debt-upcoming-overdue {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.debt-upcoming-amount {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Карточка долга в списке (/debts) и в истории клиента (ClientDetailPage) —
+   переиспользуется оттуда через прямой импорт этого модуля. */
+.debt-row-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.debt-closed-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.debt-closed-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 2px;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.debt-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px 12px 17px;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, var(--border));
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 6%, transparent);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+/* Акцентная полоса статуса слева — на hover не красим весь фон строки
+   (это конфликтовало со смыслом цвета), а даём самой полосе градиент и лёгкое
+   свечение. */
+.debt-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--debt-accent, var(--border));
+  transition: width 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.debt-row:hover,
+.debt-row:focus-visible {
+  border-color: var(--debt-accent, var(--border));
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--text) 10%, transparent);
+  transform: translateY(-1px);
+}
+
+.debt-row:hover::before,
+.debt-row:focus-visible::before {
+  width: 4px;
+  background: linear-gradient(180deg, var(--debt-accent), color-mix(in srgb, var(--debt-accent) 55%, transparent));
+  box-shadow: 0 0 10px 1px color-mix(in srgb, var(--debt-accent) 55%, transparent);
+}
+
+.debt-row-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.debt-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.debt-row-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.debt-row-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debt-row-top strong {
+  flex-shrink: 0;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.debt-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.debt-row-installment {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--accent);
+}
+
+.debt-row-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
