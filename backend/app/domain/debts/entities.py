@@ -107,6 +107,8 @@ class Debt:
 
     def extend(self, new_due_date: date, reason: str, author_id: int | None, today: date | None = None) -> None:
         today = today or date.today()
+        if new_due_date < today:
+            raise DomainError("Новый срок долга не может быть в прошлом")
         self.extensions.append(
             DebtExtension(
                 old_due_date=self.due_date,

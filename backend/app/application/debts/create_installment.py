@@ -36,6 +36,11 @@ class CreateInstallmentUseCase:
         async with self._uow as uow:
             debt = await uow.debts.get(cmd.debt_id)
 
+            today = date.today()
+            for payment in cmd.schedule:
+                if payment.due_date < today:
+                    raise DomainError("Дата платежа графика не может быть в прошлом")
+
             total = Money.zero()
             for payment in cmd.schedule:
                 total = total + Money.of(payment.amount)
