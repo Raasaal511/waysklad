@@ -32,6 +32,7 @@ import {
   IconSearch,
   type Icon,
 } from '@tabler/icons-react'
+import layoutStyles from '../../shared/ui/Layout.module.css'
 
 const BarcodeScanner = lazy(() =>
   import('../../entities/barcode/BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })),
@@ -88,23 +89,23 @@ export function AssignedUsersField({
 
   if (candidates.length === 0) {
     return (
-      <p className="text-muted">
+      <p className={layoutStyles.textMuted}>
         Нет доступных ответственных — сначала добавьте кладовщика в «Профиль → Аккаунт → Сотрудники».
       </p>
     )
   }
 
   return (
-    <div className="stack" style={{ gap: 8 }}>
+    <div className={layoutStyles.stack} style={{ gap: 8 }}>
       {candidates.map((c) => (
-        <label key={c.id} className="row" style={{ gap: 8 }}>
+        <label key={c.id} className={layoutStyles.row} style={{ gap: 8 }}>
           <input
             type="checkbox"
             checked={selectedIds.includes(c.id)}
             onChange={() => toggle(c.id)}
           />
           {c.name}
-          {c.role === 'owner' && <span className="text-muted"> (владелец)</span>}
+          {c.role === 'owner' && <span className={layoutStyles.textMuted}> (владелец)</span>}
         </label>
       ))}
     </div>
@@ -132,19 +133,19 @@ export function NewWarehouseForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <form className="form" onSubmit={handleSubmit}>
-      <label className="field">
+    <form className={layoutStyles.form} onSubmit={handleSubmit}>
+      <label className={layoutStyles.field}>
         Название склада
         <input value={name} onChange={(e) => setName(e.target.value)} required />
       </label>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Адрес
         <input value={address} onChange={(e) => setAddress(e.target.value)} />
       </label>
-      <p className="text-muted">
+      <p className={layoutStyles.textMuted}>
         Ответственных сотрудников можно назначить позже — на странице склада или в карточке сотрудника.
       </p>
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       <Button type="submit" disabled={saving}>
         {saving ? 'Сохранение…' : 'Создать склад'}
       </Button>
@@ -354,10 +355,10 @@ export function MovementForm({
   }
 
   return (
-    <form className="form" onSubmit={handleSubmit}>
-      <div className="row">
+    <form className={layoutStyles.form} onSubmit={handleSubmit}>
+      <div className={layoutStyles.row}>
         {!fixedWarehouseId && (
-          <label className="field" style={{ flex: 1 }}>
+          <label className={layoutStyles.field} style={{ flex: 1 }}>
             {mode === 'transfer' ? 'Склад-отправитель' : 'Склад'}
             <Select
               value={warehouseId != null ? String(warehouseId) : ''}
@@ -367,7 +368,7 @@ export function MovementForm({
           </label>
         )}
         {mode === 'transfer' && (
-          <label className="field" style={{ flex: 1 }}>
+          <label className={layoutStyles.field} style={{ flex: 1 }}>
             Склад-получатель
             <Select
               value={toWarehouseId != null ? String(toWarehouseId) : ''}
@@ -407,16 +408,16 @@ export function MovementForm({
             </label>
           </div>
         )}
-        {scanError && <p className="error">{scanError}</p>}
+        {scanError && <p className={layoutStyles.error}>{scanError}</p>}
       </div>
 
       <div className="sale-results-panel">
         <div className="sale-results-header">
           <span>Товары</span>
-          <span className="text-muted">{filtered.length} найдено</span>
+          <span className={layoutStyles.textMuted}>{filtered.length} найдено</span>
         </div>
         {filtered.length === 0 ? (
-          <p className="text-muted">
+          <p className={layoutStyles.textMuted}>
             {stockLimited ? 'На складе нет товаров, доступных для этой операции' : 'Ничего не найдено'}
           </p>
         ) : (
@@ -488,17 +489,17 @@ export function MovementForm({
 
       {showScanner && (
         <Modal title="Сканировать штрихкод" onClose={() => setShowScanner(false)}>
-          <Suspense fallback={<p className="text-muted">Загрузка сканера…</p>}>
+          <Suspense fallback={<p className={layoutStyles.textMuted}>Загрузка сканера…</p>}>
             <BarcodeScanner onDetected={handleScan} onClose={() => setShowScanner(false)} />
           </Suspense>
         </Modal>
       )}
 
       {lines.length > 0 && (
-        <div className="stack card card-full">
-          <div className="section-title">
+        <div className={[layoutStyles.stack, layoutStyles.card, layoutStyles.cardFull].join(' ')}>
+          <div className={layoutStyles.sectionTitle}>
             <h3>{MODE_LABELS[mode]}</h3>
-            <span className="text-muted">{lines.length} поз.</span>
+            <span className={layoutStyles.textMuted}>{lines.length} поз.</span>
           </div>
           <div className="table-wrap cart-table-wrap">
             <div className="cart-table-head" style={{ gridTemplateColumns: movementColumns }}>
@@ -588,14 +589,14 @@ export function MovementForm({
       )}
 
       {mode === 'receive' && lines.length > 0 && (
-        <div className="stack" style={{ gap: 10 }}>
+        <div className={layoutStyles.stack} style={{ gap: 10 }}>
           <label className="sale-checkbox">
             <input type="checkbox" checked={withDebt} onChange={(e) => setWithDebt(e.target.checked)} />
             Принять в долг поставщику
           </label>
           {withDebt && (
-            <div className="row">
-              <label className="field" style={{ flex: 1 }}>
+            <div className={layoutStyles.row}>
+              <label className={layoutStyles.field} style={{ flex: 1 }}>
                 Поставщик
                 <Select
                   value={supplierId != null ? String(supplierId) : ''}
@@ -603,7 +604,7 @@ export function MovementForm({
                   options={suppliers.map((s) => ({ value: String(s.id), label: s.name }))}
                 />
               </label>
-              <label className="field" style={{ flex: 1 }}>
+              <label className={layoutStyles.field} style={{ flex: 1 }}>
                 Долг до
                 <DateInput
                   value={debtDueDate}
@@ -616,7 +617,7 @@ export function MovementForm({
         </div>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       <Button
         type="submit"
         disabled={

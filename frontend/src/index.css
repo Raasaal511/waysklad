@@ -2817,38 +2817,6 @@ input.sale-client-search:not([type='checkbox']):not([type='radio']) {
   transform: rotate(180deg);
 }
 
-.movement-history-summary {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 0;
-  background: transparent;
-  border: none;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-}
-
-.movement-history-summary .disclosure-chevron {
-  flex-shrink: 0;
-  color: var(--text-muted);
-  transition: transform 0.15s ease;
-}
-
-.movement-history-summary[aria-expanded='true'] .disclosure-chevron {
-  transform: rotate(180deg);
-}
-
-.movement-history-money {
-  flex-shrink: 0;
-  color: var(--accent);
-  font-weight: 600;
-  font-size: calc(1em + 5px);
-  font-variant-numeric: tabular-nums;
-}
-
 .sale-day-group {
   display: flex;
   flex-direction: column;
