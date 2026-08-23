@@ -3,10 +3,17 @@ from fastapi import APIRouter
 from app.presentation.counterparties.schemas import (
     ClientCreateRequest,
     ClientResponse,
+    ClientUpdateRequest,
     SupplierCreateRequest,
     SupplierResponse,
 )
-from app.presentation.deps import ActorDep, CreateClientDep, CreateSupplierDep, UowDep
+from app.presentation.deps import (
+    ActorDep,
+    CreateClientDep,
+    CreateSupplierDep,
+    UowDep,
+    UpdateClientDep,
+)
 
 router = APIRouter(prefix="/counterparties", tags=["counterparties"])
 
@@ -19,9 +26,20 @@ async def create_client(
 
 
 @router.get("/clients")
-async def search_clients(uow: UowDep, query: str = "") -> list[ClientResponse]:
+async def search_clients(
+    uow: UowDep, query: str = "", include_inactive: bool = False
+) -> list[ClientResponse]:
     async with uow:
-        return [ClientResponse.from_entity(c) for c in await uow.clients.search(query)]
+        clients = await uow.clients.search(query, include_inactive=include_inactive)
+        return [ClientResponse.from_entity(c) for c in clients]
+
+
+@router.patch("/clients/{client_id}")
+async def update_client(
+    client_id: int, body: ClientUpdateRequest, actor: ActorDep, use_case: UpdateClientDep
+) -> ClientResponse:
+    client = await use_case.execute(actor, body.to_command(client_id))
+    return ClientResponse.from_entity(client)
 
 
 @router.post("/suppliers", status_code=201)

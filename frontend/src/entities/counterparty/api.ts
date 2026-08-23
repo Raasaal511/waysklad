@@ -7,6 +7,7 @@ export interface Client {
   whatsapp: string
   city: string
   debt_limit: string | null
+  is_active: boolean
 }
 
 export interface Supplier {
@@ -16,9 +17,12 @@ export interface Supplier {
   note: string
 }
 
-export function searchClients(query = '') {
-  const q = query ? `?query=${encodeURIComponent(query)}` : ''
-  return api.get<Client[]>(`/counterparties/clients${q}`)
+export function searchClients(query = '', includeInactive = false) {
+  const params = new URLSearchParams()
+  if (query) params.set('query', query)
+  if (includeInactive) params.set('include_inactive', 'true')
+  const q = params.toString()
+  return api.get<Client[]>(`/counterparties/clients${q ? `?${q}` : ''}`)
 }
 
 export function createClient(input: {
@@ -29,6 +33,20 @@ export function createClient(input: {
   debt_limit?: string | null
 }) {
   return api.post<Client>('/counterparties/clients', input)
+}
+
+export function updateClient(
+  clientId: number,
+  input: {
+    name: string
+    phone?: string
+    whatsapp?: string
+    city?: string
+    debt_limit?: string | null
+    is_active: boolean
+  },
+) {
+  return api.patch<Client>(`/counterparties/clients/${clientId}`, input)
 }
 
 export function listSuppliers() {

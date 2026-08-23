@@ -20,6 +20,7 @@ from app.application.auth.update_employee import UpdateEmployeeUseCase
 from app.application.auth.update_shop import UpdateShopUseCase
 from app.application.counterparties.create_client import CreateClientUseCase
 from app.application.counterparties.create_supplier import CreateSupplierUseCase
+from app.application.counterparties.update_client import UpdateClientUseCase
 from app.application.debts.create_installment import CreateInstallmentUseCase
 from app.application.debts.extend_debt import ExtendDebtUseCase
 from app.application.debts.issue_debt import IssueDebtUseCase
@@ -120,6 +121,7 @@ get_change_order_status = _with_uow(ChangeOrderStatusUseCase)
 get_cancel_order = _with_uow(CancelOrderUseCase)
 get_issue_order = _with_uow(IssueOrderUseCase)
 get_create_client = _with_uow(CreateClientUseCase)
+get_update_client = _with_uow(UpdateClientUseCase)
 get_create_supplier = _with_uow(CreateSupplierUseCase)
 get_dashboard = _with_uow(GetDashboardUseCase)
 get_top_products = _with_uow(GetTopProductsUseCase)
@@ -180,6 +182,7 @@ ChangeOrderStatusDep = Annotated[ChangeOrderStatusUseCase, Depends(get_change_or
 CancelOrderDep = Annotated[CancelOrderUseCase, Depends(get_cancel_order)]
 IssueOrderDep = Annotated[IssueOrderUseCase, Depends(get_issue_order)]
 CreateClientDep = Annotated[CreateClientUseCase, Depends(get_create_client)]
+UpdateClientDep = Annotated[UpdateClientUseCase, Depends(get_update_client)]
 CreateSupplierDep = Annotated[CreateSupplierUseCase, Depends(get_create_supplier)]
 GetDashboardDep = Annotated[GetDashboardUseCase, Depends(get_dashboard)]
 GetTopProductsDep = Annotated[GetTopProductsUseCase, Depends(get_top_products)]

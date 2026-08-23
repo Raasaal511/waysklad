@@ -25,6 +25,7 @@ class ClientMapper:
             whatsapp=Phone(model.whatsapp) if model.whatsapp else None,
             city=model.city,
             debt_limit=Money(model.debt_limit) if model.debt_limit is not None else None,
+            is_active=model.is_active,
         )
 
 

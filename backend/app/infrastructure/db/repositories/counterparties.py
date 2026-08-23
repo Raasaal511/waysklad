@@ -28,20 +28,39 @@ class SqlAlchemyClientRepository(SqlAlchemyRepository, IClientRepository):
             raise NotFoundError(f"Клиент {client_id} не найден")
         return ClientMapper.to_entity(model)
 
-    async def search(self, query: str) -> list[Client]:
+    async def search(self, query: str, include_inactive: bool = False) -> list[Client]:
         pattern = f"%{query}%"
+        conditions = [
+            ClientModel.tenant_id == self._tenant,
+            or_(ClientModel.name.ilike(pattern), ClientModel.phone.ilike(pattern)),
+        ]
+        if not include_inactive:
+            conditions.append(ClientModel.is_active.is_(True))
         models = (
             await self._session.execute(
-                select(ClientModel)
-                .where(
-                    ClientModel.tenant_id == self._tenant,
-                    or_(ClientModel.name.ilike(pattern), ClientModel.phone.ilike(pattern)),
-                )
-                .order_by(ClientModel.name)
-                .limit(50)
+                select(ClientModel).where(*conditions).order_by(ClientModel.name).limit(50)
             )
         ).scalars().all()
         return [ClientMapper.to_entity(m) for m in models]
+
+    async def save(self, client: Client) -> Client:
+        model = (
+            await self._session.execute(
+                select(ClientModel).where(
+                    ClientModel.tenant_id == self._tenant, ClientModel.id == client.id
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            raise NotFoundError(f"Клиент {client.id} не найден")
+        model.name = client.name
+        model.phone = str(client.phone) if client.phone else ""
+        model.whatsapp = str(client.whatsapp) if client.whatsapp else ""
+        model.city = client.city
+        model.debt_limit = client.debt_limit.amount if client.debt_limit else None
+        model.is_active = client.is_active
+        await self._session.flush()
+        return client
 
 
 class SqlAlchemySupplierRepository(SqlAlchemyRepository, ISupplierRepository):

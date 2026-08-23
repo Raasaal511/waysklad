@@ -31,6 +31,10 @@ from app.application.counterparties.create_supplier import (
     CreateSupplierCommand,
     CreateSupplierUseCase,
 )
+from app.application.counterparties.update_client import (
+    UpdateClientCommand,
+    UpdateClientUseCase,
+)
 from app.application.debts.create_installment import (
     CreateInstallmentCommand,
     CreateInstallmentUseCase,
@@ -2139,3 +2143,38 @@ async def test_update_employee_rejects_role_escalation_by_manager(
                 user_id=seller.id, name="Зара", role=Role.MANAGER, is_active=True,
             ),
         )
+
+
+async def test_update_client_changes_fields(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Ахмед", debt_limit=Decimal("1000"))
+    )
+
+    updated = await UpdateClientUseCase(make_uow(tenant_id)).execute(
+        owner,
+        UpdateClientCommand(
+            client_id=client.id, name="Ахмед Х.", city="Грозный", debt_limit=Decimal("2000"),
+        ),
+    )
+
+    assert updated.name == "Ахмед Х."
+    assert updated.city == "Грозный"
+    assert updated.debt_limit == Money.of("2000")
+
+
+async def test_deactivated_client_excluded_from_default_search(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Заур")
+    )
+
+    await UpdateClientUseCase(make_uow(tenant_id)).execute(
+        owner,
+        UpdateClientCommand(client_id=client.id, name="Заур", is_active=False),
+    )
+
+    async with make_uow(tenant_id) as uow:
+        assert await uow.clients.search("Заур") == []
+        visible_with_inactive = await uow.clients.search("Заур", include_inactive=True)
+        assert visible_with_inactive[0].is_active is False

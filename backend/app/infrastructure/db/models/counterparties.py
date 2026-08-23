@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from sqlalchemy import Numeric, String, Text
+from sqlalchemy import Boolean, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.infrastructure.db.models.base import Base, TenantMixin, TimestampMixin
@@ -18,6 +18,7 @@ class ClientModel(Base, TenantMixin, TimestampMixin):
     city: Mapped[str] = mapped_column(String(100), default="")
     debt_limit: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))  # NULL — без лимита
     note: Mapped[str] = mapped_column(Text, default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
 
 class SupplierModel(Base, TenantMixin, TimestampMixin):

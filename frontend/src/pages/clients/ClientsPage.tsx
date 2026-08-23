@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   searchClients,
   createClient,
@@ -8,19 +8,17 @@ import {
   type Client,
   type Supplier,
 } from '../../entities/counterparty/api'
-import { listClientDebts, listSupplierDebts, type Debt } from '../../entities/debt/api'
+import { listSupplierDebts, type Debt } from '../../entities/debt/api'
 import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
-import { IconPlus, IconChevronRight } from '@tabler/icons-react'
+import { IconPlus, IconChevronRight, IconUser, IconTruck, IconPhone, IconMapPin } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
 
-const CLIENT_COLUMNS = '1.4fr 1fr 1fr 1fr 20px'
-const SUPPLIER_COLUMNS = '1.6fr 1.6fr 20px'
-
 export function ClientsPage() {
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const highlightId = searchParams.get('highlight')
   const [tab, setTab] = useState<'clients' | 'suppliers'>('clients')
@@ -29,14 +27,13 @@ export function ClientsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
   const highlightRef = useRef<HTMLButtonElement>(null)
 
   async function load() {
     setLoading(true)
     try {
-      const [c, s] = await Promise.all([searchClients(), listSuppliers()])
+      const [c, s] = await Promise.all([searchClients('', true), listSuppliers()])
       setClients(c)
       setSuppliers(s)
     } catch (err) {
@@ -95,12 +92,6 @@ export function ClientsPage() {
         </Modal>
       )}
 
-      {selectedClient && (
-        <Modal title={selectedClient.name} onClose={() => setSelectedClient(null)}>
-          <ClientDebtsSummary client={selectedClient} />
-        </Modal>
-      )}
-
       {selectedSupplier && (
         <Modal title={selectedSupplier.name} onClose={() => setSelectedSupplier(null)}>
           <SupplierDebtsSummary supplier={selectedSupplier} />
@@ -114,115 +105,66 @@ export function ClientsPage() {
         clients.length === 0 ? (
           <p className="text-muted">Клиентов пока нет</p>
         ) : (
-          <div className="data-table">
-            <div className="data-table-head" style={{ gridTemplateColumns: CLIENT_COLUMNS }}>
-              <span>Имя</span>
-              <span>Телефон</span>
-              <span>Город</span>
-              <span>Лимит долга</span>
-              <span />
-            </div>
-            <div className="data-table-body">
-              {clients.map((c, i) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  ref={String(c.id) === highlightId ? highlightRef : undefined}
-                  className={`data-row data-row-link sale-history-row-in${String(c.id) === highlightId ? ' row-highlight' : ''}`}
-                  style={
-                    {
-                      gridTemplateColumns: CLIENT_COLUMNS,
-                      '--row-delay': `${Math.min(i, 12) * 25}ms`,
-                    } as CSSProperties
-                  }
-                  onClick={() => setSelectedClient(c)}
-                >
-                  <span className="data-row-name">{c.name}</span>
-                  <span className="text-muted">{c.phone || '—'}</span>
-                  <span className="text-muted">{c.city || '—'}</span>
-                  <span className="text-muted">{c.debt_limit ?? '—'}</span>
-                  <IconChevronRight size={16} stroke={1.8} className="data-row-chevron" />
-                </button>
-              ))}
-            </div>
+          <div className="contact-row-list">
+            {clients.map((c, i) => (
+              <button
+                key={c.id}
+                type="button"
+                ref={String(c.id) === highlightId ? highlightRef : undefined}
+                className={`contact-row sale-history-row-in${String(c.id) === highlightId ? ' row-highlight' : ''}`}
+                style={{ '--row-delay': `${Math.min(i, 12) * 25}ms` } as CSSProperties}
+                onClick={() => navigate(`/clients/${c.id}`)}
+              >
+                <span className="contact-row-icon">
+                  <IconUser size={16} stroke={1.8} />
+                </span>
+                <div className="contact-row-main">
+                  <div className="contact-row-top">
+                    <span className="contact-row-name">{c.name}</span>
+                    {!c.is_active && <span className="badge">Неактивен</span>}
+                  </div>
+                  <div className="contact-row-meta">
+                    {c.phone && (
+                      <span>
+                        <IconPhone size={13} stroke={1.8} /> {c.phone}
+                      </span>
+                    )}
+                    {c.city && (
+                      <span>
+                        <IconMapPin size={13} stroke={1.8} /> {c.city}
+                      </span>
+                    )}
+                    {c.debt_limit && <span>Лимит долга: {formatMoney(c.debt_limit)} ₽</span>}
+                  </div>
+                </div>
+                <IconChevronRight size={18} stroke={1.8} className="contact-row-chevron" />
+              </button>
+            ))}
           </div>
         )
       ) : suppliers.length === 0 ? (
         <p className="text-muted">Поставщиков пока нет</p>
       ) : (
-        <div className="data-table">
-          <div className="data-table-head" style={{ gridTemplateColumns: SUPPLIER_COLUMNS }}>
-            <span>Название</span>
-            <span>Контакт</span>
-            <span />
-          </div>
-          <div className="data-table-body">
-            {suppliers.map((s, i) => (
-              <button
-                key={s.id}
-                type="button"
-                className="data-row data-row-link sale-history-row-in"
-                style={
-                  {
-                    gridTemplateColumns: SUPPLIER_COLUMNS,
-                    '--row-delay': `${Math.min(i, 12) * 25}ms`,
-                  } as CSSProperties
-                }
-                onClick={() => setSelectedSupplier(s)}
-              >
-                <span className="data-row-name">{s.name}</span>
-                <span className="text-muted">{s.contact || '—'}</span>
-                <IconChevronRight size={16} stroke={1.8} className="data-row-chevron" />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function ClientDebtsSummary({ client }: { client: Client }) {
-  const [debts, setDebts] = useState<Debt[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    listClientDebts(client.id)
-      .then((summary) => setDebts(summary.debts))
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Не удалось загрузить долги'))
-  }, [client.id])
-
-  const active = debts?.filter((d) => !d.is_closed) ?? []
-  const closed = debts?.filter((d) => d.is_closed) ?? []
-  const totalBalance = active.reduce((sum, d) => sum + Number(d.balance), 0)
-
-  return (
-    <div className="stack">
-      <div className="row wrap" style={{ gap: 12 }}>
-        {client.phone && <span className="text-muted">{client.phone}</span>}
-        {client.city && <span className="text-muted">{client.city}</span>}
-        {client.debt_limit && <span className="text-muted">Лимит долга: {formatMoney(client.debt_limit)} ₽</span>}
-      </div>
-
-      <h3>Долги</h3>
-      {error && <p className="error">{error}</p>}
-      {debts === null ? (
-        <p className="text-muted">Загрузка…</p>
-      ) : debts.length === 0 ? (
-        <p className="text-muted">Долгов нет</p>
-      ) : (
-        <div className="stack" style={{ gap: 8 }}>
-          {active.length > 0 && (
-            <p className="text-muted">Активных долгов на {formatMoney(totalBalance)} ₽</p>
-          )}
-          {[...active, ...closed].map((d) => (
-            <div key={d.id} className="client-debt-item">
-              <span className={DEBT_STATUS_BADGE_CLASS[d.status]}>{DEBT_STATUS_LABELS[d.status]}</span>
-              <span>{formatMoney(d.balance)} ₽ из {formatMoney(d.amount)} ₽</span>
-              {d.due_date && (
-                <span className="text-muted">до {new Date(d.due_date).toLocaleDateString('ru-RU')}</span>
-              )}
-            </div>
+        <div className="contact-row-list">
+          {suppliers.map((s, i) => (
+            <button
+              key={s.id}
+              type="button"
+              className="contact-row sale-history-row-in"
+              style={{ '--row-delay': `${Math.min(i, 12) * 25}ms` } as CSSProperties}
+              onClick={() => setSelectedSupplier(s)}
+            >
+              <span className="contact-row-icon">
+                <IconTruck size={16} stroke={1.8} />
+              </span>
+              <div className="contact-row-main">
+                <div className="contact-row-top">
+                  <span className="contact-row-name">{s.name}</span>
+                </div>
+                {s.contact && <div className="contact-row-meta">{s.contact}</div>}
+              </div>
+              <IconChevronRight size={18} stroke={1.8} className="contact-row-chevron" />
+            </button>
           ))}
         </div>
       )}

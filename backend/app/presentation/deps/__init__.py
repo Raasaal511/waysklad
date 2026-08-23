@@ -63,6 +63,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     SetWarehouseAssignmentsDep,
     StocktakeDep,
     TransferDep,
+    UpdateClientDep,
     UpdateEmployeeDep,
     UpdateOrderDep,
     UpdateProductDep,

@@ -12,6 +12,7 @@ class Client:
     whatsapp: Phone | None = None
     city: str = ""
     debt_limit: Money | None = None  # лимит долга, None — без лимита
+    is_active: bool = True
 
 
 @dataclass
