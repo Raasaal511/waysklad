@@ -25,7 +25,11 @@ export function InlinePopover({
   useLayoutEffect(() => {
     if (!open) return
     function place() {
-      const rect = anchorRef.current?.getBoundingClientRect()
+      // .inline-popover-anchor рендерится с display:contents (чтобы не мешать
+      // flex/grid-раскладке родителя), а у таких элементов нет своего бокса —
+      // getBoundingClientRect() на самом anchor всегда вернёт нулевой прямоугольник.
+      // Поэтому меряем реальный DOM-узел триггера (его первый дочерний элемент).
+      const rect = anchorRef.current?.firstElementChild?.getBoundingClientRect()
       if (!rect) return
       const margin = 12
       const left = Math.min(

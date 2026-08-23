@@ -25,10 +25,13 @@ import {
   IconArrowUpRight,
   IconArrowDownLeft,
   IconCalendarRepeat,
+  IconSearch,
+  IconClockHour4,
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
 import { DateInput } from '../../shared/ui/DateInput'
+import { QuickNewClientForm } from '../../shared/ui/QuickNewClientForm'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
 import { daysOverdue, pluralDays } from '../../entities/debt/dueDate'
@@ -59,8 +62,20 @@ const STATUS_FILTERS: { value: Debt['status'] | 'all'; label: string }[] = [
   { value: 'due_soon', label: 'Скоро срок' },
   { value: 'partially_paid', label: 'Погашен частично' },
   { value: 'active', label: 'Активен' },
-  { value: 'closed', label: 'Погашен' },
 ]
+
+// Дата, которой считаем долг закрытым — последняя оплата (если она была);
+// нужна только для группировки погашённых долгов по месяцу на отдельной
+// вкладке, в данных нет отдельного closed_at.
+function closedOn(debt: Debt): string {
+  if (debt.repayments.length === 0) return debt.issued_at
+  return debt.repayments.reduce((latest, r) => (r.on > latest ? r.on : latest), debt.repayments[0].on)
+}
+
+function monthLabel(dateStr: string): string {
+  const label = new Date(dateStr).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('ru-RU')
@@ -140,6 +155,8 @@ export function DebtsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [showUpcoming, setShowUpcoming] = useState(false)
+  const [view, setView] = useState<'active' | 'closed'>('active')
   const [direction, setDirection] = useState<'clients' | 'suppliers'>('clients')
   const [statusFilter, setStatusFilter] = useState<Debt['status'] | 'all'>('all')
   const [query, setQuery] = useState('')
@@ -167,15 +184,15 @@ export function DebtsPage() {
   }, [])
 
   // Погашенные долги не нужны по умолчанию — грузим только когда владелец
-  // действительно захочет их увидеть через фильтр "Погашен".
+  // действительно открыл вкладку "Погашенные".
   useEffect(() => {
-    if (statusFilter !== 'closed' || closedDebts !== null) return
+    if (view !== 'closed' || closedDebts !== null) return
     setLoadingClosed(true)
     listClosedDebts()
       .then(setClosedDebts)
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Не удалось загрузить погашенные долги'))
       .finally(() => setLoadingClosed(false))
-  }, [statusFilter, closedDebts])
+  }, [view, closedDebts])
 
   const counterpartyName = (debt: Debt) =>
     debt.client_id
@@ -188,10 +205,7 @@ export function DebtsPage() {
   const totalWeOwe = supplierDebts.reduce((sum, d) => sum + Number(d.balance), 0)
 
   const visibleDebts = useMemo(() => {
-    const source = statusFilter === 'closed' ? closedDebts ?? [] : debts
-    const byDirection = source.filter((d) =>
-      direction === 'clients' ? d.client_id != null : d.supplier_id != null,
-    )
+    const byDirection = debts.filter((d) => (direction === 'clients' ? d.client_id != null : d.supplier_id != null))
     const byStatus = statusFilter === 'all' ? byDirection : byDirection.filter((d) => d.status === statusFilter)
     const trimmedQuery = query.trim().toLowerCase()
     const filtered = trimmedQuery
@@ -203,10 +217,30 @@ export function DebtsPage() {
       return (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999')
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [direction, statusFilter, debts, closedDebts, query, clients, suppliers])
+  }, [direction, statusFilter, debts, query, clients, suppliers])
+
+  // Погашенные — отдельной вкладкой, сгруппированы по месяцу закрытия (месяц
+  // последней оплаты), последние группы сверху.
+  const closedGroups = useMemo(() => {
+    const trimmedQuery = query.trim().toLowerCase()
+    const source = closedDebts ?? []
+    const filtered = trimmedQuery
+      ? source.filter((d) => counterpartyName(d).toLowerCase().includes(trimmedQuery))
+      : source
+    const sorted = [...filtered].sort((a, b) => closedOn(b).localeCompare(closedOn(a)))
+    const groups: { label: string; items: Debt[] }[] = []
+    for (const d of sorted) {
+      const label = monthLabel(closedOn(d))
+      const group = groups.at(-1)?.label === label ? groups.at(-1)! : { label, items: [] }
+      if (groups.at(-1) !== group) groups.push(group)
+      group.items.push(d)
+    }
+    return groups
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closedDebts, query, clients, suppliers])
 
   const upcoming = useMemo(
-    () => upcomingPayments(debts, counterpartyName).slice(0, 5),
+    () => upcomingPayments(debts, counterpartyName),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [debts, clients, suppliers],
   )
@@ -225,15 +259,24 @@ export function DebtsPage() {
     <div className="stack">
       <div className="section-title">
         <h2>Долги</h2>
-        <Button onClick={() => setShowForm(true)}>
-          <IconPlus size={16} stroke={1.8} /> Выдать долг
-        </Button>
+        <div className="row" style={{ gap: 8 }}>
+          {upcoming.length > 0 && (
+            <Button variant="secondary" onClick={() => setShowUpcoming(true)}>
+              <IconClockHour4 size={16} stroke={1.8} /> Выплаты
+              <span className="count-badge">{upcoming.length}</span>
+            </Button>
+          )}
+          <Button onClick={() => setShowForm(true)}>
+            <IconPlus size={16} stroke={1.8} /> Выдать долг
+          </Button>
+        </div>
       </div>
 
       {showForm && (
         <Modal title="Выдать долг" onClose={() => setShowForm(false)}>
           <IssueDebtForm
             clients={clients}
+            onClientCreated={(client) => setClients((prev) => [...prev, client])}
             suppliers={suppliers}
             onDone={() => {
               setShowForm(false)
@@ -245,28 +288,49 @@ export function DebtsPage() {
 
       {error && <p className="error">{error}</p>}
 
-      {!loading && upcoming.length > 0 && (
-        <div className="card card-full stack">
-          <h3>Ближайшие выплаты</h3>
-          <div className="debt-schedule">
-            {upcoming.map((p, i) => (
-              <button
-                key={i}
-                type="button"
-                className="debt-schedule-row debt-upcoming-row"
-                onClick={() => navigate(`/debts/${p.debtId}`)}
-              >
-                <span>
-                  {formatDate(p.dueDate)} <span className="text-muted">· {p.name}</span>
-                </span>
-                <span>{formatMoney(p.amount)} ₽</span>
-              </button>
-            ))}
+      {showUpcoming && (
+        <Modal title="Ближайшие выплаты" onClose={() => setShowUpcoming(false)}>
+          <div className="debt-upcoming-list debt-upcoming-list-modal">
+            {upcoming.map((p, i) => {
+              const overdue = daysOverdue(p.dueDate) > 0
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className="debt-upcoming-row"
+                  onClick={() => {
+                    setShowUpcoming(false)
+                    navigate(`/debts/${p.debtId}`)
+                  }}
+                >
+                  <span className={`debt-upcoming-date${overdue ? ' text-danger' : ''}`}>
+                    {formatDate(p.dueDate)}
+                  </span>
+                  <span className="debt-upcoming-name">{p.name}</span>
+                  {overdue && (
+                    <span className="text-danger debt-upcoming-overdue">
+                      просрочен на {daysOverdue(p.dueDate)} {pluralDays(daysOverdue(p.dueDate))}
+                    </span>
+                  )}
+                  <strong className="debt-upcoming-amount">{formatMoney(p.amount)} ₽</strong>
+                  <IconChevronRight size={16} stroke={1.8} className="data-row-chevron" />
+                </button>
+              )
+            })}
           </div>
-        </div>
+        </Modal>
       )}
 
-      {!loading && (clientDebts.length > 0 || supplierDebts.length > 0) && (
+      <div className="sale-period-tabs">
+        <Button variant="secondary" active={view === 'active'} onClick={() => setView('active')}>
+          Активные
+        </Button>
+        <Button variant="secondary" active={view === 'closed'} onClick={() => setView('closed')}>
+          Погашенные
+        </Button>
+      </div>
+
+      {!loading && view === 'active' && (
         <div className="debt-tabs">
           <button
             type="button"
@@ -293,9 +357,10 @@ export function DebtsPage() {
         </div>
       )}
 
-      {!loading && (clientDebts.length > 0 || supplierDebts.length > 0) && (
+      {!loading && (
         <div className="sale-search-panel">
           <div className="sale-search-row">
+            <IconSearch size={16} stroke={1.8} className="sale-search-icon" />
             <input
               className="sale-search-input"
               placeholder="Поиск по клиенту или поставщику…"
@@ -306,7 +371,7 @@ export function DebtsPage() {
         </div>
       )}
 
-      {!loading && (clientDebts.length > 0 || supplierDebts.length > 0) && (
+      {!loading && view === 'active' && (
         <div className="debt-status-filters">
           {STATUS_FILTERS.map((f) => (
             <button
@@ -321,20 +386,42 @@ export function DebtsPage() {
         </div>
       )}
 
-      {loading || (statusFilter === 'closed' && loadingClosed) ? (
+      {view === 'active' ? (
+        loading ? (
+          <p className="text-muted">Загрузка…</p>
+        ) : visibleDebts.length === 0 ? (
+          <p className="text-muted">
+            {query.trim()
+              ? 'Ничего не найдено'
+              : statusFilter === 'all'
+                ? 'Долгов нет'
+                : 'Долгов с таким статусом нет'}
+          </p>
+        ) : (
+          <div className="debt-row-list">
+            {visibleDebts.map((d) => (
+              <DebtRow key={d.id} debt={d} name={counterpartyName(d)} onOpen={() => navigate(`/debts/${d.id}`)} />
+            ))}
+          </div>
+        )
+      ) : loadingClosed ? (
         <p className="text-muted">Загрузка…</p>
-      ) : visibleDebts.length === 0 ? (
-        <p className="text-muted">
-          {query.trim()
-            ? 'Ничего не найдено'
-            : statusFilter === 'all'
-              ? 'Долгов нет'
-              : 'Долгов с таким статусом нет'}
-        </p>
+      ) : closedGroups.length === 0 ? (
+        <p className="text-muted">{query.trim() ? 'Ничего не найдено' : 'Погашенных долгов нет'}</p>
       ) : (
-        <div className="debt-row-list">
-          {visibleDebts.map((d) => (
-            <DebtRow key={d.id} debt={d} name={counterpartyName(d)} onOpen={() => navigate(`/debts/${d.id}`)} />
+        <div className="stack">
+          {closedGroups.map((group) => (
+            <div key={group.label} className="debt-closed-group">
+              <div className="debt-closed-group-head">
+                <span>{group.label}</span>
+                <span className="text-muted">{group.items.length}</span>
+              </div>
+              <div className="debt-row-list">
+                {group.items.map((d) => (
+                  <DebtRow key={d.id} debt={d} name={counterpartyName(d)} onOpen={() => navigate(`/debts/${d.id}`)} />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -388,15 +475,18 @@ function DebtRow({ debt, name, onOpen }: { debt: Debt; name: string; onOpen: () 
 
 function IssueDebtForm({
   clients,
+  onClientCreated,
   suppliers,
   onDone,
 }: {
   clients: Client[]
+  onClientCreated: (client: Client) => void
   suppliers: Supplier[]
   onDone: () => void
 }) {
   const [kind, setKind] = useState<'client' | 'supplier'>('client')
   const [clientId, setClientId] = useState<number | null>(clients[0]?.id ?? null)
+  const [showNewClientForm, setShowNewClientForm] = useState(false)
   const [supplierId, setSupplierId] = useState<number | null>(suppliers[0]?.id ?? null)
   const [amount, setAmount] = useState('')
   const [dueDate, setDueDate] = useState('')
@@ -466,11 +556,27 @@ function IssueDebtForm({
       {kind === 'client' ? (
         <label className="field">
           Клиент
-          <Select
-            value={clientId != null ? String(clientId) : ''}
-            onChange={(v) => setClientId(Number(v))}
-            options={clients.map((c) => ({ value: String(c.id), label: c.name }))}
-          />
+          <div className="sale-client-row">
+            <Select
+              value={clientId != null ? String(clientId) : ''}
+              onChange={(v) => setClientId(Number(v))}
+              options={clients.map((c) => ({ value: String(c.id), label: c.name }))}
+            />
+            <QuickNewClientForm
+              open={showNewClientForm}
+              onOpenChange={setShowNewClientForm}
+              trigger={
+                <Button type="button" variant="secondary" onClick={() => setShowNewClientForm(true)}>
+                  <IconPlus size={16} stroke={1.8} /> Клиент
+                </Button>
+              }
+              onCreated={(client) => {
+                onClientCreated(client)
+                setClientId(client.id)
+                setShowNewClientForm(false)
+              }}
+            />
+          </div>
         </label>
       ) : (
         <label className="field">

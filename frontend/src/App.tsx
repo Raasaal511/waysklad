@@ -15,6 +15,7 @@ import { TasksPage } from './pages/tasks/TasksPage'
 import { DebtsPage } from './pages/debts/DebtsPage'
 import { DebtDetailPage } from './pages/debts/DebtDetailPage'
 import { ClientsPage } from './pages/clients/ClientsPage'
+import { ClientDetailPage } from './pages/clients/ClientDetailPage'
 import { AnalyticsPage } from './pages/analytics/AnalyticsPage'
 import { ProfilePage } from './pages/profile/ProfilePage'
 import { EmployeesPage } from './pages/employees/EmployeesPage'
@@ -46,6 +47,7 @@ export function App() {
               <Route path="/debts" element={<DebtsPage />} />
               <Route path="/debts/:id" element={<DebtDetailPage />} />
               <Route path="/clients" element={<ClientsPage />} />
+              <Route path="/clients/:id" element={<ClientDetailPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/employees" element={<EmployeesPage />} />
               <Route path="/audit" element={<AuditPage />} />
