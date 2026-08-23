@@ -7,7 +7,6 @@ import {
   useState,
   type CSSProperties,
   type FormEvent,
-  type ReactNode,
 } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
@@ -20,7 +19,7 @@ import {
   type Unit,
 } from '../../entities/product/api'
 import { listWarehouses, listStock, type Warehouse, type StockItem } from '../../entities/inventory/api'
-import { searchClients, createClient, type Client } from '../../entities/counterparty/api'
+import { searchClients, type Client } from '../../entities/counterparty/api'
 import { listClientDebts, type Debt } from '../../entities/debt/api'
 import { listEmployees } from '../../entities/profile/api'
 import type { User } from '../../entities/auth/api'
@@ -60,12 +59,11 @@ import {
 } from '@tabler/icons-react'
 import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
-import { InlinePopover } from '../../shared/ui/InlinePopover'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
 import { DateInput } from '../../shared/ui/DateInput'
-import { PhoneInput } from '../../shared/ui/PhoneInput'
+import { QuickNewClientForm } from '../../shared/ui/QuickNewClientForm'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
 import { InfoHint } from '../../shared/ui/InfoHint'
@@ -2071,55 +2069,3 @@ function SaleEditForm({
   )
 }
 
-function QuickNewClientForm({
-  open,
-  onOpenChange,
-  trigger,
-  onCreated,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  trigger: ReactNode
-  onCreated: (client: Client) => void
-}) {
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-    setError(null)
-    setSaving(true)
-    try {
-      const client = await createClient({ name, phone })
-      setName('')
-      setPhone('')
-      onCreated(client)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось добавить клиента')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <InlinePopover title="Новый клиент" trigger={trigger} open={open} onOpenChange={onOpenChange}>
-      <form className="form" onSubmit={handleSubmit}>
-        <label className="field">
-          Имя
-          <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
-        </label>
-        <label className="field">
-          Телефон
-          <PhoneInput value={phone} onChange={setPhone} />
-        </label>
-        {error && <p className="error">{error}</p>}
-        <Button type="submit" disabled={saving || !name.trim()}>
-          {saving ? 'Сохранение…' : 'Добавить и выбрать'}
-        </Button>
-      </form>
-    </InlinePopover>
-  )
-}

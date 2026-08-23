@@ -29,6 +29,7 @@ import {
   IconArrowBarToDown,
   IconClipboardCheck,
   IconTruck,
+  IconSearch,
 } from '@tabler/icons-react'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Button } from '../../shared/ui/Button'
@@ -371,6 +372,7 @@ export function WarehouseDetailPage() {
           <h3>Товары на складе</h3>
           <div className="sale-search-panel">
             <div className="sale-search-row">
+              <IconSearch size={16} stroke={1.8} className="sale-search-icon" />
               <input
                 className="sale-search-input"
                 placeholder="Поиск по названию, артикулу, штрихкоду…"

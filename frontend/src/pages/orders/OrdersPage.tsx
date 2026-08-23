@@ -53,6 +53,7 @@ import {
   IconTable,
   IconList,
   IconCalendar,
+  IconSearch,
   type Icon as TablerIcon,
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
@@ -1399,6 +1400,7 @@ function NewOrderForm({
 
       <div className="stack" style={{ gap: 10 }}>
         <div className="sale-search-row">
+          <IconSearch size={16} stroke={1.8} className="sale-search-icon" />
           <input
             className="sale-search-input"
             placeholder="Поиск по названию, артикулу, штрихкоду…"

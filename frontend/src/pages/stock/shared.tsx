@@ -29,6 +29,7 @@ import {
   IconArrowBarToDown,
   IconArrowBarUp,
   IconArrowsRightLeft,
+  IconSearch,
   type Icon,
 } from '@tabler/icons-react'
 
@@ -379,6 +380,7 @@ export function MovementForm({
 
       <div className="sale-search-panel">
         <div className="sale-search-row">
+          <IconSearch size={16} stroke={1.8} className="sale-search-icon" />
           <input
             className="sale-search-input"
             placeholder="Поиск по названию, артикулу, штрихкоду…"

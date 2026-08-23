@@ -38,6 +38,7 @@ import {
   IconChevronDown,
   IconTrash,
   IconRefresh,
+  IconSearch,
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
@@ -330,6 +331,7 @@ export function ProductsPage() {
 
       <div className="sale-search-panel">
         <div className="sale-search-row">
+          <IconSearch size={16} stroke={1.8} className="sale-search-icon" />
           <input
             className="sale-search-input"
             placeholder="Поиск по названию, артикулу…"
