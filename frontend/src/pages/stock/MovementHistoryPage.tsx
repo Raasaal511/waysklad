@@ -19,6 +19,8 @@ import { DropdownMenu } from '../../shared/ui/DropdownMenu'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
 import { formatQuantity, formatMoney } from '../../shared/lib/format'
 import { IconChevronLeft, IconDownload, IconChevronDown } from '@tabler/icons-react'
+import layoutStyles from '../../shared/ui/Layout.module.css'
+import styles from './MovementHistoryPage.module.css'
 
 const MODE_LABELS: Record<DocumentHistoryEntry['type'], string> = {
   receipt: 'Приёмка',
@@ -166,12 +168,12 @@ export function MovementHistoryPage() {
     (warehouseFilter !== 'all' ? 1 : 0) + (typeFilter !== 'all' ? 1 : 0) + (period !== 'all' ? 1 : 0)
 
   return (
-    <div className="stack">
+    <div className={layoutStyles.stack}>
       <Link to="/stock" className="back-link">
         <IconChevronLeft size={16} stroke={1.8} /> Склады
       </Link>
 
-      <div className="section-title">
+      <div className={layoutStyles.sectionTitle}>
         <h2>История движения товара</h2>
         <DropdownMenu
           align="right"
@@ -187,7 +189,7 @@ export function MovementHistoryPage() {
           }))}
         />
       </div>
-      {exportError && <p className="error">{exportError}</p>}
+      {exportError && <p className={layoutStyles.error}>{exportError}</p>}
 
       <div className="sale-period-tabs">
         {(Object.keys(PERIOD_LABELS) as PeriodFilter[]).map((p) => (
@@ -241,61 +243,65 @@ export function MovementHistoryPage() {
       </div>
 
       {!loading && filtered.length > 0 && periodReceiptsTotal > 0 && (
-        <div className="card card-full sale-period-summary">
+        <div className={[layoutStyles.card, layoutStyles.cardFull, 'sale-period-summary'].join(' ')}>
           <h3 className="sale-period-summary-title">Закуплено за «{PERIOD_LABELS[period]}»</h3>
           <div className="stat">
             <span className="stat-label">Сумма приёмок</span>
-            <span className="stat-value movement-history-money">{formatMoney(periodReceiptsTotal)} ₽</span>
+            <span className={`stat-value ${styles['movement-history-money']}`}>
+              {formatMoney(periodReceiptsTotal)} ₽
+            </span>
           </div>
         </div>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : filtered.length === 0 ? (
-        <p className="text-muted">
+        <p className={layoutStyles.textMuted}>
           {documents.length === 0 ? 'Движений товара пока не было' : 'По этим фильтрам ничего не найдено'}
         </p>
       ) : (
-        <div className="stack" style={{ gap: 10 }}>
+        <div className={layoutStyles.stack} style={{ gap: 10 }}>
           {filtered.map((doc, i) => {
             const expanded = expandedId === doc.id
             const total = documentTotal(doc)
             return (
               <div
                 key={doc.id}
-                className="card card-full stack sale-history-row-in"
+                className={[layoutStyles.card, layoutStyles.cardFull, layoutStyles.stack, 'sale-history-row-in'].join(
+                  ' ',
+                )}
                 style={{ gap: 10, '--row-delay': `${Math.min(i, 12) * 25}ms` } as CSSProperties}
               >
                 <button
                   type="button"
-                  className="movement-history-summary"
+                  className={styles['movement-history-summary']}
                   aria-expanded={expanded}
                   onClick={() => setExpandedId(expanded ? null : doc.id)}
                 >
-                  <div className="stack" style={{ gap: 4, flex: 1 }}>
-                    <div className="row wrap" style={{ gap: 8 }}>
+                  <div className={layoutStyles.stack} style={{ gap: 4, flex: 1 }}>
+                    <div className={[layoutStyles.row, layoutStyles.wrap].join(' ')} style={{ gap: 8 }}>
                       <span className="badge accent">{MODE_LABELS[doc.type]}</span>
-                      <span className="text-muted">№{doc.number}</span>
-                      <span className="text-muted">{formatDateTime(doc.created_at)}</span>
+                      <span className={layoutStyles.textMuted}>№{doc.number}</span>
+                      <span className={layoutStyles.textMuted}>{formatDateTime(doc.created_at)}</span>
                     </div>
-                    <div className="row wrap" style={{ gap: 16 }}>
+                    <div className={[layoutStyles.row, layoutStyles.wrap].join(' ')} style={{ gap: 16 }}>
                       <span>
                         {doc.type === 'transfer'
                           ? `${warehouseName(doc.warehouse_id)} → ${doc.to_warehouse_id ? warehouseName(doc.to_warehouse_id) : ''}`
                           : warehouseName(doc.warehouse_id)}
                       </span>
-                      <span className="text-muted">{authorName(doc.author_id)}</span>
-                      <span className="text-muted">
+                      <span className={layoutStyles.textMuted}>{authorName(doc.author_id)}</span>
+                      <span className={layoutStyles.textMuted}>
                         {doc.lines.length} {doc.lines.length === 1 ? 'позиция' : 'позиций'}
                       </span>
                     </div>
                   </div>
                   {total !== null && (
-                    <span className="movement-history-money">{formatMoney(total)} ₽</span>
+                    <span className={styles['movement-history-money']}>{formatMoney(total)} ₽</span>
                   )}
-                  <IconChevronDown size={18} stroke={1.8} className="disclosure-chevron" />
+                  <IconChevronDown size={18} stroke={1.8} className={styles['disclosure-chevron']} />
                 </button>
 
                 {expanded && (
@@ -321,7 +327,7 @@ export function MovementHistoryPage() {
                               {formatQuantity(line.quantity)} {unitName(productUnitCode(line.product_id))}
                             </span>
                             {doc.type === 'receipt' && (
-                              <span className="movement-history-money">
+                              <span className={styles['movement-history-money']}>
                                 {line.cost ? `${formatMoney(line.cost)} ₽` : '—'}
                               </span>
                             )}
@@ -329,7 +335,7 @@ export function MovementHistoryPage() {
                         ))}
                       </div>
                     </div>
-                    {doc.note && <span className="text-muted">{doc.note}</span>}
+                    {doc.note && <span className={layoutStyles.textMuted}>{doc.note}</span>}
                   </>
                 )}
               </div>

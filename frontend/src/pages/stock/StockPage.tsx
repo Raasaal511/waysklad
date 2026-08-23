@@ -9,6 +9,7 @@ import { IconButton } from '../../shared/ui/IconButton'
 import { Button } from '../../shared/ui/Button'
 import { isLowStock } from '../../shared/lib/format'
 import { NewWarehouseForm } from './shared'
+import layoutStyles from '../../shared/ui/Layout.module.css'
 
 export function StockPage() {
   const [stock, setStock] = useState<StockItem[]>([])
@@ -47,10 +48,10 @@ export function StockPage() {
   const totalLowStock = stock.filter((s) => isLowStock(s.quantity, minStockById.get(s.product_id) ?? '0')).length
 
   return (
-    <div className="stack">
-      <div className="section-title">
+    <div className={layoutStyles.stack}>
+      <div className={layoutStyles.sectionTitle}>
         <h2>Склады</h2>
-        <div className="row" style={{ gap: 8 }}>
+        <div className={layoutStyles.row} style={{ gap: 8 }}>
           <Link to="/stock/history">
             <IconButton variant="accent" tooltip="История движения" style={{ width: 40, height: 40 }}>
               <IconHistory size={19} stroke={1.8} />
@@ -73,10 +74,10 @@ export function StockPage() {
         </Modal>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
 
       {!loading && warehouses.length > 1 && (
-        <div className="card card-full">
+        <div className={[layoutStyles.card, layoutStyles.cardFull].join(' ')}>
           <div className="grid-stats">
             <div className="stat">
               <span className="stat-label">Складов</span>
@@ -95,9 +96,9 @@ export function StockPage() {
       )}
 
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : warehouses.length === 0 ? (
-        <p className="text-muted">Складов пока нет</p>
+        <p className={layoutStyles.textMuted}>Складов пока нет</p>
       ) : (
         <div className="warehouse-tiles">
           {warehouses.map((w, i) => {
@@ -115,7 +116,7 @@ export function StockPage() {
                   </span>
                   <div className="warehouse-tile-heading">
                     <strong className="warehouse-tile-name">{w.name}</strong>
-                    <span className="text-muted">{w.address || 'Без адреса'}</span>
+                    <span className={layoutStyles.textMuted}>{w.address || 'Без адреса'}</span>
                   </div>
                   <IconChevronRight size={20} stroke={1.8} className="warehouse-tile-chevron" />
                 </div>

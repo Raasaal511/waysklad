@@ -50,6 +50,7 @@ import {
   type MovementMode,
   type MovementLine,
 } from './shared'
+import styles from './WarehouseDetailPage.module.css'
 
 const STOCK_COLUMNS = '2fr 1fr 1fr 1fr'
 
@@ -463,7 +464,7 @@ export function WarehouseDetailPage() {
       {!loading && recommendations.length > 0 && (
         <div className="stack">
           <div className="row" style={{ gap: 6 }}>
-            <IconTrendingUp size={18} stroke={1.8} className="restock-title-icon" />
+            <IconTrendingUp size={18} stroke={1.8} className={styles['restock-title-icon']} />
             <h3>Стоит дозаказать</h3>
           </div>
           <p className="text-muted">
@@ -475,9 +476,9 @@ export function WarehouseDetailPage() {
               const inCart = restockCartIds.includes(rec.product_id)
               const alreadyRestocked = restockedProductIds.has(rec.product_id)
               return (
-                <div key={rec.product_id} className="product-tile restock-tile">
+                <div key={rec.product_id} className={`product-tile ${styles['restock-tile']}`}>
                   {alreadyRestocked && (
-                    <span className="restock-tile-badge" title="Уже есть активная задача на дозаказ">
+                    <span className={styles['restock-tile-badge']} title="Уже есть активная задача на дозаказ">
                       <IconTruck size={11} stroke={2} /> В задаче
                     </span>
                   )}
@@ -485,7 +486,7 @@ export function WarehouseDetailPage() {
                     variant="muted"
                     tooltip={inCart ? 'Убрать из списка дозаказа' : 'Добавить в список дозаказа'}
                     aria-label={inCart ? 'Убрать из списка дозаказа' : 'Добавить в список дозаказа'}
-                    className={`restock-tile-add${inCart ? ' restock-tile-add-checked' : ''}`}
+                    className={[styles['restock-tile-add'], inCart && styles['restock-tile-add-checked']].filter(Boolean).join(' ')}
                     onClick={() => {
                       setRestockCartIds((prev) =>
                         inCart ? prev.filter((id) => id !== rec.product_id) : [...prev, rec.product_id],
@@ -503,7 +504,7 @@ export function WarehouseDetailPage() {
                   </IconButton>
                   <button
                     type="button"
-                    className="restock-tile-photo-link"
+                    className={styles['restock-tile-photo-link']}
                     onClick={() => product && setSelectedProduct(product)}
                   >
                     <ProductPhoto src={product?.photo ?? ''} />
@@ -511,7 +512,7 @@ export function WarehouseDetailPage() {
                   <div className="product-tile-body">
                     <button
                       type="button"
-                      className="product-tile-name restock-tile-name-btn"
+                      className={`product-tile-name ${styles['restock-tile-name-btn']}`}
                       onClick={() => product && setSelectedProduct(product)}
                     >
                       {rec.product_name}
@@ -678,30 +679,30 @@ function RestockCartMenu({
       {!open && (
         <div
           ref={triggerRef}
-          className={`restock-cart-trigger${leaving ? ' restock-cart-trigger-out' : ''}`}
+          className={[styles['restock-cart-trigger'], leaving && styles['restock-cart-trigger-out']].filter(Boolean).join(' ')}
         >
           <button
             type="button"
-            className="restock-cart-fab"
+            className={styles['restock-cart-fab']}
             aria-label="Список дозаказа"
             onClick={() => setOpen(true)}
           >
             <IconShoppingCart size={24} stroke={1.8} />
           </button>
-          <span key={items.length} className="restock-cart-badge">
+          <span key={items.length} className={styles['restock-cart-badge']}>
             {items.length}
           </span>
         </div>
       )}
 
       {open && (
-        <div ref={panelRef} className="restock-cart-panel">
-          <div className="restock-cart-panel-header">
-            <span className="restock-cart-panel-title">Список дозаказа</span>
+        <div ref={panelRef} className={styles['restock-cart-panel']}>
+          <div className={styles['restock-cart-panel-header']}>
+            <span className={styles['restock-cart-panel-title']}>Список дозаказа</span>
             <div className="row" style={{ gap: 4 }}>
               <button
                 type="button"
-                className="restock-cart-clear"
+                className={styles['restock-cart-clear']}
                 onClick={() => {
                   setOpen(false)
                   onClear()
@@ -718,19 +719,19 @@ function RestockCartMenu({
               </IconButton>
             </div>
           </div>
-          <div className="restock-cart-list">
+          <div className={styles['restock-cart-list']}>
             {items.map((rec) => {
               const product = productById(rec.product_id)
               const unit = unitName(product?.unit_code ?? 'pcs')
               return (
-                <div key={rec.product_id} className="restock-cart-row">
-                  <div className="restock-cart-row-name">
+                <div key={rec.product_id} className={styles['restock-cart-row']}>
+                  <div className={styles['restock-cart-row-name']}>
                     <div>{rec.product_name}</div>
                     <div className="cart-table-stock">
                       Остаток: {formatQuantity(rec.quantity)} {unit}
                     </div>
                   </div>
-                  <label className="restock-cart-row-qty">
+                  <label className={styles['restock-cart-row-qty']}>
                     <input
                       type="text"
                       inputMode="decimal"
@@ -757,7 +758,7 @@ function RestockCartMenu({
           </div>
           <button
             type="button"
-            className="restock-cart-submit"
+            className={styles['restock-cart-submit']}
             onClick={() => {
               setOpen(false)
               onSubmit()
