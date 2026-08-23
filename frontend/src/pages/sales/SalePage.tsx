@@ -454,7 +454,8 @@ export function SalePage() {
             </div>
           </div>
           <div className="sale-payment-breakdown">
-            <Button
+            <button
+              type="button"
               className={`sale-payment-item${paymentFilter === 'all' ? ' sale-payment-item-active' : ''}`}
               onClick={() => setPaymentFilter('all')}
             >
@@ -462,9 +463,10 @@ export function SalePage() {
               <span>
                 {periodSales.length} · {formatMoney(periodTotalAll)} ₽
               </span>
-            </Button>
+            </button>
             {(Object.keys(PAYMENT_LABELS) as PaymentMethod[]).map((method) => (
-              <Button
+              <button
+                type="button"
                 key={method}
                 className={`sale-payment-item${paymentFilter === method ? ' sale-payment-item-active' : ''}`}
                 onClick={() => setPaymentFilter(method)}
@@ -474,7 +476,7 @@ export function SalePage() {
                 <span>
                   {paymentStats[method].count} · {formatMoney(paymentStats[method].total)} ₽
                 </span>
-              </Button>
+              </button>
             ))}
           </div>
         </div>
@@ -520,7 +522,8 @@ export function SalePage() {
               </div>
               <div className="sale-history">
                 {group.sales.map((s, i) => (
-                  <Button
+                  <button
+                    type="button"
                     className="sale-history-row sale-history-row-in"
                     style={
                       {
@@ -564,7 +567,7 @@ export function SalePage() {
                             minute: '2-digit',
                           })}
                     </span>
-                  </Button>
+                  </button>
                 ))}
               </div>
             </div>
