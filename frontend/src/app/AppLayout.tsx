@@ -23,6 +23,7 @@ import { Button } from '../shared/ui/Button'
 import { IconButton } from '../shared/ui/IconButton'
 import { useOfflineSync } from '../shared/offline/useOfflineSync'
 import type { Role } from '../entities/auth/api'
+import styles from './AppLayout.module.css'
 
 interface NavItem {
   to: string
@@ -82,12 +83,17 @@ function NavItems({
           to={item.to}
           end={item.to === '/'}
           className={({ isActive }) =>
-            `${variant === 'sidebar' ? 'app-sidebar-item' : 'app-nav-item'}${isActive ? ' active' : ''}`
+            [
+              variant === 'sidebar' ? styles['app-sidebar-item'] : styles['app-nav-item'],
+              isActive && styles.active,
+            ]
+              .filter(Boolean)
+              .join(' ')
           }
           data-tooltip={collapsed ? item.label : undefined}
           data-nav={item.to === '/tasks' ? 'tasks' : undefined}
         >
-          <span className={variant === 'sidebar' ? 'app-sidebar-icon' : 'app-nav-icon'}>
+          <span className={variant === 'sidebar' ? styles['app-sidebar-icon'] : styles['app-nav-icon']}>
             <item.icon size={variant === 'sidebar' ? 19 : 21} stroke={1.8} />
           </span>
           {!(variant === 'sidebar' && collapsed) && <span>{item.label}</span>}
@@ -100,14 +106,14 @@ function NavItems({
 function LogoMark() {
   const { mode } = useTheme()
   const src = mode === 'dark' ? '/logo-mark-dark.png' : '/logo-mark.png'
-  return <img src={src} alt="WaySklad" className="app-logo-mark" />
+  return <img src={src} alt="WaySklad" className={styles['app-logo-mark']} />
 }
 
 function ShopTitle({ shopName }: { shopName: string }) {
   return (
-    <div className="app-shop-title">
-      <span className="app-shop-name">{shopName}</span>
-      <span className="app-brand-tag">WaySklad</span>
+    <div className={styles['app-shop-title']}>
+      <span className={styles['app-shop-name']}>{shopName}</span>
+      <span className={styles['app-brand-tag']}>WaySklad</span>
     </div>
   )
 }
@@ -125,14 +131,14 @@ function UserBadge({
   return (
     <Link
       to="/profile"
-      className="app-user-badge"
+      className={styles['app-user-badge']}
       data-tooltip={collapsed ? `${name ?? ''}${role ? ` · ${ROLE_LABELS[role]}` : ''}` : undefined}
     >
-      <span className="app-user-avatar">{initial}</span>
+      <span className={styles['app-user-avatar']}>{initial}</span>
       {!collapsed && (
-        <span className="app-user-info">
-          <span className="app-user-name">{name}</span>
-          {role && <span className="app-user-role">{ROLE_LABELS[role]}</span>}
+        <span className={styles['app-user-info']}>
+          <span className={styles['app-user-name']}>{name}</span>
+          {role && <span className={styles['app-user-role']}>{ROLE_LABELS[role]}</span>}
         </span>
       )}
     </Link>
@@ -175,13 +181,16 @@ export function AppLayout() {
   }, [])
 
   return (
-    <div className={`app-layout${collapsed ? ' sidebar-collapsed' : ''}`}>
+    <div className={[styles['app-layout'], collapsed && styles['sidebar-collapsed']].filter(Boolean).join(' ')}>
       {notice && (
-        <div className={`app-offline-toast app-offline-toast-${notice.kind}`} role="status">
+        <div
+          className={[styles['app-offline-toast'], styles[`app-offline-toast-${notice.kind}`]].join(' ')}
+          role="status"
+        >
           {notice.message}
           <button
             type="button"
-            className="app-offline-toast-close"
+            className={styles['app-offline-toast-close']}
             onClick={dismissNotice}
             aria-label="Закрыть"
           >
@@ -189,21 +198,21 @@ export function AppLayout() {
           </button>
         </div>
       )}
-      <aside className="app-sidebar">
-        <div className="app-sidebar-top">
+      <aside className={styles['app-sidebar']}>
+        <div className={styles['app-sidebar-top']}>
           {collapsed ? (
             <LogoMark />
           ) : (
-            <div className="app-shop-brand">
+            <div className={styles['app-shop-brand']}>
               <LogoMark />
               <ShopTitle shopName={shopName} />
             </div>
           )}
-          <div className="app-sidebar-top-actions">
+          <div className={styles['app-sidebar-top-actions']}>
             <NotificationBell align="left" />
             <IconButton
               variant="accent"
-              className="app-sidebar-toggle"
+              className={styles['app-sidebar-toggle']}
               onClick={() => setCollapsed((v) => !v)}
               aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
               data-tooltip={collapsed ? 'Развернуть' : undefined}
@@ -215,19 +224,19 @@ export function AppLayout() {
 
         <UserBadge name={user?.name} role={user?.role} collapsed={collapsed} />
         {pendingCount > 0 && (
-          <div className="app-offline-pending" data-tooltip="Продажи, ожидающие отправки на сервер">
+          <div className={styles['app-offline-pending']} data-tooltip="Продажи, ожидающие отправки на сервер">
             {collapsed ? pendingCount : `Не отправлено: ${pendingCount}`}
           </div>
         )}
 
-        <nav className="app-sidebar-nav">
+        <nav className={styles['app-sidebar-nav']}>
           <NavItems variant="sidebar" collapsed={collapsed} role={user?.role} />
         </nav>
 
-        <div className="app-sidebar-footer">
+        <div className={styles['app-sidebar-footer']}>
           <Button
             variant="secondary"
-            className="app-logout"
+            className={styles['app-logout']}
             onClick={logout}
             data-tooltip={collapsed ? 'Выйти' : undefined}
           >
@@ -236,13 +245,13 @@ export function AppLayout() {
         </div>
       </aside>
 
-      <div className="app-main">
-        <header className="app-header" ref={headerRef}>
-          <div className="app-shop-brand">
+      <div className={styles['app-main']}>
+        <header className={styles['app-header']} ref={headerRef}>
+          <div className={styles['app-shop-brand']}>
             <LogoMark />
             <ShopTitle shopName={shopName} />
           </div>
-          <div className="app-header-user">
+          <div className={styles['app-header-user']}>
             <NotificationBell />
             <UserBadge name={user?.name} role={user?.role} />
             <Button variant="secondary" onClick={logout}>
@@ -251,11 +260,11 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main className="app-content">
+        <main className={styles['app-content']}>
           <Outlet />
         </main>
 
-        <nav className="app-nav">
+        <nav className={styles['app-nav']}>
           <NavItems variant="bottom" role={user?.role} />
         </nav>
       </div>

@@ -1,0 +1,208 @@
+/* Auth screen — src/pages/auth/LoginPage.tsx */
+
+.auth-screen {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--accent) 48%, #0a0d0c);
+}
+
+.auth-backdrop {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(ellipse 60% 50% at 22% 18%, color-mix(in srgb, var(--accent) 75%, transparent) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 45% at 82% 78%, color-mix(in srgb, var(--accent-hover) 65%, transparent) 0%, transparent 65%),
+    linear-gradient(
+      155deg,
+      color-mix(in srgb, var(--accent) 48%, #0a0d0c) 0%,
+      color-mix(in srgb, var(--accent) 58%, #0a0d0c) 100%
+    );
+  mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black 30%, transparent 92%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black 30%, transparent 92%);
+  opacity: 0.9;
+}
+
+.auth-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 140% 100% at 50% 100%,
+    color-mix(in srgb, var(--accent) 48%, #0a0d0c) 0%,
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 400px;
+  background: color-mix(in srgb, var(--bg) 96%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid color-mix(in srgb, var(--bg) 25%, transparent);
+  border-radius: 20px;
+  padding: 28px 26px 26px;
+  box-shadow:
+    0 32px 70px -28px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+}
+
+:root[data-theme='dark'] .auth-card {
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+}
+
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  margin-bottom: 24px;
+}
+
+.auth-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  object-fit: contain;
+  background: var(--accent-soft);
+  padding: 7px;
+}
+
+.auth-title {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+
+.auth-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.auth-tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-muted);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.auth-tab {
+  position: relative;
+  z-index: 1;
+  padding: 9px 0;
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 14px;
+  transition: color 0.2s ease;
+}
+
+.auth-tab-active {
+  color: var(--text);
+}
+
+.auth-tab-indicator {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 6px);
+  height: calc(100% - 8px);
+  background: var(--bg);
+  border-radius: 9px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: transform 0.25s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.auth-tab-indicator-right {
+  transform: translateX(100%);
+}
+
+.auth-form-viewport {
+  overflow: hidden;
+}
+
+.auth-form-track {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 200%;
+  align-items: start;
+  transform: translateX(0%);
+  transition: transform 0.32s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.auth-form-track-register {
+  transform: translateX(-50%);
+}
+
+.auth-form {
+  min-width: 0;
+  padding: 2px;
+}
+
+.auth-form[aria-hidden='true'] {
+  visibility: hidden;
+}
+
+.auth-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-top: -4px;
+}
+
+.auth-password-field {
+  position: relative;
+  display: flex;
+}
+
+.auth-password-field input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.auth-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  color: var(--text-muted);
+}
+
+.auth-password-toggle:hover {
+  background: var(--bg-muted);
+  color: var(--text);
+}

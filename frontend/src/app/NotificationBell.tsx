@@ -7,6 +7,8 @@ import {
   markAllNotificationsRead,
   type Notification,
 } from '../entities/notification/api'
+import layoutStyles from '../shared/ui/Layout.module.css'
+import styles from './NotificationBell.module.css'
 
 const POLL_INTERVAL_MS = 30_000
 
@@ -87,40 +89,47 @@ export function NotificationBell({ align = 'right' }: { align?: 'left' | 'right'
   }
 
   return (
-    <div ref={triggerRef} className="app-bell">
+    <div ref={triggerRef} className={styles['app-bell']}>
       <button
         type="button"
-        className="app-bell-trigger"
+        className={styles['app-bell-trigger']}
         aria-label="Уведомления"
         onClick={() => setOpen((v) => !v)}
       >
         <IconBell size={19} stroke={1.8} />
-        {unread > 0 && <span className="app-bell-badge">{unread > 9 ? '9+' : unread}</span>}
+        {unread > 0 && <span className={styles['app-bell-badge']}>{unread > 9 ? '9+' : unread}</span>}
       </button>
 
       {open && (
-        <div ref={panelRef} className={`app-bell-panel${align === 'left' ? ' app-bell-panel-left' : ''}`}>
-          <div className="app-bell-panel-header">
+        <div
+          ref={panelRef}
+          className={[styles['app-bell-panel'], align === 'left' && styles['app-bell-panel-left']]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <div className={styles['app-bell-panel-header']}>
             <span>Уведомления</span>
             {unread > 0 && (
-              <button type="button" className="app-bell-read-all" onClick={handleReadAll}>
+              <button type="button" className={styles['app-bell-read-all']} onClick={handleReadAll}>
                 Прочитать все
               </button>
             )}
           </div>
           {items.length === 0 ? (
-            <p className="text-muted app-bell-empty">Пока пусто</p>
+            <p className={[layoutStyles.textMuted, styles['app-bell-empty']].join(' ')}>Пока пусто</p>
           ) : (
-            <div className="app-bell-list">
+            <div className={styles['app-bell-list']}>
               {items.map((n) => (
                 <button
                   key={n.id}
                   type="button"
-                  className={`app-bell-item${n.is_read ? '' : ' app-bell-item-unread'}`}
+                  className={[styles['app-bell-item'], !n.is_read && styles['app-bell-item-unread']]
+                    .filter(Boolean)
+                    .join(' ')}
                   onClick={() => handleItemClick(n)}
                 >
-                  <span className="app-bell-item-text">{n.text}</span>
-                  <span className="app-bell-item-time">{formatTime(n.created_at)}</span>
+                  <span className={styles['app-bell-item-text']}>{n.text}</span>
+                  <span className={styles['app-bell-item-time']}>{formatTime(n.created_at)}</span>
                 </button>
               ))}
             </div>
