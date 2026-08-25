@@ -10,10 +10,14 @@ from app.domain.identity.permissions import Actor, Permission, require
 @dataclass(frozen=True)
 class UpdateShopCommand:
     name: str
+    summary_daily_enabled: bool | None = None
+    summary_weekly_enabled: bool | None = None
+    summary_monthly_enabled: bool | None = None
+    summary_daily_hour_msk: int | None = None
 
 
 class UpdateShopUseCase:
-    """Владелец меняет название магазина."""
+    """Владелец меняет название магазина и настройки Telegram-сводки."""
 
     def __init__(self, uow: IUnitOfWork):
         self._uow = uow
@@ -22,10 +26,20 @@ class UpdateShopUseCase:
         require(actor, Permission.SETTINGS_MANAGE)
         if not cmd.name.strip():
             raise DomainError("Название магазина не может быть пустым")
+        if cmd.summary_daily_hour_msk is not None and not (0 <= cmd.summary_daily_hour_msk <= 23):
+            raise DomainError("Час рассылки должен быть от 0 до 23")
 
         async with self._uow as uow:
             tenant = await uow.tenants.get(uow.tenant_id)
             tenant.name = cmd.name.strip()
+            if cmd.summary_daily_enabled is not None:
+                tenant.summary_daily_enabled = cmd.summary_daily_enabled
+            if cmd.summary_weekly_enabled is not None:
+                tenant.summary_weekly_enabled = cmd.summary_weekly_enabled
+            if cmd.summary_monthly_enabled is not None:
+                tenant.summary_monthly_enabled = cmd.summary_monthly_enabled
+            if cmd.summary_daily_hour_msk is not None:
+                tenant.summary_daily_hour_msk = cmd.summary_daily_hour_msk
             tenant = await uow.tenants.save(tenant)
             await uow.audit.add(AuditEntry.record(actor, "shop.update", tenant.id))
             await uow.commit()

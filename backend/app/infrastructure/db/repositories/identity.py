@@ -56,6 +56,10 @@ class SqlAlchemyTenantRepository(SqlAlchemyRepository, ITenantRepository):
             raise NotFoundError(f"Магазин {tenant.id} не найден")
         model.name = tenant.name
         model.owner_telegram_chat_id = tenant.owner_telegram_chat_id
+        model.summary_daily_enabled = tenant.summary_daily_enabled
+        model.summary_weekly_enabled = tenant.summary_weekly_enabled
+        model.summary_monthly_enabled = tenant.summary_monthly_enabled
+        model.summary_daily_hour_msk = tenant.summary_daily_hour_msk
         await self._session.flush()
         return tenant
 

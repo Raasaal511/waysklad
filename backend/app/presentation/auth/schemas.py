@@ -94,20 +94,38 @@ class TenantResponse(BaseModel):
     id: int
     name: str
     owner_telegram_chat_id: str | None
+    summary_daily_enabled: bool
+    summary_weekly_enabled: bool
+    summary_monthly_enabled: bool
+    summary_daily_hour_msk: int
 
     @classmethod
     def from_entity(cls, tenant: Tenant) -> "TenantResponse":
         return cls(
             id=tenant.id, name=tenant.name,
             owner_telegram_chat_id=tenant.owner_telegram_chat_id,
+            summary_daily_enabled=tenant.summary_daily_enabled,
+            summary_weekly_enabled=tenant.summary_weekly_enabled,
+            summary_monthly_enabled=tenant.summary_monthly_enabled,
+            summary_daily_hour_msk=tenant.summary_daily_hour_msk,
         )
 
 
 class UpdateShopRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
+    summary_daily_enabled: bool | None = None
+    summary_weekly_enabled: bool | None = None
+    summary_monthly_enabled: bool | None = None
+    summary_daily_hour_msk: int | None = Field(default=None, ge=0, le=23)
 
     def to_command(self) -> UpdateShopCommand:
-        return UpdateShopCommand(name=self.name)
+        return UpdateShopCommand(
+            name=self.name,
+            summary_daily_enabled=self.summary_daily_enabled,
+            summary_weekly_enabled=self.summary_weekly_enabled,
+            summary_monthly_enabled=self.summary_monthly_enabled,
+            summary_daily_hour_msk=self.summary_daily_hour_msk,
+        )
 
 
 class ChangePasswordRequest(BaseModel):

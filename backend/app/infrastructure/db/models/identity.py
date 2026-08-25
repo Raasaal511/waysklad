@@ -1,5 +1,5 @@
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, SmallInteger, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domain.identity.entities import Role
@@ -18,6 +18,10 @@ class TenantModel(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(200))
     slug: Mapped[str | None] = mapped_column(String(120), unique=True, index=True)
     owner_telegram_chat_id: Mapped[str | None] = mapped_column(String(32))  # для сводок бота
+    summary_daily_enabled: Mapped[bool] = mapped_column(default=True)
+    summary_weekly_enabled: Mapped[bool] = mapped_column(default=False)
+    summary_monthly_enabled: Mapped[bool] = mapped_column(default=False)
+    summary_daily_hour_msk: Mapped[int] = mapped_column(SmallInteger, default=20)
 
 
 class WarehouseModel(Base, TenantMixin, TimestampMixin):

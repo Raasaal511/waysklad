@@ -23,6 +23,10 @@ class Tenant:
     # публичный URL витрины (waysklad.ru/<slug>); None — пока не сгенерирован
     slug: str | None = None
     owner_telegram_chat_id: str | None = None
+    summary_daily_enabled: bool = True
+    summary_weekly_enabled: bool = False
+    summary_monthly_enabled: bool = False
+    summary_daily_hour_msk: int = 20
 
 
 @dataclass

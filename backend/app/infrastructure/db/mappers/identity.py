@@ -10,6 +10,10 @@ class TenantMapper:
             name=tenant.name,
             slug=tenant.slug,
             owner_telegram_chat_id=tenant.owner_telegram_chat_id,
+            summary_daily_enabled=tenant.summary_daily_enabled,
+            summary_weekly_enabled=tenant.summary_weekly_enabled,
+            summary_monthly_enabled=tenant.summary_monthly_enabled,
+            summary_daily_hour_msk=tenant.summary_daily_hour_msk,
         )
 
     @staticmethod
@@ -19,6 +23,10 @@ class TenantMapper:
             name=model.name,
             slug=model.slug,
             owner_telegram_chat_id=model.owner_telegram_chat_id,
+            summary_daily_enabled=model.summary_daily_enabled,
+            summary_weekly_enabled=model.summary_weekly_enabled,
+            summary_monthly_enabled=model.summary_monthly_enabled,
+            summary_daily_hour_msk=model.summary_daily_hour_msk,
         )
 
 
