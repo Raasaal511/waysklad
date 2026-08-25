@@ -36,6 +36,17 @@ services:
       backend:
         condition: service_healthy
 
+  scheduler:
+    image: waysklad-backend-prod
+    env_file: .env
+    command: python -m app.infrastructure.scheduler
+    volumes:
+      - uploads_data:/app/uploads
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:
   uploads_data:
