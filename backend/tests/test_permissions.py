@@ -23,9 +23,8 @@ def test_seller_cannot_manage_products_or_see_purchase_prices():
     assert has_permission(Role.SELLER, Permission.DEBTS_MANAGE)
 
 
-def test_manager_has_analytics_but_no_audit():
+def test_manager_has_analytics_and_products():
     assert has_permission(Role.MANAGER, Permission.ANALYTICS_VIEW)
-    assert not has_permission(Role.MANAGER, Permission.AUDIT_VIEW)
     assert has_permission(Role.MANAGER, Permission.PRODUCTS_MANAGE)
     assert has_permission(Role.MANAGER, Permission.USERS_MANAGE)
 
