@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel
@@ -10,6 +10,7 @@ from app.domain.analytics.repository import (
     PeriodTotals,
     ProductSales,
     StockValueItem,
+    TimelinePoint,
 )
 from app.domain.common.money import Money
 
@@ -39,6 +40,22 @@ class DashboardResponse(BaseModel):
             today=PeriodTotalsResponse.from_entity(result.today),
             week=PeriodTotalsResponse.from_entity(result.week),
             month=PeriodTotalsResponse.from_entity(result.month),
+        )
+
+
+class TimelinePointResponse(BaseModel):
+    bucket_start: date
+    sales_count: int
+    revenue: Decimal
+    profit: Decimal
+
+    @classmethod
+    def from_entity(cls, point: TimelinePoint) -> "TimelinePointResponse":
+        return cls(
+            bucket_start=point.bucket_start,
+            sales_count=point.sales_count,
+            revenue=Money.of(point.revenue).amount,
+            profit=Money.of(point.profit).amount,
         )
 
 

@@ -1,22 +1,213 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import {
   getDashboard,
   getTopProducts,
   getCategoryProfit,
   getDeadStock,
   getStockValue,
+  getRevenueTimeline,
+  getPeriodTotals,
   type Dashboard,
   type ProductSales,
   type CategoryProfit,
   type DeadStockItem,
   type StockValue,
+  type TimelinePoint,
+  type TimelineBucket,
+  type PeriodTotals,
 } from '../../entities/analytics/api'
 import { ApiError } from '../../shared/api/client'
-import { formatQuantity } from '../../shared/lib/format'
+import { formatQuantity, formatMoney } from '../../shared/lib/format'
+import { BarChart, type BarChartPoint } from '../../shared/ui/BarChart'
+import {
+  IconReportMoney,
+  IconTrendingUp,
+  IconShoppingCart,
+  IconWallet,
+  IconTrophy,
+  IconChartPie,
+  IconChartBar,
+  IconPackageOff,
+  IconReceipt,
+} from '@tabler/icons-react'
+import layoutStyles from '../../shared/ui/Layout.module.css'
+import styles from './AnalyticsPage.module.css'
 
-const TOP_PRODUCTS_COLUMNS = '2fr 1fr 1fr'
-const CATEGORY_PROFIT_COLUMNS = '1.6fr 1fr 1fr 1fr'
-const DEAD_STOCK_COLUMNS = '2fr 1fr 1.2fr'
+const TOP_PRODUCTS_COLUMNS = '2fr 1fr 1fr 1fr 1fr'
+const CATEGORY_PROFIT_COLUMNS = '1.6fr 1fr 1fr 1fr 1fr'
+const DEAD_STOCK_COLUMNS = '2fr 1fr 1fr 1fr'
+
+type PeriodKey = 'month' | 'quarter' | 'year'
+
+const PERIOD_LABELS: Record<PeriodKey, string> = {
+  month: 'Месяц',
+  quarter: 'Квартал',
+  year: 'Год',
+}
+
+const PERIOD_BUCKET: Record<PeriodKey, TimelineBucket> = {
+  month: 'day',
+  quarter: 'week',
+  year: 'month',
+}
+
+/** Календарные границы периода, содержащего anchor (не скользящее окно —
+ * ровно с 1-го по последнее число месяца/квартала/года). */
+function calendarRange(anchor: Date, period: PeriodKey): { from: Date; to: Date } {
+  const y = anchor.getFullYear()
+  if (period === 'month') {
+    const m = anchor.getMonth()
+    return { from: new Date(y, m, 1), to: new Date(y, m + 1, 0) }
+  }
+  if (period === 'quarter') {
+    const q = Math.floor(anchor.getMonth() / 3)
+    return { from: new Date(y, q * 3, 1), to: new Date(y, q * 3 + 3, 0) }
+  }
+  return { from: new Date(y, 0, 1), to: new Date(y, 11, 31) }
+}
+
+/** Границы предыдущего периода той же длины (для сравнения "было/стало") —
+ * предыдущий месяц/квартал/год, а не скользящее окно назад от сегодня. */
+function previousCalendarRange(anchor: Date, period: PeriodKey): { from: Date; to: Date } {
+  return calendarRange(shiftAnchor(anchor, period, -1), period)
+}
+
+function shiftAnchor(anchor: Date, period: PeriodKey, dir: 1 | -1): Date {
+  const d = new Date(anchor)
+  if (period === 'month') d.setMonth(d.getMonth() + dir)
+  else if (period === 'quarter') d.setMonth(d.getMonth() + dir * 3)
+  else d.setFullYear(d.getFullYear() + dir)
+  return d
+}
+
+const QUARTER_LABELS = ['I', 'II', 'III', 'IV']
+
+function formatRangeTitle(anchor: Date, period: PeriodKey): string {
+  if (period === 'month') return anchor.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
+  if (period === 'quarter') return `${QUARTER_LABELS[Math.floor(anchor.getMonth() / 3)]} квартал ${anchor.getFullYear()}`
+  return String(anchor.getFullYear())
+}
+
+const BUCKET_HINT: Record<TimelineBucket, string> = {
+  day: 'по дням',
+  week: 'по неделям (столбец — сумма за 7 дней, дата — понедельник недели)',
+  month: 'по месяцам',
+}
+
+const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
+
+/** Календарная дата в YYYY-MM-DD по локальным компонентам (не toISOString,
+ * который конвертирует в UTC и на восточных часовых поясах сдвигает
+ * полночь на день назад — "1 августа" превращалось в "31 июля"). */
+function toISODate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function formatBucketLabel(iso: string, bucket: TimelineBucket): string {
+  const d = parseISODate(iso)
+  if (bucket === 'month') return MONTH_SHORT[d.getMonth()]
+  if (bucket === 'week') {
+    const end = new Date(d)
+    end.setDate(end.getDate() + 6)
+    const sameMonth = d.getMonth() === end.getMonth()
+    return sameMonth
+      ? `${d.getDate()}–${end.getDate()} ${MONTH_SHORT[d.getMonth()]}`
+      : `${d.getDate()} ${MONTH_SHORT[d.getMonth()]}–${end.getDate()} ${MONTH_SHORT[end.getMonth()]}`
+  }
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+}
+
+/** Компактная подпись для оси, когда точек много (дни месяца) — только
+ * число, без месяца, чтобы подпись помещалась под узким столбцом. */
+function formatBucketAxis(iso: string, bucket: TimelineBucket): string {
+  if (bucket !== 'day') return formatBucketLabel(iso, bucket)
+  return String(parseISODate(iso).getDate())
+}
+
+function formatBucketFull(iso: string, bucket: TimelineBucket): string {
+  const d = parseISODate(iso)
+  if (bucket === 'month') return d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
+  if (bucket === 'week') return `Неделя с ${d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}`
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+/** Парсит "YYYY-MM-DD" как локальную календарную дату (не new Date(str),
+ * которая трактует такую строку как UTC-полночь и на восточных часовых
+ * поясах сдвигает день на -1 при чтении локальными геттерами). */
+function parseISODate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function bucketStartOf(d: Date, bucket: TimelineBucket): Date {
+  const result = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  if (bucket === 'month') result.setDate(1)
+  if (bucket === 'week') {
+    const day = result.getDay()
+    const diff = (day + 6) % 7 // понедельник — начало недели
+    result.setDate(result.getDate() - diff)
+  }
+  return result
+}
+
+function bucketAdd(d: Date, bucket: TimelineBucket): Date {
+  const result = new Date(d)
+  if (bucket === 'month') result.setMonth(result.getMonth() + 1)
+  else if (bucket === 'week') result.setDate(result.getDate() + 7)
+  else result.setDate(result.getDate() + 1)
+  return result
+}
+
+/** Бэкенд отдаёт только бакеты с продажами — пропуски (месяцы/недели/дни без
+ * продаж) нужно дозаполнить нулями сами, иначе при малом числе точек график
+ * рисует один-два «повисших» бара без временного контекста вместо шкалы. */
+function fillTimelineGaps(
+  timeline: TimelinePoint[],
+  dateFrom: string,
+  dateTo: string,
+  bucket: TimelineBucket,
+): TimelinePoint[] {
+  const byBucket = new Map(timeline.map((p) => [p.bucket_start, p]))
+  const start = bucketStartOf(parseISODate(dateFrom), bucket)
+  const end = bucketStartOf(parseISODate(dateTo), bucket)
+  const result: TimelinePoint[] = []
+  for (let cursor = start; cursor <= end; cursor = bucketAdd(cursor, bucket)) {
+    const key = toISODate(cursor)
+    result.push(byBucket.get(key) ?? { bucket_start: key, sales_count: 0, revenue: '0', profit: '0' })
+  }
+  return result
+}
+
+function formatMoneyShort(value: number): string {
+  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} млн ₽`
+  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(0)} тыс ₽`
+  return `${value.toFixed(0)} ₽`
+}
+
+/** % изменения к предыдущему периоду. null, если сравнивать не с чем —
+ * не было продаж в прошлом периоде (0 → N% выглядело бы как случайные "+∞"). */
+function percentDelta(current: number | null, previous: number | null): number | null {
+  if (current == null || previous == null || previous === 0) return null
+  return ((current - previous) / previous) * 100
+}
+
+function DeltaBadge({ value }: { value: number | null }) {
+  if (value == null) return null
+  const flat = Math.abs(value) < 0.05
+  const positive = value > 0
+  return (
+    <span
+      className={[styles.heroDelta, flat ? styles.heroDeltaFlat : positive ? styles.heroDeltaUp : styles.heroDeltaDown]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      {flat ? '' : positive ? '↑' : '↓'} {Math.abs(value).toFixed(1)}%
+    </span>
+  )
+}
 
 export function AnalyticsPage() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
@@ -24,118 +215,330 @@ export function AnalyticsPage() {
   const [categoryProfit, setCategoryProfit] = useState<CategoryProfit[]>([])
   const [deadStock, setDeadStock] = useState<DeadStockItem[]>([])
   const [stockValue, setStockValue] = useState<StockValue | null>(null)
+  const [timeline, setTimeline] = useState<TimelinePoint[]>([])
+  const [prevTotals, setPrevTotals] = useState<PeriodTotals | null>(null)
+  const [period, setPeriod] = useState<PeriodKey>('year')
+  const [anchor, setAnchor] = useState(() => new Date())
+  const [metric, setMetric] = useState<'revenue' | 'profit'>('revenue')
   const [loading, setLoading] = useState(true)
+  const [periodLoading, setPeriodLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const calRange = useMemo(() => calendarRange(anchor, period), [anchor, period])
+  const range = useMemo(
+    () => ({ dateFrom: toISODate(calRange.from), dateTo: toISODate(calRange.to) }),
+    [calRange],
+  )
+  const prevRange = useMemo(() => {
+    const r = previousCalendarRange(anchor, period)
+    return { dateFrom: toISODate(r.from), dateTo: toISODate(r.to) }
+  }, [anchor, period])
+  const isCurrentPeriod = useMemo(() => {
+    const today = new Date()
+    return calendarRange(today, period).from.getTime() === calRange.from.getTime()
+  }, [calRange, period])
+
+  const bucket = PERIOD_BUCKET[period]
+
+  function changePeriod(next: PeriodKey) {
+    setPeriod(next)
+    setAnchor(new Date())
+  }
+
   useEffect(() => {
-    Promise.all([getDashboard(), getTopProducts(), getCategoryProfit(), getDeadStock(), getStockValue()])
-      .then(([d, t, cp, dead, sv]) => {
-        setDashboard(d)
-        setTopProducts(t)
-        setCategoryProfit(cp)
-        setDeadStock(dead)
-        setStockValue(sv)
-      })
-      .catch((err) => {
-        setError(err instanceof ApiError ? err.message : 'Не удалось загрузить аналитику')
-      })
+    getDashboard()
+      .then(setDashboard)
+      .catch((err) => setError(err instanceof ApiError ? err.message : 'Не удалось загрузить аналитику'))
       .finally(() => setLoading(false))
+    getDeadStock()
+      .then(setDeadStock)
+      .catch(() => {})
+    getStockValue()
+      .then(setStockValue)
+      .catch(() => {})
   }, [])
 
-  if (loading) return <p className="text-muted">Загрузка…</p>
-  if (error) return <p className="error">{error}</p>
+  useEffect(() => {
+    setPeriodLoading(true)
+    Promise.all([
+      getTopProducts(range),
+      getCategoryProfit(range),
+      getRevenueTimeline({ ...range, bucket }),
+      getPeriodTotals(prevRange),
+    ])
+      .then(([t, cp, tl, prev]) => {
+        setTopProducts(t)
+        setCategoryProfit(cp)
+        setTimeline(tl)
+        setPrevTotals(prev)
+      })
+      .catch((err) => setError(err instanceof ApiError ? err.message : 'Не удалось загрузить аналитику'))
+      .finally(() => setPeriodLoading(false))
+  }, [range, prevRange, bucket])
+
+  if (loading) return <p className={layoutStyles.textMuted}>Загрузка…</p>
+  if (error) return <p className={layoutStyles.error}>{error}</p>
   if (!dashboard) return null
 
+  const periodRevenue = timeline.reduce((sum, p) => sum + Number(p.revenue), 0)
+  const periodProfit = timeline.reduce((sum, p) => sum + Number(p.profit), 0)
+  const periodSalesCount = timeline.reduce((sum, p) => sum + p.sales_count, 0)
+  const margin = periodRevenue > 0 ? (periodProfit / periodRevenue) * 100 : null
+  const avgCheck = periodSalesCount > 0 ? periodRevenue / periodSalesCount : null
+
+  const revenueDelta = percentDelta(periodRevenue, prevTotals ? Number(prevTotals.revenue) : null)
+  const profitDelta = percentDelta(periodProfit, prevTotals ? Number(prevTotals.profit) : null)
+  const salesDelta = percentDelta(periodSalesCount, prevTotals ? prevTotals.sales_count : null)
+  const prevAvgCheck =
+    prevTotals && prevTotals.sales_count > 0 ? Number(prevTotals.revenue) / prevTotals.sales_count : null
+  const avgCheckDelta = percentDelta(avgCheck, prevAvgCheck)
+
+  const filledTimeline = fillTimelineGaps(timeline, range.dateFrom, range.dateTo, bucket)
+
+  const chartPoints: BarChartPoint[] = filledTimeline.map((p) => {
+    const value = Number(metric === 'revenue' ? p.revenue : p.profit)
+    const revenue = Number(p.revenue)
+    const profit = Number(p.profit)
+    const bucketMargin = revenue > 0 ? (profit / revenue) * 100 : null
+    const avgCheck = p.sales_count > 0 ? revenue / p.sales_count : null
+    return {
+      label: formatBucketLabel(p.bucket_start, bucket),
+      axisLabel: formatBucketAxis(p.bucket_start, bucket),
+      value,
+      tooltip: (
+        <>
+          <strong>{formatMoneyShort(value)}</strong>
+          <span>{formatBucketLabel(p.bucket_start, bucket)} · {p.sales_count} прод.</span>
+        </>
+      ),
+      detail: (
+        <>
+          <div className={styles.detailItem}>
+            <span className={styles.detailLabel}>{formatBucketFull(p.bucket_start, bucket)}</span>
+            <span className={styles.detailValue}>{p.sales_count} продаж</span>
+          </div>
+          <div className={styles.detailItem}>
+            <span className={styles.detailLabel}>Выручка</span>
+            <span className={styles.detailValue}>{formatMoney(revenue)} ₽</span>
+          </div>
+          <div className={styles.detailItem}>
+            <span className={styles.detailLabel}>Прибыль</span>
+            <span className={styles.detailValue}>
+              {formatMoney(profit)} ₽{bucketMargin != null && ` · ${bucketMargin.toFixed(1)}%`}
+            </span>
+          </div>
+          {avgCheck != null && (
+            <div className={styles.detailItem}>
+              <span className={styles.detailLabel}>Средний чек</span>
+              <span className={styles.detailValue}>{formatMoney(Math.round(avgCheck))} ₽</span>
+            </div>
+          )}
+        </>
+      ),
+    }
+  })
+
+  const sortedCategoryProfit = [...categoryProfit].sort((a, b) => Number(b.profit) - Number(a.profit))
+
   return (
-    <div className="stack">
+    <div className={layoutStyles.stack}>
       <h2>Аналитика</h2>
 
-      <div className="stack">
-        <h3>Сегодня</h3>
-        <div className="card card-full grid-stats">
-          <Stat label="Продаж" value={String(dashboard.today.sales_count)} />
-          <Stat label="Выручка" value={`${dashboard.today.revenue} ₽`} />
-          <Stat label="Прибыль" value={`${dashboard.today.profit} ₽`} />
+      <div className={styles.periodRow}>
+        <div className={styles.periodTabs}>
+          {(Object.keys(PERIOD_LABELS) as PeriodKey[]).map((key) => (
+            <button
+              key={key}
+              type="button"
+              className={period === key ? styles.pillTabActive : styles.pillTab}
+              onClick={() => changePeriod(key)}
+            >
+              {PERIOD_LABELS[key]}
+            </button>
+          ))}
+        </div>
+        <div className={styles.periodNav}>
+          <button
+            type="button"
+            className={styles.periodNavBtn}
+            onClick={() => setAnchor((a) => shiftAnchor(a, period, -1))}
+            aria-label="Предыдущий период"
+          >
+            ‹
+          </button>
+          <span className={styles.periodNavTitle}>{formatRangeTitle(anchor, period)}</span>
+          <button
+            type="button"
+            className={styles.periodNavBtn}
+            onClick={() => setAnchor((a) => shiftAnchor(a, period, 1))}
+            disabled={isCurrentPeriod}
+            aria-label="Следующий период"
+          >
+            ›
+          </button>
         </div>
       </div>
 
-      <div className="stack">
-        <h3>Неделя</h3>
-        <div className="card card-full grid-stats">
-          <Stat label="Продаж" value={String(dashboard.week.sales_count)} />
-          <Stat label="Выручка" value={`${dashboard.week.revenue} ₽`} />
-          <Stat label="Прибыль" value={`${dashboard.week.profit} ₽`} />
+      <div className={styles.heroGrid}>
+        <div className={styles.heroCard}>
+          <span className={styles.heroIcon}>
+            <IconShoppingCart size={22} stroke={1.7} />
+          </span>
+          <div className={styles.heroBody}>
+            <span className={styles.heroLabel}>Продаж за период</span>
+            <span className={styles.heroValue}>{periodSalesCount}</span>
+            <DeltaBadge value={salesDelta} />
+          </div>
         </div>
-      </div>
-
-      <div className="stack">
-        <h3>Месяц</h3>
-        <div className="card card-full grid-stats">
-          <Stat label="Продаж" value={String(dashboard.month.sales_count)} />
-          <Stat label="Выручка" value={`${dashboard.month.revenue} ₽`} />
-          <Stat label="Прибыль" value={`${dashboard.month.profit} ₽`} />
+        <div className={styles.heroCard}>
+          <span className={styles.heroIcon}>
+            <IconWallet size={22} stroke={1.7} />
+          </span>
+          <div className={styles.heroBody}>
+            <span className={styles.heroLabel}>Выручка за период</span>
+            <span className={styles.heroValue}>{formatMoney(periodRevenue)} ₽</span>
+            <DeltaBadge value={revenueDelta} />
+          </div>
         </div>
-      </div>
-
-      {stockValue && (
-        <div className="card card-full">
-          <span className="text-muted">Деньги в товаре</span>
-          <div className="stat-value">{stockValue.total_value} ₽</div>
-        </div>
-      )}
-
-      <div className="stack">
-        <h3>Топ товаров</h3>
-        {topProducts.length === 0 ? (
-          <p className="text-muted">Продаж за месяц пока нет</p>
-        ) : (
-          <div className="data-table">
-            <div className="data-table-head" style={{ gridTemplateColumns: TOP_PRODUCTS_COLUMNS }}>
-              <span>Товар</span>
-              <span>Продано</span>
-              <span>Выручка</span>
+        <div className={styles.heroCard}>
+          <span className={styles.heroIcon}>
+            <IconTrendingUp size={22} stroke={1.7} />
+          </span>
+          <div className={styles.heroBody}>
+            <span className={styles.heroLabel}>Прибыль за период</span>
+            <span className={styles.heroValue}>{formatMoney(periodProfit)} ₽</span>
+            <div className={styles.heroSubRow}>
+              {margin != null && <span className={styles.heroSub}>{margin.toFixed(1)}% маржа</span>}
+              <DeltaBadge value={profitDelta} />
             </div>
-            <div className="data-table-body">
-              {topProducts.map((p, i) => (
-                <div
-                  key={p.product_id}
-                  className="data-row sale-history-row-in"
-                  style={
-                    {
-                      gridTemplateColumns: TOP_PRODUCTS_COLUMNS,
-                      '--row-delay': `${Math.min(i, 12) * 25}ms`,
-                    } as CSSProperties
-                  }
-                >
-                  <span className="data-row-name">{p.product_name}</span>
-                  <span>{p.quantity_sold}</span>
-                  <span>{p.revenue} ₽</span>
-                </div>
-              ))}
+          </div>
+        </div>
+        <div className={styles.heroCard}>
+          <span className={styles.heroIcon}>
+            <IconReceipt size={22} stroke={1.7} />
+          </span>
+          <div className={styles.heroBody}>
+            <span className={styles.heroLabel}>Средний чек</span>
+            <span className={styles.heroValue}>{avgCheck != null ? `${formatMoney(Math.round(avgCheck))} ₽` : '—'}</span>
+            <DeltaBadge value={avgCheckDelta} />
+          </div>
+        </div>
+        {stockValue && (
+          <div className={styles.heroCard}>
+            <span className={styles.heroIcon}>
+              <IconReportMoney size={22} stroke={1.7} />
+            </span>
+            <div className={styles.heroBody}>
+              <span className={styles.heroLabel}>Деньги в товаре</span>
+              <span className={styles.heroValue}>{formatMoney(stockValue.total_value)} ₽</span>
             </div>
           </div>
         )}
       </div>
 
-      <div className="stack">
-        <h3>Прибыльность по категориям</h3>
-        {categoryProfit.length === 0 ? (
-          <p className="text-muted">Продаж за месяц пока нет</p>
+      <div className={layoutStyles.stack}>
+        <div className={styles.sectionHeadingRow}>
+          <div className={styles.sectionHeading}>
+            <IconChartBar size={17} stroke={1.8} className={styles.sectionHeadingIcon} />
+            <h3>Динамика</h3>
+          </div>
+          <div className={styles.metricTabs}>
+            <button
+              type="button"
+              className={metric === 'revenue' ? styles.pillTabActive : styles.pillTab}
+              onClick={() => setMetric('revenue')}
+            >
+              Выручка
+            </button>
+            <button
+              type="button"
+              className={metric === 'profit' ? styles.pillTabActive : styles.pillTab}
+              onClick={() => setMetric('profit')}
+            >
+              Прибыль
+            </button>
+          </div>
+        </div>
+        <p className={styles.chartHint}>
+          Группировка {BUCKET_HINT[bucket]} · нажмите на столбец, чтобы посмотреть детали
+        </p>
+        <div className={`${layoutStyles.card} ${layoutStyles.cardFull}`}>
+          {periodLoading ? (
+            <p className={layoutStyles.textMuted}>Загрузка…</p>
+          ) : (
+            <BarChart points={chartPoints} formatValue={formatMoneyShort} emptyMessage="Продаж за период нет" />
+          )}
+        </div>
+      </div>
+
+      <div className={layoutStyles.stack}>
+        <div className={styles.sectionHeading}>
+          <IconTrophy size={17} stroke={1.8} className={styles.sectionHeadingIcon} />
+          <h3>Топ товаров за период</h3>
+        </div>
+        {topProducts.length === 0 ? (
+          <p className={layoutStyles.textMuted}>Продаж за период пока нет</p>
         ) : (
-          <div className="data-table">
-            <div className="data-table-head" style={{ gridTemplateColumns: CATEGORY_PROFIT_COLUMNS }}>
+          <div className={layoutStyles.dataTable}>
+            <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: TOP_PRODUCTS_COLUMNS }}>
+              <span>Товар</span>
+              <span>Продано</span>
+              <span>Выручка</span>
+              <span>Ср. чек</span>
+              <span>Доля</span>
+            </div>
+            <div className={layoutStyles.dataTableBody}>
+              {topProducts.map((p, i) => {
+                const share = periodRevenue > 0 ? (Number(p.revenue) / periodRevenue) * 100 : null
+                const avgPrice = Number(p.quantity_sold) > 0 ? Number(p.revenue) / Number(p.quantity_sold) : null
+                return (
+                  <div
+                    key={p.product_id}
+                    className={`${layoutStyles.dataRow} sale-history-row-in`}
+                    style={
+                      {
+                        gridTemplateColumns: TOP_PRODUCTS_COLUMNS,
+                        '--row-delay': `${Math.min(i, 12) * 25}ms`,
+                      } as CSSProperties
+                    }
+                  >
+                    <span className={layoutStyles.dataRowName}>{p.product_name}</span>
+                    <span>{formatQuantity(p.quantity_sold)}</span>
+                    <span>{formatMoney(p.revenue)} ₽</span>
+                    <span>{avgPrice != null ? `${formatMoney(Math.round(avgPrice))} ₽` : '—'}</span>
+                    <span>{share != null ? `${share.toFixed(1)}%` : '—'}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className={layoutStyles.stack}>
+        <div className={styles.sectionHeading}>
+          <IconChartPie size={17} stroke={1.8} className={styles.sectionHeadingIcon} />
+          <h3>Прибыльность по категориям</h3>
+        </div>
+        {categoryProfit.length === 0 ? (
+          <p className={layoutStyles.textMuted}>Продаж за период пока нет</p>
+        ) : (
+          <div className={layoutStyles.dataTable}>
+            <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: CATEGORY_PROFIT_COLUMNS }}>
               <span>Категория</span>
               <span>Выручка</span>
               <span>Прибыль</span>
               <span>Маржа</span>
+              <span>Доля</span>
             </div>
-            <div className="data-table-body">
-              {[...categoryProfit]
-                .sort((a, b) => Number(b.profit) - Number(a.profit))
-                .map((c, i) => (
+            <div className={layoutStyles.dataTableBody}>
+              {sortedCategoryProfit.map((c, i) => {
+                const catMargin = Number(c.revenue) > 0 ? (Number(c.profit) / Number(c.revenue)) * 100 : null
+                const share = periodRevenue > 0 ? (Number(c.revenue) / periodRevenue) * 100 : null
+                return (
                   <div
                     key={c.category_id ?? 'none'}
-                    className="data-row sale-history-row-in"
+                    className={`${layoutStyles.dataRow} sale-history-row-in`}
                     style={
                       {
                         gridTemplateColumns: CATEGORY_PROFIT_COLUMNS,
@@ -143,51 +546,66 @@ export function AnalyticsPage() {
                       } as CSSProperties
                     }
                   >
-                    <span className="data-row-name">{c.category_name}</span>
-                    <span>{c.revenue} ₽</span>
-                    <span>{c.profit} ₽</span>
-                    <span>
-                      {Number(c.revenue) > 0
-                        ? `${((Number(c.profit) / Number(c.revenue)) * 100).toFixed(1)}%`
-                        : '—'}
+                    <span className={layoutStyles.dataRowName}>{c.category_name}</span>
+                    <span>{formatMoney(c.revenue)} ₽</span>
+                    <span>{formatMoney(c.profit)} ₽</span>
+                    <span className={styles.marginCell}>
+                      {catMargin != null ? (
+                        <span className={marginBadgeClass(catMargin, styles)}>{catMargin.toFixed(1)}%</span>
+                      ) : (
+                        '—'
+                      )}
                     </span>
+                    <span>{share != null ? `${share.toFixed(1)}%` : '—'}</span>
                   </div>
-                ))}
+                )
+              })}
             </div>
           </div>
         )}
       </div>
 
-      <div className="stack">
-        <h3>Мёртвый остаток (60+ дней)</h3>
+      <div className={layoutStyles.stack}>
+        <div className={styles.sectionHeading}>
+          <IconPackageOff size={17} stroke={1.8} className={styles.sectionHeadingIcon} />
+          <h3>Мёртвый остаток (60+ дней)</h3>
+        </div>
         {deadStock.length === 0 ? (
-          <p className="text-muted">Залежавшихся товаров нет</p>
+          <p className={layoutStyles.textMuted}>Залежавшихся товаров нет</p>
         ) : (
-          <div className="data-table">
-            <div className="data-table-head" style={{ gridTemplateColumns: DEAD_STOCK_COLUMNS }}>
+          <div className={layoutStyles.dataTable}>
+            <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: DEAD_STOCK_COLUMNS }}>
               <span>Товар</span>
               <span>Остаток</span>
-              <span>Последняя продажа</span>
+              <span>Заморожено</span>
+              <span>Без продаж</span>
             </div>
-            <div className="data-table-body">
-              {deadStock.map((d, i) => (
-                <div
-                  key={d.product_id}
-                  className="data-row sale-history-row-in"
-                  style={
-                    {
-                      gridTemplateColumns: DEAD_STOCK_COLUMNS,
-                      '--row-delay': `${Math.min(i, 12) * 25}ms`,
-                    } as CSSProperties
-                  }
-                >
-                  <span className="data-row-name">{d.product_name}</span>
-                  <span>{formatQuantity(d.quantity)}</span>
-                  <span className="text-muted">
-                    {d.last_sale_at ? new Date(d.last_sale_at).toLocaleDateString('ru-RU') : 'никогда'}
-                  </span>
-                </div>
-              ))}
+            <div className={layoutStyles.dataTableBody}>
+              {deadStock.map((d, i) => {
+                const frozenValue = Number(d.quantity) * Number(d.purchase_price)
+                const daysSinceSale = d.last_sale_at
+                  ? Math.floor((Date.now() - new Date(d.last_sale_at).getTime()) / 86_400_000)
+                  : null
+                return (
+                  <div
+                    key={d.product_id}
+                    className={`${layoutStyles.dataRow} sale-history-row-in`}
+                    style={
+                      {
+                        gridTemplateColumns: DEAD_STOCK_COLUMNS,
+                        '--row-delay': `${Math.min(i, 12) * 25}ms`,
+                      } as CSSProperties
+                    }
+                  >
+                    <span className={layoutStyles.dataRowName}>{d.product_name}</span>
+                    <span>{formatQuantity(d.quantity)}</span>
+                    <span>{formatMoney(frozenValue)} ₽</span>
+                    <span className={layoutStyles.textMuted}>
+                      {daysSinceSale != null ? `${daysSinceSale} дн.` : 'никогда'}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
@@ -196,11 +614,8 @@ export function AnalyticsPage() {
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="stat">
-      <span className="stat-value">{value}</span>
-      <span className="stat-label">{label}</span>
-    </div>
-  )
+function marginBadgeClass(margin: number, s: typeof styles): string {
+  if (margin < 15) return `${s.marginBadge} ${s.marginBadgeLow}`
+  if (margin < 30) return `${s.marginBadge} ${s.marginBadgeMid}`
+  return `${s.marginBadge} ${s.marginBadgeHigh}`
 }

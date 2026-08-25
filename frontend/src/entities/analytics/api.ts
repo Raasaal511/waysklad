@@ -47,16 +47,51 @@ export interface StockValue {
   items: StockValueItem[]
 }
 
+export type TimelineBucket = 'day' | 'week' | 'month'
+
+export interface TimelinePoint {
+  bucket_start: string
+  sales_count: number
+  revenue: string
+  profit: string
+}
+
+export interface AnalyticsPeriodParams {
+  dateFrom?: string
+  dateTo?: string
+}
+
+function periodQuery(params: AnalyticsPeriodParams = {}): string {
+  const search = new URLSearchParams()
+  if (params.dateFrom) search.set('date_from', params.dateFrom)
+  if (params.dateTo) search.set('date_to', params.dateTo)
+  const qs = search.toString()
+  return qs ? `?${qs}` : ''
+}
+
 export function getDashboard() {
   return api.get<Dashboard>('/analytics/dashboard')
 }
 
-export function getTopProducts() {
-  return api.get<ProductSales[]>('/analytics/top-products')
+export function getPeriodTotals(params: AnalyticsPeriodParams = {}) {
+  return api.get<PeriodTotals>(`/analytics/totals${periodQuery(params)}`)
 }
 
-export function getCategoryProfit() {
-  return api.get<CategoryProfit[]>('/analytics/category-profit')
+export function getTopProducts(params: AnalyticsPeriodParams = {}) {
+  return api.get<ProductSales[]>(`/analytics/top-products${periodQuery(params)}`)
+}
+
+export function getCategoryProfit(params: AnalyticsPeriodParams = {}) {
+  return api.get<CategoryProfit[]>(`/analytics/category-profit${periodQuery(params)}`)
+}
+
+export function getRevenueTimeline(params: AnalyticsPeriodParams & { bucket?: TimelineBucket } = {}) {
+  const search = new URLSearchParams()
+  if (params.dateFrom) search.set('date_from', params.dateFrom)
+  if (params.dateTo) search.set('date_to', params.dateTo)
+  if (params.bucket) search.set('bucket', params.bucket)
+  const qs = search.toString()
+  return api.get<TimelinePoint[]>(`/analytics/timeline${qs ? `?${qs}` : ''}`)
 }
 
 export function getDeadStock() {

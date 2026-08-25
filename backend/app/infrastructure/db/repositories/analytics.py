@@ -11,6 +11,8 @@ from app.domain.analytics.repository import (
     ProductSales,
     RestockRecommendation,
     StockValueItem,
+    TimelineBucket,
+    TimelinePoint,
 )
 from app.infrastructure.db.models.catalog import CategoryModel, ProductModel
 from app.infrastructure.db.models.debts import DebtModel
@@ -28,6 +30,7 @@ class SqlAlchemyAnalyticsRepository(SqlAlchemyRepository, IAnalyticsRepository):
     ) -> PeriodTotals:
         sale_filter = [
             SaleModel.tenant_id == self._tenant,
+            SaleModel.deleted_at.is_(None),
             SaleModel.created_at >= date_from,
             SaleModel.created_at < date_to,
         ]
@@ -52,6 +55,45 @@ class SqlAlchemyAnalyticsRepository(SqlAlchemyRepository, IAnalyticsRepository):
 
         return PeriodTotals(sales_count=sales_count, revenue=revenue, profit=profit)
 
+    async def revenue_timeline(
+        self,
+        date_from: datetime,
+        date_to: datetime,
+        bucket: TimelineBucket,
+        warehouse_ids: list[int] | None = None,
+    ) -> list[TimelinePoint]:
+        sale_filter = [
+            SaleModel.tenant_id == self._tenant,
+            SaleModel.deleted_at.is_(None),
+            SaleModel.created_at >= date_from,
+            SaleModel.created_at < date_to,
+        ]
+        if warehouse_ids is not None:
+            sale_filter.append(SaleModel.warehouse_id.in_(warehouse_ids))
+
+        bucket_expr = func.date_trunc(bucket, SaleModel.created_at)
+        rows = (
+            await self._session.execute(
+                select(
+                    bucket_expr,
+                    func.count(func.distinct(SaleModel.id)),
+                    func.coalesce(func.sum(_LINE_REVENUE), 0),
+                    func.coalesce(func.sum(_LINE_PROFIT), 0),
+                )
+                .select_from(SaleLineModel)
+                .join(SaleModel, SaleModel.id == SaleLineModel.sale_id)
+                .where(*sale_filter)
+                .group_by(bucket_expr)
+                .order_by(bucket_expr)
+            )
+        ).all()
+        return [
+            TimelinePoint(
+                bucket_start=bucket_start.date(), sales_count=count, revenue=revenue, profit=profit,
+            )
+            for bucket_start, count, revenue, profit in rows
+        ]
+
     async def top_products(
         self,
         date_from: datetime,
@@ -61,6 +103,7 @@ class SqlAlchemyAnalyticsRepository(SqlAlchemyRepository, IAnalyticsRepository):
     ) -> list[ProductSales]:
         sale_filter = [
             SaleModel.tenant_id == self._tenant,
+            SaleModel.deleted_at.is_(None),
             SaleModel.created_at >= date_from,
             SaleModel.created_at < date_to,
         ]
@@ -94,6 +137,7 @@ class SqlAlchemyAnalyticsRepository(SqlAlchemyRepository, IAnalyticsRepository):
     ) -> list[CategoryProfit]:
         sale_filter = [
             SaleModel.tenant_id == self._tenant,
+            SaleModel.deleted_at.is_(None),
             SaleModel.created_at >= date_from,
             SaleModel.created_at < date_to,
         ]
@@ -132,7 +176,7 @@ class SqlAlchemyAnalyticsRepository(SqlAlchemyRepository, IAnalyticsRepository):
                 func.max(SaleModel.created_at).label("last_sale_at"),
             )
             .join(SaleModel, SaleModel.id == SaleLineModel.sale_id)
-            .where(SaleModel.tenant_id == self._tenant)
+            .where(SaleModel.tenant_id == self._tenant, SaleModel.deleted_at.is_(None))
             .group_by(SaleLineModel.product_id)
             .subquery()
         )
@@ -223,6 +267,7 @@ class SqlAlchemyAnalyticsRepository(SqlAlchemyRepository, IAnalyticsRepository):
 
         sale_filter = [
             SaleModel.tenant_id == self._tenant,
+            SaleModel.deleted_at.is_(None),
             SaleModel.created_at >= sale_period_from,
         ]
         if warehouse_ids is not None:

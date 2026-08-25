@@ -1,11 +1,21 @@
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Protocol
+from typing import Literal, Protocol
+
+TimelineBucket = Literal["day", "week", "month"]
 
 
 @dataclass(frozen=True)
 class PeriodTotals:
+    sales_count: int
+    revenue: Decimal
+    profit: Decimal
+
+
+@dataclass(frozen=True)
+class TimelinePoint:
+    bucket_start: date
     sales_count: int
     revenue: Decimal
     profit: Decimal
@@ -63,6 +73,18 @@ class IAnalyticsRepository(Protocol):
     async def totals_for_period(
         self, date_from: datetime, date_to: datetime, warehouse_ids: list[int] | None = None
     ) -> PeriodTotals: ...
+
+    async def revenue_timeline(
+        self,
+        date_from: datetime,
+        date_to: datetime,
+        bucket: TimelineBucket,
+        warehouse_ids: list[int] | None = None,
+    ) -> list[TimelinePoint]:
+        """Выручка/прибыль, сгруппированные по бакетам времени (день/неделя/месяц) —
+        для графика на странице «Аналитика». Бакеты без продаж не включаются в
+        результат (заполняются нулями на вызывающей стороне при необходимости)."""
+        ...
 
     async def top_products(
         self,
