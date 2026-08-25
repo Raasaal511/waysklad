@@ -44,7 +44,6 @@ class Permission(StrEnum):
     USERS_MANAGE = "users.manage"
 
     ANALYTICS_VIEW = "analytics.view"  # дашборд, прибыль — «отчёты о прибыли»
-    AUDIT_VIEW = "audit.view"
     SETTINGS_MANAGE = "settings.manage"  # настройки магазина (Telegram-сводка и т.п.) — только владелец
 
 
@@ -84,7 +83,6 @@ _ANALYST = {
     Permission.ORDERS_VIEW,
     Permission.CLIENTS_VIEW,
     Permission.ANALYTICS_VIEW,
-    Permission.AUDIT_VIEW,
     Permission.TASKS_VIEW,        # видит доску, но не ведёт задачи (read-only роль)
 }
 
