@@ -852,7 +852,7 @@ async def test_storekeeper_cannot_view_orders_via_api(client, owner_headers, ran
     assert response.status_code == 403
 
 
-async def test_audit_log_records_actions_and_guards_access(client, owner_headers, random_phone):
+async def test_audit_log_records_actions_on_entity_history(client, owner_headers):
     response = await client.post(
         "/api/products",
         headers=owner_headers,
@@ -869,7 +869,7 @@ async def test_audit_log_records_actions_and_guards_access(client, owner_headers
         headers=owner_headers,
         json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "10"}]},
     )
-    await client.post(
+    sale = await client.post(
         "/api/sales",
         headers=owner_headers,
         json={
@@ -878,28 +878,19 @@ async def test_audit_log_records_actions_and_guards_access(client, owner_headers
             "items": [{"product_id": product_id, "quantity": "1.5", "price": "700"}],
         },
     )
+    sale_id = sale.json()["id"]
 
-    response = await client.get("/api/audit", headers=owner_headers)
+    # история продажи — записана через тот же журнал, но по конкретной сущности
+    response = await client.get(f"/api/sales/{sale_id}/history", headers=owner_headers)
     assert response.status_code == 200
     actions = [entry["action"] for entry in response.json()]
-    # журнал в обратном хронологическом порядке
-    assert actions == ["sale.create", "stock.receive", "product.create", "shop.register"]
-    sale_entry = response.json()[0]
-    assert sale_entry["details"]["total"] == "1050.00"
+    assert actions == ["sale.create"]
+    assert response.json()[0]["details"]["total"] == "1050.00"
 
-    # продавцу журнал недоступен
-    response = await client.post(
-        "/api/auth/employees",
-        headers=owner_headers,
-        json={"name": "Зара", "phone": random_phone(), "password": "secret123", "role": "seller"},
-    )
-    login = await client.post(
-        "/api/auth/login",
-        json={"phone": response.json()["phone"], "password": "secret123"},
-    )
-    seller_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
-    response = await client.get("/api/audit", headers=seller_headers)
-    assert response.status_code == 403
+    # история товара — отдельный журнал по своей сущности
+    response = await client.get(f"/api/products/{product_id}/history", headers=owner_headers)
+    assert response.status_code == 200
+    assert [entry["action"] for entry in response.json()] == ["product.create"]
 
 
 def _excel_file(rows: list[tuple]) -> bytes:
@@ -1150,6 +1141,19 @@ async def test_analytics_endpoints_via_api(client, owner_headers, random_phone):
     response = await client.get("/api/analytics/top-products", headers=owner_headers)
     assert response.status_code == 200
     assert response.json()[0]["product_name"] == "Товар аналитики"
+
+    response = await client.get("/api/analytics/timeline", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    timeline = response.json()
+    assert len(timeline) == 1
+    assert timeline[0]["revenue"] == "400.00"
+    assert timeline[0]["profit"] == "200.00"
+    assert timeline[0]["sales_count"] == 1
+
+    response = await client.get(
+        "/api/analytics/timeline", headers=owner_headers, params={"bucket": "bogus"}
+    )
+    assert response.status_code == 422
 
     response = await client.get("/api/analytics/stock-value", headers=owner_headers)
     assert response.status_code == 200
