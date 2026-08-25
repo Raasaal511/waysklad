@@ -86,15 +86,32 @@ class Debt:
     def is_closed(self) -> bool:
         return self.balance == Money.zero()
 
+    @property
+    def next_installment_due_date(self) -> date | None:
+        """Срок ближайшего неоплаченного платежа графика рассрочки.
+
+        Оплаты покрывают платежи графика по порядку (та же эвристика, что и во
+        фронтенде — прямой связи Repayment→InstallmentPayment в данных нет).
+        None, если графика нет или все его платежи уже покрыты оплатами.
+        """
+        paid_so_far = self.repaid
+        for installment in self.schedule:
+            if paid_so_far >= installment.amount:
+                paid_so_far = paid_so_far - installment.amount
+                continue
+            return installment.due_date
+        return None
+
     def status(self, today: date | None = None) -> DebtStatus:
         today = today or date.today()
         if self.is_closed:
             return DebtStatus.CLOSED
-        if self.due_date is not None and self.due_date < today:
+        effective_due_date = self.next_installment_due_date or self.due_date
+        if effective_due_date is not None and effective_due_date < today:
             return DebtStatus.OVERDUE
         if self.repaid > Money.zero():
             return DebtStatus.PARTIALLY_PAID
-        if self.due_date is not None and self.due_date - today <= SOON_DUE_WINDOW:
+        if effective_due_date is not None and effective_due_date - today <= SOON_DUE_WINDOW:
             return DebtStatus.DUE_SOON
         return DebtStatus.ACTIVE
 
