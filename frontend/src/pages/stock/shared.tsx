@@ -8,11 +8,11 @@ import {
   type Warehouse,
 } from '../../entities/inventory/api'
 import { getByBarcode, type Category, type Product, type Unit } from '../../entities/product/api'
-import { listEmployees } from '../../entities/profile/api'
 import { listSuppliers, type Supplier } from '../../entities/counterparty/api'
 import type { User } from '../../entities/auth/api'
 import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
+import { useCatalog } from '../../app/CatalogContext'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
@@ -55,21 +55,20 @@ export const MODE_ICONS: Record<MovementMode, Icon> = {
 /** Ответственным за склад может быть только владелец или кладовщик (storekeeper) — так же проверяется на бэкенде. */
 export function useWarehouseManagerCandidates(): User[] {
   const { user } = useAuth()
-  const [candidates, setCandidates] = useState<User[]>([])
+  const { employees, ensureEmployees } = useCatalog()
 
   useEffect(() => {
-    listEmployees()
-      .then((employees) => {
-        const list = employees.filter((e) => e.role === 'storekeeper' || e.role === 'owner')
-        if (user && user.role === 'owner' && !list.some((e) => e.id === user.id)) {
-          list.unshift(user)
-        }
-        setCandidates(list)
-      })
-      .catch(() => {})
-  }, [user])
+    ensureEmployees().catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  return candidates
+  return useMemo(() => {
+    const list = employees.filter((e) => e.role === 'storekeeper' || e.role === 'owner')
+    if (user && user.role === 'owner' && !list.some((e) => e.id === user.id)) {
+      return [user, ...list]
+    }
+    return list
+  }, [employees, user])
 }
 
 export function AssignedUsersField({
@@ -112,8 +111,14 @@ export function AssignedUsersField({
   )
 }
 
-export function NewWarehouseForm({ onCreated }: { onCreated: () => void }) {
-  const [name, setName] = useState('')
+export function NewWarehouseForm({
+  onCreated,
+  defaultName = '',
+}: {
+  onCreated: () => void
+  defaultName?: string
+}) {
+  const [name, setName] = useState(defaultName)
   const [address, setAddress] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)

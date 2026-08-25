@@ -13,7 +13,7 @@ from app.domain.catalog.entities import Product
 from app.domain.common.money import Money
 from app.domain.common.quantity import UNITS
 from app.domain.common.phone import Phone
-from app.domain.identity.entities import Role, Tenant, User
+from app.domain.identity.entities import Role, Tenant, User, Warehouse
 from app.domain.identity.permissions import Actor
 from app.infrastructure.db.models.base import Base
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
@@ -91,7 +91,10 @@ def create_shop(make_uow, random_phone) -> Callable:
 
 @pytest.fixture
 async def registered_shop(make_uow, random_phone, hasher) -> tuple[int, str, Actor]:
-    """Магазин, заведённый через RegisterShopUseCase: (tenant_id, phone, Actor-владелец)."""
+    """Магазин, заведённый через RegisterShopUseCase: (tenant_id, phone, Actor-владелец).
+    Склад больше не создаётся автоматически при регистрации (владелец заводит его сам
+    в онбординге) — тестовый склад заводим здесь явно, чтобы не переписывать все тесты,
+    которые полагаются на готовый склад."""
     phone = random_phone()
     result = await RegisterShopUseCase(make_uow(), hasher).execute(
         RegisterShopCommand(
@@ -99,6 +102,9 @@ async def registered_shop(make_uow, random_phone, hasher) -> tuple[int, str, Act
         )
     )
     owner = result.owner
+    async with make_uow(owner.tenant_id) as uow:
+        await uow.warehouses.add(Warehouse(id=None, name="Основной склад"))
+        await uow.commit()
     return owner.tenant_id, phone, Actor(id=owner.id, role=owner.role)
 
 
@@ -147,7 +153,9 @@ async def client(db_session_factory, tmp_path) -> AsyncIterator[AsyncClient]:
 
 @pytest.fixture
 async def owner_headers(client, random_phone) -> dict:
-    """Authorization-заголовок владельца только что зарегистрированного через API магазина."""
+    """Authorization-заголовок владельца только что зарегистрированного через API магазина.
+    Склад больше не создаётся автоматически при регистрации — заводим его явно тем же
+    HTTP-запросом, каким это сделал бы владелец в онбординге."""
     response = await client.post(
         "/api/auth/register",
         json={
@@ -158,4 +166,9 @@ async def owner_headers(client, random_phone) -> dict:
         },
     )
     assert response.status_code == 201, response.text
-    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+    headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+    warehouse_response = await client.post(
+        "/api/inventory/warehouses", headers=headers, json={"name": "Основной склад"}
+    )
+    assert warehouse_response.status_code == 201, warehouse_response.text
+    return headers

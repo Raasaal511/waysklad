@@ -1,7 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
-import { listStock, listWarehouses, type StockItem, type Warehouse } from '../../entities/inventory/api'
-import { listAllProducts, type Product } from '../../entities/product/api'
 import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
 import { IconPlus, IconBuildingWarehouse, IconChevronRight, IconHistory } from '@tabler/icons-react'
@@ -9,12 +7,12 @@ import { IconButton } from '../../shared/ui/IconButton'
 import { Button } from '../../shared/ui/Button'
 import { isLowStock } from '../../shared/lib/format'
 import { NewWarehouseForm } from './shared'
+import { useCatalog } from '../../app/CatalogContext'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 
 export function StockPage() {
-  const [stock, setStock] = useState<StockItem[]>([])
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
-  const [products, setProducts] = useState<Product[]>([])
+  const { stock, warehouses, products, ensureStock, ensureWarehouses, ensureProducts, refresh: refreshCatalog } =
+    useCatalog()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showWarehouseForm, setShowWarehouseForm] = useState(false)
@@ -22,10 +20,7 @@ export function StockPage() {
   async function load(silent = false) {
     if (!silent) setLoading(true)
     try {
-      const [s, w, p] = await Promise.all([listStock(), listWarehouses(), listAllProducts()])
-      setStock(s)
-      setWarehouses(w)
-      setProducts(p)
+      await Promise.all([ensureStock(), ensureWarehouses(), ensureProducts()])
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось загрузить остатки')
     } finally {
@@ -35,6 +30,7 @@ export function StockPage() {
 
   useEffect(() => {
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const minStockById = new Map(products.map((p) => [p.id, p.min_stock]))
@@ -66,9 +62,10 @@ export function StockPage() {
       {showWarehouseForm && (
         <Modal title="Новый склад" onClose={() => setShowWarehouseForm(false)}>
           <NewWarehouseForm
+            defaultName={warehouses.length === 0 ? 'Основной склад' : ''}
             onCreated={() => {
               setShowWarehouseForm(false)
-              load(true)
+              refreshCatalog(['warehouses']).catch(() => {})
             }}
           />
         </Modal>
@@ -78,18 +75,18 @@ export function StockPage() {
 
       {!loading && warehouses.length > 1 && (
         <div className={[layoutStyles.card, layoutStyles.cardFull].join(' ')}>
-          <div className="grid-stats">
-            <div className="stat">
-              <span className="stat-label">Складов</span>
-              <span className="stat-value">{warehouses.length}</span>
+          <div className={layoutStyles.gridStats}>
+            <div className={layoutStyles.stat}>
+              <span className={layoutStyles.statLabel}>Складов</span>
+              <span className={layoutStyles.statValue}>{warehouses.length}</span>
             </div>
-            <div className="stat">
-              <span className="stat-label">Позиций на остатке</span>
-              <span className="stat-value">{totalPositions}</span>
+            <div className={layoutStyles.stat}>
+              <span className={layoutStyles.statLabel}>Позиций на остатке</span>
+              <span className={layoutStyles.statValue}>{totalPositions}</span>
             </div>
-            <div className="stat">
-              <span className="stat-label">Заканчивается</span>
-              <span className="stat-value">{totalLowStock}</span>
+            <div className={layoutStyles.stat}>
+              <span className={layoutStyles.statLabel}>Заканчивается</span>
+              <span className={layoutStyles.statValue}>{totalLowStock}</span>
             </div>
           </div>
         </div>
@@ -100,39 +97,45 @@ export function StockPage() {
       ) : warehouses.length === 0 ? (
         <p className={layoutStyles.textMuted}>Складов пока нет</p>
       ) : (
-        <div className="warehouse-tiles">
+        <div className={layoutStyles.warehouseTiles}>
           {warehouses.map((w, i) => {
             const low = lowStockCount(w.id)
             return (
               <Link
                 key={w.id}
                 to={`/stock/${w.id}`}
-                className="warehouse-tile sale-history-row-in"
+                className={`${layoutStyles.warehouseTile} sale-history-row-in`}
                 style={{ '--row-delay': `${Math.min(i, 12) * 40}ms` } as CSSProperties}
               >
-                <div className="warehouse-tile-header">
-                  <span className="warehouse-tile-icon">
+                <div className={layoutStyles.warehouseTileHeader}>
+                  <span className={layoutStyles.warehouseTileIcon}>
                     <IconBuildingWarehouse size={26} stroke={1.6} />
                   </span>
-                  <div className="warehouse-tile-heading">
-                    <strong className="warehouse-tile-name">{w.name}</strong>
+                  <div className={layoutStyles.warehouseTileHeading}>
+                    <strong className={layoutStyles.warehouseTileName}>{w.name}</strong>
                     <span className={layoutStyles.textMuted}>{w.address || 'Без адреса'}</span>
                   </div>
-                  <IconChevronRight size={20} stroke={1.8} className="warehouse-tile-chevron" />
+                  <IconChevronRight size={20} stroke={1.8} className={layoutStyles.warehouseTileChevron} />
                 </div>
 
-                <div className="warehouse-tile-stats">
-                  <div className="stat">
-                    <span className="stat-label">Позиций</span>
-                    <span className="stat-value">{itemCount(w.id)}</span>
+                <div className={layoutStyles.warehouseTileStats}>
+                  <div className={layoutStyles.stat}>
+                    <span className={layoutStyles.statLabel}>Позиций</span>
+                    <span className={layoutStyles.statValue}>{itemCount(w.id)}</span>
                   </div>
-                  <div className="stat">
-                    <span className="stat-label">Заканчивается</span>
-                    <span className={`stat-value${low > 0 ? ' stat-value-warning' : ''}`}>{low}</span>
+                  <div className={layoutStyles.stat}>
+                    <span className={layoutStyles.statLabel}>Заканчивается</span>
+                    <span
+                      className={[layoutStyles.statValue, low > 0 && layoutStyles.statValueWarning]
+                        .filter(Boolean)
+                        .join(' ')}
+                    >
+                      {low}
+                    </span>
                   </div>
-                  <div className="stat">
-                    <span className="stat-label">Ответственных</span>
-                    <span className="stat-value">{w.assigned_user_ids.length}</span>
+                  <div className={layoutStyles.stat}>
+                    <span className={layoutStyles.statLabel}>Ответственных</span>
+                    <span className={layoutStyles.statValue}>{w.assigned_user_ids.length}</span>
                   </div>
                 </div>
               </Link>

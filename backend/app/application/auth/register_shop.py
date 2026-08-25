@@ -5,7 +5,7 @@ from app.domain.common.exceptions import DomainError
 from app.domain.common.phone import Phone
 from app.domain.common.slug import generate_slug
 from app.domain.common.uow import IUnitOfWork
-from app.domain.identity.entities import Role, Tenant, User, Warehouse
+from app.domain.identity.entities import Role, Tenant, User
 from app.domain.identity.permissions import Actor
 from app.domain.identity.ports import IPasswordHasher
 
@@ -51,7 +51,6 @@ class RegisterShopUseCase:
                     password_hash=self._hasher.hash(cmd.password),
                 )
             )
-            await uow.warehouses.add(Warehouse(id=None, name="Основной склад"))
             await uow.audit.add(
                 AuditEntry.record(
                     Actor(id=owner.id, role=owner.role), "shop.register", tenant.id

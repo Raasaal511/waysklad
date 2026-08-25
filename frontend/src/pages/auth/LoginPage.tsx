@@ -58,6 +58,7 @@ export function LoginPage() {
     try {
       const result = await registerShop({ shop_name: shopName, owner_name: ownerName, phone, password })
       auth.login(result, true)
+      sessionStorage.setItem('waysklad:onboarding-pending', '1')
       navigate('/')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось зарегистрировать магазин')
