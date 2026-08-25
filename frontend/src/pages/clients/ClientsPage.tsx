@@ -64,11 +64,11 @@ export function ClientsPage() {
         </Button>
       </div>
 
-      <div className={layoutStyles.row}>
-        <Button variant={tab === 'clients' ? 'primary' : 'secondary'} onClick={() => setTab('clients')}>
+      <div className="sale-period-tabs">
+        <Button variant="secondary" active={tab === 'clients'} onClick={() => setTab('clients')}>
           Клиенты
         </Button>
-        <Button variant={tab === 'suppliers' ? 'primary' : 'secondary'} onClick={() => setTab('suppliers')}>
+        <Button variant="secondary" active={tab === 'suppliers'} onClick={() => setTab('suppliers')}>
           Поставщики
         </Button>
       </div>

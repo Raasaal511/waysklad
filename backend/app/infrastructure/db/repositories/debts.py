@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.domain.common.exceptions import NotFoundError
 from app.domain.debts.entities import Debt
 from app.domain.debts.repository import IDebtRepository
+from app.infrastructure.db.filtering.debt_filter import DebtFilterFactory
 from app.infrastructure.db.mappers.debts import DebtMapper
 from app.infrastructure.db.models.debts import (
     DebtExtensionModel,
@@ -129,3 +132,11 @@ class SqlAlchemyDebtRepository(SqlAlchemyRepository, IDebtRepository):
             )
         ).scalars().all()
         return [debt for debt in map(DebtMapper.to_entity, models) if debt.is_closed]
+
+    async def list_filtered(self, raw_params: dict) -> tuple[list[Debt], int]:
+        fields = DebtFilterFactory.build_fields(date.today())
+        base = select(DebtModel).where(DebtModel.tenant_id == self._tenant)
+        count_base = select(func.count()).select_from(DebtModel).where(DebtModel.tenant_id == self._tenant)
+        models = await DebtFilterFactory.fetch_list(self._session, raw_params, base, fields)
+        total = await DebtFilterFactory.fetch_count(self._session, raw_params, count_base, fields)
+        return [DebtMapper.to_entity(m) for m in models], total

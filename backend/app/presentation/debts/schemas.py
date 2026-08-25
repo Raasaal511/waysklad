@@ -1,7 +1,8 @@
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.application.debts.create_installment import (
     CreateInstallmentCommand,
@@ -11,7 +12,7 @@ from app.application.debts.extend_debt import ExtendDebtCommand
 from app.application.debts.issue_debt import IssueDebtCommand
 from app.application.debts.issue_supplier_debt import IssueSupplierDebtCommand
 from app.application.debts.repay_debt import RepayDebtCommand
-from app.domain.debts.entities import Debt, total_balance
+from app.domain.debts.entities import Debt, DebtStatus, total_balance
 
 
 class IssueDebtRequest(BaseModel):
@@ -53,6 +54,35 @@ class RepayDebtRequest(BaseModel):
         return RepayDebtCommand(
             debt_id=debt_id, amount=self.amount, paid_on=self.paid_on, note=self.note,
         )
+
+
+class DebtsFilterParams(BaseModel):
+    """Query-параметры списка долгов — форма запроса; преобразование в raw_params
+    для generic filter-системы см. to_raw_params()."""
+
+    limit: int = Field(50, le=200)
+    offset: int = Field(0, ge=0)
+    order_by: str | None = None
+    direction: Literal["client", "supplier"] | None = None
+    status: DebtStatus | None = None
+    query: str = ""
+
+    model_config = {"extra": "forbid"}
+
+    def to_raw_params(self) -> dict:
+        raw: dict = {
+            "limit": self.limit,
+            "offset": self.offset,
+            "order_by": self.order_by,
+            "status": self.status,
+        }
+        if self.direction == "client":
+            raw["client_id__is_null"] = False
+        elif self.direction == "supplier":
+            raw["supplier_id__is_null"] = False
+        if self.query.strip():
+            raw["counterparty_name__ilike"] = self.query.strip()
+        return raw
 
 
 class ExtendDebtRequest(BaseModel):
@@ -171,4 +201,57 @@ class DebtsSummaryResponse(BaseModel):
         return cls(
             total_balance=total_balance(debts).amount,
             debts=[DebtResponse.from_entity(d) for d in debts],
+        )
+
+
+class UpcomingPaymentResponse(BaseModel):
+    debt_id: int
+    due_date: date
+    amount: Decimal
+    counterparty_name: str
+
+
+class DebtsOverviewResponse(BaseModel):
+    """Сводка по всем активным долгам сразу — не зависит от текущих фильтров списка
+    (направление/статус/поиск), нужна для виджетов «Нам должны/Мы должны» и
+    «ближайшие выплаты» на странице «Долги»."""
+
+    client_total_balance: Decimal
+    client_debt_count: int
+    supplier_total_balance: Decimal
+    supplier_debt_count: int
+    upcoming_payments: list[UpcomingPaymentResponse]
+
+    @classmethod
+    def from_active_debts(
+        cls, debts: list[Debt], counterparty_name: dict[tuple[str, int], str],
+    ) -> "DebtsOverviewResponse":
+        client_debts = [d for d in debts if d.client_id is not None]
+        supplier_debts = [d for d in debts if d.supplier_id is not None]
+        upcoming: list[UpcomingPaymentResponse] = []
+        for debt in debts:
+            if not debt.schedule:
+                continue
+            key = ("client", debt.client_id) if debt.client_id is not None else ("supplier", debt.supplier_id)
+            name = counterparty_name.get(key, "—")
+            paid_so_far = debt.repaid
+            for installment in debt.schedule:
+                if paid_so_far >= installment.amount:
+                    paid_so_far = paid_so_far - installment.amount
+                    continue
+                upcoming.append(
+                    UpcomingPaymentResponse(
+                        debt_id=debt.id,
+                        due_date=installment.due_date,
+                        amount=installment.amount.amount,
+                        counterparty_name=name,
+                    )
+                )
+        upcoming.sort(key=lambda p: p.due_date)
+        return cls(
+            client_total_balance=total_balance(client_debts).amount,
+            client_debt_count=len(client_debts),
+            supplier_total_balance=total_balance(supplier_debts).amount,
+            supplier_debt_count=len(supplier_debts),
+            upcoming_payments=upcoming,
         )

@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   listActiveDebts,
   listClosedDebts,
+  getDebtsOverview,
   issueDebt,
   issueSupplierDebt,
   createInstallment,
   repayDebt,
   type Debt,
+  type DebtsOverview,
 } from '../../entities/debt/api'
 import { searchClients, listSuppliers, type Client, type Supplier } from '../../entities/counterparty/api'
 import {
@@ -37,16 +39,6 @@ import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt
 import { daysOverdue, pluralDays } from '../../entities/debt/dueDate'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './DebtsPage.module.css'
-
-// Порядок "серьёзности" статуса — просроченные и горящие сроком долги всегда
-// показываются выше спокойных, чтобы владелец сразу видел, кому звонить.
-const STATUS_SEVERITY: Record<Debt['status'], number> = {
-  overdue: 4,
-  due_soon: 3,
-  partially_paid: 2,
-  active: 1,
-  closed: 0,
-}
 
 // Цвет левой полоски карточки долга — тот же смысл, что у бейджа статуса,
 // но как акцент, по которому можно опознать "горящий" долг не читая текст.
@@ -121,42 +113,22 @@ function DueDatePresets({ value, onChange }: { value: string; onChange: (v: stri
   )
 }
 
-interface UpcomingPayment {
-  debtId: number
-  dueDate: string
-  amount: string
-  name: string
-}
-
-// Ближайшие неоплаченные платежи графиков рассрочки по всем активным долгам —
-// та же эвристика "оплачено покрывает платежи по порядку", что и в карточке
-// долга: связи Repayment→InstallmentPayment в данных нет.
-function upcomingPayments(debts: Debt[], counterpartyName: (d: Debt) => string): UpcomingPayment[] {
-  const result: UpcomingPayment[] = []
-  for (const debt of debts) {
-    if (debt.schedule.length === 0) continue
-    let paidSoFar = debt.repayments.reduce((sum, r) => sum + Number(r.amount), 0)
-    for (const s of debt.schedule) {
-      const amount = Number(s.amount)
-      if (paidSoFar >= amount - 0.01) {
-        paidSoFar -= amount
-        continue
-      }
-      result.push({ debtId: debt.id, dueDate: s.due_date, amount: s.amount, name: counterpartyName(debt) })
-    }
-  }
-  return result.sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-}
+const PAGE_SIZE = 50
 
 export function DebtsPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const highlightId = searchParams.get('highlight')
   const [debts, setDebts] = useState<Debt[]>([])
-  const [closedDebts, setClosedDebts] = useState<Debt[] | null>(null)
+  const [total, setTotal] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [closedDebts, setClosedDebts] = useState<Debt[]>([])
+  const [closedTotal, setClosedTotal] = useState(0)
+  const [closedLoaded, setClosedLoaded] = useState(false)
   const [loadingClosed, setLoadingClosed] = useState(false)
   const [clients, setClients] = useState<Client[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [overview, setOverview] = useState<DebtsOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -165,18 +137,32 @@ export function DebtsPage() {
   const [direction, setDirection] = useState<'clients' | 'suppliers'>('clients')
   const [statusFilter, setStatusFilter] = useState<Debt['status'] | 'all'>('all')
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 300)
+    return () => clearTimeout(timer)
+  }, [query])
+
+  function refreshOverview() {
+    getDebtsOverview().then(setOverview).catch(() => {})
+  }
+
+  // Первая загрузка страницы — полноэкранный "Загрузка…", заодно тянет
+  // клиентов/поставщиков. Смена фильтра ими не пользуется — см. reloadDebts.
   async function load() {
     setLoading(true)
     try {
-      const [activeDebts, clientList, supplierList] = await Promise.all([
-        listActiveDebts(),
+      const [{ items, total: t }, clientList, supplierList] = await Promise.all([
+        listActiveDebts({ direction, status: statusFilter, query: debouncedQuery, limit: PAGE_SIZE }),
         searchClients(),
         listSuppliers(),
       ])
-      setDebts(activeDebts)
+      setDebts(items)
+      setTotal(t)
       setClients(clientList)
       setSuppliers(supplierList)
+      refreshOverview()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось загрузить долги')
     } finally {
@@ -184,81 +170,108 @@ export function DebtsPage() {
     }
   }
 
+  const isFirstLoad = useRef(true)
+
+  // Перезагрузка списка при смене фильтра — без полноэкранного "Загрузка…" и
+  // без повторных запросов клиентов/поставщиков.
+  async function reloadDebts() {
+    try {
+      const { items, total: t } = await listActiveDebts({
+        direction, status: statusFilter, query: debouncedQuery, limit: PAGE_SIZE,
+      })
+      setDebts(items)
+      setTotal(t)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось загрузить долги')
+    }
+  }
+
+  async function loadMore() {
+    setLoadingMore(true)
+    try {
+      const { items, total: t } = await listActiveDebts({
+        direction, status: statusFilter, query: debouncedQuery, limit: PAGE_SIZE, offset: debts.length,
+      })
+      setDebts((prev) => [...prev, ...items])
+      setTotal(t)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось загрузить долги')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
   useEffect(() => {
-    load()
-  }, [])
+    if (isFirstLoad.current) {
+      isFirstLoad.current = false
+      load()
+    } else {
+      reloadDebts()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [direction, statusFilter, debouncedQuery])
 
   // Погашенные долги не нужны по умолчанию — грузим только когда владелец
-  // действительно открыл вкладку "Погашенные".
+  // действительно открыл вкладку "Погашенные"; при смене поиска перезагружаем.
   useEffect(() => {
-    if (view !== 'closed' || closedDebts !== null) return
+    if (view !== 'closed') return
     setLoadingClosed(true)
-    listClosedDebts()
-      .then(setClosedDebts)
+    listClosedDebts({ direction, query: debouncedQuery, limit: PAGE_SIZE })
+      .then(({ items, total: t }) => {
+        setClosedDebts(items)
+        setClosedTotal(t)
+        setClosedLoaded(true)
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Не удалось загрузить погашенные долги'))
       .finally(() => setLoadingClosed(false))
-  }, [view, closedDebts])
+  }, [view, direction, debouncedQuery])
+
+  async function loadMoreClosed() {
+    setLoadingClosed(true)
+    try {
+      const { items, total: t } = await listClosedDebts({
+        direction, query: debouncedQuery, limit: PAGE_SIZE, offset: closedDebts.length,
+      })
+      setClosedDebts((prev) => [...prev, ...items])
+      setClosedTotal(t)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось загрузить погашенные долги')
+    } finally {
+      setLoadingClosed(false)
+    }
+  }
 
   const counterpartyName = (debt: Debt) =>
     debt.client_id
       ? clients.find((c) => c.id === debt.client_id)?.name ?? `Клиент #${debt.client_id}`
       : suppliers.find((s) => s.id === debt.supplier_id)?.name ?? `Поставщик #${debt.supplier_id}`
 
-  const clientDebts = useMemo(() => debts.filter((d) => d.client_id != null), [debts])
-  const supplierDebts = useMemo(() => debts.filter((d) => d.supplier_id != null), [debts])
-  const totalOwedToUs = clientDebts.reduce((sum, d) => sum + Number(d.balance), 0)
-  const totalWeOwe = supplierDebts.reduce((sum, d) => sum + Number(d.balance), 0)
-
-  const visibleDebts = useMemo(() => {
-    const byDirection = debts.filter((d) => (direction === 'clients' ? d.client_id != null : d.supplier_id != null))
-    const byStatus = statusFilter === 'all' ? byDirection : byDirection.filter((d) => d.status === statusFilter)
-    const trimmedQuery = query.trim().toLowerCase()
-    const filtered = trimmedQuery
-      ? byStatus.filter((d) => counterpartyName(d).toLowerCase().includes(trimmedQuery))
-      : byStatus
-    return [...filtered].sort((a, b) => {
-      const bySeverity = STATUS_SEVERITY[b.status] - STATUS_SEVERITY[a.status]
-      if (bySeverity !== 0) return bySeverity
-      return (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999')
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [direction, statusFilter, debts, query, clients, suppliers])
-
-  // Погашенные — отдельной вкладкой, сгруппированы по месяцу закрытия (месяц
-  // последней оплаты), последние группы сверху.
+  // Сортировка и группировка уже применены сервером (severity/issued_at) —
+  // здесь только группировка погашённых по месяцу для отображения.
   const closedGroups = useMemo(() => {
-    const trimmedQuery = query.trim().toLowerCase()
-    const source = closedDebts ?? []
-    const filtered = trimmedQuery
-      ? source.filter((d) => counterpartyName(d).toLowerCase().includes(trimmedQuery))
-      : source
-    const sorted = [...filtered].sort((a, b) => closedOn(b).localeCompare(closedOn(a)))
     const groups: { label: string; items: Debt[] }[] = []
-    for (const d of sorted) {
+    for (const d of closedDebts) {
       const label = monthLabel(closedOn(d))
       const group = groups.at(-1)?.label === label ? groups.at(-1)! : { label, items: [] }
       if (groups.at(-1) !== group) groups.push(group)
       group.items.push(d)
     }
     return groups
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [closedDebts, query, clients, suppliers])
+  }, [closedDebts])
 
-  const upcoming = useMemo(
-    () => upcomingPayments(debts, counterpartyName),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [debts, clients, suppliers],
-  )
+  const upcoming = overview?.upcoming_payments ?? []
+  const totalOwedToUs = Number(overview?.client_total_balance ?? 0)
+  const totalWeOwe = Number(overview?.supplier_total_balance ?? 0)
+  const clientDebtCount = overview?.client_debt_count ?? 0
+  const supplierDebtCount = overview?.supplier_debt_count ?? 0
 
   // Переход по ссылке "?highlight=id" (из уведомления, из продажи) — сразу
   // открываем карточку конкретного долга.
   useEffect(() => {
-    if (loading || !highlightId) return
-    const debt = debts.find((d) => String(d.id) === highlightId)
-    if (!debt) return
-    navigate(`/debts/${debt.id}`, { replace: true })
+    if (!highlightId) return
+    navigate(`/debts/${highlightId}`, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, highlightId, debts])
+  }, [highlightId])
 
   return (
     <div className={layoutStyles.stack}>
@@ -294,10 +307,10 @@ export function DebtsPage() {
       {error && <p className={layoutStyles.error}>{error}</p>}
 
       {showUpcoming && (
-        <Modal title="Ближайшие выплаты" onClose={() => setShowUpcoming(false)}>
+        <Modal title="Ближайшие выплаты" size="wide" onClose={() => setShowUpcoming(false)}>
           <div className={`${styles['debt-upcoming-list']} ${styles['debt-upcoming-list-modal']}`}>
             {upcoming.map((p, i) => {
-              const overdue = daysOverdue(p.dueDate) > 0
+              const overdue = daysOverdue(p.due_date) > 0
               return (
                 <button
                   key={i}
@@ -305,7 +318,7 @@ export function DebtsPage() {
                   className={styles['debt-upcoming-row']}
                   onClick={() => {
                     setShowUpcoming(false)
-                    navigate(`/debts/${p.debtId}`)
+                    navigate(`/debts/${p.debt_id}`)
                   }}
                 >
                   <span
@@ -313,12 +326,12 @@ export function DebtsPage() {
                       .filter(Boolean)
                       .join(' ')}
                   >
-                    {formatDate(p.dueDate)}
+                    {formatDate(p.due_date)}
                   </span>
-                  <span className={styles['debt-upcoming-name']}>{p.name}</span>
+                  <span className={styles['debt-upcoming-name']}>{p.counterparty_name}</span>
                   {overdue && (
                     <span className={`${layoutStyles.textDanger} ${styles['debt-upcoming-overdue']}`}>
-                      просрочен на {daysOverdue(p.dueDate)} {pluralDays(daysOverdue(p.dueDate))}
+                      просрочен на {daysOverdue(p.due_date)} {pluralDays(daysOverdue(p.due_date))}
                     </span>
                   )}
                   <strong className={styles['debt-upcoming-amount']}>{formatMoney(p.amount)} ₽</strong>
@@ -354,7 +367,7 @@ export function DebtsPage() {
               <IconArrowDownLeft size={14} stroke={2} /> Нам должны клиенты
             </span>
             <strong>{formatMoney(String(totalOwedToUs))} ₽</strong>
-            {clientDebts.length > 0 && <span className={layoutStyles.countBadge}>{clientDebts.length}</span>}
+            {clientDebtCount > 0 && <span className={layoutStyles.countBadge}>{clientDebtCount}</span>}
           </button>
           <button
             type="button"
@@ -369,7 +382,7 @@ export function DebtsPage() {
               <IconArrowUpRight size={14} stroke={2} /> Мы должны поставщикам
             </span>
             <strong>{formatMoney(String(totalWeOwe))} ₽</strong>
-            {supplierDebts.length > 0 && <span className={layoutStyles.countBadge}>{supplierDebts.length}</span>}
+            {supplierDebtCount > 0 && <span className={layoutStyles.countBadge}>{supplierDebtCount}</span>}
           </button>
         </div>
       )}
@@ -409,25 +422,32 @@ export function DebtsPage() {
       {view === 'active' ? (
         loading ? (
           <p className={layoutStyles.textMuted}>Загрузка…</p>
-        ) : visibleDebts.length === 0 ? (
+        ) : debts.length === 0 ? (
           <p className={layoutStyles.textMuted}>
-            {query.trim()
+            {debouncedQuery.trim()
               ? 'Ничего не найдено'
               : statusFilter === 'all'
                 ? 'Долгов нет'
                 : 'Долгов с таким статусом нет'}
           </p>
         ) : (
-          <div className={styles['debt-row-list']}>
-            {visibleDebts.map((d) => (
-              <DebtRow key={d.id} debt={d} name={counterpartyName(d)} onOpen={() => navigate(`/debts/${d.id}`)} />
-            ))}
+          <div className={layoutStyles.stack}>
+            <div className={styles['debt-row-list']}>
+              {debts.map((d) => (
+                <DebtRow key={d.id} debt={d} name={counterpartyName(d)} onOpen={() => navigate(`/debts/${d.id}`)} />
+              ))}
+            </div>
+            {debts.length < total && (
+              <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? 'Загрузка…' : `Показать ещё (${total - debts.length})`}
+              </Button>
+            )}
           </div>
         )
-      ) : loadingClosed ? (
+      ) : loadingClosed && !closedLoaded ? (
         <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : closedGroups.length === 0 ? (
-        <p className={layoutStyles.textMuted}>{query.trim() ? 'Ничего не найдено' : 'Погашенных долгов нет'}</p>
+        <p className={layoutStyles.textMuted}>{debouncedQuery.trim() ? 'Ничего не найдено' : 'Погашенных долгов нет'}</p>
       ) : (
         <div className={layoutStyles.stack}>
           {closedGroups.map((group) => (
@@ -443,6 +463,11 @@ export function DebtsPage() {
               </div>
             </div>
           ))}
+          {closedDebts.length < closedTotal && (
+            <Button variant="secondary" onClick={loadMoreClosed} disabled={loadingClosed}>
+              {loadingClosed ? 'Загрузка…' : `Показать ещё (${closedTotal - closedDebts.length})`}
+            </Button>
+          )}
         </div>
       )}
     </div>

@@ -1,12 +1,15 @@
 from datetime import date
+from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Response
 
 from app.domain.identity.permissions import Permission
 from app.presentation.audit.schemas import AuditEntryResponse
 from app.presentation.debts.schemas import (
     CreateInstallmentRequest,
     DebtResponse,
+    DebtsFilterParams,
+    DebtsOverviewResponse,
     DebtsSummaryResponse,
     ExtendDebtRequest,
     IssueDebtRequest,
@@ -43,15 +46,36 @@ async def issue_supplier_debt(
 
 
 @router.get("", dependencies=[_view])
-async def list_active_debts(uow: UowDep) -> list[DebtResponse]:
+async def list_active_debts(
+    response: Response, uow: UowDep, params: Annotated[DebtsFilterParams, Depends()],
+) -> list[DebtResponse]:
     async with uow:
-        return [DebtResponse.from_entity(d) for d in await uow.debts.list_active()]
+        raw_params = {**params.to_raw_params(), "balance__gt": 0, "order_by": params.order_by or "-severity"}
+        debts, total = await uow.debts.list_filtered(raw_params)
+        response.headers["X-Total-Count"] = str(total)
+        return [DebtResponse.from_entity(d) for d in debts]
 
 
 @router.get("/closed", dependencies=[_view])
-async def list_closed_debts(uow: UowDep) -> list[DebtResponse]:
+async def list_closed_debts(
+    response: Response, uow: UowDep, params: Annotated[DebtsFilterParams, Depends()],
+) -> list[DebtResponse]:
     async with uow:
-        return [DebtResponse.from_entity(d) for d in await uow.debts.list_closed()]
+        raw_params = {**params.to_raw_params(), "balance__lte": 0, "order_by": params.order_by or "-issued_at"}
+        debts, total = await uow.debts.list_filtered(raw_params)
+        response.headers["X-Total-Count"] = str(total)
+        return [DebtResponse.from_entity(d) for d in debts]
+
+
+@router.get("/overview", dependencies=[_view])
+async def get_debts_overview(uow: UowDep) -> DebtsOverviewResponse:
+    async with uow:
+        debts = await uow.debts.list_active()
+        clients = await uow.clients.search("", include_inactive=True)
+        suppliers = await uow.suppliers.list()
+        counterparty_name = {("client", c.id): c.name for c in clients}
+        counterparty_name.update({("supplier", s.id): s.name for s in suppliers})
+        return DebtsOverviewResponse.from_active_debts(debts, counterparty_name)
 
 
 @router.get("/due", dependencies=[_view])

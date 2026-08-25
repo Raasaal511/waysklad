@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date
 from typing import Protocol
 
@@ -25,4 +27,9 @@ class IDebtRepository(Protocol):
 
     async def list_closed(self) -> list[Debt]:
         """Все погашенные долги арендатора — для вкладки «Погашен» в общем списке."""
+        ...
+
+    async def list_filtered(self, raw_params: dict) -> tuple[list[Debt], int]:
+        """Список долгов по декларативным фильтрам (см. app/infrastructure/db/filtering) —
+        для страницы «Долги» с направлением/статусом/поиском/сортировкой на сервере."""
         ...

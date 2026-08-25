@@ -21,7 +21,7 @@ import { listClientDebts, type Debt } from '../../entities/debt/api'
 import { DebtCard } from '../../entities/debt/DebtCard'
 import { listSales, getSale, type Sale } from '../../entities/sale/api'
 import { listDocuments, type DocumentHistoryEntry } from '../../entities/inventory/api'
-import { listAllProducts, listUnits, type Product, type Unit } from '../../entities/product/api'
+import { useCatalog } from '../../app/CatalogContext'
 import { ApiError } from '../../shared/api/client'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
@@ -107,6 +107,7 @@ const REPUTATION_ICON: Record<Reputation['level'], typeof IconShieldCheck> = {
 export function ClientDetailPage() {
   const { id } = useParams<{ id: string }>()
   const clientId = Number(id)
+  const { products: debtProducts, units: debtUnits, ensureProducts, ensureUnits } = useCatalog()
 
   const [client, setClient] = useState<Client | null>(null)
   const [debts, setDebts] = useState<Debt[] | null>(null)
@@ -118,8 +119,6 @@ export function ClientDetailPage() {
   const [openDebtId, setOpenDebtId] = useState<number | null>(null)
   const [debtSale, setDebtSale] = useState<Sale | null>(null)
   const [debtReceipt, setDebtReceipt] = useState<DocumentHistoryEntry | null>(null)
-  const [debtProducts, setDebtProducts] = useState<Product[]>([])
-  const [debtUnits, setDebtUnits] = useState<Unit[]>([])
   const [debtLoading, setDebtLoading] = useState(false)
 
   async function loadClient() {
@@ -133,25 +132,13 @@ export function ClientDetailPage() {
     const target = (debts ?? []).find((d) => d.id === debtId)
     try {
       if (target?.sale_id != null) {
-        const [s, productList, unitList] = await Promise.all([
-          getSale(target.sale_id),
-          listAllProducts(),
-          listUnits(),
-        ])
+        const [s] = await Promise.all([getSale(target.sale_id), ensureProducts(), ensureUnits()])
         setDebtSale(s)
         setDebtReceipt(null)
-        setDebtProducts(productList)
-        setDebtUnits(unitList)
       } else if (target?.receipt_document_id != null) {
-        const [documents, productList, unitList] = await Promise.all([
-          listDocuments(),
-          listAllProducts(),
-          listUnits(),
-        ])
+        const [documents] = await Promise.all([listDocuments(), ensureProducts(), ensureUnits()])
         setDebtSale(null)
         setDebtReceipt(documents.find((doc) => doc.id === target.receipt_document_id) ?? null)
-        setDebtProducts(productList)
-        setDebtUnits(unitList)
       } else {
         setDebtSale(null)
         setDebtReceipt(null)
@@ -171,15 +158,15 @@ export function ClientDetailPage() {
     async function load() {
       setLoading(true)
       try {
-        const [clients, debtsSummary, salesList] = await Promise.all([
+        const [clients, debtsSummary, salesResult] = await Promise.all([
           searchClients('', true),
           listClientDebts(clientId),
-          listSales(),
+          listSales({ clientId, limit: 200 }),
         ])
         if (cancelled) return
         setClient(clients.find((c) => c.id === clientId) ?? null)
         setDebts(debtsSummary.debts)
-        setSales(salesList.filter((s) => s.client_id === clientId))
+        setSales(salesResult.items)
       } catch (err) {
         if (!cancelled) setError(err instanceof ApiError ? err.message : 'Не удалось загрузить клиента')
       } finally {
@@ -241,7 +228,7 @@ export function ClientDetailPage() {
   if (!loading && !client) {
     return (
       <div className={layoutStyles.stack}>
-        <Link to="/clients" className="back-link">
+        <Link to="/clients" className={layoutStyles.backLink}>
           <IconChevronLeft size={16} stroke={1.8} /> Все контрагенты
         </Link>
         <p className={layoutStyles.error}>{error ?? 'Клиент не найден'}</p>
@@ -251,7 +238,7 @@ export function ClientDetailPage() {
 
   return (
     <div className={layoutStyles.stack}>
-      <Link to="/clients" className="back-link">
+      <Link to="/clients" className={layoutStyles.backLink}>
         <IconChevronLeft size={16} stroke={1.8} /> Все контрагенты
       </Link>
 

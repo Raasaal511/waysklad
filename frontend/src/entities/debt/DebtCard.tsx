@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { repayDebt, extendDebt, createInstallment, type Debt } from './api'
+import { repayDebt, extendDebt, createInstallment, getDebtHistory, type Debt, type DebtHistoryEntry } from './api'
 import type { Client, Supplier } from '../counterparty/api'
 import type { Sale } from '../sale/api'
 import type { DocumentHistoryEntry } from '../inventory/api'
@@ -23,15 +23,54 @@ import {
   IconCalendarTime,
   IconCalendarRepeat,
   IconClockExclamation,
+  IconCalendarPlus,
+  IconCalendarRepeat as IconInstallment,
+  type Icon as TablerIcon,
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
 import { DateInput } from '../../shared/ui/DateInput'
 import { InfoHint } from '../../shared/ui/InfoHint'
+import { HistoryDisclosure } from '../../shared/ui/HistoryDisclosure'
 import { formatMoney, formatQuantity, normalizeDecimalInput } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from './debtStatus'
 import { daysOverdue, pluralDays } from './dueDate'
 import styles from './DebtCard.module.css'
+
+const DEBT_HISTORY_ACTION_LABELS: Record<string, string> = {
+  'debt.issue': 'Долг выдан клиенту',
+  'debt.issue_supplier': 'Долг выдан поставщику',
+  'debt.repay': 'Внесена оплата',
+  'debt.extend': 'Продлён срок',
+  'debt.installment': 'Составлен график рассрочки',
+}
+
+const DEBT_HISTORY_ACTION_ICONS: Record<string, TablerIcon> = {
+  'debt.issue': IconUser,
+  'debt.issue_supplier': IconTruck,
+  'debt.repay': IconCash,
+  'debt.extend': IconCalendarPlus,
+  'debt.installment': IconInstallment,
+}
+
+function formatDebtHistoryDetail(entry: DebtHistoryEntry): string | null {
+  const d = entry.details
+  switch (entry.action) {
+    case 'debt.issue':
+    case 'debt.issue_supplier':
+      return d.amount != null ? `${formatMoney(String(d.amount))} ₽` : null
+    case 'debt.repay':
+      return d.amount != null
+        ? `Внесено ${formatMoney(String(d.amount))} ₽ · остаток ${formatMoney(String(d.balance ?? '0'))} ₽`
+        : null
+    case 'debt.extend':
+      return d.new_due_date ? `Новый срок ${formatDate(String(d.new_due_date))}` : null
+    case 'debt.installment':
+      return d.payments != null ? `Платежей: ${d.payments}` : null
+    default:
+      return null
+  }
+}
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('ru-RU')
@@ -416,6 +455,13 @@ export function DebtCard({
           </div>
         </div>
       )}
+
+      <HistoryDisclosure
+        load={() => getDebtHistory(debt.id)}
+        actionLabels={DEBT_HISTORY_ACTION_LABELS}
+        actionIcons={DEBT_HISTORY_ACTION_ICONS}
+        formatDetail={formatDebtHistoryDetail}
+      />
     </div>
   )
 }
