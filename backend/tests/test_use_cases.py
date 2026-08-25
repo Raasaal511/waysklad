@@ -120,6 +120,7 @@ from app.domain.sales.payment import PaymentMethod
 from app.infrastructure.db.models.identity import TenantModel
 from app.infrastructure.db.models.sales import SaleModel
 from app.infrastructure.files import LocalFileStorage
+from app.domain.analytics.period import SummaryPeriod
 from app.infrastructure.telegram import _send_summaries_async
 
 
@@ -1815,19 +1816,26 @@ async def test_telegram_daily_summary(
     )
 
     sent = []
+    documents = []
 
     class FakeNotifier:
         def send(self, chat_id: str, text: str) -> None:
             sent.append((chat_id, text))
 
-    await _send_summaries_async(FakeNotifier())
+        def send_document(self, chat_id: str, filename: str, content: bytes, caption: str = "") -> None:
+            documents.append((chat_id, filename))
+
+    # дефолт tenant.summary_daily_hour_msk = 20 (МСК) -> now в UTC должен быть 17:00
+    await _send_summaries_async(SummaryPeriod.DAY, FakeNotifier(), now=datetime(2026, 8, 25, 17, tzinfo=timezone.utc))
 
     assert len(sent) == 1
     chat_id, text = sent[0]
     assert chat_id == "12345"
-    assert "Продаж: 1" in text
-    assert "Выручка: 200" in text
-    assert "Прибыль: 100" in text
+    assert "Продаж: <b>1</b>" in text
+    assert "Выручка: <b>200" in text
+    assert "Прибыль: <b>100" in text
+    assert len(documents) == 1
+    assert documents[0][0] == "12345"
 
 
 async def test_create_sale_is_idempotent_by_client_op_id(

@@ -1302,6 +1302,41 @@ async def test_connect_telegram_via_api(client, owner_headers, random_phone):
     assert response.status_code == 403
 
 
+async def test_update_shop_summary_schedule_via_api(client, owner_headers):
+    response = await client.get("/api/auth/shop", headers=owner_headers)
+    assert response.status_code == 200
+    shop = response.json()
+    # дефолты сразу после регистрации
+    assert shop["summary_daily_enabled"] is True
+    assert shop["summary_weekly_enabled"] is False
+    assert shop["summary_monthly_enabled"] is False
+    assert shop["summary_daily_hour_msk"] == 20
+
+    response = await client.patch(
+        "/api/auth/shop",
+        headers=owner_headers,
+        json={
+            "name": shop["name"],
+            "summary_weekly_enabled": True,
+            "summary_monthly_enabled": True,
+            "summary_daily_hour_msk": 9,
+        },
+    )
+    assert response.status_code == 200, response.text
+    updated = response.json()
+    assert updated["summary_daily_enabled"] is True  # не тронули — осталось прежним
+    assert updated["summary_weekly_enabled"] is True
+    assert updated["summary_monthly_enabled"] is True
+    assert updated["summary_daily_hour_msk"] == 9
+
+    response = await client.patch(
+        "/api/auth/shop",
+        headers=owner_headers,
+        json={"name": shop["name"], "summary_daily_hour_msk": 24},
+    )
+    assert response.status_code == 422  # вне диапазона 0..23
+
+
 async def test_product_history_via_api(client, owner_headers):
     response = await client.post(
         "/api/products",
