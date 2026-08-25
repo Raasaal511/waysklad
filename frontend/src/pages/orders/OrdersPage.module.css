@@ -1,0 +1,618 @@
+/* Стили, специфичные для страницы заказов. Перенесено из src/index.css
+   при миграции на CSS Modules. */
+
+.ordersIntro {
+  position: relative;
+  border: 1px dashed var(--accent-border);
+  background: var(--accent-soft-weak);
+  padding-right: 44px;
+}
+
+.ordersIntroClose {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.ordersIntroFlow {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.ordersIntroStep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 220px;
+}
+
+.ordersIntroIcon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ordersIntroIconAccent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ordersIntroArrow {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.ordersBoard {
+  display: grid;
+  grid-template-columns: repeat(var(--board-cols, 3), minmax(280px, 440px));
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .ordersBoard {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ordersBoardColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  background: var(--bg-muted);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.ordersBoardColumnOver {
+  border-color: var(--accent);
+  background: var(--accent-soft-weak);
+}
+
+.ordersBoardColumnHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.ordersBoardDot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--col-accent, var(--text-muted));
+}
+
+.ordersBoardColumnCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--col-accent, var(--border)) 18%, var(--bg-muted));
+  color: var(--col-accent, var(--text-muted));
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ordersBoardColumnAdd {
+  margin-left: auto;
+}
+
+.ordersBoardColumnBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 60px;
+}
+
+@media (min-width: 900px) {
+  .ordersBoardColumn {
+    max-height: calc(100vh - 180px);
+  }
+
+  .ordersBoardColumnBody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+  }
+}
+
+.ordersBoardEmpty {
+  padding: 16px 10px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.ordersBoardEmptyAction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+
+.ordersBoardEmptyAction:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ordersBoardCard {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  max-width: none;
+  padding: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease, transform 0.12s ease;
+}
+
+.ordersBoardCard:hover {
+  border-color: var(--accent-border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+}
+
+.ordersBoardCard:active {
+  cursor: grabbing;
+}
+
+.ordersBoardCardDragging {
+  opacity: 0.4;
+}
+
+.ordersBoardCardAccent {
+  align-self: flex-start;
+  width: 26px;
+  height: 3px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--col-accent, var(--border));
+}
+
+.ordersBoardCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ordersBoardCardNumber {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ordersBoardCardClient {
+  font-size: 15px;
+}
+
+.ordersBoardCardTotal {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ordersBoardCardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ordersBoardCardDue {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ordersBoardCardDueOverdue {
+  color: var(--danger);
+}
+
+.ordersBoardCardAvatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ordersHistoryList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ordersHistoryCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  max-width: none;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.ordersHistoryCard:hover {
+  border-color: var(--accent-border);
+}
+
+.ordersHistoryCardMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ordersHistoryCardTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ordersHistoryCardMoney {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 13px;
+}
+
+/* Переключатель видов (Доска/Таблица/Список/Календарь).
+   Дублируется в TasksPage.module.css — обе страницы используют этот блок
+   одновременно, дублирование сделано намеренно, чтобы избежать гонки правок. */
+
+.viewSwitcher {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.viewSwitcher > button {
+  flex-shrink: 0;
+}
+
+/* Календарь */
+
+.viewCalendar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.viewCalendarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.viewCalendarTitle {
+  font-weight: 600;
+  font-size: 15px;
+  text-transform: capitalize;
+}
+
+.viewCalendarNav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.viewCalendarWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  padding: 0 1px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.viewCalendarWeekdays > span {
+  text-align: center;
+  padding: 4px 0;
+}
+
+.viewCalendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.viewCalendarCell {
+  background: var(--bg);
+  min-height: 64px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.viewCalendarCellOutside {
+  background: var(--bg-muted);
+}
+
+.viewCalendarCellOutside .viewCalendarDate {
+  opacity: 0.4;
+}
+
+.viewCalendarDate {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 18px;
+  text-align: center;
+  border-radius: 999px;
+}
+
+.viewCalendarDateToday {
+  background: var(--accent);
+  color: #ffffff;
+  padding: 1px 6px;
+}
+
+.viewCalendarEntry {
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: 5px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  text-align: left;
+  padding: 2px 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.viewCalendarEntry:hover {
+  filter: brightness(0.96);
+}
+
+.viewCalendarEntryMore {
+  background: none;
+  color: var(--text-muted);
+  padding: 0 5px;
+}
+
+.viewCalendarUnscheduled {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.viewCalendarUnscheduledTitle {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Корзина позиций заказа (форма создания/редактирования) */
+
+.cartTableWrap {
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.cartTableHead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: grid;
+  gap: 0;
+  padding: 10px 16px;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cartTableRow {
+  display: grid;
+  gap: 0;
+  align-items: start;
+  padding: 10px 16px;
+}
+
+.cartTableRow:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.cartTableHead > *,
+.cartTableRow > * {
+  min-width: 0;
+}
+
+.cartTableHead > *:not(:first-child):not(:last-child),
+.cartTableRow > *:not(:first-child):not(:last-child) {
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+}
+
+.cartTableRow > *:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cartTableName {
+  font-weight: 500;
+  overflow-wrap: break-word;
+}
+
+.cartTableWrapCompact .cartTableHead,
+.cartTableWrapCompact .cartTableRow {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.cartTableWrapCompact .cartTableHead > *:not(:first-child):not(:last-child),
+.cartTableWrapCompact .cartTableRow > *:not(:first-child):not(:last-child) {
+  padding-left: 12px;
+}
+
+.cartTableWrapCompact .cartTableRow input {
+  padding: 4px 6px;
+  font-size: 13px;
+}
+
+.cartTableStock {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.cartTableRow input {
+  padding: 6px 8px;
+  width: 100%;
+}
+
+.cartQtyStepper {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  max-width: 96px;
+}
+
+.cartQtyStepper input {
+  min-width: 0;
+  width: 100%;
+  text-align: center;
+  padding-right: 4px;
+}
+
+.cartQtyStepColumn {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 22px;
+}
+
+button.cartQtyStep {
+  flex: 1;
+  padding: 0;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  line-height: 1;
+}
+
+button.cartQtyStep:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.cartQtyStepIconUp {
+  transform: rotate(-90deg);
+}
+
+.cartQtyStepIconDown {
+  transform: rotate(90deg);
+}
+
+.cartTablePriceCell input {
+  padding-right: 24px;
+}
+
+.cartTableQtyCell,
+.cartTablePriceCell {
+  position: relative;
+}
+
+.cartTablePriceSuffix {
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.cartInputWarning {
+  border-color: var(--danger) !important;
+}
+
+.cartInputWarning:focus {
+  outline-color: var(--danger);
+}
+
+.cartTableWarning {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--danger);
+  white-space: nowrap;
+}

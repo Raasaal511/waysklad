@@ -1,5 +1,8 @@
 README.md
 
+docs/
+
+/.claude
 # --- Python ---
 __pycache__/
 *.py[cod]
@@ -76,6 +79,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# --- Backups ---
+backups/
+
+# --- Uploads (фото товаров) ---
+backend/uploads/
+
 # --- Environment ---
 .env
 .env.local
@@ -90,3 +99,4 @@ lerna-debug.log*
 *.swo
 .DS_Store
 Thumbs.db
+.claude

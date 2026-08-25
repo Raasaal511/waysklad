@@ -1,0 +1,69 @@
+/* Button — src/shared/ui/Button.tsx
+   Базовые стили тега <button> (padding, layout) остаются глобальными в
+   index.css, т.к. применяются ко всем кнопкам приложения, а не только
+   к компоненту Button. Здесь — только цветовые варианты. */
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid transparent;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-secondary {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-secondary.btn-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.btn-secondary.btn-active:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.btn-accent-outline {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+.btn-accent-outline:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.btn-ink {
+  background: var(--ink);
+  color: var(--bg);
+  border: 1px solid transparent;
+}
+
+.btn-ink:hover:not(:disabled) {
+  background: var(--ink-hover);
+}

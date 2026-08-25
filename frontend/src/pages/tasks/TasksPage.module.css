@@ -1,0 +1,634 @@
+/* Стили, специфичные для TasksPage. Часть классов (view-switcher,
+   view-calendar*) скопирована из index.css один в один — такой же
+   набор используется в OrdersPage.module.css (независимая копия, чтобы
+   избежать гонки правок общего файла). */
+
+/* Переключатель видов (Доска/Таблица/Список/Календарь) */
+
+.viewSwitcher {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.viewSwitcher > button {
+  flex-shrink: 0;
+}
+
+/* Календарь */
+
+.viewCalendar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.viewCalendarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.viewCalendarTitle {
+  font-weight: 600;
+  font-size: 15px;
+  text-transform: capitalize;
+}
+
+.viewCalendarNav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.viewCalendarWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  padding: 0 1px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.viewCalendarWeekdays > span {
+  text-align: center;
+  padding: 4px 0;
+}
+
+.viewCalendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.viewCalendarCell {
+  background: var(--bg);
+  min-height: 64px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.viewCalendarCellOutside {
+  background: var(--bg-muted);
+}
+
+.viewCalendarCellOutside .viewCalendarDate {
+  opacity: 0.4;
+}
+
+.viewCalendarDate {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 18px;
+  text-align: center;
+  border-radius: 999px;
+}
+
+.viewCalendarDateToday {
+  background: var(--accent);
+  color: #ffffff;
+  padding: 1px 6px;
+}
+
+.viewCalendarEntry {
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: 5px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  text-align: left;
+  padding: 2px 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.viewCalendarEntry:hover {
+  filter: brightness(0.96);
+}
+
+.viewCalendarEntryMore {
+  background: none;
+  color: var(--text-muted);
+  padding: 0 5px;
+}
+
+.viewCalendarUnscheduled {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.viewCalendarUnscheduledTitle {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+@media (min-width: 900px) {
+  .viewCalendarCell {
+    min-height: 100px;
+    padding: 6px;
+    gap: 4px;
+  }
+}
+
+/* Вкладки Активные/Завершённые */
+
+.periodTabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.periodTabs > button {
+  flex-shrink: 0;
+}
+
+/* Доска задач (канбан) */
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(var(--board-cols, 3), minmax(280px, 440px));
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .board {
+    grid-template-columns: 1fr;
+  }
+}
+
+.boardColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  background: var(--bg-muted);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.boardColumnOver {
+  border-color: var(--accent);
+  background: var(--accent-soft-weak);
+}
+
+.boardColumnHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.boardDot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--col-accent, var(--text-muted));
+}
+
+.boardColumnCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--col-accent, var(--border)) 18%, var(--bg-muted));
+  color: var(--col-accent, var(--text-muted));
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.boardColumnBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 60px;
+}
+
+@media (min-width: 900px) {
+  .boardColumn {
+    max-height: calc(100vh - 180px);
+  }
+
+  .boardColumnBody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+  }
+}
+
+.boardEmpty {
+  padding: 16px 10px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.boardEmptyAction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+
+.boardEmptyAction:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.boardCard {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  max-width: none;
+  padding: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease, transform 0.12s ease;
+}
+
+.boardCard:hover {
+  border-color: var(--accent-border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+}
+
+.boardCard:active {
+  cursor: grabbing;
+}
+
+.boardCardDragging {
+  opacity: 0.4;
+}
+
+.boardCardAccent {
+  align-self: flex-start;
+  width: 26px;
+  height: 3px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--col-accent, var(--border));
+}
+
+.boardCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.boardCardNumber {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.boardCardClient {
+  font-size: 15px;
+}
+
+.boardCardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.boardCardDue {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.boardCardDueOverdue {
+  color: var(--danger);
+}
+
+.boardCardPeople {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.boardCardAvatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.boardCardAvatarMuted {
+  background: var(--bg-muted);
+  color: var(--text-muted);
+}
+
+.personCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.personCardAvatar {
+  width: 36px;
+  height: 36px;
+  font-size: 13px;
+}
+
+.personCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.metaGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+}
+
+/* Инлайн-редактирование полей задачи — используют самописные Select/DateInput
+   (не нативные <select>/<input type=date>, у которых на macOS/Chrome рисуется
+   несъёмный системный вид), поэтому размер элемента стабилен независимо от
+   режима и карточка не "дёргается". Переопределяем их обычный крупный вид
+   триггера на компактный, чтобы вписаться в узкую строку карточки. */
+
+.inlineEditSelect,
+.inlineEditDate {
+  width: 100%;
+  min-width: 180px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.inlineEditSelect svg {
+  display: none;
+}
+
+.createdByHint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.inlineClearBtn {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.inlineClearBtn:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.inlineEditTextarea {
+  width: 100%;
+  padding: 6px 8px;
+  margin: -6px -8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  resize: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.inlineEditTextarea:hover:not(:disabled) {
+  background: var(--bg-muted);
+}
+
+.inlineEditTextarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg);
+}
+
+.inlineEditTextarea:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.inlineEditTextarea::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.inlineEditTextarea:hover:not(:disabled) {
+  background: var(--bg-muted);
+}
+
+.inlineEditTextarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg);
+}
+
+.inlineEditTextarea:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* Список (карточки истории/списка задач) */
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.historyCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  max-width: none;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.historyCard:hover {
+  border-color: var(--accent-border);
+}
+
+.historyCardMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.historyCardTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Строка табличного вида задач: анимация появления */
+
+.rowIn {
+  animation: rowIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: var(--row-delay, 0ms);
+}
+
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rowIn {
+    animation: none;
+  }
+}
+
+/* Тост «дозаказ оформлен на склад» */
+
+.restockToast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: min(92vw, 420px);
+  padding: 14px 14px 14px 12px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28);
+  animation: restockToastIn 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes restockToastIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(16px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .restockToast {
+    animation: none;
+  }
+}
+
+.restockToastIcon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.restockToastBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.restockToastTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.restockToastClose {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.restockToastClose:hover {
+  color: var(--text);
+  background: var(--bg-muted);
+}

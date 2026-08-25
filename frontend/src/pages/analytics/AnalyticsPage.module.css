@@ -1,0 +1,260 @@
+.periodRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.periodTabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  align-self: flex-start;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-sm) + 4px);
+}
+
+.periodNav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.periodNavBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.periodNavBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.periodNavBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.periodNavTitle {
+  min-width: 130px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: capitalize;
+}
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.heroCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.heroIcon {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.heroBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.heroLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.heroValue {
+  font-size: 19px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.heroSub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.heroSubRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.heroDelta {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.heroDeltaUp {
+  color: var(--accent);
+}
+
+.heroDeltaDown {
+  color: var(--danger);
+}
+
+.heroDeltaFlat {
+  color: var(--text-muted);
+}
+
+.chartHint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.sectionHeadingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sectionHeadingRow .metricTabs {
+  flex-shrink: 0;
+}
+
+.metricTabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-sm) + 4px);
+}
+
+.pillTab,
+.pillTabActive {
+  padding: 7px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.pillTab:hover {
+  color: var(--text);
+  background: var(--bg-muted);
+}
+
+.pillTabActive {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.pillTabActive:hover {
+  background: var(--accent-hover);
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sectionHeading h3 {
+  margin: 0;
+}
+
+.sectionHeadingIcon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.detailItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detailLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.detailValue {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.marginCell {
+  display: flex;
+}
+
+.marginBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.marginBadgeLow {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.marginBadgeMid {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.marginBadgeHigh {
+  background: var(--accent-soft);
+  color: var(--accent);
+}

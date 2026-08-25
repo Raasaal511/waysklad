@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    environment:
+      # ICU-локаль: без неё lower()/ILIKE не работают с кириллицей (поиск товаров)
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=und"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "55432:5432"  # 5432 часто занят локальным Postgres.app на хосте
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    image: waysklad-backend-dev
+    env_file: .env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+    ports:
+      - "18000:8000"  # 8000 часто занят другими локальными сервисами
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    image: waysklad-frontend-dev
+    environment:
+      VITE_PROXY_TARGET: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5190:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

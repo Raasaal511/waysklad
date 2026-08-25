@@ -1,0 +1,104 @@
+/* DateInput — src/shared/ui/DateInput.tsx
+   .select-trigger, .select-trigger-value, .select-trigger-placeholder
+   общие с Select.tsx — вынесены в Layout.module.css. */
+
+.date-input-trigger {
+  gap: 8px;
+}
+
+.date-input-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.date-picker {
+  position: fixed;
+  z-index: 200;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  padding: 12px;
+  width: 280px;
+}
+
+.date-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.date-picker-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.date-picker-nav {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.date-picker-nav:hover {
+  background: var(--bg-muted);
+  color: var(--text);
+}
+
+.date-picker-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+
+.date-picker-weekdays span {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.date-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.date-picker-day {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.date-picker-day:hover:not(:disabled) {
+  background: var(--bg-muted);
+}
+
+.date-picker-day-today {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.date-picker-day-selected {
+  background: var(--accent);
+  color: #fff;
+}
+
+.date-picker-day-selected:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.date-picker-day:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

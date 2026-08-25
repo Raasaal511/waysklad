@@ -1,0 +1,130 @@
+.app-bell {
+  position: relative;
+}
+
+.app-bell-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.app-bell-trigger:hover {
+  background: var(--bg-muted);
+}
+
+.app-bell-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--warning);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.app-bell-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 150;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  max-height: min(420px, calc(100vh - 120px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.app-bell-panel-left {
+  right: auto;
+  left: 0;
+}
+
+.app-bell-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.app-bell-read-all {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.app-bell-empty {
+  padding: 8px 0;
+}
+
+.app-bell-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.app-bell-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-bell-item:hover {
+  background: var(--bg-muted);
+}
+
+.app-bell-item-unread {
+  background: var(--accent-soft);
+}
+
+.app-bell-item-unread:hover {
+  background: var(--accent-soft);
+  filter: brightness(0.97);
+}
+
+.app-bell-item-text {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.app-bell-item-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}

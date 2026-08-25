@@ -1,0 +1,98 @@
+.iconAccent {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.telegramSteps {
+  gap: 10px;
+  background: var(--bg-muted);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.telegramStep {
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.telegramStepNumber {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.summarySchedule {
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.summaryRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.summaryCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.summaryCheckbox input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin: 0;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.summaryCheckbox input[type='checkbox']::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  transform: scale(0);
+  transition: transform 0.1s ease;
+  box-shadow: inset 1em 1em white;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.summaryCheckbox input[type='checkbox']:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.summaryCheckbox input[type='checkbox']:checked::before {
+  transform: scale(1);
+}
+
+.summaryCheckbox input[type='checkbox']:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.summaryHourSelect {
+  flex: 0 0 auto;
+  width: 190px;
+}
