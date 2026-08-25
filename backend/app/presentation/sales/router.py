@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Response
@@ -5,6 +6,7 @@ from fastapi import APIRouter, Response
 from app.application.sales.delete_sale import DeleteSaleCommand
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Permission, require_warehouse
+from app.domain.sales.payment import PaymentMethod
 from app.domain.sales.receipt import build_whatsapp_link, render_receipt_text
 from app.infrastructure.receipt_pdf import render_receipt_pdf
 from app.presentation.audit.schemas import AuditEntryResponse
@@ -25,6 +27,7 @@ from app.presentation.sales.schemas import (
     SaleReturnLineResponse,
     SaleReturnResponse,
     SaleResponse,
+    SalesSummaryResponse,
 )
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -46,12 +49,51 @@ async def return_sale(
 
 
 @router.get("", dependencies=[require_permission(Permission.SALES_CREATE)])
-async def list_sales(actor: ActorDep, uow: UowDep) -> list[SaleResponse]:
+async def list_sales(
+    response: Response,
+    actor: ActorDep,
+    uow: UowDep,
+    limit: int = 50,
+    offset: int = 0,
+    client_id: int | None = None,
+    warehouse_id: int | None = None,
+    payment_method: PaymentMethod | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    sort: str = "date_desc",
+) -> list[SaleResponse]:
     async with uow:
-        sales = await uow.sales.list()
-        if actor.is_warehouse_scoped:
-            sales = [s for s in sales if s.warehouse_id in actor.warehouse_ids]
+        sales, total = await uow.sales.list(
+            limit=limit,
+            offset=offset,
+            client_id=client_id,
+            warehouse_id=warehouse_id,
+            warehouse_ids=list(actor.warehouse_ids) if actor.is_warehouse_scoped else None,
+            payment_method=payment_method,
+            date_from=date_from,
+            date_to=date_to,
+            sort=sort,
+        )
+        response.headers["X-Total-Count"] = str(total)
         return [SaleResponse.from_entity(s) for s in sales]
+
+
+@router.get("/summary", dependencies=[require_permission(Permission.SALES_CREATE)])
+async def get_sales_summary(
+    actor: ActorDep,
+    uow: UowDep,
+    warehouse_id: int | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> SalesSummaryResponse:
+    async with uow:
+        stats = await uow.sales.summary_by_payment_method(
+            warehouse_id=warehouse_id,
+            warehouse_ids=list(actor.warehouse_ids) if actor.is_warehouse_scoped else None,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        return SalesSummaryResponse.from_stats(stats)
 
 
 @router.get("/{sale_id}", dependencies=[require_permission(Permission.SALES_CREATE)])

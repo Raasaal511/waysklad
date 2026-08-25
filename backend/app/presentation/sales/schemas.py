@@ -184,3 +184,24 @@ class SaleReturnResponse(BaseModel):
 class ReceiptResponse(BaseModel):
     text: str
     whatsapp_link: str | None  # None, если у продажи нет клиента с телефоном/WhatsApp
+
+
+class SalePaymentSummaryResponse(BaseModel):
+    count: int
+    total: Decimal
+
+
+class SalesSummaryResponse(BaseModel):
+    """Сводка по всем способам оплаты за период — не зависит от фильтра по способу
+    оплаты в списке продаж, показывает все варианты одновременно."""
+
+    by_payment_method: dict[str, SalePaymentSummaryResponse]
+
+    @classmethod
+    def from_stats(cls, stats: dict[PaymentMethod, tuple[int, Decimal]]) -> "SalesSummaryResponse":
+        return cls(
+            by_payment_method={
+                method.value: SalePaymentSummaryResponse(count=count, total=total)
+                for method, (count, total) in stats.items()
+            }
+        )
