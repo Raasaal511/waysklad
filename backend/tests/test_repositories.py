@@ -5,7 +5,7 @@ import pytest
 
 from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Product, ProductVariant
-from app.domain.common.exceptions import NotFoundError
+from app.domain.common.exceptions import DomainError, NotFoundError
 from app.domain.common.money import Money
 from app.domain.common.phone import Phone
 from app.domain.common.quantity import UNITS, Quantity
@@ -344,3 +344,90 @@ async def test_client_search_and_debt_limit_persists(make_uow, create_shop):
 
         milana = await uow.clients.search("Милана")
         assert milana[0].debt_limit is None
+
+
+async def test_debts_list_filtered_status_query_and_pagination(make_uow, create_shop):
+    tenant_id, _, _ = await create_shop()
+
+    async with make_uow(tenant_id) as uow:
+        ahmed = await uow.clients.add(Client(id=None, name="Ахмед", phone=Phone("+79280005511")))
+        milana = await uow.clients.add(Client(id=None, name="Милана", phone=Phone("+79280005522")))
+        # просроченный долг Ахмеда — остаток есть, срок в прошлом
+        overdue_debt = await uow.debts.add(
+            Debt(
+                id=None, client_id=ahmed.id, amount=Money.of("1000"), issued_at=date.today(),
+                due_date=date.today() - timedelta(days=5),
+            )
+        )
+        # активный долг Миланы — остаток есть, срок далеко
+        await uow.debts.add(
+            Debt(
+                id=None, client_id=milana.id, amount=Money.of("2000"), issued_at=date.today(),
+                due_date=date.today() + timedelta(days=60),
+            )
+        )
+        # закрытый долг Ахмеда — погашен полностью
+        closed_debt = await uow.debts.add(
+            Debt(id=None, client_id=ahmed.id, amount=Money.of("500"), issued_at=date.today())
+        )
+        await uow.commit()
+        closed_debt.repay(Money.of("500"), on=date.today())
+        await uow.debts.save(closed_debt)
+        await uow.commit()
+
+    async with make_uow(tenant_id) as uow:
+        # active-запрос (balance__gt=0) не должен вернуть закрытый долг
+        debts, total = await uow.debts.list_filtered({"balance__gt": 0})
+        assert total == 2
+        assert closed_debt.id not in {d.id for d in debts}
+
+        # closed-запрос видит только погашенный
+        closed_only, closed_total = await uow.debts.list_filtered({"balance__lte": 0})
+        assert closed_total == 1
+        assert [d.id for d in closed_only] == [closed_debt.id]
+
+        # фильтр по статусу overdue
+        overdue_only, overdue_total = await uow.debts.list_filtered(
+            {"balance__gt": 0, "status": "overdue"}
+        )
+        assert overdue_total == 1
+        assert overdue_only[0].id == overdue_debt.id
+
+        # поиск по имени контрагента
+        by_name, by_name_total = await uow.debts.list_filtered(
+            {"balance__gt": 0, "counterparty_name__ilike": "Мила"}
+        )
+        assert by_name_total == 1
+        assert by_name[0].client_id == milana.id
+
+        # пагинация: limit=1 всё равно возвращает верный total
+        page, page_total = await uow.debts.list_filtered({"balance__gt": 0, "limit": 1, "offset": 0})
+        assert len(page) == 1
+        assert page_total == 2
+
+        # сортировка по severity (overdue выше active)
+        sorted_debts, _ = await uow.debts.list_filtered({"balance__gt": 0, "order_by": "-severity"})
+        assert sorted_debts[0].id == overdue_debt.id
+
+
+async def test_debts_list_filtered_tenant_isolation(make_uow, create_shop):
+    tenant_a, _, _ = await create_shop()
+    tenant_b, _, _ = await create_shop()
+
+    async with make_uow(tenant_a) as uow:
+        client = await uow.clients.add(Client(id=None, name="Ахмед", phone=Phone("+79280006611")))
+        await uow.debts.add(Debt(id=None, client_id=client.id, amount=Money.of("1000"), issued_at=date.today()))
+        await uow.commit()
+
+    async with make_uow(tenant_b) as uow:
+        debts, total = await uow.debts.list_filtered({})
+        assert debts == []
+        assert total == 0
+
+
+async def test_debts_list_filtered_rejects_unknown_field(make_uow, create_shop):
+    tenant_id, _, _ = await create_shop()
+
+    async with make_uow(tenant_id) as uow:
+        with pytest.raises(DomainError):
+            await uow.debts.list_filtered({"bogus_field": 1})
