@@ -901,7 +901,7 @@ async def test_deleted_sale_excluded_from_list(
     )
 
     async with make_uow(tenant_id) as uow:
-        sales = await uow.sales.list()
+        sales, _ = await uow.sales.list()
         assert all(s.id != sale_result.sale.id for s in sales)
 
 
