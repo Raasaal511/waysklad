@@ -30,10 +30,13 @@
 
 .icon-button-accent {
   color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
 }
 
 .icon-button-accent:hover:not(:disabled) {
-  background: var(--accent-soft);
+  background: var(--accent-soft-weak);
+  border-color: var(--accent);
 }
 
 .icon-button-neutral {

@@ -61,6 +61,7 @@
   color: var(--text);
   font-size: 14px;
   font-weight: 600;
+  margin-bottom: 4px;
 }
 
 .fieldHint {
@@ -76,6 +77,27 @@
   border-radius: var(--radius-sm);
   padding: 10px 12px;
   font-size: 14px;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  color: var(--text);
+  font-weight: 500;
+  font-size: 14px;
+  text-decoration: none;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 12px 7px 8px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.backLink:hover {
+  background: var(--border);
+  border-color: var(--accent);
 }
 
 .textMuted {
@@ -334,4 +356,428 @@ a.badge:hover {
   color: var(--text-muted);
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+/* Table (обычный <table>) */
+
+.tableWrap {
+  overflow-x: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.tableWrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tableWrap th,
+.tableWrap td {
+  text-align: left;
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+
+.tableWrap td:first-child {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.tableWrap thead th {
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.tableWrap tbody tr:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+@keyframes rowHighlightFade {
+  from {
+    background: var(--accent-soft);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+.rowHighlight {
+  animation: rowHighlightFade 2.5s ease-out;
+}
+
+.lineItem {
+  display: grid;
+  grid-template-columns: 1fr 90px 90px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.lineItem input,
+.lineItem select {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  width: 100%;
+}
+
+/* Stat tile — статистика в карточках (продажи, склад, профиль, аналитика) */
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 190px;
+  flex-shrink: 0;
+}
+
+.statValue {
+  display: inline-block;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.statValueWarning {
+  color: var(--warning);
+}
+
+.statLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.gridStats {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 36px;
+  row-gap: 16px;
+}
+
+/* Warehouse tiles — StockPage, ProfilePage */
+
+.warehouseTiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.warehouseTile {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px);
+  text-decoration: none;
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.2s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.warehouseTile:hover {
+  z-index: 1;
+  border-color: var(--accent);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.1);
+  transform: scale(1.015);
+}
+
+.warehouseTileHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.warehouseTileIcon {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.warehouseTileHeading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.warehouseTileName {
+  font-size: 18px;
+}
+
+.warehouseTileChevron {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.warehouseTile:hover .warehouseTileChevron {
+  transform: translateX(3px);
+  color: var(--accent);
+}
+
+.warehouseTileStats {
+  display: flex;
+  gap: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* Product picker (Продажа/Заказы/Приёмка/Товары) */
+
+.productGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  align-items: start;
+  gap: 10px;
+  padding: 10px;
+}
+
+.productTile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: none;
+  padding: 8px 10px;
+  text-align: left;
+  text-decoration: none;
+  background: var(--bg);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.2s ease,
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.productTileMaxReached {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  margin-bottom: 2px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.16);
+  z-index: 5;
+}
+
+.productTile:hover {
+  z-index: 1;
+  border-color: var(--accent);
+  background: var(--bg-muted);
+  color: var(--text);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  transform: scale(1.04);
+}
+
+.productTile:active {
+  transform: scale(0.98);
+}
+
+.productTile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.productTileInCart,
+.productTileInCart:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.productTileBody {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 6px;
+  row-gap: 2px;
+  overflow: hidden;
+}
+
+.productTileMeta {
+  display: contents;
+}
+
+.productTileCartBadge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.productTileCartBadgeHidden {
+  display: none;
+}
+
+.productTileRemove {
+  flex-shrink: 0;
+  padding: 0;
+  width: 13px;
+  height: 13px;
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  border: none;
+}
+
+.productTileRemove:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.productTileName {
+  grid-column: 1 / -1;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--text);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.productTilePriceLabel {
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
+.productTilePrice {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.productTileStock {
+  display: contents;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.productTileStockLabel {
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
+.productTileStockValueWrap {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.productTileStockValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.productTileStockOut .productTileStockLabel,
+.productTileStockOut .productTileStockValue {
+  color: var(--warning);
+  opacity: 1;
+  font-weight: 600;
+}
+
+.productTileStockIn .productTileStockValue {
+  color: var(--accent);
+  opacity: 1;
+  font-weight: 600;
+}
+
+/* Прочие переиспользуемые утилиты */
+
+.filterField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.disclosureLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.disclosureLink:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.disclosureLink:disabled {
+  opacity: 0.6;
+}
+
+.disclosureLink svg {
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.disclosureLink[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+.onboardingBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border: 1px dashed var(--accent-border);
+  background: var(--accent-soft-weak);
+}
+
+.onboardingBanner a {
+  text-decoration: none;
 }

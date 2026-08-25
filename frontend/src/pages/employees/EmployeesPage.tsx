@@ -1,14 +1,17 @@
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
-import { listEmployees, createEmployee, updateEmployee } from '../../entities/profile/api'
+import { createEmployee, updateEmployee } from '../../entities/profile/api'
 import type { Role, User } from '../../entities/auth/api'
-import { listWarehouses, type Warehouse } from '../../entities/inventory/api'
+import type { Warehouse } from '../../entities/inventory/api'
 import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
+import { useCatalog } from '../../app/CatalogContext'
 import { Modal } from '../../shared/ui/Modal'
-import { IconPlus, IconChevronRight } from '@tabler/icons-react'
+import { IconPlus, IconChevronRight, IconUsersGroup, IconBuildingWarehouse } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
+import layoutStyles from '../../shared/ui/Layout.module.css'
+import styles from './EmployeesPage.module.css'
 
 const ROLE_LABELS: Record<Role, string> = {
   owner: 'Владелец',
@@ -25,12 +28,24 @@ const ASSIGNABLE_ROLES: Role[] = ['manager', 'seller', 'storekeeper']
 // роли, для которых нужна привязка к складу (минимум один)
 const WAREHOUSE_SCOPED_ROLES: Role[] = ['manager', 'seller', 'storekeeper']
 
-const EMPLOYEE_COLUMNS = '1.2fr 1fr 1fr 1.4fr 20px'
+const ROLE_BADGE_VARIANT: Record<Role, 'accent' | 'warning' | 'default'> = {
+  owner: 'accent',
+  manager: 'accent',
+  seller: 'default',
+  storekeeper: 'default',
+  analyst: 'warning',
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[1][0]).toUpperCase()
+}
 
 export function EmployeesPage() {
   const { user } = useAuth()
-  const [employees, setEmployees] = useState<User[]>([])
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const { employees, warehouses, ensureEmployees, ensureWarehouses, refresh: refreshCatalog } = useCatalog()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showEmployeeForm, setShowEmployeeForm] = useState(false)
@@ -45,9 +60,7 @@ export function EmployeesPage() {
     }
     setLoading(true)
     try {
-      const [employeeList, warehouseList] = await Promise.all([listEmployees(), listWarehouses()])
-      setEmployees(employeeList)
-      setWarehouses(warehouseList)
+      await Promise.all([ensureEmployees(), ensureWarehouses()])
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось загрузить сотрудников')
     } finally {
@@ -62,23 +75,50 @@ export function EmployeesPage() {
 
   if (!canManageUsers) {
     return (
-      <div className="stack">
+      <div className={layoutStyles.stack}>
         <h2>Сотрудники</h2>
-        <p className="text-muted">Доступно только владельцу и управляющему.</p>
+        <p className={layoutStyles.textMuted}>Доступно только владельцу и управляющему.</p>
       </div>
     )
   }
 
   const warehouseNameById = new Map(warehouses.map((w) => [w.id, w.name]))
+  const activeCount = employees.filter((e) => e.is_active).length
+  const inactiveCount = employees.length - activeCount
 
   return (
-    <div className="stack">
-      <div className="section-title">
+    <div className={layoutStyles.stack}>
+      <div className={layoutStyles.sectionTitle}>
         <h2>Сотрудники</h2>
         <Button onClick={() => setShowEmployeeForm(true)}>
           <IconPlus size={16} stroke={1.8} /> Сотрудник
         </Button>
       </div>
+
+      {!loading && employees.length > 0 && (
+        <div className={`${layoutStyles.card} ${layoutStyles.cardFull}`}>
+          <div className={layoutStyles.gridStats}>
+            <div className={layoutStyles.stat}>
+              <span className={layoutStyles.statLabel}>Всего</span>
+              <span className={layoutStyles.statValue}>{employees.length}</span>
+            </div>
+            <div className={layoutStyles.stat}>
+              <span className={layoutStyles.statLabel}>Активны</span>
+              <span className={layoutStyles.statValue}>{activeCount}</span>
+            </div>
+            {inactiveCount > 0 && (
+              <div className={layoutStyles.stat}>
+                <span className={layoutStyles.statLabel}>Отключены</span>
+                <span className={`${layoutStyles.statValue} ${layoutStyles.statValueWarning}`}>{inactiveCount}</span>
+              </div>
+            )}
+            <div className={layoutStyles.stat}>
+              <span className={layoutStyles.statLabel}>Складов</span>
+              <span className={layoutStyles.statValue}>{warehouses.length}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showEmployeeForm && (
         <Modal title="Новый сотрудник" onClose={() => setShowEmployeeForm(false)}>
@@ -86,7 +126,7 @@ export function EmployeesPage() {
             warehouses={warehouses}
             onDone={() => {
               setShowEmployeeForm(false)
-              load()
+              refreshCatalog(['employees']).catch(() => {})
             }}
           />
         </Modal>
@@ -99,60 +139,66 @@ export function EmployeesPage() {
             employee={editingEmployee}
             onDone={() => {
               setEditingEmployee(null)
-              load()
+              refreshCatalog(['employees']).catch(() => {})
             }}
           />
         </Modal>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : employees.length === 0 ? (
-        <p className="text-muted">Кроме вас сотрудников пока нет</p>
+        <div className={styles.emptyState}>
+          <IconUsersGroup size={28} stroke={1.5} className={styles.emptyStateIcon} />
+          <p className={layoutStyles.textMuted}>Кроме вас сотрудников пока нет</p>
+        </div>
       ) : (
-        <div className="data-table">
-          <div className="data-table-head" style={{ gridTemplateColumns: EMPLOYEE_COLUMNS }}>
-            <span>Имя</span>
-            <span>Телефон</span>
-            <span>Роль</span>
-            <span>Склады</span>
-            <span />
-          </div>
-          <div className="data-table-body">
-            {employees.map((e, i) => {
-              const editable = e.role !== 'owner'
-              return (
-                <button
-                  key={e.id}
-                  type="button"
-                  className={`data-row sale-history-row-in${editable ? ' data-row-link' : ''}`}
-                  style={
-                    {
-                      gridTemplateColumns: EMPLOYEE_COLUMNS,
-                      '--row-delay': `${Math.min(i, 12) * 25}ms`,
-                    } as CSSProperties
-                  }
-                  disabled={!editable}
-                  onClick={() => editable && setEditingEmployee(e)}
-                >
-                  <span className="data-row-name">{e.name}</span>
-                  <span className="text-muted">{e.phone}</span>
-                  <span>{ROLE_LABELS[e.role]}</span>
-                  <span className="text-muted">
-                    {e.role === 'owner'
-                      ? 'Все склады'
-                      : e.warehouse_ids.map((id) => warehouseNameById.get(id) ?? id).join(', ') || '—'}
-                  </span>
-                  {editable ? (
-                    <IconChevronRight size={16} stroke={1.8} className="data-row-chevron" />
-                  ) : (
-                    <span />
-                  )}
-                </button>
-              )
-            })}
-          </div>
+        <div className={styles.employeeGrid}>
+          {employees.map((e, i) => {
+            const editable = e.role !== 'owner'
+            const warehouseNames =
+              e.role === 'owner'
+                ? 'Все склады'
+                : e.warehouse_ids.map((id) => warehouseNameById.get(id) ?? id).join(', ') || 'Склад не назначен'
+            return (
+              <button
+                key={e.id}
+                type="button"
+                className={`${styles.employeeCard} sale-history-row-in${editable ? ` ${styles.employeeCardLink}` : ''}${!e.is_active ? ` ${styles.employeeCardInactive}` : ''}`}
+                style={{ '--row-delay': `${Math.min(i, 12) * 30}ms` } as CSSProperties}
+                disabled={!editable}
+                onClick={() => editable && setEditingEmployee(e)}
+              >
+                <span className={styles.employeeAvatar}>{initials(e.name)}</span>
+                <div className={styles.employeeBody}>
+                  <div className={styles.employeeNameRow}>
+                    <strong className={styles.employeeName}>{e.name}</strong>
+                    {!e.is_active && <span className={layoutStyles.badge}>Отключён</span>}
+                  </div>
+                  <span className={layoutStyles.textMuted}>{e.phone}</span>
+                  <div className={styles.employeeMetaRow}>
+                    <span
+                      className={[
+                        layoutStyles.badge,
+                        ROLE_BADGE_VARIANT[e.role] === 'accent' && layoutStyles.accent,
+                        ROLE_BADGE_VARIANT[e.role] === 'warning' && layoutStyles.warning,
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    >
+                      {ROLE_LABELS[e.role]}
+                    </span>
+                    <span className={styles.employeeWarehouses}>
+                      <IconBuildingWarehouse size={14} stroke={1.8} />
+                      {warehouseNames}
+                    </span>
+                  </div>
+                </div>
+                {editable && <IconChevronRight size={18} stroke={1.8} className={styles.employeeChevron} />}
+              </button>
+            )
+          })}
         </div>
       )}
     </div>
@@ -173,9 +219,9 @@ function WarehouseCheckboxList({
   }
 
   return (
-    <div className="stack" style={{ gap: 8 }}>
+    <div className={layoutStyles.stack} style={{ gap: 8 }}>
       {warehouses.map((w) => (
-        <label key={w.id} className="row" style={{ gap: 8 }}>
+        <label key={w.id} className={layoutStyles.row} style={{ gap: 8 }}>
           <input type="checkbox" checked={selected.includes(w.id)} onChange={() => toggle(w.id)} />
           {w.name}
         </label>
@@ -241,18 +287,18 @@ function EmployeeForm({
   }
 
   return (
-    <form className="form" onSubmit={handleSubmit}>
-      <label className="field">
+    <form className={layoutStyles.form} onSubmit={handleSubmit}>
+      <label className={layoutStyles.field}>
         Имя
         <input value={name} onChange={(e) => setName(e.target.value)} required />
       </label>
       {!isEdit && (
         <>
-          <label className="field">
+          <label className={layoutStyles.field}>
             Телефон
             <PhoneInput value={phone} onChange={setPhone} required />
           </label>
-          <label className="field">
+          <label className={layoutStyles.field}>
             Пароль
             <input
               type="password"
@@ -264,7 +310,7 @@ function EmployeeForm({
           </label>
         </>
       )}
-      <label className="field">
+      <label className={layoutStyles.field}>
         Роль
         <Select
           value={role}
@@ -273,7 +319,7 @@ function EmployeeForm({
         />
       </label>
       {needsWarehousePicker && (
-        <div className="field">
+        <div className={layoutStyles.field}>
           Склады
           <WarehouseCheckboxList
             warehouses={warehouses}
@@ -283,12 +329,12 @@ function EmployeeForm({
         </div>
       )}
       {isEdit && (
-        <label className="row" style={{ gap: 8 }}>
+        <label className={layoutStyles.row} style={{ gap: 8 }}>
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
           Активен
         </label>
       )}
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       <Button type="submit" disabled={saving}>
         {saving ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Добавить сотрудника'}
       </Button>

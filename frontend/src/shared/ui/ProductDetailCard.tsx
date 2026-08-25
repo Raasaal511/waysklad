@@ -1,16 +1,16 @@
-import { useState, type CSSProperties } from 'react'
+import { type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   getProductHistory,
   type Product,
   type Unit,
   type Category,
-  type ProductHistoryEntry,
 } from '../../entities/product/api'
 import type { Warehouse, StockItem } from '../../entities/inventory/api'
 import { Modal } from './Modal'
 import { IconButton } from './IconButton'
 import { InfoHint } from './InfoHint'
+import { HistoryDisclosure } from './HistoryDisclosure'
 import { formatMoney, formatQuantity } from '../lib/format'
 import layoutStyles from './Layout.module.css'
 import styles from './ProductDetailCard.module.css'
@@ -18,7 +18,6 @@ import {
   IconPencil,
   IconCheck,
   IconPhoto,
-  IconChevronDown,
   IconChevronRight,
   type Icon as TablerIcon,
 } from '@tabler/icons-react'
@@ -56,9 +55,6 @@ export function ProductDetailCard({
   onEdit?: () => void
 }) {
   const navigate = useNavigate()
-  const [history, setHistory] = useState<ProductHistoryEntry[] | null>(null)
-  const [loadingHistory, setLoadingHistory] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
 
   const unitName = (code: string) => units.find((u) => u.code === code)?.name ?? code
   const categoryName = (id: number | null) =>
@@ -74,23 +70,6 @@ export function ProductDetailCard({
       }
     })
     .filter((row) => row.quantity > 0 || warehouses.length <= 5)
-
-  async function toggleHistory() {
-    if (historyOpen) {
-      setHistoryOpen(false)
-      return
-    }
-    setHistoryOpen(true)
-    if (history !== null) return
-    setLoadingHistory(true)
-    try {
-      setHistory(await getProductHistory(product.id))
-    } catch {
-      setHistory([])
-    } finally {
-      setLoadingHistory(false)
-    }
-  }
 
   return (
     <Modal title={product.name} onClose={onClose} size="full">
@@ -245,46 +224,11 @@ export function ProductDetailCard({
           </>
         )}
 
-        <div className="sale-detail-history">
-          <button
-            type="button"
-            className="disclosure-link"
-            onClick={toggleHistory}
-            disabled={loadingHistory}
-            aria-expanded={historyOpen}
-          >
-            {loadingHistory ? 'Загрузка…' : 'История изменений'}
-            <IconChevronDown size={14} stroke={1.8} />
-          </button>
-          {historyOpen &&
-            (history === null ? null : history.length === 0 ? (
-              <p className={layoutStyles.textMuted}>Изменений не было</p>
-            ) : (
-              <div className="sale-detail-history-list">
-                {history.map((entry) => {
-                  const HistoryIcon = PRODUCT_HISTORY_ACTION_ICONS[entry.action] ?? IconPencil
-                  return (
-                    <div key={entry.id} className="sale-detail-history-item">
-                      <span className="sale-detail-history-icon">
-                        <HistoryIcon size={15} stroke={1.8} />
-                      </span>
-                      <span className="sale-detail-history-label">
-                        {PRODUCT_HISTORY_ACTION_LABELS[entry.action] ?? entry.action}
-                      </span>
-                      <span className="sale-detail-history-time">
-                        {new Date(entry.created_at).toLocaleString('ru-RU', {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
-        </div>
+        <HistoryDisclosure
+          load={() => getProductHistory(product.id)}
+          actionLabels={PRODUCT_HISTORY_ACTION_LABELS}
+          actionIcons={PRODUCT_HISTORY_ACTION_ICONS}
+        />
       </div>
     </Modal>
   )

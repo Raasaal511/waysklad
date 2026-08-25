@@ -2,8 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 
 import { createPortal } from 'react-dom'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
-  listStock,
-  listWarehouses,
   setWarehouseAssignments,
   updateWarehouseDetails,
   getRestockRecommendations,
@@ -11,12 +9,11 @@ import {
   type Warehouse,
   type RestockRecommendation,
 } from '../../entities/inventory/api'
-import { listAllProducts, listCategories, listUnits, type Category, type Product, type Unit } from '../../entities/product/api'
-import { listEmployees } from '../../entities/profile/api'
+import type { Product } from '../../entities/product/api'
 import { createTask, changeTaskStatus, listActiveTasks } from '../../entities/task/api'
-import type { User } from '../../entities/auth/api'
 import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
+import { useCatalog } from '../../app/CatalogContext'
 import { Modal } from '../../shared/ui/Modal'
 import {
   IconChevronLeft,
@@ -50,6 +47,7 @@ import {
   type MovementMode,
   type MovementLine,
 } from './shared'
+import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './WarehouseDetailPage.module.css'
 
 const STOCK_COLUMNS = '2fr 1fr 1fr 1fr'
@@ -70,13 +68,22 @@ export function WarehouseDetailPage() {
   const { user } = useAuth()
   const canManageWarehouses = user?.role === 'owner' || user?.role === 'manager'
 
-  const [warehouse, setWarehouse] = useState<Warehouse | null>(null)
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
-  const [allStock, setAllStock] = useState<StockItem[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [units, setUnits] = useState<Unit[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [employees, setEmployees] = useState<User[]>([])
+  const {
+    products,
+    units,
+    categories,
+    employees,
+    warehouses,
+    stock: allStock,
+    ensureProducts,
+    ensureUnits,
+    ensureCategories,
+    ensureEmployees,
+    ensureWarehouses,
+    ensureStock,
+    refresh: refreshCatalog,
+  } = useCatalog()
+  const warehouse = warehouses.find((w) => w.id === warehouseId) ?? null
   const [recommendations, setRecommendations] = useState<RestockRecommendation[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -99,23 +106,16 @@ export function WarehouseDetailPage() {
   async function load(silent = false) {
     if (!silent) setLoading(true)
     try {
-      const [s, w, p, u, c, emp, rec, activeTasks] = await Promise.all([
-        listStock(),
-        listWarehouses(),
-        listAllProducts(),
-        listUnits(),
-        listCategories(),
-        canManageWarehouses ? listEmployees() : Promise.resolve<User[]>([]),
+      const [, , p, , , , rec, activeTasks] = await Promise.all([
+        ensureStock(),
+        ensureWarehouses(),
+        ensureProducts(),
+        ensureUnits(),
+        ensureCategories(),
+        canManageWarehouses ? ensureEmployees() : Promise.resolve(),
         getRestockRecommendations(warehouseId),
         listActiveTasks(),
       ])
-      setAllStock(s)
-      setWarehouses(w)
-      setWarehouse(w.find((item) => item.id === warehouseId) ?? null)
-      setProducts(p)
-      setUnits(u)
-      setCategories(c)
-      setEmployees(emp)
       setRecommendations(rec)
       setRestockedProductIds(
         new Set(
@@ -256,7 +256,7 @@ export function WarehouseDetailPage() {
   if (!loading && !warehouse) {
     return (
       <div className="stack">
-        <Link to="/stock" className="back-link">
+        <Link to="/stock" className={layoutStyles.backLink}>
           <IconChevronLeft size={16} stroke={1.8} /> Все склады
         </Link>
         <p className="error">Склад не найден</p>
@@ -266,7 +266,7 @@ export function WarehouseDetailPage() {
 
   return (
     <div className="stack">
-      <Link to="/stock" className="back-link">
+      <Link to="/stock" className={layoutStyles.backLink}>
         <IconChevronLeft size={16} stroke={1.8} /> Все склады
       </Link>
 
@@ -337,6 +337,7 @@ export function WarehouseDetailPage() {
               }
               setMode(null)
               setMovementDrafts((prev) => ({ ...prev, [mode]: undefined }))
+              refreshCatalog(['stock']).catch(() => {})
               load(true)
             }}
           />
@@ -349,7 +350,7 @@ export function WarehouseDetailPage() {
             warehouse={warehouse}
             onDone={() => {
               setShowEdit(false)
-              load(true)
+              refreshCatalog(['warehouses']).catch(() => {})
             }}
           />
         </Modal>

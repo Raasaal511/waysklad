@@ -16,3 +16,7 @@ class InsufficientStockError(DomainError):
 
 class OverRepaymentError(DomainError):
     """Погашение больше остатка долга."""
+
+
+class InvalidFilterError(DomainError):
+    """Недопустимое поле, оператор или сортировка в query-параметрах списка."""

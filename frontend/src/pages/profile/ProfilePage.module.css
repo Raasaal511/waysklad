@@ -1,0 +1,31 @@
+.iconAccent {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.telegramSteps {
+  gap: 10px;
+  background: var(--bg-muted);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.telegramStep {
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.telegramStepNumber {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

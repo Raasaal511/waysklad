@@ -11,12 +11,9 @@ import {
 import { useSearchParams } from 'react-router-dom'
 import {
   listProducts,
-  listAllProducts,
   createProduct,
   updateProduct,
-  listUnits,
   createUnit,
-  listCategories,
   createCategory,
   setProductPhoto,
   importProducts,
@@ -27,7 +24,8 @@ import {
   type VariantInput,
   type ExportFormat,
 } from '../../entities/product/api'
-import { listWarehouses, listStock, type Warehouse, type StockItem } from '../../entities/inventory/api'
+import type { Warehouse } from '../../entities/inventory/api'
+import { useCatalog } from '../../app/CatalogContext'
 import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
 import {
@@ -59,6 +57,8 @@ import {
   normalizeDecimalInput,
 } from '../../shared/lib/format'
 import { useAuth } from '../../app/AuthContext'
+import layoutStyles from '../../shared/ui/Layout.module.css'
+import styles from './ProductsPage.module.css'
 
 const EXPORT_FORMAT_LABELS: Record<ExportFormat, string> = {
   xlsx: 'Excel (.xlsx)',
@@ -139,12 +139,20 @@ export function ProductsPage() {
   const { user } = useAuth()
   const canManage = user?.role === 'owner' || user?.role === 'manager'
 
+  const {
+    categories,
+    units,
+    stock,
+    warehouses,
+    ensureCategories,
+    ensureUnits,
+    ensureStock,
+    ensureWarehouses,
+    ensureProducts,
+    refresh: refreshCatalog,
+  } = useCatalog()
   const [products, setProducts] = useState<Product[]>([])
   const [total, setTotal] = useState(0)
-  const [categories, setCategories] = useState<Category[]>([])
-  const [units, setUnits] = useState<Unit[]>([])
-  const [stock, setStock] = useState<StockItem[]>([])
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -169,7 +177,7 @@ export function ProductsPage() {
   useEffect(() => {
     const openId = searchParams.get('open')
     if (!openId) return
-    listAllProducts()
+    ensureProducts()
       .then((all) => {
         const product = all.find((p) => p.id === Number(openId))
         if (product) setSelectedProduct(product)
@@ -249,10 +257,11 @@ export function ProductsPage() {
   }, [debouncedQuery, categoryId, serverSort])
 
   useEffect(() => {
-    listCategories().then(setCategories).catch(() => {})
-    listUnits().then(setUnits).catch(() => {})
-    listStock().then(setStock).catch(() => {})
-    listWarehouses().then(setWarehouses).catch(() => {})
+    ensureCategories().catch(() => {})
+    ensureUnits().catch(() => {})
+    ensureStock().catch(() => {})
+    ensureWarehouses().catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const unitName = (code: string) => units.find((u) => u.code === code)?.name ?? code
@@ -279,6 +288,7 @@ export function ProductsPage() {
 
   function refreshAfterChange() {
     loadProducts()
+    refreshCatalog(['products', 'stock', 'categories', 'units']).catch(() => {})
   }
 
   const activeFilterCount =
@@ -288,10 +298,10 @@ export function ProductsPage() {
     (inStockOnly ? 1 : 0)
 
   return (
-    <div className="stack">
-      <div className="section-title">
+    <div className={layoutStyles.stack}>
+      <div className={layoutStyles.sectionTitle}>
         <h2>Товары</h2>
-        <div className="row" style={{ gap: 8 }}>
+        <div className={layoutStyles.row} style={{ gap: 8 }}>
           <DropdownMenu
             align="right"
             trigger={
@@ -327,21 +337,21 @@ export function ProductsPage() {
           )}
         </div>
       </div>
-      {exportError && <p className="error">{exportError}</p>}
+      {exportError && <p className={layoutStyles.error}>{exportError}</p>}
 
-      <div className="sale-search-panel">
-        <div className="sale-search-row">
-          <IconSearch size={16} stroke={1.8} className="sale-search-icon" />
+      <div className={styles.saleSearchPanel}>
+        <div className={styles.saleSearchRow}>
+          <IconSearch size={16} stroke={1.8} className={styles.saleSearchIcon} />
           <input
-            className="sale-search-input"
+            className={styles.saleSearchInput}
             placeholder="Поиск по названию, артикулу…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <div className="sale-filters-row">
+        <div className={styles.saleFiltersRow}>
           {categories.length > 0 && (
-            <label className="filter-field">
+            <label className={layoutStyles.filterField}>
               <Select
                 value={categoryId === 'all' ? 'all' : String(categoryId)}
                 onChange={(v) => setCategoryId(v === 'all' ? 'all' : Number(v))}
@@ -350,7 +360,7 @@ export function ProductsPage() {
             </label>
           )}
           {warehouses.length > 1 && (
-            <label className="filter-field">
+            <label className={layoutStyles.filterField}>
               <Select
                 value={warehouseId === 'all' ? 'all' : String(warehouseId)}
                 onChange={(v) => setWarehouseId(v === 'all' ? 'all' : Number(v))}
@@ -361,14 +371,14 @@ export function ProductsPage() {
               />
             </label>
           )}
-          <label className="filter-field">
+          <label className={layoutStyles.filterField}>
             <Select
               value={sortMode}
               onChange={(v) => setSortMode(v as SortMode)}
               options={Object.entries(SORT_LABELS).map(([value, label]) => ({ value, label }))}
             />
           </label>
-          <label className="sale-checkbox">
+          <label className={styles.saleCheckbox}>
             <input
               type="checkbox"
               checked={inStockOnly}
@@ -389,17 +399,17 @@ export function ProductsPage() {
         </div>
       </div>
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : filtered.length === 0 ? (
-        <p className="text-muted">Товаров не найдено</p>
+        <p className={layoutStyles.textMuted}>Товаров не найдено</p>
       ) : (
         <>
-          <p className="text-muted">
+          <p className={layoutStyles.textMuted}>
             Показано {filtered.length} из {total}
           </p>
-          <div className="product-grid">
+          <div className={layoutStyles.productGrid}>
             {filtered.map((p, i) => {
               const qty = stockFor(p.id)
               const reserved = reservedFor(p.id)
@@ -410,7 +420,7 @@ export function ProductsPage() {
                   key={p.id}
                   role="button"
                   tabIndex={0}
-                  className="product-tile sale-history-row-in"
+                  className={`${layoutStyles.productTile} ${styles.saleHistoryRowIn}`}
                   style={{ '--row-delay': `${Math.min(i, 12) * 25}ms` } as CSSProperties}
                   onClick={() => setSelectedProduct(p)}
                   onKeyDown={(e) => {
@@ -421,16 +431,16 @@ export function ProductsPage() {
                   }}
                 >
                   <ProductPhoto src={p.photo} />
-                  <div className="product-tile-body">
-                    <span className="product-tile-name">{p.name}</span>
-                    <span className="product-tile-meta">
-                      <span className="product-tile-price-label">Цена за {unitName(p.unit_code)}:</span>
-                      <span className="product-tile-price">{formatMoney(p.retail_price)} ₽</span>
+                  <div className={layoutStyles.productTileBody}>
+                    <span className={layoutStyles.productTileName}>{p.name}</span>
+                    <span className={layoutStyles.productTileMeta}>
+                      <span className={layoutStyles.productTilePriceLabel}>Цена за {unitName(p.unit_code)}:</span>
+                      <span className={layoutStyles.productTilePrice}>{formatMoney(p.retail_price)} ₽</span>
                     </span>
                     <span
-                      className={`product-tile-stock${out ? ' product-tile-stock-out' : ' product-tile-stock-in'}`}
+                      className={`${layoutStyles.productTileStock} ${out ? layoutStyles.productTileStockOut : layoutStyles.productTileStockIn}`}
                     >
-                      <span className="product-tile-stock-label">
+                      <span className={layoutStyles.productTileStockLabel}>
                         Остаток:
                         {reserved > 0 && (
                           <InfoHint
@@ -438,8 +448,8 @@ export function ProductsPage() {
                           />
                         )}
                       </span>
-                      <span className="product-tile-stock-value-wrap">
-                        <span className="product-tile-stock-value">
+                      <span className={layoutStyles.productTileStockValueWrap}>
+                        <span className={layoutStyles.productTileStockValue}>
                           {formatQuantity(String(qty))} {unitName(p.unit_code)}
                         </span>
                         {low && <StockWarningIcon />}
@@ -474,8 +484,8 @@ export function ProductsPage() {
             categories={categories}
             units={units}
             warehouses={warehouses}
-            onCategoriesChanged={setCategories}
-            onUnitsChanged={setUnits}
+            onCategoriesChanged={() => refreshCatalog(['categories'])}
+            onUnitsChanged={() => refreshCatalog(['units'])}
             onSavingChange={setProductFormSaving}
             onDone={() => {
               setShowForm(false)
@@ -524,8 +534,8 @@ export function ProductsPage() {
             categories={categories}
             units={units}
             warehouses={warehouses}
-            onCategoriesChanged={setCategories}
-            onUnitsChanged={setUnits}
+            onCategoriesChanged={() => refreshCatalog(['categories'])}
+            onUnitsChanged={() => refreshCatalog(['units'])}
             onSavingChange={setProductFormSaving}
             onDone={(updated) => {
               setShowEditProduct(false)
@@ -572,8 +582,8 @@ function ImportProductsModal({
 
   return (
     <Modal title={`Импорт товаров из ${format === 'csv' ? 'CSV' : 'Excel'}`} onClose={onClose}>
-      <div className="stack">
-        <p className="text-muted">
+      <div className={layoutStyles.stack}>
+        <p className={layoutStyles.textMuted}>
           Формат колонок: Название | Артикул | Штрихкод | Ед.изм. | Закупочная цена | Розничная
           цена | Мин.остаток. Первая строка — заголовок, пропускается.
         </p>
@@ -582,21 +592,21 @@ function ImportProductsModal({
           accept={format === 'csv' ? '.csv' : '.xlsx'}
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         />
-        {error && <p className="error">{error}</p>}
+        {error && <p className={layoutStyles.error}>{error}</p>}
         {result && (
-          <div className="stack">
+          <div className={layoutStyles.stack}>
             <p>Создано товаров: {result.created}</p>
             {result.errors.length > 0 && (
-              <div className="data-table">
-                <div className="data-table-head" style={{ gridTemplateColumns: IMPORT_ERRORS_COLUMNS }}>
+              <div className={layoutStyles.dataTable}>
+                <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: IMPORT_ERRORS_COLUMNS }}>
                   <span>Строка</span>
                   <span>Ошибка</span>
                 </div>
-                <div className="data-table-body">
+                <div className={layoutStyles.dataTableBody}>
                   {result.errors.map((e, i) => (
-                    <div key={i} className="data-row" style={{ gridTemplateColumns: IMPORT_ERRORS_COLUMNS }}>
+                    <div key={i} className={layoutStyles.dataRow} style={{ gridTemplateColumns: IMPORT_ERRORS_COLUMNS }}>
                       <span>{e.row}</span>
-                      <span className="text-muted">{e.message}</span>
+                      <span className={layoutStyles.textMuted}>{e.message}</span>
                     </div>
                   ))}
                 </div>
@@ -604,7 +614,7 @@ function ImportProductsModal({
             )}
           </div>
         )}
-        <div className="row" style={{ gap: 8 }}>
+        <div className={layoutStyles.row} style={{ gap: 8 }}>
           <Button onClick={handleImport} disabled={!file || importing}>
             {importing ? 'Импорт…' : 'Импортировать'}
           </Button>
@@ -656,12 +666,12 @@ function QuickNewCategoryForm({
 
   return (
     <InlinePopover title="Новая категория" trigger={trigger} open={open} onOpenChange={onOpenChange}>
-      <form className="form" onSubmit={handleSubmit}>
-        <label className="field">
+      <form className={layoutStyles.form} onSubmit={handleSubmit}>
+        <label className={layoutStyles.field}>
           Название
           <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
         </label>
-        <label className="field">
+        <label className={layoutStyles.field}>
           Родительская категория
           <Select
             value={parentId ? String(parentId) : ''}
@@ -669,7 +679,7 @@ function QuickNewCategoryForm({
             options={[{ value: '', label: 'Без родителя' }, ...categoryOptions(categories)]}
           />
         </label>
-        {error && <p className="error">{error}</p>}
+        {error && <p className={layoutStyles.error}>{error}</p>}
         <Button type="submit" disabled={saving || !name.trim()}>
           {saving ? 'Сохранение…' : 'Создать категорию'}
         </Button>
@@ -715,8 +725,8 @@ function QuickNewUnitForm({
 
   return (
     <InlinePopover title="Новая единица измерения" trigger={trigger} open={open} onOpenChange={onOpenChange}>
-      <form className="form" onSubmit={handleSubmit}>
-        <label className="field">
+      <form className={layoutStyles.form} onSubmit={handleSubmit}>
+        <label className={layoutStyles.field}>
           Код
           <input
             value={code}
@@ -727,7 +737,7 @@ function QuickNewUnitForm({
             autoFocus
           />
         </label>
-        <label className="field">
+        <label className={layoutStyles.field}>
           Название
           <input
             value={name}
@@ -737,7 +747,7 @@ function QuickNewUnitForm({
             required
           />
         </label>
-        <label className="sale-checkbox">
+        <label className={styles.saleCheckbox}>
           <input
             type="checkbox"
             checked={fractional}
@@ -745,7 +755,7 @@ function QuickNewUnitForm({
           />
           Допускает дробное количество (кг, л…)
         </label>
-        {error && <p className="error">{error}</p>}
+        {error && <p className={layoutStyles.error}>{error}</p>}
         <Button type="submit" disabled={saving || !code.trim() || !name.trim()}>
           {saving ? 'Сохранение…' : 'Создать единицу'}
         </Button>
@@ -768,8 +778,8 @@ function ProductForm({
   categories: Category[]
   units: Unit[]
   warehouses: Warehouse[]
-  onCategoriesChanged: (categories: Category[]) => void
-  onUnitsChanged: (units: Unit[]) => void
+  onCategoriesChanged: (category: Category) => void
+  onUnitsChanged: (unit: Unit) => void
   onSavingChange?: (saving: boolean) => void
   onDone: (updated?: Product) => void
 }) {
@@ -862,15 +872,15 @@ function ProductForm({
   }
 
   return (
-    <form className="form" id={PRODUCT_FORM_ID} onSubmit={handleSubmit}>
-    <fieldset className="form-fieldset" disabled={saving}>
-      <label className="field">
+    <form className={layoutStyles.form} id={PRODUCT_FORM_ID} onSubmit={handleSubmit}>
+    <fieldset className={styles.formFieldset} disabled={saving}>
+      <label className={layoutStyles.field}>
         Название
         <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
       </label>
 
-      <div className="row">
-        <label className="field" style={{ flex: 1 }}>
+      <div className={layoutStyles.row}>
+        <label className={layoutStyles.field} style={{ flex: 1 }}>
           Закупочная цена
           <input
             type="text"
@@ -882,7 +892,7 @@ function ProductForm({
             }}
           />
         </label>
-        <label className="field" style={{ flex: 1 }}>
+        <label className={layoutStyles.field} style={{ flex: 1 }}>
           Розничная цена
           <input
             type="text"
@@ -896,9 +906,9 @@ function ProductForm({
         </label>
       </div>
 
-      <label className="field">
+      <label className={layoutStyles.field}>
         Категория
-        <div className="row">
+        <div className={layoutStyles.row}>
           <div style={{ flex: 1 }}>
             <Select
               value={categoryId ? String(categoryId) : ''}
@@ -916,7 +926,7 @@ function ProductForm({
               </Button>
             }
             onCreated={(category) => {
-              onCategoriesChanged([...categories, category])
+              onCategoriesChanged(category)
               setCategoryId(category.id)
               setShowNewCategory(false)
             }}
@@ -924,11 +934,11 @@ function ProductForm({
         </div>
       </label>
 
-      <h4 className="form-section-title">Учёт и остаток</h4>
+      <h4 className={styles.formSectionTitle}>Учёт и остаток</h4>
 
-      <label className="field">
+      <label className={layoutStyles.field}>
         Единица измерения
-        <div className="row">
+        <div className={layoutStyles.row}>
           <div style={{ flex: 1 }}>
             <Select
               value={unitCode}
@@ -953,7 +963,7 @@ function ProductForm({
               </Button>
             }
             onCreated={(unit) => {
-              onUnitsChanged([...units, unit])
+              onUnitsChanged(unit)
               setUnitCode(unit.code)
               setShowNewUnit(false)
             }}
@@ -962,8 +972,8 @@ function ProductForm({
       </label>
 
       {!product && warehouses.length > 0 && (
-        <div className="row">
-          <label className="field" style={{ flex: 1 }}>
+        <div className={layoutStyles.row}>
+          <label className={layoutStyles.field} style={{ flex: 1 }}>
             Начальный остаток
             <input
               type="text"
@@ -978,7 +988,7 @@ function ProductForm({
             />
           </label>
           {warehouses.length > 1 && (
-            <label className="field" style={{ flex: 1 }}>
+            <label className={layoutStyles.field} style={{ flex: 1 }}>
               На каком складе
               <Select
                 value={String(initialStockWarehouseId ?? '')}
@@ -990,9 +1000,9 @@ function ProductForm({
         </div>
       )}
 
-      <label className="field">
+      <label className={layoutStyles.field}>
         Минимальный остаток
-        <span className="field-hint">Порог, при котором товар считается «заканчивается» — не текущее количество</span>
+        <span className={layoutStyles.fieldHint}>Порог, при котором товар считается «заканчивается» — не текущее количество</span>
         <input
           type="text"
           inputMode="decimal"
@@ -1005,11 +1015,11 @@ function ProductForm({
         />
       </label>
 
-      <h4 className="form-section-title">Идентификация</h4>
+      <h4 className={styles.formSectionTitle}>Идентификация</h4>
 
-      <label className="field">
+      <label className={layoutStyles.field}>
         Артикул
-        <div className="row">
+        <div className={layoutStyles.row}>
           <input value={sku} onChange={(e) => setSku(e.target.value)} style={{ flex: 1 }} />
           <IconButton
             variant="neutral"
@@ -1021,9 +1031,9 @@ function ProductForm({
           </IconButton>
         </div>
       </label>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Штрихкод
-        <div className="row">
+        <div className={layoutStyles.row}>
           <input
             value={barcode ?? ''}
             onChange={(e) => setBarcode(e.target.value)}
@@ -1039,7 +1049,7 @@ function ProductForm({
       </label>
       {showScanner && (
         <Modal title="Сканировать штрихкод" onClose={() => setShowScanner(false)}>
-          <Suspense fallback={<p className="text-muted">Загрузка сканера…</p>}>
+          <Suspense fallback={<p className={layoutStyles.textMuted}>Загрузка сканера…</p>}>
             <BarcodeScanner
               onDetected={(code) => {
                 setBarcode(code)
@@ -1051,30 +1061,30 @@ function ProductForm({
         </Modal>
       )}
 
-      <h4 className="form-section-title">Дополнительно</h4>
+      <h4 className={styles.formSectionTitle}>Дополнительно</h4>
 
-      <label className="field">
+      <label className={layoutStyles.field}>
         Фото
         <input type="file" accept="image/*" onChange={handlePhotoChange} />
       </label>
-      {photoPreview && <img src={photoPreview} alt="" className="product-form-photo-preview" />}
+      {photoPreview && <img src={photoPreview} alt="" className={styles.productFormPhotoPreview} />}
 
-      <div className="field">
-        <div className="row between">
+      <div className={layoutStyles.field}>
+        <div className={`${layoutStyles.row} ${layoutStyles.between}`}>
           <span>Варианты (размер/цвет)</span>
           <Button variant="secondary" onClick={addVariant}>
             <IconPlus size={14} stroke={1.8} /> Добавить
           </Button>
         </div>
         {variants.length > 0 && (
-          <div className="variant-list">
-            <div className="variant-row variant-row-header">
+          <div className={styles.variantList}>
+            <div className={`${styles.variantRow} ${styles.variantRowHeader}`}>
               <span>Размер</span>
               <span>Цвет</span>
               <span />
             </div>
             {variants.map((v, i) => (
-              <div key={i} className="variant-row">
+              <div key={i} className={styles.variantRow}>
                 <input
                   value={v.size}
                   onChange={(e) => updateVariant(i, { size: e.target.value })}
@@ -1092,7 +1102,7 @@ function ProductForm({
         )}
       </div>
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
     </fieldset>
     </form>
   )

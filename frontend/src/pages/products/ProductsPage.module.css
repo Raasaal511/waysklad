@@ -1,0 +1,164 @@
+/* Специфичные для ProductsPage классы. Перенесено из src/index.css. */
+
+/* Поиск и фильтры — общий паттерн с SalePage (там ещё не мигрирован, поэтому
+   пока дублируется здесь один в один, а не выносится в Layout.module.css). */
+
+.saleSearchPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.saleSearchRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.saleSearchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+  color: var(--text-muted);
+  pointer-events: none;
+  transition: color 0.15s ease;
+}
+
+input.saleSearchInput:not([type='checkbox']):not([type='radio']) {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  padding: 12px 14px 12px 46px !important;
+  background: var(--bg);
+  border: 1px solid color-mix(in srgb, var(--text) 16%, var(--border));
+  border-radius: var(--radius);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.saleSearchInput:hover {
+  border-color: var(--accent);
+}
+
+input.saleSearchInput:not([type='checkbox']):not([type='radio']):focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.saleSearchRow:has(.saleSearchInput:focus) .saleSearchIcon,
+.saleSearchRow:has(.saleSearchInput:hover) .saleSearchIcon {
+  color: var(--accent);
+}
+
+.saleFiltersRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: end;
+}
+
+.saleCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding-bottom: 10px;
+}
+
+.saleHistoryRowIn {
+  animation: saleHistoryRowIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: var(--row-delay, 0ms);
+}
+
+@keyframes saleHistoryRowIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saleHistoryRowIn {
+    animation: none;
+  }
+}
+
+/* Форма товара */
+
+.formFieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.formFieldset:disabled {
+  opacity: 0.6;
+}
+
+/* Лёгкий заголовок-разделитель секции внутри длинной формы — в отличие от
+   field-group не рисует рамку-коробку, просто размечает начало новой смысловой
+   группы полей, чтобы форма не выглядела одной сплошной колонкой одинаковых полей */
+.formSectionTitle {
+  margin: 4px 0 -4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.formSectionTitle:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.productFormPhotoPreview {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: var(--bg-muted);
+  align-self: flex-start;
+}
+
+.variantList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.variantRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.variantRow input {
+  min-width: 0;
+}
+
+.variantRowHeader {
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}

@@ -158,19 +158,39 @@
   padding: 4px 0 max(4px, env(safe-area-inset-bottom));
   z-index: 10;
   overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.app-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .app-nav-item {
   flex: 1;
-  min-width: 64px;
+  min-width: 40px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 6px 4px;
+  padding: 8px 2px;
   text-decoration: none;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 10px;
+}
+
+.app-nav-item span:not(.app-nav-icon) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Совсем узкие экраны (7+ пунктов не помещаются даже с обрезкой) — прячем
+   подписи, оставляем только иконки; название доступно через aria-label. */
+@media (max-width: 400px) {
+  .app-nav-item span:not(.app-nav-icon) {
+    display: none;
+  }
 }
 
 .app-nav-item.active {

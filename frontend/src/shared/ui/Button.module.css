@@ -6,6 +6,7 @@
 .btn-primary {
   background: var(--accent);
   color: #fff;
+  border: 1px solid transparent;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -13,20 +14,21 @@
 }
 
 .btn-secondary {
-  background: var(--accent-soft-weak);
+  background: var(--bg);
   color: var(--text);
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--border);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--accent-soft);
   border-color: var(--accent);
+  color: var(--accent);
 }
 
 .btn-secondary.btn-active {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
+  font-weight: 600;
 }
 
 .btn-secondary.btn-active:hover:not(:disabled) {
@@ -59,6 +61,7 @@
 .btn-ink {
   background: var(--ink);
   color: var(--bg);
+  border: 1px solid transparent;
 }
 
 .btn-ink:hover:not(:disabled) {

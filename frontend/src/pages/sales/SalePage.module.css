@@ -1,0 +1,890 @@
+/* Утилиты, специфичные для SalePage. Общие классы — в shared/ui/Layout.module.css */
+
+.iconAccent {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.modalFooterTotal {
+  margin-left: auto;
+  font-size: 15px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.modalFooterTotal strong {
+  color: var(--text);
+  font-size: 18px;
+}
+
+.modalFooterBreakdown {
+  color: var(--text-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.salePaymentBadgeAll {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.saleDetailTotals {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  align-self: flex-end;
+  min-width: 180px;
+}
+
+.saleDetailTotalsRow {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.saleDetailTotalsRowSum {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text);
+}
+
+/* Cart table */
+
+.cartTableWrap {
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.cartTableHead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: grid;
+  gap: 0;
+  padding: 10px 16px;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cartTableRow {
+  display: grid;
+  gap: 0;
+  align-items: start;
+  padding: 10px 16px;
+}
+
+.cartTableRow:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.cartTableHead > *,
+.cartTableRow > * {
+  min-width: 0;
+}
+
+.cartTableHead > *:not(:first-child):not(:last-child),
+.cartTableRow > *:not(:first-child):not(:last-child) {
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+}
+
+.cartTableRow > *:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cartTableName {
+  font-weight: 500;
+  overflow-wrap: break-word;
+}
+
+.cartTableStock {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.cartTableTotal {
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.cartTableRow input {
+  padding: 6px 8px;
+  width: 100%;
+}
+
+.cartQtyStepper {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  max-width: 96px;
+}
+
+.cartQtyStepper input {
+  min-width: 0;
+  width: 100%;
+  text-align: center;
+  padding-right: 4px;
+}
+
+.cartQtyStepColumn {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 22px;
+}
+
+button.cartQtyStep {
+  flex: 1;
+  padding: 0;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  line-height: 1;
+}
+
+button.cartQtyStep:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.cartQtyStepIconUp {
+  transform: rotate(-90deg);
+}
+
+.cartQtyStepIconDown {
+  transform: rotate(90deg);
+}
+
+.cartTablePriceCell input {
+  padding-right: 24px;
+}
+
+.cartTableQtyCell,
+.cartTablePriceCell {
+  position: relative;
+}
+
+.cartTablePriceSuffix {
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.cartInputWarning {
+  border-color: var(--danger) !important;
+}
+
+.cartInputWarning:focus {
+  outline-color: var(--danger);
+}
+
+.cartTableWarning {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--danger);
+  white-space: normal;
+  line-height: 1.3;
+}
+
+.cartTableMaxReached {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 2px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 2px solid var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.16);
+  z-index: 5;
+}
+
+/* Sale history */
+
+.saleFiltersBar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  position: sticky;
+  top: var(--app-header-height, 0px);
+  z-index: 5;
+  padding: 10px 0;
+  margin: -10px 0;
+  background: var(--bg-muted);
+  transition: box-shadow 0.15s ease;
+}
+
+.saleFiltersBar.isPinned {
+  box-shadow: 0 8px 12px -8px rgba(0, 0, 0, 0.35);
+}
+
+.salePeriodTabs {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-sm) + 4px);
+}
+
+.salePeriodTabs > button {
+  flex-shrink: 0;
+}
+
+.pillTab,
+.pillTabActive {
+  padding: 7px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.pillTab:hover {
+  color: var(--text);
+  background: var(--bg-muted);
+}
+
+.pillTabActive {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.pillTabActive:hover {
+  background: var(--accent-hover);
+}
+
+.saleFiltersScroll {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.saleFiltersScroll > .saleSortField {
+  flex-shrink: 0;
+}
+
+input.saleClientSearch:not([type='checkbox']):not([type='radio']) {
+  flex: 1 1 140px;
+  min-width: 120px;
+  max-width: 220px;
+  background: var(--bg);
+  padding: 10px 13px;
+  font-size: 14px;
+}
+
+.saleSortField select,
+.saleSortField .selectTrigger {
+  width: auto;
+  background: var(--bg);
+  padding: 10px 13px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.saleFiltersScroll input.saleFilterActive:not([type='checkbox']):not([type='radio']),
+.saleFiltersScroll select.saleFilterActive {
+  border-color: var(--accent);
+}
+
+.saleDayGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.saleDayHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: capitalize;
+}
+
+.saleDayHeaderStats {
+  display: flex;
+  gap: 10px;
+  font-weight: 400;
+  text-transform: none;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.saleDayHeaderTotal {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.saleHistory {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.saleHistoryRow {
+  display: grid;
+  grid-template-columns: var(--history-row-columns, 100px 92px 1fr 1fr 70px);
+  align-items: center;
+  gap: 8px 14px;
+  padding: 12px 14px;
+  background: var(--bg);
+  color: var(--text);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  transition: background-color 0.15s ease;
+}
+
+.saleHistoryRow:last-child {
+  border-bottom: none;
+}
+
+/* backwards, не both: анимация должна держать стартовый кадр (opacity: 0) до
+   своего animation-delay, но НЕ фиксировать transform после завершения —
+   иначе она навсегда "запирает" transform: translateY(0) на элементе и
+   перебивает hover/active transform (scale) на карточках типа .productTile,
+   которые используют этот же класс для входа. */
+.saleHistoryRowIn {
+  animation: saleHistoryRowIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: var(--row-delay, 0ms);
+}
+
+@keyframes saleHistoryRowIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saleHistoryRowIn {
+    animation: none;
+  }
+}
+
+.saleHistoryRow:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.saleHistoryRow:hover:not(:disabled) .saleHistoryDetail,
+.saleHistoryRow:hover:not(:disabled) .saleHistoryTime {
+  color: var(--text);
+}
+
+.saleHistoryTotal {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.saleHistoryRow :global(.badge) {
+  text-align: center;
+}
+
+.saleHistoryDetail {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saleHistoryTime {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .saleHistoryRow {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .saleHistoryTime {
+    text-align: left;
+  }
+}
+
+/* Sale screen layout */
+
+.saleSearchPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.saleSearchRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.saleSearchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+  color: var(--text-muted);
+  pointer-events: none;
+  transition: color 0.15s ease;
+}
+
+input.saleSearchInput:not([type='checkbox']):not([type='radio']) {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  padding: 12px 14px 12px 46px !important;
+  background: var(--bg);
+  border: 1px solid color-mix(in srgb, var(--text) 16%, var(--border));
+  border-radius: var(--radius);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.saleSearchInput:hover {
+  border-color: var(--accent);
+}
+
+input.saleSearchInput:not([type='checkbox']):not([type='radio']):focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.saleSearchRow:has(.saleSearchInput:focus) .saleSearchIcon,
+.saleSearchRow:has(.saleSearchInput:hover) .saleSearchIcon {
+  color: var(--accent);
+}
+
+/* Сканер штрихкода камерой нужен только на телефоне */
+@media (min-width: 900px) {
+  .saleScanButton {
+    display: none;
+  }
+}
+
+.saleFiltersRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: end;
+}
+
+.saleFilterField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 150px;
+}
+
+.saleFilterField select {
+  background: var(--bg);
+}
+
+.saleFilterLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.saleCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding-bottom: 10px;
+}
+
+.saleResultsPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.saleResultsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.salePeriodSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.salePeriodSummaryTitle {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.salePeriodSummary :global(.statValue) {
+  font-size: 26px;
+}
+
+.salePaymentBreakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.salePaymentItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.salePaymentItem:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-muted);
+  color: var(--text);
+}
+
+.salePaymentItem:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.salePaymentItemActive {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.salePaymentItem:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.saleCheckoutGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 200px));
+  gap: 12px;
+}
+
+.saleClientField {
+  grid-column: 1 / -1;
+  max-width: 480px;
+}
+
+.saleClientRequired {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.saleChangeShort {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.saleDiscountRow {
+  display: flex;
+  gap: 8px;
+}
+
+.saleDiscountRow input {
+  flex: 1;
+  min-width: 0;
+}
+
+.saleDiscountToggle {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.saleDiscountToggle button {
+  padding: 10px 12px;
+}
+
+.saleClientRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Компонент Select рендерит <button class="selectTrigger">, а не нативный
+   <select> — таргетить нужно именно его, иначе он не сжимается и толкает
+   кнопку "+ Клиент" за пределы модалки (не просто узко — совсем убегает). */
+.saleClientRow :global(.selectTrigger) {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.saleClientRow :global(.inline-popover-anchor) {
+  flex-shrink: 0;
+}
+
+.saleDetailMeta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-muted);
+  border-radius: var(--radius);
+}
+
+.saleDetailMetaItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  font-size: 14px;
+}
+
+.saleDetailActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.saleDetailSectionTitle {
+  margin: 0;
+}
+
+.saleDetailClientCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  transition: border-color 0.15s ease;
+}
+
+.saleDetailClientCard:has(a:hover) {
+  border-color: var(--accent);
+}
+
+.saleDetailClientLink {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.saleDetailClientName {
+  font-weight: 600;
+  flex: 1;
+}
+
+.saleDetailClientArrowLink {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.saleDetailClientArrow {
+  color: inherit;
+}
+
+.saleNote {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.saleNoteHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.saleNoteTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.saleNoteStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.saleNoteStatusHidden {
+  visibility: hidden;
+}
+
+.saleNoteStatusError {
+  color: var(--danger);
+}
+
+.saleNoteTextarea {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+  resize: vertical;
+  min-height: 44px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.saleNoteTextarea:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.saleNoteTextarea:not(:disabled):focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  background: var(--bg);
+}
+
+.saleNoteTextarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* Тост об успешном сохранении продажи — сам исчезает, не требует закрытия
+   вручную (в отличие от полноэкранной карточки чека, которая остаётся для
+   просмотра продажи из истории). */
+.saleSavedToast {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  max-width: min(90vw, 420px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.saleSavedToastClose {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.7;
+}
+
+.saleSavedToastClose:hover {
+  opacity: 1;
+}

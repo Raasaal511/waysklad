@@ -1,18 +1,9 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  listDocuments,
-  listWarehouses,
-  exportDocuments,
-  type DocumentHistoryEntry,
-  type ExportFormat,
-  type Warehouse,
-} from '../../entities/inventory/api'
-import { listAllProducts, listUnits, type Product, type Unit } from '../../entities/product/api'
-import { listEmployees } from '../../entities/profile/api'
-import type { User } from '../../entities/auth/api'
+import { listDocuments, exportDocuments, type DocumentHistoryEntry, type ExportFormat } from '../../entities/inventory/api'
 import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
+import { useCatalog } from '../../app/CatalogContext'
 import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
 import { DropdownMenu } from '../../shared/ui/DropdownMenu'
@@ -92,11 +83,9 @@ export function MovementHistoryPage() {
   const { user } = useAuth()
   const canSeeEmployees = user?.role === 'owner' || user?.role === 'manager'
 
+  const { warehouses, products, units, employees, ensureWarehouses, ensureProducts, ensureUnits, ensureEmployees } =
+    useCatalog()
   const [documents, setDocuments] = useState<DocumentHistoryEntry[]>([])
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [units, setUnits] = useState<Unit[]>([])
-  const [employees, setEmployees] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -110,18 +99,14 @@ export function MovementHistoryPage() {
     setLoading(true)
     setError(null)
     try {
-      const [docs, w, p, u, emp] = await Promise.all([
+      const [docs] = await Promise.all([
         listDocuments(),
-        listWarehouses(),
-        listAllProducts(),
-        listUnits(),
-        canSeeEmployees ? listEmployees() : Promise.resolve<User[]>([]),
+        ensureWarehouses(),
+        ensureProducts(),
+        ensureUnits(),
+        canSeeEmployees ? ensureEmployees() : Promise.resolve(),
       ])
       setDocuments(docs)
-      setWarehouses(w)
-      setProducts(p)
-      setUnits(u)
-      setEmployees(emp)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось загрузить историю')
     } finally {
@@ -169,7 +154,7 @@ export function MovementHistoryPage() {
 
   return (
     <div className={layoutStyles.stack}>
-      <Link to="/stock" className="back-link">
+      <Link to="/stock" className={layoutStyles.backLink}>
         <IconChevronLeft size={16} stroke={1.8} /> Склады
       </Link>
 
@@ -191,23 +176,23 @@ export function MovementHistoryPage() {
       </div>
       {exportError && <p className={layoutStyles.error}>{exportError}</p>}
 
-      <div className="sale-period-tabs">
+      <div className={styles['period-tabs']}>
         {(Object.keys(PERIOD_LABELS) as PeriodFilter[]).map((p) => (
-          <Button
+          <button
             key={p}
+            type="button"
             translate="no"
-            variant="secondary"
-            active={period === p}
+            className={period === p ? styles.pillTabActive : styles.pillTab}
             onClick={() => setPeriod(p)}
           >
             {PERIOD_LABELS[p]}
-          </Button>
+          </button>
         ))}
       </div>
 
-      <div className="sale-filters-row">
+      <div className={[layoutStyles.row, layoutStyles.wrap].join(' ')} style={{ gap: 14, alignItems: 'end' }}>
         {warehouses.length > 1 && (
-          <label className="filter-field">
+          <label className={layoutStyles.filterField}>
             <Select
               value={warehouseFilter === 'all' ? 'all' : String(warehouseFilter)}
               onChange={(v) => setWarehouseFilter(v === 'all' ? 'all' : Number(v))}
@@ -218,7 +203,7 @@ export function MovementHistoryPage() {
             />
           </label>
         )}
-        <label className="filter-field">
+        <label className={layoutStyles.filterField}>
           <Select
             value={typeFilter}
             onChange={(v) => setTypeFilter(v as DocumentHistoryEntry['type'] | 'all')}
@@ -243,11 +228,11 @@ export function MovementHistoryPage() {
       </div>
 
       {!loading && filtered.length > 0 && periodReceiptsTotal > 0 && (
-        <div className={[layoutStyles.card, layoutStyles.cardFull, 'sale-period-summary'].join(' ')}>
-          <h3 className="sale-period-summary-title">Закуплено за «{PERIOD_LABELS[period]}»</h3>
-          <div className="stat">
-            <span className="stat-label">Сумма приёмок</span>
-            <span className={`stat-value ${styles['movement-history-money']}`}>
+        <div className={[layoutStyles.card, layoutStyles.cardFull, layoutStyles.stack].join(' ')} style={{ gap: 18 }}>
+          <h3 className={styles['period-summary-title']}>Закуплено за «{PERIOD_LABELS[period]}»</h3>
+          <div className={layoutStyles.stat}>
+            <span className={layoutStyles.statLabel}>Сумма приёмок</span>
+            <span className={`${layoutStyles.statValue} ${styles['movement-history-money']}`}>
               {formatMoney(periodReceiptsTotal)} ₽
             </span>
           </div>
@@ -282,7 +267,9 @@ export function MovementHistoryPage() {
                 >
                   <div className={layoutStyles.stack} style={{ gap: 4, flex: 1 }}>
                     <div className={[layoutStyles.row, layoutStyles.wrap].join(' ')} style={{ gap: 8 }}>
-                      <span className="badge accent">{MODE_LABELS[doc.type]}</span>
+                      <span className={[layoutStyles.badge, layoutStyles.accent].join(' ')}>
+                        {MODE_LABELS[doc.type]}
+                      </span>
                       <span className={layoutStyles.textMuted}>№{doc.number}</span>
                       <span className={layoutStyles.textMuted}>{formatDateTime(doc.created_at)}</span>
                     </div>
@@ -306,23 +293,23 @@ export function MovementHistoryPage() {
 
                 {expanded && (
                   <>
-                    <div className="data-table">
+                    <div className={layoutStyles.dataTable}>
                       <div
-                        className="data-table-head"
+                        className={layoutStyles.dataTableHead}
                         style={{ gridTemplateColumns: doc.type === 'receipt' ? '2fr 1fr 1fr' : '2fr 1fr' }}
                       >
                         <span>Товар</span>
                         <span>Кол-во</span>
                         {doc.type === 'receipt' && <span>Закуп. цена</span>}
                       </div>
-                      <div className="data-table-body">
+                      <div className={layoutStyles.dataTableBody}>
                         {doc.lines.map((line, i) => (
                           <div
                             key={i}
-                            className="data-row"
+                            className={layoutStyles.dataRow}
                             style={{ gridTemplateColumns: doc.type === 'receipt' ? '2fr 1fr 1fr' : '2fr 1fr' }}
                           >
-                            <span className="data-row-name">{productName(line.product_id)}</span>
+                            <span className={layoutStyles.dataRowName}>{productName(line.product_id)}</span>
                             <span>
                               {formatQuantity(line.quantity)} {unitName(productUnitCode(line.product_id))}
                             </span>
