@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 
 from app.presentation.analytics.router import router as analytics_router
-from app.presentation.audit.router import router as audit_router
 from app.presentation.auth.router import router as auth_router
 from app.presentation.counterparties.router import router as counterparties_router
 from app.presentation.debts.router import router as debts_router
@@ -25,5 +24,4 @@ router.include_router(orders_router)
 router.include_router(tasks_router)
 router.include_router(notifications_router)
 router.include_router(analytics_router)
-router.include_router(audit_router)
 router.include_router(sync_router)

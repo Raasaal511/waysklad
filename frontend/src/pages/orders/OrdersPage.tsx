@@ -23,9 +23,10 @@ import {
   BOARD_STATUSES,
   STATUS_ACCENT,
 } from '../../entities/order/orderStatus'
-import { listAllProducts, listUnits, getByBarcode, type Product, type Unit } from '../../entities/product/api'
+import { getByBarcode, type Product, type Unit } from '../../entities/product/api'
 import { searchClients, type Client } from '../../entities/counterparty/api'
-import { listWarehouses, listStock, type Warehouse, type StockItem } from '../../entities/inventory/api'
+import type { Warehouse, StockItem } from '../../entities/inventory/api'
+import { useCatalog } from '../../app/CatalogContext'
 import { getSale, type Sale, type PaymentMethod } from '../../entities/sale/api'
 import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
@@ -40,7 +41,6 @@ import {
   IconBarcode,
   IconChevronRight,
   IconChevronLeft,
-  IconChevronDown,
   IconPencil,
   IconBan,
   IconCheck,
@@ -63,6 +63,7 @@ import { DateInput } from '../../shared/ui/DateInput'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
 import { InfoHint } from '../../shared/ui/InfoHint'
+import { HistoryDisclosure } from '../../shared/ui/HistoryDisclosure'
 import {
   formatMoney,
   formatQuantity,
@@ -73,6 +74,8 @@ import {
 } from '../../shared/lib/format'
 import { isBarcodeScannerSupported } from '../../entities/barcode/barcodeSupport'
 import { useAuth } from '../../app/AuthContext'
+import layoutStyles from '../../shared/ui/Layout.module.css'
+import styles from './OrdersPage.module.css'
 
 const BarcodeScanner = lazy(() =>
   import('../../entities/barcode/BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })),
@@ -113,6 +116,24 @@ const ORDER_HISTORY_ACTION_LABELS: Record<string, string> = {
   'order.status': 'Изменён статус',
   'order.cancel': 'Заказ отменён',
   'order.issue': 'Заказ выдан',
+}
+
+function formatOrderHistoryDetail(entry: OrderHistoryEntry): string | null {
+  const d = entry.details
+  switch (entry.action) {
+    case 'order.create':
+    case 'order.update':
+    case 'order.issue':
+      return d.total != null ? `${formatMoney(String(d.total))} ₽` : null
+    case 'order.status': {
+      const status = d.status as OrderStatus | undefined
+      return status ? ORDER_STATUS_LABELS[status] : null
+    }
+    case 'order.cancel':
+      return typeof d.reason === 'string' && d.reason ? d.reason : null
+    default:
+      return null
+  }
 }
 
 const ORDER_HISTORY_ACTION_ICONS: Record<string, TablerIcon> = {
@@ -184,13 +205,11 @@ export function OrdersPage() {
   const { user } = useAuth()
   const canManage = user?.role === 'owner' || user?.role === 'manager' || user?.role === 'seller'
 
+  const { products, units, warehouses, stock, ensureProducts, ensureUnits, ensureWarehouses, ensureStock } =
+    useCatalog()
   const [activeOrders, setActiveOrders] = useState<Order[]>([])
   const [completedOrders, setCompletedOrders] = useState<Order[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [units, setUnits] = useState<Unit[]>([])
   const [clients, setClients] = useState<Client[]>([])
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
-  const [stock, setStock] = useState<StockItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -219,22 +238,18 @@ export function OrdersPage() {
   async function load(silent = false) {
     if (!silent) setLoading(true)
     try {
-      const [active, completed, p, u, c, w, s] = await Promise.all([
+      const [active, completed, , , c] = await Promise.all([
         listActiveOrders(),
         listCompletedOrders(),
-        listAllProducts(),
-        listUnits(),
+        ensureProducts(),
+        ensureUnits(),
         searchClients(),
-        listWarehouses(),
-        listStock(),
+        ensureWarehouses(),
+        ensureStock(),
       ])
       setActiveOrders(active)
       setCompletedOrders(completed)
-      setProducts(p)
-      setUnits(u)
       setClients(c)
-      setWarehouses(w)
-      setStock(s)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось загрузить заказы')
     } finally {
@@ -244,6 +259,7 @@ export function OrdersPage() {
 
   useEffect(() => {
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const clientName = (id: number) => clients.find((c) => c.id === id)?.name ?? `#${id}`
@@ -293,8 +309,8 @@ export function OrdersPage() {
   const orders = tab === 'active' ? activeOrders : completedOrders
 
   return (
-    <div className="stack">
-      <div className="section-title">
+    <div className={layoutStyles.stack}>
+      <div className={layoutStyles.sectionTitle}>
         <h2>Заказы</h2>
         {canManage && (
           <Button onClick={() => setShowForm(true)}>
@@ -304,34 +320,34 @@ export function OrdersPage() {
       </div>
 
       {showOnboarding && (
-        <div className="card card-full orders-intro">
+        <div className={[layoutStyles.card, layoutStyles.cardFull, styles.ordersIntro].join(' ')}>
           <IconButton
             variant="muted"
-            className="orders-intro-close"
+            className={styles.ordersIntroClose}
             tooltip="Понятно, больше не показывать"
             aria-label="Понятно, больше не показывать"
             onClick={dismissOnboarding}
           >
             <IconX size={16} stroke={1.8} />
           </IconButton>
-          <div className="orders-intro-flow">
-            <div className="orders-intro-step">
-              <span className="orders-intro-icon">
+          <div className={styles.ordersIntroFlow}>
+            <div className={styles.ordersIntroStep}>
+              <span className={styles.ordersIntroIcon}>
                 <IconMessage2 size={20} stroke={1.8} />
               </span>
-              <div className="stack" style={{ gap: 2 }}>
+              <div className={layoutStyles.stack} style={{ gap: 2 }}>
                 <strong>Заказ</strong>
-                <span className="text-muted">Клиент попросил заранее — остаток резервируется на складе</span>
+                <span className={layoutStyles.textMuted}>Клиент попросил заранее — остаток резервируется на складе</span>
               </div>
             </div>
-            <IconArrowRight size={18} stroke={1.8} className="orders-intro-arrow" />
-            <div className="orders-intro-step">
-              <span className="orders-intro-icon orders-intro-icon-accent">
+            <IconArrowRight size={18} stroke={1.8} className={styles.ordersIntroArrow} />
+            <div className={styles.ordersIntroStep}>
+              <span className={[styles.ordersIntroIcon, styles.ordersIntroIconAccent].join(' ')}>
                 <IconReceipt2 size={20} stroke={1.8} />
               </span>
-              <div className="stack" style={{ gap: 2 }}>
+              <div className={layoutStyles.stack} style={{ gap: 2 }}>
                 <strong>Выдача</strong>
-                <span className="text-muted">Клиент забрал и доплатил — товар списан, продажа оформлена сама</span>
+                <span className={layoutStyles.textMuted}>Клиент забрал и доплатил — товар списан, продажа оформлена сама</span>
               </div>
             </div>
           </div>
@@ -379,19 +395,19 @@ export function OrdersPage() {
         />
       )}
 
-      <div className="row between wrap" style={{ gap: 10 }}>
+      <div className={[layoutStyles.row, layoutStyles.between, layoutStyles.wrap].join(' ')} style={{ gap: 10 }}>
         <div className="sale-period-tabs">
           <Button variant="secondary" active={tab === 'active'} onClick={() => setTab('active')}>
             Активные
-            {activeOrders.length > 0 && <span className="count-badge">{activeOrders.length}</span>}
+            {activeOrders.length > 0 && <span className={layoutStyles.countBadge}>{activeOrders.length}</span>}
           </Button>
           <Button variant="secondary" active={tab === 'completed'} onClick={() => setTab('completed')}>
             Завершённые
-            {completedOrders.length > 0 && <span className="count-badge">{completedOrders.length}</span>}
+            {completedOrders.length > 0 && <span className={layoutStyles.countBadge}>{completedOrders.length}</span>}
           </Button>
         </div>
         {tab === 'active' && (
-          <div className="view-switcher" role="tablist" aria-label="Вид отображения">
+          <div className={styles.viewSwitcher} role="tablist" aria-label="Вид отображения">
             {VIEW_MODE_OPTIONS.map(({ mode, label, icon: Icon }) => (
               <Button
                 key={mode}
@@ -406,16 +422,16 @@ export function OrdersPage() {
         )}
       </div>
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : tab === 'active' && viewMode === 'table' ? (
         <OrdersTableView orders={activeOrders} clientName={clientName} onSelect={setSelectedOrder} />
       ) : tab === 'active' && viewMode === 'list' ? (
         activeOrders.length === 0 ? (
-          <p className="text-muted">Активных заказов пока нет</p>
+          <p className={layoutStyles.textMuted}>Активных заказов пока нет</p>
         ) : (
-          <div className="orders-history-list">
+          <div className={styles.ordersHistoryList}>
             {activeOrders.map((o) => (
               <OrderListRow
                 key={o.id}
@@ -431,26 +447,28 @@ export function OrdersPage() {
       ) : tab === 'active' && viewMode === 'calendar' ? (
         <OrdersCalendarView orders={activeOrders} clientName={clientName} onSelect={setSelectedOrder} />
       ) : tab === 'active' ? (
-        <div className="orders-board" style={{ '--board-cols': BOARD_STATUSES.length } as CSSProperties}>
+        <div className={styles.ordersBoard} style={{ '--board-cols': BOARD_STATUSES.length } as CSSProperties}>
           {BOARD_STATUSES.map((status) => {
             const columnOrders = activeOrders.filter((o) => o.status === status)
             return (
               <div
                 key={status}
-                className={`orders-board-column${dragOverStatus === status ? ' orders-board-column-over' : ''}`}
+                className={[styles.ordersBoardColumn, dragOverStatus === status ? styles.ordersBoardColumnOver : null]
+                  .filter(Boolean)
+                  .join(' ')}
                 style={{ '--col-accent': STATUS_ACCENT[status] } as CSSProperties}
                 onDragOver={(e) => handleColumnDragOver(e, status)}
                 onDragLeave={() => setDragOverStatus((s) => (s === status ? null : s))}
                 onDrop={(e) => handleColumnDrop(e, status)}
               >
-                <div className="orders-board-column-head">
-                  <span className="orders-board-dot" />
+                <div className={styles.ordersBoardColumnHead}>
+                  <span className={styles.ordersBoardDot} />
                   <span>{ORDER_STATUS_LABELS[status]}</span>
-                  <span className="orders-board-column-count">{columnOrders.length}</span>
+                  <span className={styles.ordersBoardColumnCount}>{columnOrders.length}</span>
                   {status === 'new' && canManage && (
                     <IconButton
                       variant="accent"
-                      className="orders-board-column-add"
+                      className={styles.ordersBoardColumnAdd}
                       tooltip="Новый заказ"
                       aria-label="Новый заказ"
                       onClick={() => setShowForm(true)}
@@ -459,14 +477,18 @@ export function OrdersPage() {
                     </IconButton>
                   )}
                 </div>
-                <div className="orders-board-column-body">
+                <div className={styles.ordersBoardColumnBody}>
                   {columnOrders.length === 0 ? (
                     status === 'new' && canManage ? (
-                      <button type="button" className="orders-board-empty orders-board-empty-action" onClick={() => setShowForm(true)}>
+                      <button
+                        type="button"
+                        className={[styles.ordersBoardEmpty, styles.ordersBoardEmptyAction].join(' ')}
+                        onClick={() => setShowForm(true)}
+                      >
                         <IconPlus size={16} stroke={1.8} /> Создать заказ
                       </button>
                     ) : (
-                      <div className="orders-board-empty">Пусто</div>
+                      <div className={styles.ordersBoardEmpty}>Пусто</div>
                     )
                   ) : (
                     columnOrders.map((o) => {
@@ -477,34 +499,48 @@ export function OrdersPage() {
                       return (
                         <div
                           key={o.id}
-                          className={`orders-board-card${draggedId === o.id ? ' orders-board-card-dragging' : ''}`}
+                          className={[styles.ordersBoardCard, draggedId === o.id ? styles.ordersBoardCardDragging : null]
+                            .filter(Boolean)
+                            .join(' ')}
                           draggable={canManage}
                           onDragStart={() => handleDragStart(o)}
                           onDragEnd={handleDragEnd}
                           onClick={() => setSelectedOrder(o)}
                         >
-                          <span className="orders-board-card-accent" />
-                          <div className="orders-board-card-head">
-                            <span className="orders-board-card-number">
+                          <span className={styles.ordersBoardCardAccent} />
+                          <div className={styles.ordersBoardCardHead}>
+                            <span className={styles.ordersBoardCardNumber}>
                               №{o.number ?? o.id}{' '}
-                              <SourceIcon size={13} stroke={1.8} className="text-muted" title={ORDER_SOURCE_LABELS[o.source]} />
+                              <SourceIcon
+                                size={13}
+                                stroke={1.8}
+                                className={layoutStyles.textMuted}
+                                title={ORDER_SOURCE_LABELS[o.source]}
+                              />
                             </span>
-                            <span className="orders-board-card-total">{formatMoney(o.total)} ₽</span>
+                            <span className={styles.ordersBoardCardTotal}>{formatMoney(o.total)} ₽</span>
                           </div>
-                          <strong className="orders-board-card-client">{name}</strong>
-                          <div className="orders-board-card-footer">
+                          <strong className={styles.ordersBoardCardClient}>{name}</strong>
+                          <div className={styles.ordersBoardCardFooter}>
                             {o.due_date ? (
                               <span
-                                className={`orders-board-card-due${overdue ? ' orders-board-card-due-overdue' : ''}`}
+                                className={[
+                                  styles.ordersBoardCardDue,
+                                  overdue ? styles.ordersBoardCardDueOverdue : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' ')}
                               >
                                 <IconClock size={13} stroke={1.8} /> {formatDueDate(o.due_date)}
                               </span>
                             ) : partiallyPrepaid ? (
-                              <span className="badge warning">предоплата {formatMoney(o.prepayment)} ₽</span>
+                              <span className={[layoutStyles.badge, layoutStyles.warning].join(' ')}>
+                                предоплата {formatMoney(o.prepayment)} ₽
+                              </span>
                             ) : (
                               <span />
                             )}
-                            <span className="orders-board-card-avatar" title={name}>
+                            <span className={styles.ordersBoardCardAvatar} title={name}>
                               {initials(name)}
                             </span>
                           </div>
@@ -518,27 +554,31 @@ export function OrdersPage() {
           })}
         </div>
       ) : orders.length === 0 ? (
-        <p className="text-muted">Завершённых заказов пока нет</p>
+        <p className={layoutStyles.textMuted}>Завершённых заказов пока нет</p>
       ) : (
-        <div className="orders-history-list">
+        <div className={styles.ordersHistoryList}>
           {orders.map((o) => (
-            <div key={o.id} className="card orders-history-card" onClick={() => setSelectedOrder(o)}>
-              <div className="orders-history-card-main">
-                <div className="orders-history-card-title">
+            <div
+              key={o.id}
+              className={[layoutStyles.card, styles.ordersHistoryCard].join(' ')}
+              onClick={() => setSelectedOrder(o)}
+            >
+              <div className={styles.ordersHistoryCardMain}>
+                <div className={styles.ordersHistoryCardTitle}>
                   <strong>№{o.number ?? o.id}</strong>
                   <span>{clientName(o.client_id)}</span>
                   <span className={ORDER_STATUS_BADGE_CLASS[o.status]}>{ORDER_STATUS_LABELS[o.status]}</span>
                 </div>
                 {o.created_at && (
-                  <span className="text-muted">
+                  <span className={layoutStyles.textMuted}>
                     {o.status === 'cancelled' ? 'Создан' : 'Выдан'} {formatDateTime(o.created_at)}
                   </span>
                 )}
               </div>
-              <div className="orders-history-card-money">
-                <span className="orders-board-card-total">{formatMoney(o.total)} ₽</span>
+              <div className={styles.ordersHistoryCardMoney}>
+                <span className={styles.ordersBoardCardTotal}>{formatMoney(o.total)} ₽</span>
                 {o.status === 'issued' && Number(o.to_pay) > 0 && (
-                  <span className="text-muted">доплата {formatMoney(o.to_pay)} ₽</span>
+                  <span className={layoutStyles.textMuted}>доплата {formatMoney(o.to_pay)} ₽</span>
                 )}
               </div>
             </div>
@@ -558,10 +598,10 @@ function OrdersTableView({
   clientName: (id: number) => string
   onSelect: (order: Order) => void
 }) {
-  if (orders.length === 0) return <p className="text-muted">Активных заказов пока нет</p>
+  if (orders.length === 0) return <p className={layoutStyles.textMuted}>Активных заказов пока нет</p>
   return (
-    <div className="data-table">
-      <div className="data-table-head" style={{ gridTemplateColumns: ORDER_TABLE_COLUMNS }}>
+    <div className={layoutStyles.dataTable}>
+      <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: ORDER_TABLE_COLUMNS }}>
         <span>№</span>
         <span>Клиент</span>
         <span>Источник</span>
@@ -570,7 +610,7 @@ function OrdersTableView({
         <span>Срок</span>
         <span />
       </div>
-      <div className="data-table-body">
+      <div className={layoutStyles.dataTableBody}>
         {orders.map((o, i) => {
           const SourceIcon = ORDER_SOURCE_ICONS[o.source]
           const overdue = o.due_date != null && isOverdue(o.due_date)
@@ -578,7 +618,7 @@ function OrdersTableView({
             <button
               key={o.id}
               type="button"
-              className="data-row data-row-link sale-history-row-in"
+              className={[layoutStyles.dataRow, layoutStyles.dataRowLink, 'sale-history-row-in'].join(' ')}
               style={
                 {
                   gridTemplateColumns: ORDER_TABLE_COLUMNS,
@@ -587,17 +627,17 @@ function OrdersTableView({
               }
               onClick={() => onSelect(o)}
             >
-              <span className="data-row-name">№{o.number ?? o.id}</span>
+              <span className={layoutStyles.dataRowName}>№{o.number ?? o.id}</span>
               <span>{clientName(o.client_id)}</span>
-              <span className="row text-muted" style={{ gap: 4 }}>
+              <span className={[layoutStyles.row, layoutStyles.textMuted].join(' ')} style={{ gap: 4 }}>
                 <SourceIcon size={14} stroke={1.8} /> {ORDER_SOURCE_LABELS[o.source]}
               </span>
               <span className={ORDER_STATUS_BADGE_CLASS[o.status]}>{ORDER_STATUS_LABELS[o.status]}</span>
               <span>{formatMoney(o.total)} ₽</span>
-              <span className={overdue ? 'orders-board-card-due-overdue' : 'text-muted'}>
+              <span className={overdue ? styles.ordersBoardCardDueOverdue : layoutStyles.textMuted}>
                 {o.due_date ? formatDueDate(o.due_date) : '—'}
               </span>
-              <IconChevronRight size={16} stroke={1.8} className="data-row-chevron" />
+              <IconChevronRight size={16} stroke={1.8} className={layoutStyles.dataRowChevron} />
             </button>
           )
         })}
@@ -622,24 +662,24 @@ function OrderListRow({
   const next = NEXT_STATUS[order.status]
   const overdue = order.due_date != null && isOverdue(order.due_date)
   return (
-    <div className="card orders-history-card" onClick={() => onSelect(order)}>
-      <div className="orders-history-card-main">
-        <div className="orders-history-card-title">
+    <div className={[layoutStyles.card, styles.ordersHistoryCard].join(' ')} onClick={() => onSelect(order)}>
+      <div className={styles.ordersHistoryCardMain}>
+        <div className={styles.ordersHistoryCardTitle}>
           <strong>№{order.number ?? order.id}</strong>
           <span>{clientName(order.client_id)}</span>
           <span className={ORDER_STATUS_BADGE_CLASS[order.status]}>{ORDER_STATUS_LABELS[order.status]}</span>
         </div>
         {order.due_date && (
-          <span className={overdue ? 'orders-board-card-due-overdue' : 'text-muted'}>
+          <span className={overdue ? styles.ordersBoardCardDueOverdue : layoutStyles.textMuted}>
             <IconClock size={13} stroke={1.8} /> до {formatDueDate(order.due_date)}
           </span>
         )}
       </div>
-      <div className="row" style={{ gap: 10 }}>
-        <div className="orders-history-card-money">
-          <span className="orders-board-card-total">{formatMoney(order.total)} ₽</span>
+      <div className={layoutStyles.row} style={{ gap: 10 }}>
+        <div className={styles.ordersHistoryCardMoney}>
+          <span className={styles.ordersBoardCardTotal}>{formatMoney(order.total)} ₽</span>
           {Number(order.prepayment) > 0 && Number(order.to_pay) > 0 && (
-            <span className="text-muted">доплата {formatMoney(order.to_pay)} ₽</span>
+            <span className={layoutStyles.textMuted}>доплата {formatMoney(order.to_pay)} ₽</span>
           )}
         </div>
         {canManage && next && (
@@ -697,9 +737,9 @@ function OrdersCalendarView({
   const todayISO = toISODate(new Date())
 
   return (
-    <div className="view-calendar">
-      <div className="view-calendar-header">
-        <div className="view-calendar-nav">
+    <div className={styles.viewCalendar}>
+      <div className={styles.viewCalendarHeader}>
+        <div className={styles.viewCalendarNav}>
           <IconButton
             variant="muted"
             onClick={() => setCursor(new Date(year, month - 1, 1))}
@@ -715,19 +755,19 @@ function OrdersCalendarView({
             <IconChevronRight size={16} stroke={1.8} />
           </IconButton>
         </div>
-        <span className="view-calendar-title">
+        <span className={styles.viewCalendarTitle}>
           {MONTHS[month]} {year}
         </span>
         <Button variant="secondary" onClick={() => setCursor(new Date())}>
           Сегодня
         </Button>
       </div>
-      <div className="view-calendar-weekdays">
+      <div className={styles.viewCalendarWeekdays}>
         {WEEKDAYS.map((w) => (
           <span key={w}>{w}</span>
         ))}
       </div>
-      <div className="view-calendar-grid">
+      <div className={styles.viewCalendarGrid}>
         {cells.map((date, i) => {
           const iso = toISODate(date)
           const inMonth = date.getMonth() === month
@@ -735,40 +775,57 @@ function OrdersCalendarView({
           const visible = dayOrders.slice(0, 3)
           const overflow = dayOrders.length - visible.length
           return (
-            <div key={i} className={`view-calendar-cell${inMonth ? '' : ' view-calendar-cell-outside'}`}>
-              <span className={`view-calendar-date${iso === todayISO ? ' view-calendar-date-today' : ''}`}>
+            <div
+              key={i}
+              className={[styles.viewCalendarCell, inMonth ? null : styles.viewCalendarCellOutside]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <span
+                className={[styles.viewCalendarDate, iso === todayISO ? styles.viewCalendarDateToday : null]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
                 {date.getDate()}
               </span>
               {visible.map((o) => (
                 <button
                   key={o.id}
                   type="button"
-                  className="view-calendar-entry"
+                  className={styles.viewCalendarEntry}
                   onClick={() => onSelect(o)}
                   title={`№${o.number ?? o.id} · ${clientName(o.client_id)}`}
                 >
                   {clientName(o.client_id)}
                 </button>
               ))}
-              {overflow > 0 && <span className="view-calendar-entry view-calendar-entry-more">+{overflow}</span>}
+              {overflow > 0 && (
+                <span className={[styles.viewCalendarEntry, styles.viewCalendarEntryMore].join(' ')}>
+                  +{overflow}
+                </span>
+              )}
             </div>
           )
         })}
       </div>
       {unscheduled.length > 0 && (
-        <div className="view-calendar-unscheduled">
-          <span className="view-calendar-unscheduled-title">Без даты готовности · {unscheduled.length}</span>
-          <div className="orders-history-list">
+        <div className={styles.viewCalendarUnscheduled}>
+          <span className={styles.viewCalendarUnscheduledTitle}>Без даты готовности · {unscheduled.length}</span>
+          <div className={styles.ordersHistoryList}>
             {unscheduled.map((o) => (
-              <div key={o.id} className="card orders-history-card" onClick={() => onSelect(o)}>
-                <div className="orders-history-card-main">
-                  <div className="orders-history-card-title">
+              <div
+                key={o.id}
+                className={[layoutStyles.card, styles.ordersHistoryCard].join(' ')}
+                onClick={() => onSelect(o)}
+              >
+                <div className={styles.ordersHistoryCardMain}>
+                  <div className={styles.ordersHistoryCardTitle}>
                     <strong>№{o.number ?? o.id}</strong>
                     <span>{clientName(o.client_id)}</span>
                     <span className={ORDER_STATUS_BADGE_CLASS[o.status]}>{ORDER_STATUS_LABELS[o.status]}</span>
                   </div>
                 </div>
-                <span className="orders-board-card-total">{formatMoney(o.total)} ₽</span>
+                <span className={styles.ordersBoardCardTotal}>{formatMoney(o.total)} ₽</span>
               </div>
             ))}
           </div>
@@ -787,6 +844,7 @@ function IssueOrderModal({
   onClose: () => void
   onIssued: (result: IssueOrderResult) => void
 }) {
+  const { refresh: refreshCatalog } = useCatalog()
   const [payment, setPayment] = useState<PaymentMethod>('cash')
   const [cashReceived, setCashReceived] = useState('')
   const [debtDueDate, setDebtDueDate] = useState('')
@@ -812,6 +870,7 @@ function IssueOrderModal({
         cash_received: payment === 'cash' && cashReceived ? cashReceived : null,
         debt_due_date: payment === 'credit' ? debtDueDate : null,
       })
+      refreshCatalog(['stock']).catch(() => {})
       onIssued(result)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось выдать заказ')
@@ -822,7 +881,7 @@ function IssueOrderModal({
 
   return (
     <Modal title={`Выдать заказ №${order.number ?? order.id}`} onClose={onClose}>
-      <form className="form" onSubmit={handleSubmit}>
+      <form className={layoutStyles.form} onSubmit={handleSubmit}>
         <div className="sale-detail-totals">
           <div className="sale-detail-totals-row">
             <span>Сумма заказа</span>
@@ -840,7 +899,7 @@ function IssueOrderModal({
           </div>
         </div>
 
-        <label className="field">
+        <label className={layoutStyles.field}>
           Способ оплаты
           <Select
             value={payment}
@@ -850,7 +909,7 @@ function IssueOrderModal({
         </label>
 
         {payment === 'cash' && (
-          <label className="field">
+          <label className={layoutStyles.field}>
             Получено
             <input
               type="text"
@@ -863,7 +922,7 @@ function IssueOrderModal({
               }}
             />
             {cashReceivedCents > 0 && (
-              <span className={changeCents < 0 ? 'sale-change-short' : 'text-muted'}>
+              <span className={changeCents < 0 ? 'sale-change-short' : layoutStyles.textMuted}>
                 {changeCents >= 0
                   ? `Сдача: ${formatMoney(change)} ₽`
                   : `Не хватает: ${formatMoney(centsToMoney(-changeCents))} ₽`}
@@ -873,7 +932,7 @@ function IssueOrderModal({
         )}
 
         {payment === 'credit' && (
-          <label className="field">
+          <label className={layoutStyles.field}>
             Долг до
             <DateInput
               required
@@ -884,7 +943,7 @@ function IssueOrderModal({
           </label>
         )}
 
-        {error && <p className="error">{error}</p>}
+        {error && <p className={layoutStyles.error}>{error}</p>}
         <Button type="submit" disabled={saving}>
           {saving ? 'Оформление…' : 'Выдать заказ'}
         </Button>
@@ -919,14 +978,14 @@ function CancelOrderForm({
 
   return (
     <Modal title={`Отменить заказ №${order.number ?? order.id}?`} onClose={onClose}>
-      <div className="stack">
+      <div className={layoutStyles.stack}>
         <p>Резерв товара по заказу будет снят со склада. Это действие нельзя отменить.</p>
-        <label className="field">
+        <label className={layoutStyles.field}>
           Причина (необязательно)
           <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="клиент передумал…" />
         </label>
-        {error && <p className="error">{error}</p>}
-        <div className="row" style={{ gap: 8 }}>
+        {error && <p className={layoutStyles.error}>{error}</p>}
+        <div className={layoutStyles.row} style={{ gap: 8 }}>
           <Button variant="danger" onClick={handleConfirm} disabled={saving}>
             {saving ? 'Отмена…' : 'Да, отменить заказ'}
           </Button>
@@ -964,9 +1023,6 @@ function OrderDetail({
   const [showEdit, setShowEdit] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
   const [showIssue, setShowIssue] = useState(false)
-  const [history, setHistory] = useState<OrderHistoryEntry[] | null>(null)
-  const [historyOpen, setHistoryOpen] = useState(false)
-  const [loadingHistory, setLoadingHistory] = useState(false)
   const [linkedSale, setLinkedSale] = useState<Sale | null>(null)
 
   const productName = (id: number) => products.find((p) => p.id === id)?.name ?? `#${id}`
@@ -978,23 +1034,6 @@ function OrderDetail({
     if (order.sale_id == null) return
     getSale(order.sale_id).then(setLinkedSale).catch(() => {})
   }, [order.sale_id])
-
-  async function toggleHistory() {
-    if (historyOpen) {
-      setHistoryOpen(false)
-      return
-    }
-    setHistoryOpen(true)
-    if (history !== null) return
-    setLoadingHistory(true)
-    try {
-      setHistory(await getOrderHistory(order.id))
-    } catch {
-      setHistory([])
-    } finally {
-      setLoadingHistory(false)
-    }
-  }
 
   const headerActions = canManage && !isTerminal && (
     <>
@@ -1021,8 +1060,8 @@ function OrderDetail({
 
   return (
     <Modal title={`Заказ №${order.number ?? order.id}`} onClose={onClose} size="wide" headerActions={headerActions}>
-      <div className="stack">
-        <div className="row between wrap" style={{ gap: 10 }}>
+      <div className={layoutStyles.stack}>
+        <div className={[layoutStyles.row, layoutStyles.between, layoutStyles.wrap].join(' ')} style={{ gap: 10 }}>
           <span className={ORDER_STATUS_BADGE_CLASS[order.status]}>{ORDER_STATUS_LABELS[order.status]}</span>
           {canManage && order.status === 'ready' && (
             <Button onClick={() => setShowIssue(true)}>Выдать и оформить продажу</Button>
@@ -1031,28 +1070,28 @@ function OrderDetail({
 
         <div className="sale-detail-meta">
           <div className="sale-detail-meta-item">
-            <span className="text-muted">Источник</span>
+            <span className={layoutStyles.textMuted}>Источник</span>
             <span>{ORDER_SOURCE_LABELS[order.source]}</span>
           </div>
           <div className="sale-detail-meta-item">
-            <span className="text-muted">Склад</span>
+            <span className={layoutStyles.textMuted}>Склад</span>
             <span>{warehouseName}</span>
           </div>
           {order.due_date && (
             <div className="sale-detail-meta-item">
-              <span className="text-muted">Дата готовности</span>
+              <span className={layoutStyles.textMuted}>Дата готовности</span>
               <span>{formatDueDate(order.due_date)}</span>
             </div>
           )}
           {order.created_at && (
             <div className="sale-detail-meta-item">
-              <span className="text-muted">Создан</span>
+              <span className={layoutStyles.textMuted}>Создан</span>
               <span>{formatDateTime(order.created_at)}</span>
             </div>
           )}
           {linkedSale && (
             <div className="sale-detail-meta-item">
-              <span className="text-muted">Оплата при выдаче</span>
+              <span className={layoutStyles.textMuted}>Оплата при выдаче</span>
               <span className={PAYMENT_BADGE_CLASS[linkedSale.payment_method]}>
                 {PAYMENT_LABELS[linkedSale.payment_method]}
               </span>
@@ -1073,20 +1112,20 @@ function OrderDetail({
         )}
 
         <h3 className="sale-detail-section-title">
-          Товары <span className="text-muted">· {order.lines.length} поз.</span>
+          Товары <span className={layoutStyles.textMuted}>· {order.lines.length} поз.</span>
         </h3>
-        <div className="data-table">
-          <div className="data-table-head" style={{ gridTemplateColumns: ORDER_LINES_COLUMNS }}>
+        <div className={layoutStyles.dataTable}>
+          <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: ORDER_LINES_COLUMNS }}>
             <span>Товар</span>
             <span>Кол-во</span>
             <span>Цена</span>
             <span>Сумма</span>
           </div>
-          <div className="data-table-body">
+          <div className={layoutStyles.dataTableBody}>
             {order.lines.map((line, i) => (
               <div
                 key={i}
-                className="data-row sale-history-row-in"
+                className={[layoutStyles.dataRow, 'sale-history-row-in'].join(' ')}
                 style={
                   {
                     gridTemplateColumns: ORDER_LINES_COLUMNS,
@@ -1094,7 +1133,7 @@ function OrderDetail({
                   } as CSSProperties
                 }
               >
-                <span className="data-row-name">{productName(line.product_id)}</span>
+                <span className={layoutStyles.dataRowName}>{productName(line.product_id)}</span>
                 <span>{formatQuantity(line.quantity)}</span>
                 <span>{formatMoney(line.price)} ₽</span>
                 <span>{formatMoney(line.total)} ₽</span>
@@ -1121,47 +1160,21 @@ function OrderDetail({
         </div>
 
         {order.note && (
-          <div className="stack" style={{ gap: 2 }}>
-            <span className="field-label">Заметка</span>
-            <span className="text-muted" style={{ whiteSpace: 'pre-wrap' }}>
+          <div className={layoutStyles.stack} style={{ gap: 2 }}>
+            <span className={layoutStyles.fieldLabel}>Заметка</span>
+            <span className={layoutStyles.textMuted} style={{ whiteSpace: 'pre-wrap' }}>
               {order.note}
             </span>
           </div>
         )}
 
-        <div className="sale-detail-history">
-          <button
-            type="button"
-            className="disclosure-link"
-            onClick={toggleHistory}
-            disabled={loadingHistory}
-            aria-expanded={historyOpen}
-          >
-            {loadingHistory ? 'Загрузка…' : 'История изменений'}
-            <IconChevronDown size={14} stroke={1.8} />
-          </button>
-          {historyOpen &&
-            (history === null ? null : history.length === 0 ? (
-              <p className="text-muted">Изменений не было</p>
-            ) : (
-              <div className="sale-detail-history-list">
-                {history.map((entry) => {
-                  const HistoryIcon = ORDER_HISTORY_ACTION_ICONS[entry.action] ?? IconArrowRight
-                  return (
-                    <div key={entry.id} className="sale-detail-history-item">
-                      <span className="sale-detail-history-icon">
-                        <HistoryIcon size={15} stroke={1.8} />
-                      </span>
-                      <span className="sale-detail-history-label">
-                        {ORDER_HISTORY_ACTION_LABELS[entry.action] ?? entry.action}
-                      </span>
-                      <span className="sale-detail-history-time">{formatDateTime(entry.created_at)}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
-        </div>
+        <HistoryDisclosure
+          load={() => getOrderHistory(order.id)}
+          actionLabels={ORDER_HISTORY_ACTION_LABELS}
+          formatDetail={formatOrderHistoryDetail}
+          actionIcons={ORDER_HISTORY_ACTION_ICONS}
+          defaultIcon={IconArrowRight}
+        />
       </div>
 
       {showEdit && (
@@ -1368,9 +1381,9 @@ function NewOrderForm({
   }
 
   return (
-    <form className="form" onSubmit={handleSubmit}>
-      <div className="row">
-        <label className="field" style={{ flex: 1 }}>
+    <form className={layoutStyles.form} onSubmit={handleSubmit}>
+      <div className={layoutStyles.row}>
+        <label className={layoutStyles.field} style={{ flex: 1 }}>
           Клиент
           <Select
             value={clientId != null ? String(clientId) : ''}
@@ -1379,7 +1392,7 @@ function NewOrderForm({
           />
         </label>
         {warehouses.length > 1 && (
-          <label className="field" style={{ flex: 1 }}>
+          <label className={layoutStyles.field} style={{ flex: 1 }}>
             Склад
             <Select
               value={warehouseId != null ? String(warehouseId) : ''}
@@ -1388,7 +1401,7 @@ function NewOrderForm({
             />
           </label>
         )}
-        <label className="field" style={{ flex: 1 }}>
+        <label className={layoutStyles.field} style={{ flex: 1 }}>
           Источник
           <Select
             value={source}
@@ -1398,7 +1411,7 @@ function NewOrderForm({
         </label>
       </div>
 
-      <div className="stack" style={{ gap: 10 }}>
+      <div className={layoutStyles.stack} style={{ gap: 10 }}>
         <div className="sale-search-row">
           <IconSearch size={16} stroke={1.8} className="sale-search-icon" />
           <input
@@ -1413,15 +1426,15 @@ function NewOrderForm({
             </Button>
           )}
         </div>
-        {scanError && <p className="error">{scanError}</p>}
+        {scanError && <p className={layoutStyles.error}>{scanError}</p>}
         <div className="sale-results-header">
           <span>Товары</span>
-          <span className="text-muted">{filtered.length} найдено</span>
+          <span className={layoutStyles.textMuted}>{filtered.length} найдено</span>
         </div>
         {filtered.length === 0 ? (
-          <p className="text-muted">Ничего не найдено</p>
+          <p className={layoutStyles.textMuted}>Ничего не найдено</p>
         ) : (
-          <div className="product-grid" style={{ maxHeight: 480, minHeight: 220, overflowY: 'auto' }}>
+          <div className={layoutStyles.productGrid} style={{ maxHeight: 480, minHeight: 220, overflowY: 'auto' }}>
             {filtered.map((p) => {
               const inLineQty = lines.find((l) => l.product.id === p.id)?.quantity
               const available = stockFor(p.id)
@@ -1431,7 +1444,9 @@ function NewOrderForm({
                   key={p.id}
                   role="button"
                   tabIndex={0}
-                  className={`product-tile${inLineQty ? ' product-tile-in-cart' : ''}`}
+                  className={[layoutStyles.productTile, inLineQty ? layoutStyles.productTileInCart : null]
+                    .filter(Boolean)
+                    .join(' ')}
                   onClick={() => addLine(p)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -1441,17 +1456,18 @@ function NewOrderForm({
                   }}
                 >
                   <ProductPhoto src={p.photo} />
-                  <div className="product-tile-body">
-                    <span className="product-tile-name">{p.name}</span>
-                    <span className="product-tile-price-label">Цена за {unitName(p.unit_code)}:</span>
-                    <span className="product-tile-price">{formatMoney(p.retail_price)} ₽</span>
+                  <div className={layoutStyles.productTileBody}>
+                    <span className={layoutStyles.productTileName}>{p.name}</span>
+                    <span className={layoutStyles.productTilePriceLabel}>Цена за {unitName(p.unit_code)}:</span>
+                    <span className={layoutStyles.productTilePrice}>{formatMoney(p.retail_price)} ₽</span>
                     {available !== null && (
                       <span
-                        className={`product-tile-stock${
-                          isOutOfStock(available) ? ' product-tile-stock-out' : ' product-tile-stock-in'
-                        }`}
+                        className={[
+                          layoutStyles.productTileStock,
+                          isOutOfStock(available) ? layoutStyles.productTileStockOut : layoutStyles.productTileStockIn,
+                        ].join(' ')}
                       >
-                        <span className="product-tile-stock-label">
+                        <span className={layoutStyles.productTileStockLabel}>
                           Доступно:
                           {reserved > 0 && (
                             <InfoHint
@@ -1459,8 +1475,8 @@ function NewOrderForm({
                             />
                           )}
                         </span>
-                        <span className="product-tile-stock-value-wrap">
-                          <span className="product-tile-stock-value">
+                        <span className={layoutStyles.productTileStockValueWrap}>
+                          <span className={layoutStyles.productTileStockValue}>
                             {formatQuantity(available)} {unitName(p.unit_code)}
                           </span>
                           {isLowStock(available, p.min_stock) && <StockWarningIcon />}
@@ -1469,13 +1485,18 @@ function NewOrderForm({
                     )}
                   </div>
                   <span
-                    className={`product-tile-cart-badge${inLineQty ? '' : ' product-tile-cart-badge-hidden'}`}
+                    className={[
+                      layoutStyles.productTileCartBadge,
+                      inLineQty ? null : layoutStyles.productTileCartBadgeHidden,
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
                   >
                     {inLineQty ? (
                       <>
                         {formatQuantity(inLineQty)}
                         <IconButton
-                          className="product-tile-remove"
+                          className={layoutStyles.productTileRemove}
                           onClick={(e) => {
                             e.stopPropagation()
                             removeLine(p.id)
@@ -1498,20 +1519,20 @@ function NewOrderForm({
 
       {showScanner && (
         <Modal title="Сканировать штрихкод" onClose={() => setShowScanner(false)}>
-          <Suspense fallback={<p className="text-muted">Загрузка сканера…</p>}>
+          <Suspense fallback={<p className={layoutStyles.textMuted}>Загрузка сканера…</p>}>
             <BarcodeScanner onDetected={handleScan} onClose={() => setShowScanner(false)} />
           </Suspense>
         </Modal>
       )}
 
       {lines.length > 0 && (
-        <div className="stack card card-full">
-          <div className="section-title">
+        <div className={[layoutStyles.stack, layoutStyles.card, layoutStyles.cardFull].join(' ')}>
+          <div className={layoutStyles.sectionTitle}>
             <h3>Позиции заказа</h3>
-            <span className="text-muted">{lines.length} поз.</span>
+            <span className={layoutStyles.textMuted}>{lines.length} поз.</span>
           </div>
-          <div className="table-wrap cart-table-wrap cart-table-wrap-compact">
-            <div className="cart-table-head" style={{ gridTemplateColumns: '34% 27% 27% 12%' }}>
+          <div className={[layoutStyles.tableWrap, styles.cartTableWrap, styles.cartTableWrapCompact].join(' ')}>
+            <div className={styles.cartTableHead} style={{ gridTemplateColumns: '34% 27% 27% 12%' }}>
               <span>Товар</span>
               <span>Кол-во</span>
               <span>Цена</span>
@@ -1524,57 +1545,57 @@ function NewOrderForm({
                 return (
                   <div
                     key={line.product.id}
-                    className="cart-table-row"
+                    className={styles.cartTableRow}
                     style={{ gridTemplateColumns: '34% 27% 27% 12%' }}
                   >
-                    <div className="cart-table-name">
+                    <div className={styles.cartTableName}>
                       <div>{line.product.name}</div>
                       {available !== null && (
-                        <div className="cart-table-stock">
+                        <div className={styles.cartTableStock}>
                           Доступно: {formatQuantity(available)} {unitName(line.product.unit_code)}
                         </div>
                       )}
                     </div>
-                    <div className="cart-table-qty-cell">
-                      <div className="cart-qty-stepper">
+                    <div className={styles.cartTableQtyCell}>
+                      <div className={styles.cartQtyStepper}>
                         <input
                           type="text"
                           inputMode="decimal"
-                          className={overStock ? 'cart-input-warning' : undefined}
+                          className={overStock ? styles.cartInputWarning : undefined}
                           value={line.quantity}
                           onChange={(e) => updateLine(line.product.id, 'quantity', e.target.value)}
                         />
-                        <div className="cart-qty-step-column">
+                        <div className={styles.cartQtyStepColumn}>
                           <IconButton
                             variant="muted"
-                            className="cart-qty-step"
+                            className={styles.cartQtyStep}
                             onClick={() => stepLineQuantity(line.product.id, 1)}
                             aria-label="Увеличить количество"
                           >
-                            <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-up" />
+                            <IconChevronRight size={10} stroke={1.8} className={styles.cartQtyStepIconUp} />
                           </IconButton>
                           <IconButton
                             variant="muted"
-                            className="cart-qty-step"
+                            className={styles.cartQtyStep}
                             onClick={() => stepLineQuantity(line.product.id, -1)}
                             aria-label="Уменьшить количество"
                           >
-                            <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-down" />
+                            <IconChevronRight size={10} stroke={1.8} className={styles.cartQtyStepIconDown} />
                           </IconButton>
                         </div>
                       </div>
                       {overStock && available !== null && (
-                        <div className="cart-table-warning">больше доступного ({formatQuantity(available)})</div>
+                        <div className={styles.cartTableWarning}>больше доступного ({formatQuantity(available)})</div>
                       )}
                     </div>
-                    <div className="cart-table-price-cell">
+                    <div className={styles.cartTablePriceCell}>
                       <input
                         type="text"
                         inputMode="decimal"
                         value={line.price}
                         onChange={(e) => updateLine(line.product.id, 'price', e.target.value)}
                       />
-                      <span className="cart-table-price-suffix">₽</span>
+                      <span className={styles.cartTablePriceSuffix}>₽</span>
                     </div>
                     <IconButton
                       variant="danger"
@@ -1588,19 +1609,19 @@ function NewOrderForm({
               })}
             </div>
           </div>
-          <div className="row between">
-            <span className="text-muted">Итого</span>
+          <div className={[layoutStyles.row, layoutStyles.between].join(' ')}>
+            <span className={layoutStyles.textMuted}>Итого</span>
             <strong>{formatMoney(total)} ₽</strong>
           </div>
         </div>
       )}
 
-      <div className="row">
-        <label className="field" style={{ flex: 1 }}>
+      <div className={layoutStyles.row}>
+        <label className={layoutStyles.field} style={{ flex: 1 }}>
           Дата готовности
           <DateInput required value={dueDate} onChange={setDueDate} />
         </label>
-        <label className="field" style={{ flex: 1 }}>
+        <label className={layoutStyles.field} style={{ flex: 1 }}>
           Предоплата
           <input
             type="text"
@@ -1613,11 +1634,11 @@ function NewOrderForm({
           />
         </label>
       </div>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Заметка
         <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="из директа, размер, пожелания…" />
       </label>
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       <Button type="submit" disabled={saving || !clientId || !warehouseId || !dueDate || lines.length === 0}>
         {saving ? 'Сохранение…' : editOrder ? 'Сохранить изменения' : 'Создать заказ'}
       </Button>

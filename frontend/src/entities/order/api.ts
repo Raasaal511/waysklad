@@ -89,6 +89,7 @@ export function issueOrder(
 export interface OrderHistoryEntry {
   id: number
   user_id: number
+  user_name: string | null
   action: string
   entity: string
   entity_id: number | null

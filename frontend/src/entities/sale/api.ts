@@ -29,8 +29,49 @@ export interface Sale {
   lines: SaleLine[]
 }
 
-export function listSales() {
-  return api.get<Sale[]>('/sales')
+export interface ListSalesParams {
+  limit?: number
+  offset?: number
+  clientId?: number | null
+  warehouseId?: number | null
+  paymentMethod?: PaymentMethod | 'all'
+  dateFrom?: string | null
+  dateTo?: string | null
+  sort?: 'date_desc' | 'date_asc' | 'payment'
+}
+
+export async function listSales(params: ListSalesParams = {}) {
+  const search = new URLSearchParams()
+  if (params.limit != null) search.set('limit', String(params.limit))
+  if (params.offset != null) search.set('offset', String(params.offset))
+  if (params.clientId != null) search.set('client_id', String(params.clientId))
+  if (params.warehouseId != null) search.set('warehouse_id', String(params.warehouseId))
+  if (params.paymentMethod && params.paymentMethod !== 'all') search.set('payment_method', params.paymentMethod)
+  if (params.dateFrom) search.set('date_from', params.dateFrom)
+  if (params.dateTo) search.set('date_to', params.dateTo)
+  if (params.sort) search.set('sort', params.sort)
+  const qs = search.toString()
+  const { data, total } = await api.getWithTotal<Sale[]>(`/sales${qs ? `?${qs}` : ''}`)
+  return { items: data, total }
+}
+
+export interface SalesSummaryParams {
+  warehouseId?: number | null
+  dateFrom?: string | null
+  dateTo?: string | null
+}
+
+export interface SalesSummary {
+  by_payment_method: Partial<Record<PaymentMethod, { count: number; total: string }>>
+}
+
+export function getSalesSummary(params: SalesSummaryParams = {}) {
+  const search = new URLSearchParams()
+  if (params.warehouseId != null) search.set('warehouse_id', String(params.warehouseId))
+  if (params.dateFrom) search.set('date_from', params.dateFrom)
+  if (params.dateTo) search.set('date_to', params.dateTo)
+  const qs = search.toString()
+  return api.get<SalesSummary>(`/sales/summary${qs ? `?${qs}` : ''}`)
 }
 
 export function getSale(saleId: number) {
@@ -48,6 +89,7 @@ export function deleteSale(saleId: number) {
 export interface SaleHistoryEntry {
   id: number
   user_id: number
+  user_name: string | null
   action: string
   entity: string
   entity_id: number | null

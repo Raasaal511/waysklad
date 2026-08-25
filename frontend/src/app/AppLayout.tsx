@@ -10,7 +10,6 @@ import {
   IconUsers,
   IconChartBar,
   IconUserCog,
-  IconHistory,
   IconChevronLeft,
   IconChevronRight,
   type Icon as TablerIcon,
@@ -51,8 +50,6 @@ const NAV_ITEMS: NavItem[] = [
   },
   { to: '/analytics', label: 'Аналитика', icon: IconChartBar, roles: ['owner', 'manager', 'analyst'] },
   { to: '/employees', label: 'Сотрудники', icon: IconUserCog, roles: ['owner', 'manager'] },
-  // видно только ролям с Permission.AUDIT_VIEW (backend/app/domain/identity/permissions.py)
-  { to: '/audit', label: 'Журнал', icon: IconHistory, roles: ['owner', 'analyst'] },
 ]
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -92,6 +89,8 @@ function NavItems({
           }
           data-tooltip={collapsed ? item.label : undefined}
           data-nav={item.to === '/tasks' ? 'tasks' : undefined}
+          data-onboarding={item.to}
+          aria-label={variant === 'bottom' ? item.label : undefined}
         >
           <span className={variant === 'sidebar' ? styles['app-sidebar-icon'] : styles['app-nav-icon']}>
             <item.icon size={variant === 'sidebar' ? 19 : 21} stroke={1.8} />

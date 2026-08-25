@@ -44,6 +44,7 @@ export interface Category {
 export interface ProductHistoryEntry {
   id: number
   user_id: number
+  user_name: string | null
   action: string
   entity: string
   entity_id: number | null
@@ -99,8 +100,8 @@ export async function listProducts(params: ListProductsParams = {}) {
 }
 
 /** Весь каталог целиком (без пагинации) — для форм выбора товара: продажа, заказ, приёмка. */
-export async function listAllProducts(query = '') {
-  const { items } = await listProducts({ query, limit: 1000 })
+export async function listAllProducts(query = '', categoryId?: number | null) {
+  const { items } = await listProducts({ query, limit: 1000, categoryId })
   return items
 }
 

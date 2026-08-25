@@ -9,26 +9,18 @@ import {
   type FormEvent,
 } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import {
-  listAllProducts,
-  getByBarcode,
-  listCategories,
-  listUnits,
-  type Product,
-  type Category,
-  type Unit,
-} from '../../entities/product/api'
-import { listWarehouses, listStock, type Warehouse, type StockItem } from '../../entities/inventory/api'
+import { listAllProducts, getByBarcode, type Product } from '../../entities/product/api'
+import { type Warehouse } from '../../entities/inventory/api'
 import { searchClients, type Client } from '../../entities/counterparty/api'
 import { listClientDebts, type Debt } from '../../entities/debt/api'
-import { listEmployees } from '../../entities/profile/api'
-import type { User } from '../../entities/auth/api'
+import { useCatalog } from '../../app/CatalogContext'
 import {
   createSale,
   returnSale,
   getReceipt,
   getReceiptPdf,
   listSales,
+  getSalesSummary,
   getSale,
   editSale,
   deleteSale,
@@ -39,6 +31,7 @@ import {
   type Sale,
   type SaleHistoryEntry,
   type SaleReturn,
+  type SalesSummary,
 } from '../../entities/sale/api'
 import {
   IconReceiptRefund,
@@ -54,7 +47,6 @@ import {
   IconShare,
   IconPencil,
   IconTrash,
-  IconChevronDown,
   type Icon as TablerIcon,
 } from '@tabler/icons-react'
 import { ApiError } from '../../shared/api/client'
@@ -68,6 +60,7 @@ import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
 import { InfoHint } from '../../shared/ui/InfoHint'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
+import { HistoryDisclosure } from '../../shared/ui/HistoryDisclosure'
 import { isBarcodeScannerSupported } from '../../entities/barcode/barcodeSupport'
 import { queueSale } from '../../shared/offline/outbox'
 
@@ -87,10 +80,13 @@ import {
 } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
 import { useAuth } from '../../app/AuthContext'
+import layoutStyles from '../../shared/ui/Layout.module.css'
+import styles from './SalePage.module.css'
 
 const DRAFT_KEY = 'waysklad:sale-draft'
 const SALE_LINES_COLUMNS = '2fr 1fr 1fr 1fr'
 const CART_TABLE_COLUMNS = '40% 18% 17% 17% 8%'
+const PAGE_SIZE = 50
 
 interface CartLine {
   product: Product
@@ -157,20 +153,26 @@ const SALE_SORT_LABELS: Record<SaleSortMode, string> = {
   payment: 'По способу оплаты',
 }
 
-function isWithinPeriod(dateStr: string, period: PeriodFilter): boolean {
-  if (period === 'all') return true
-  const date = new Date(dateStr)
+function toISODate(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function periodToDateRange(period: PeriodFilter): { from: string | null; to: string | null } {
+  if (period === 'all') return { from: null, to: null }
   const now = new Date()
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  if (period === 'today') return date >= startOfToday
+  if (period === 'today') return { from: toISODate(startOfToday), to: null }
   if (period === 'week') {
     const weekAgo = new Date(startOfToday)
     weekAgo.setDate(weekAgo.getDate() - 6)
-    return date >= weekAgo
+    return { from: toISODate(weekAgo), to: null }
   }
   const monthAgo = new Date(startOfToday)
   monthAgo.setDate(monthAgo.getDate() - 29)
-  return date >= monthAgo
+  return { from: toISODate(monthAgo), to: null }
 }
 
 function dayLabel(dateStr: string): string {
@@ -194,14 +196,21 @@ const SORT_LABELS: Record<SortMode, string> = {
 }
 
 export function SalePage() {
+  const { warehouses, ensureWarehouses } = useCatalog()
   const [sales, setSales] = useState<Sale[]>([])
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const [showNewSale, setShowNewSale] = useState(() => searchParams.get('open') === '1')
   const [hasDraft] = useState(() => loadDraft() !== null)
+  const [savedSaleNotice, setSavedSaleNotice] = useState<Sale | null>(null)
+
+  useEffect(() => {
+    if (!savedSaleNotice) return
+    const timer = window.setTimeout(() => setSavedSaleNotice(null), 4000)
+    return () => window.clearTimeout(timer)
+  }, [savedSaleNotice])
 
   useEffect(() => {
     if (searchParams.get('open') !== '1') return
@@ -233,9 +242,13 @@ export function SalePage() {
   const [paymentFilter, setPaymentFilter] = useState<PaymentMethod | 'all'>('all')
   const [warehouseFilter, setWarehouseFilter] = useState<number | 'all'>('all')
   const [clientQuery, setClientQuery] = useState('')
+  const [debouncedClientQuery, setDebouncedClientQuery] = useState('')
   const [sortMode, setSortMode] = useState<SaleSortMode>('date_desc')
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
   const [pinned, setPinned] = useState(false)
+  const [total, setTotal] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [summary, setSummary] = useState<SalesSummary | null>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -248,12 +261,42 @@ export function SalePage() {
     return () => observer.disconnect()
   }, [])
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedClientQuery(clientQuery), 300)
+    return () => clearTimeout(timer)
+  }, [clientQuery])
+
+  const dateRange = useMemo(() => periodToDateRange(period), [period])
+
+async function loadSalesPage(params: {
+    warehouseFilter: number | 'all'
+    paymentFilter: PaymentMethod | 'all'
+    dateRange: { from: string | null; to: string | null }
+    sortMode: SaleSortMode
+  }) {
+    return listSales({
+      limit: PAGE_SIZE,
+      offset: 0,
+      warehouseId: params.warehouseFilter === 'all' ? null : params.warehouseFilter,
+      paymentMethod: params.paymentFilter,
+      dateFrom: params.dateRange.from,
+      dateTo: params.dateRange.to,
+      sort: params.sortMode,
+    })
+  }
+
+  // Первая загрузка страницы — показывает полноэкранный "Загрузка…" и тянет
+  // клиентов/склады заодно. Смена фильтра ими не пользуется — см. reloadSales.
   async function load() {
     setLoading(true)
     try {
-      const [s, w, c] = await Promise.all([listSales(), listWarehouses(), searchClients()])
-      setSales(s)
-      setWarehouses(w)
+      const [{ items, total: t }, , c] = await Promise.all([
+        loadSalesPage({ warehouseFilter, paymentFilter, dateRange, sortMode }),
+        ensureWarehouses(),
+        searchClients(),
+      ])
+      setSales(items)
+      setTotal(t)
       setClients(c)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось загрузить продажи')
@@ -262,41 +305,75 @@ export function SalePage() {
     }
   }
 
+  const isFirstLoad = useRef(true)
+
+  // Перезагрузка списка при смене фильтра — без полноэкранного "Загрузка…" и
+  // без повторных запросов клиентов/складов (они не зависят от фильтра продаж).
+  async function reloadSales() {
+    try {
+      const { items, total: t } = await loadSalesPage({ warehouseFilter, paymentFilter, dateRange, sortMode })
+      setSales(items)
+      setTotal(t)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось загрузить продажи')
+    }
+  }
+
+  async function loadMore() {
+    setLoadingMore(true)
+    try {
+      const { items, total: t } = await listSales({
+        limit: PAGE_SIZE,
+        offset: sales.length,
+        warehouseId: warehouseFilter === 'all' ? null : warehouseFilter,
+        paymentMethod: paymentFilter,
+        dateFrom: dateRange.from,
+        dateTo: dateRange.to,
+        sort: sortMode,
+      })
+      setSales((prev) => [...prev, ...items])
+      setTotal(t)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось загрузить продажи')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
   useEffect(() => {
-    load()
-  }, [])
+    if (isFirstLoad.current) {
+      isFirstLoad.current = false
+      load()
+    } else {
+      reloadSales()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [warehouseFilter, paymentFilter, sortMode, dateRange.from, dateRange.to])
+
+  useEffect(() => {
+    getSalesSummary({
+      warehouseId: warehouseFilter === 'all' ? null : warehouseFilter,
+      dateFrom: dateRange.from,
+      dateTo: dateRange.to,
+    })
+      .then(setSummary)
+      .catch(() => {})
+  }, [warehouseFilter, dateRange.from, dateRange.to])
 
   const warehouseName = (id: number) => warehouses.find((w) => w.id === id)?.name ?? `#${id}`
   const clientName = (id: number | null) =>
     id == null ? null : clients.find((c) => c.id === id)?.name ?? `#${id}`
 
-  const periodSales = useMemo(() => {
-    const query = clientQuery.trim().toLowerCase()
-    return sales.filter(
-      (s) =>
-        isWithinPeriod(s.created_at, period) &&
-        (warehouseFilter === 'all' || s.warehouse_id === warehouseFilter) &&
-        (query === '' || (clientName(s.client_id) ?? '').toLowerCase().includes(query)),
-    )
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales, period, warehouseFilter, clientQuery, clients])
-
+  // Текстовый поиск по клиенту остаётся клиентским: имя не хранится в продаже
+  // (только client_id), а полноценный серверный поиск по подстроке имени
+  // потребовал бы JOIN ради второстепенного фильтра — фильтруем уже
+  // загруженную (сервером отфильтрованную по остальным критериям) страницу.
   const filteredSales = useMemo(() => {
-    const list =
-      paymentFilter === 'all'
-        ? periodSales
-        : periodSales.filter((s) => s.payment_method === paymentFilter)
-    const sorted = [...list]
-    if (sortMode === 'date_asc') {
-      sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-    } else if (sortMode === 'payment') {
-      const order: Record<PaymentMethod, number> = { cash: 0, transfer: 1, credit: 2 }
-      sorted.sort((a, b) => order[a.payment_method] - order[b.payment_method])
-    } else {
-      sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    }
-    return sorted
-  }, [periodSales, paymentFilter, sortMode])
+    const query = debouncedClientQuery.trim().toLowerCase()
+    if (!query) return sales
+    return sales.filter((s) => (clientName(s.client_id) ?? '').toLowerCase().includes(query))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales, debouncedClientQuery, clients])
 
   const groups = useMemo(() => {
     if (sortMode === 'payment') {
@@ -331,19 +408,22 @@ export function SalePage() {
   const animatedPeriodTotal = useAnimatedNumber(periodTotal)
   const animatedSalesCount = useAnimatedNumber(filteredSales.length)
   const animatedAvgCheck = useAnimatedNumber(avgCheck)
-  const periodTotalAll = periodSales.reduce((sum, s) => sum + Number(s.total), 0)
-  const paymentStats = periodSales.reduce(
-    (acc, s) => {
-      acc[s.payment_method].total += Number(s.total)
-      acc[s.payment_method].count += 1
-      return acc
-    },
-    {
-      cash: { total: 0, count: 0 },
-      transfer: { total: 0, count: 0 },
-      credit: { total: 0, count: 0 },
-    } as Record<PaymentMethod, { total: number; count: number }>,
-  )
+  const paymentStats: Record<PaymentMethod, { total: number; count: number }> = {
+    cash: { total: 0, count: 0 },
+    transfer: { total: 0, count: 0 },
+    credit: { total: 0, count: 0 },
+  }
+  let periodTotalAll = 0
+  let periodCountAll = 0
+  if (summary) {
+    for (const method of Object.keys(PAYMENT_LABELS) as PaymentMethod[]) {
+      const stat = summary.by_payment_method[method]
+      if (!stat) continue
+      paymentStats[method] = { total: Number(stat.total), count: stat.count }
+      periodTotalAll += Number(stat.total)
+      periodCountAll += stat.count
+    }
+  }
 
   const activeFilterCount =
     (warehouseFilter !== 'all' ? 1 : 0) +
@@ -368,8 +448,8 @@ export function SalePage() {
     .join(' ')
 
   return (
-    <div className="stack">
-      <div className="section-title">
+    <div className={layoutStyles.stack}>
+      <div className={layoutStyles.sectionTitle}>
         <h2>Продажи</h2>
         <Button onClick={() => setShowNewSale(true)}>
           <IconPlus size={16} stroke={1.8} />
@@ -378,31 +458,33 @@ export function SalePage() {
       </div>
 
       <div ref={sentinelRef} style={{ height: 1, marginBottom: -1 }} />
-      <div className={`sale-filters-bar${pinned ? ' is-pinned' : ''}`}>
-        <div className="sale-period-tabs">
+      <div className={[styles.saleFiltersBar, pinned && styles.isPinned].filter(Boolean).join(' ')}>
+        <div className={styles.salePeriodTabs}>
           {(Object.keys(PERIOD_LABELS) as PeriodFilter[]).map((p) => (
-            <Button
+            <button
               key={p}
+              type="button"
               translate="no"
-              variant="secondary"
-              active={period === p}
+              className={period === p ? styles.pillTabActive : styles.pillTab}
               onClick={() => setPeriod(p)}
             >
               {PERIOD_LABELS[p]}
-            </Button>
+            </button>
           ))}
         </div>
-        <div className="sale-filters-scroll">
+        <div className={styles.saleFiltersScroll}>
           <input
-            className={`sale-client-search${clientQuery.trim() !== '' ? ' sale-filter-active' : ''}`}
+            className={[styles.saleClientSearch, clientQuery.trim() !== '' && styles.saleFilterActive]
+              .filter(Boolean)
+              .join(' ')}
             placeholder="Клиент"
             value={clientQuery}
             onChange={(e) => setClientQuery(e.target.value)}
           />
           {warehouses.length > 1 && (
-            <label className="sale-sort-field">
+            <label className={styles.saleSortField}>
               <Select
-                className={warehouseFilter !== 'all' ? 'sale-filter-active' : undefined}
+                className={warehouseFilter !== 'all' ? styles.saleFilterActive : undefined}
                 value={warehouseFilter === 'all' ? 'all' : String(warehouseFilter)}
                 onChange={(v) => setWarehouseFilter(v === 'all' ? 'all' : Number(v))}
                 options={[
@@ -412,9 +494,9 @@ export function SalePage() {
               />
             </label>
           )}
-          <label className="sale-sort-field">
+          <label className={styles.saleSortField}>
             <Select
-              className={sortMode !== 'date_desc' ? 'sale-filter-active' : undefined}
+              className={sortMode !== 'date_desc' ? styles.saleFilterActive : undefined}
               value={sortMode}
               onChange={(v) => setSortMode(v as SaleSortMode)}
               options={(Object.keys(SALE_SORT_LABELS) as SaleSortMode[]).map((mode) => ({
@@ -437,38 +519,45 @@ export function SalePage() {
       </div>
 
       {!loading && filteredSales.length > 0 && (
-        <div className="card card-full sale-period-summary">
-          <h3 className="sale-period-summary-title">Итого</h3>
-          <div className="grid-stats">
-            <div className="stat">
-              <span className="stat-label">Выручка</span>
-              <span className="stat-value">{formatMoney(animatedPeriodTotal)} ₽</span>
+        <div className={[layoutStyles.card, layoutStyles.cardFull, styles.salePeriodSummary].join(' ')}>
+          <h3 className={styles.salePeriodSummaryTitle}>Итого</h3>
+          <div className={layoutStyles.gridStats}>
+            <div className={layoutStyles.stat}>
+              <span className={layoutStyles.statLabel}>Выручка</span>
+              <span className={layoutStyles.statValue}>{formatMoney(animatedPeriodTotal)} ₽</span>
             </div>
-            <div className="stat">
-              <span className="stat-label">Продаж</span>
-              <span className="stat-value">{Math.round(animatedSalesCount)}</span>
+            <div className={layoutStyles.stat}>
+              <span className={layoutStyles.statLabel}>Продаж</span>
+              <span className={layoutStyles.statValue}>{Math.round(animatedSalesCount)}</span>
             </div>
-            <div className="stat">
-              <span className="stat-label">Средний чек</span>
-              <span className="stat-value">{formatMoney(animatedAvgCheck)} ₽</span>
+            <div className={layoutStyles.stat}>
+              <span className={layoutStyles.statLabel}>Средний чек</span>
+              <span className={layoutStyles.statValue}>{formatMoney(animatedAvgCheck)} ₽</span>
             </div>
           </div>
-          <div className="sale-payment-breakdown">
+          <div className={styles.salePaymentBreakdown}>
             <button
               type="button"
-              className={`sale-payment-item${paymentFilter === 'all' ? ' sale-payment-item-active' : ''}`}
+              className={[styles.salePaymentItem, paymentFilter === 'all' && styles.salePaymentItemActive]
+                .filter(Boolean)
+                .join(' ')}
               onClick={() => setPaymentFilter('all')}
             >
-              <span className="badge sale-payment-badge-all">Все способы</span>
+              <span className={[layoutStyles.badge, styles.salePaymentBadgeAll].join(' ')}>Все способы</span>
               <span>
-                {periodSales.length} · {formatMoney(periodTotalAll)} ₽
+                {periodCountAll} · {formatMoney(periodTotalAll)} ₽
               </span>
             </button>
             {(Object.keys(PAYMENT_LABELS) as PaymentMethod[]).map((method) => (
               <button
                 type="button"
                 key={method}
-                className={`sale-payment-item${paymentFilter === method ? ' sale-payment-item-active' : ''}`}
+                className={[
+                  styles.salePaymentItem,
+                  paymentFilter === method && styles.salePaymentItemActive,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 onClick={() => setPaymentFilter(method)}
                 disabled={paymentStats[method].count === 0}
               >
@@ -482,13 +571,13 @@ export function SalePage() {
         </div>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
 
       {!loading && warehouses.length === 0 && (
-        <div className="card card-full onboarding-banner">
-          <div className="stack" style={{ gap: 2 }}>
+        <div className={[layoutStyles.card, layoutStyles.cardFull, layoutStyles.onboardingBanner].join(' ')}>
+          <div className={layoutStyles.stack} style={{ gap: 2 }}>
             <strong>Добавьте склад — и можно начинать</strong>
-            <span className="text-muted">
+            <span className={layoutStyles.textMuted}>
               Склад — это то место, где реально лежит товар (магазин, точка, подсобка). Без него
               некуда принять товар и не с чего продавать.
             </span>
@@ -502,29 +591,29 @@ export function SalePage() {
       )}
 
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : filteredSales.length === 0 ? (
-        <p className="text-muted">
-          {sales.length === 0 ? 'Продаж пока нет — начните первую' : 'За этот период продаж нет'}
+        <p className={layoutStyles.textMuted}>
+          {total === 0 ? 'Продаж пока нет — начните первую' : 'За этот период продаж нет'}
         </p>
       ) : (
-        <div className="stack" style={{ gap: 16 }}>
+        <div className={layoutStyles.stack} style={{ gap: 16 }}>
           {groups.map((group) => (
-            <div className="sale-day-group" key={group.label}>
-              <div className="sale-day-header">
+            <div className={styles.saleDayGroup} key={group.label}>
+              <div className={styles.saleDayHeader}>
                 <span>{group.label}</span>
-                <span className="sale-day-header-stats">
+                <span className={styles.saleDayHeaderStats}>
                   <span>
                     {group.count} {pluralizeSales(group.count)}
                   </span>
-                  <span className="sale-day-header-total">{formatMoney(group.total)} ₽</span>
+                  <span className={styles.saleDayHeaderTotal}>{formatMoney(group.total)} ₽</span>
                 </span>
               </div>
-              <div className="sale-history">
+              <div className={styles.saleHistory}>
                 {group.sales.map((s, i) => (
                   <button
                     type="button"
-                    className="sale-history-row sale-history-row-in"
+                    className={[styles.saleHistoryRow, styles.saleHistoryRowIn].join(' ')}
                     style={
                       {
                         '--history-row-columns': historyRowColumns,
@@ -534,19 +623,19 @@ export function SalePage() {
                     key={s.id}
                     onClick={() => setSelectedSale(s)}
                   >
-                    <span className="sale-history-total">{formatMoney(s.total)} ₽</span>
+                    <span className={styles.saleHistoryTotal}>{formatMoney(s.total)} ₽</span>
                     {showPaymentTag && (
                       <span className={PAYMENT_BADGE_CLASS[s.payment_method]}>
                         {PAYMENT_LABELS[s.payment_method]}
                       </span>
                     )}
                     {showWarehouseTag && (
-                      <span className="sale-history-detail">
+                      <span className={styles.saleHistoryDetail}>
                         <IconBuildingWarehouse size={13} stroke={1.8} />
                         {warehouseName(s.warehouse_id)}
                       </span>
                     )}
-                    <span className="sale-history-detail">
+                    <span className={styles.saleHistoryDetail}>
                       {clientName(s.client_id) && (
                         <>
                           <IconUsers size={13} stroke={1.8} />
@@ -554,7 +643,7 @@ export function SalePage() {
                         </>
                       )}
                     </span>
-                    <span className="sale-history-time">
+                    <span className={styles.saleHistoryTime}>
                       {sortMode === 'payment'
                         ? new Date(s.created_at).toLocaleString('ru-RU', {
                             day: 'numeric',
@@ -572,6 +661,11 @@ export function SalePage() {
               </div>
             </div>
           ))}
+          {sales.length < total && !debouncedClientQuery.trim() && (
+            <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? 'Загрузка…' : `Показать ещё (${total - sales.length})`}
+            </Button>
+          )}
         </div>
       )}
 
@@ -587,26 +681,60 @@ export function SalePage() {
 
       {showNewSale && (
         <NewSaleForm
+          clients={clients}
+          onClientsChange={setClients}
           onClose={() => setShowNewSale(false)}
-          onDone={() => {
+          onDone={(sale) => {
             setShowNewSale(false)
+            setSavedSaleNotice(sale)
             load()
           }}
         />
+      )}
+
+      {savedSaleNotice && (
+        <div className={styles.saleSavedToast} role="status">
+          Продажа №{savedSaleNotice.id} на {formatMoney(savedSaleNotice.total)} ₽ — сохранена
+          <button
+            type="button"
+            className={styles.saleSavedToastClose}
+            onClick={() => setSavedSaleNotice(null)}
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
+        </div>
       )}
     </div>
   )
 }
 
-function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+function NewSaleForm({
+  clients: initialClients,
+  onClientsChange,
+  onClose,
+  onDone,
+}: {
+  clients: Client[]
+  onClientsChange: (clients: Client[]) => void
+  onClose: () => void
+  onDone: (sale: Sale) => void
+}) {
   const draft = useMemo(() => loadDraft(), [])
+  const {
+    categories,
+    units,
+    stock,
+    warehouses,
+    ensureCategories,
+    ensureUnits,
+    ensureStock,
+    ensureWarehouses,
+    refresh: refreshCatalog,
+  } = useCatalog()
 
   const [products, setProducts] = useState<Product[]>([])
   const [productsLoading, setProductsLoading] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
-  const [units, setUnits] = useState<Unit[]>([])
-  const [stock, setStock] = useState<StockItem[]>([])
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [warehouseId, setWarehouseId] = useState<number | null>(draft?.warehouseId ?? null)
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -625,14 +753,13 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const [discountMode, setDiscountMode] = useState<'amount' | 'percent'>(
     draft?.discountMode ?? 'amount',
   )
-  const [clients, setClients] = useState<Client[]>([])
+  const clients = initialClients
   const [clientId, setClientId] = useState<number | null>(draft?.clientId ?? null)
   const [showNewClientForm, setShowNewClientForm] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [lastSale, setLastSale] = useState<Sale | null>(null)
   const [offlineQueued, setOfflineQueued] = useState<{ itemsCount: number; total: string } | null>(null)
 
   useEffect(() => {
@@ -642,33 +769,33 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   useEffect(() => {
     setProductsLoading(true)
-    listAllProducts(debouncedQuery)
+    listAllProducts(debouncedQuery, categoryId)
       .then(setProducts)
       .catch(() => {})
       .finally(() => setProductsLoading(false))
-  }, [debouncedQuery])
+  }, [debouncedQuery, categoryId])
 
   useEffect(() => {
-    listCategories().then(setCategories).catch(() => {})
-    listUnits().then(setUnits).catch(() => {})
-    listStock().then(setStock).catch(() => {})
-    listWarehouses().then((list) => {
-      setWarehouses(list)
-      if (list.length > 0 && warehouseId == null) setWarehouseId(list[0].id)
-    }).catch(() => {})
-    searchClients().then(setClients).catch(() => {})
+    ensureCategories().catch(() => {})
+    ensureUnits().catch(() => {})
+    ensureStock().catch(() => {})
+    ensureWarehouses()
+      .then((list) => {
+        if (list.length > 0 && warehouseId == null) setWarehouseId(list[0].id)
+      })
+      .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Черновик переживает закрытие модалки/перезагрузку страницы, пока продажа не проведена
   useEffect(() => {
-    if (lastSale || offlineQueued) return
+    if (offlineQueued) return
     if (cart.length === 0) {
       clearDraft()
       return
     }
     saveDraft({ warehouseId, cart, payment, discount, discountMode, clientId })
-  }, [warehouseId, cart, payment, discount, discountMode, clientId, lastSale, offlineQueued])
+  }, [warehouseId, cart, payment, discount, discountMode, clientId, offlineQueued])
 
   async function handleScan(code: string) {
     setShowScanner(false)
@@ -745,10 +872,10 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const isFractional = (code: string) => units.find((u) => u.code === code)?.fractional ?? false
 
   const filtered = useMemo(() => {
+    // categoryId уже применён на сервере (listAllProducts выше) — здесь остаются
+    // только showAllStock/сортировка, которые требуют остатков по складу, а их
+    // на сервере для этого списка нет.
     let list = products
-    if (categoryId != null) {
-      list = list.filter((p) => p.category_id === categoryId)
-    }
     if (warehouseId != null && !showAllStock) {
       list = list.filter((p) => Number(stockFor(p.id) ?? 0) > 0)
     }
@@ -767,7 +894,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
     })
     return sorted
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, categoryId, showAllStock, sortMode, stock, warehouseId])
+  }, [products, showAllStock, sortMode, stock, warehouseId])
 
   const cartQtyByProduct = useMemo(
     () => new Map(cart.map((l) => [l.product.id, l.quantity])),
@@ -920,12 +1047,8 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
         debt_due_date: payment === 'credit' ? debtDueDate : null,
       })
       clearDraft()
-      setLastSale(sale)
-      setCart([])
-      setDiscount('0')
-      setClientId(null)
-      setDebtDueDate('')
-      setCashReceived('')
+      refreshCatalog(['stock']).catch(() => {})
+      onDone(sale)
     } catch (err) {
       // Сеть недоступна (offline или fetch упал по TypeError, не по HTTP-ответу) —
       // и продажа не в долг (офлайн-синк на бэкенде долги не поддерживает, см. sync/schemas.py) —
@@ -957,28 +1080,16 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   if (offlineQueued) {
     return (
-      <Modal title="Продажа сохранена локально" onClose={onDone} size="full">
-        <div className="stack" style={{ textAlign: 'center', padding: '24px 12px' }}>
+      <Modal title="Продажа сохранена локально" onClose={onClose} size="full">
+        <div className={layoutStyles.stack} style={{ textAlign: 'center', padding: '24px 12px' }}>
           <p>
             Нет подключения к интернету. Продажа на сумму {formatMoney(offlineQueued.total)} (позиций в чеке:{' '}
             {offlineQueued.itemsCount}) сохранена на устройстве и отправится на сервер автоматически, как
             только появится сеть.
           </p>
-          <Button onClick={onDone}>Понятно</Button>
+          <Button onClick={onClose}>Понятно</Button>
         </div>
       </Modal>
-    )
-  }
-
-  if (lastSale) {
-    return (
-      <LastSaleCard
-        sale={lastSale}
-        warehouses={warehouses}
-        clients={clients}
-        onDone={onDone}
-        onUpdated={() => {}}
-      />
     )
   }
 
@@ -995,9 +1106,9 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
           <Button variant="secondary" onClick={handleClear} disabled={cart.length === 0}>
             Очистить
           </Button>
-          <span className="modal-footer-total">
+          <span className={styles.modalFooterTotal}>
             {discountAmount > 0 && (
-              <span className="modal-footer-breakdown">
+              <span className={styles.modalFooterBreakdown}>
                 {formatMoney(subtotal)} ₽ − {formatMoney(discountAmount)} ₽ ={' '}
               </span>
             )}
@@ -1006,13 +1117,13 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
         </>
       }
     >
-      <div className="stack">
-      <div className="sale-search-panel">
+      <div className={layoutStyles.stack}>
+      <div className={styles.saleSearchPanel}>
         <div>
-          <div className="sale-search-row">
-            <IconBarcode size={18} stroke={1.8} className="sale-search-icon" />
+          <div className={styles.saleSearchRow}>
+            <IconBarcode size={18} stroke={1.8} className={styles.saleSearchIcon} />
             <input
-              className="sale-search-input"
+              className={styles.saleSearchInput}
               placeholder={
                 isBarcodeScannerSupported()
                   ? 'Найти товар по названию или отсканировать штрихкод…'
@@ -1024,7 +1135,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
             {isBarcodeScannerSupported() && (
               <Button
                 variant="secondary"
-                className="sale-scan-button"
+                className={styles.saleScanButton}
                 onClick={() => setShowScanner(true)}
               >
                 <IconBarcode size={16} stroke={1.8} /> Скан
@@ -1033,10 +1144,10 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
           </div>
         </div>
 
-        <div className="sale-filters-row">
+        <div className={styles.saleFiltersRow}>
           {warehouses.length > 1 && (
-            <label className="sale-filter-field">
-              <span className="sale-filter-label">Склад</span>
+            <label className={styles.saleFilterField}>
+              <span className={styles.saleFilterLabel}>Склад</span>
               <Select
                 value={String(warehouseId ?? '')}
                 onChange={(v) => setWarehouseId(Number(v))}
@@ -1046,8 +1157,8 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
           )}
 
           {categories.length > 0 && (
-            <label className="sale-filter-field">
-              <span className="sale-filter-label">Категория</span>
+            <label className={styles.saleFilterField}>
+              <span className={styles.saleFilterLabel}>Категория</span>
               <Select
                 value={String(categoryId ?? '')}
                 onChange={(v) => setCategoryId(v ? Number(v) : null)}
@@ -1059,8 +1170,8 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
             </label>
           )}
 
-          <label className="sale-filter-field">
-            <span className="sale-filter-label">Сортировка</span>
+          <label className={styles.saleFilterField}>
+            <span className={styles.saleFilterLabel}>Сортировка</span>
             <Select
               value={sortMode}
               onChange={(v) => setSortMode(v as SortMode)}
@@ -1069,7 +1180,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
           </label>
 
           {warehouseId != null && (
-            <label className="sale-checkbox">
+            <label className={styles.saleCheckbox}>
               <input
                 type="checkbox"
                 checked={showAllStock}
@@ -1080,21 +1191,21 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
           )}
         </div>
 
-        {scanError && <p className="error">{scanError}</p>}
+        {scanError && <p className={layoutStyles.error}>{scanError}</p>}
       </div>
 
-      <div className="sale-results-panel">
-        <div className="sale-results-header">
+      <div className={styles.saleResultsPanel}>
+        <div className={styles.saleResultsHeader}>
           <span>Товары</span>
-          {!productsLoading && <span className="text-muted">{filtered.length} найдено</span>}
+          {!productsLoading && <span className={layoutStyles.textMuted}>{filtered.length} найдено</span>}
         </div>
 
         {productsLoading ? (
-          <p className="text-muted">Загрузка…</p>
+          <p className={layoutStyles.textMuted}>Загрузка…</p>
         ) : filtered.length === 0 ? (
-          <p className="text-muted">Ничего не найдено</p>
+          <p className={layoutStyles.textMuted}>Ничего не найдено</p>
         ) : (
-          <div className="product-grid" style={{ maxHeight: 480, minHeight: 220, overflowY: 'auto' }}>
+          <div className={layoutStyles.productGrid} style={{ maxHeight: 480, minHeight: 220, overflowY: 'auto' }}>
             {filtered.map((p) => {
               const qty = stockFor(p.id)
               const reserved = reservedFor(p.id)
@@ -1104,7 +1215,9 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                   key={p.id}
                   role="button"
                   tabIndex={0}
-                  className={`product-tile${inCartQty ? ' product-tile-in-cart' : ''}`}
+                  className={[layoutStyles.productTile, inCartQty && layoutStyles.productTileInCart]
+                    .filter(Boolean)
+                    .join(' ')}
                   onClick={() => addToCart(p)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -1114,19 +1227,20 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                   }}
                 >
                   <ProductPhoto src={p.photo} />
-                  <div className="product-tile-body">
-                    <span className="product-tile-name">{p.name}</span>
-                    <span className="product-tile-meta">
-                      <span className="product-tile-price-label">Цена за {unitName(p.unit_code)}:</span>
-                      <span className="product-tile-price">{formatMoney(p.retail_price)} ₽</span>
+                  <div className={layoutStyles.productTileBody}>
+                    <span className={layoutStyles.productTileName}>{p.name}</span>
+                    <span className={layoutStyles.productTileMeta}>
+                      <span className={layoutStyles.productTilePriceLabel}>Цена за {unitName(p.unit_code)}:</span>
+                      <span className={layoutStyles.productTilePrice}>{formatMoney(p.retail_price)} ₽</span>
                     </span>
                     {qty !== null && (
                       <span
-                        className={`product-tile-stock${
-                          isOutOfStock(qty) ? ' product-tile-stock-out' : ' product-tile-stock-in'
-                        }`}
+                        className={[
+                          layoutStyles.productTileStock,
+                          isOutOfStock(qty) ? layoutStyles.productTileStockOut : layoutStyles.productTileStockIn,
+                        ].join(' ')}
                       >
-                        <span className="product-tile-stock-label">
+                        <span className={layoutStyles.productTileStockLabel}>
                           Остаток:
                           {reserved > 0 && (
                             <InfoHint
@@ -1134,8 +1248,8 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                             />
                           )}
                         </span>
-                        <span className="product-tile-stock-value-wrap">
-                          <span className="product-tile-stock-value">
+                        <span className={layoutStyles.productTileStockValueWrap}>
+                          <span className={layoutStyles.productTileStockValue}>
                             {formatQuantity(qty)} {unitName(p.unit_code)}
                           </span>
                           {isLowStock(qty, p.min_stock) && <StockWarningIcon />}
@@ -1143,12 +1257,19 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                       </span>
                     )}
                   </div>
-                  <span className={`product-tile-cart-badge${inCartQty ? '' : ' product-tile-cart-badge-hidden'}`}>
+                  <span
+                    className={[
+                      layoutStyles.productTileCartBadge,
+                      !inCartQty && layoutStyles.productTileCartBadgeHidden,
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
                     {inCartQty ? (
                       <>
                         {formatQuantity(inCartQty)}
                         <IconButton
-                          className="product-tile-remove"
+                          className={layoutStyles.productTileRemove}
                           onClick={(e) => {
                             e.stopPropagation()
                             removeLine(p.id)
@@ -1163,7 +1284,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                     )}
                   </span>
                   {maxReachedProductId === p.id && (
-                    <span className="product-tile-max-reached">Больше нет на складе</span>
+                    <span className={layoutStyles.productTileMaxReached}>Больше нет на складе</span>
                   )}
                 </div>
               )
@@ -1174,21 +1295,21 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
       {showScanner && (
         <Modal title="Сканировать штрихкод" onClose={() => setShowScanner(false)}>
-          <Suspense fallback={<p className="text-muted">Загрузка сканера…</p>}>
+          <Suspense fallback={<p className={layoutStyles.textMuted}>Загрузка сканера…</p>}>
             <BarcodeScanner onDetected={handleScan} onClose={() => setShowScanner(false)} />
           </Suspense>
         </Modal>
       )}
 
       {cart.length > 0 && (
-        <div className="stack card card-full">
-          <div className="section-title">
+        <div className={[layoutStyles.stack, layoutStyles.card, layoutStyles.cardFull].join(' ')}>
+          <div className={layoutStyles.sectionTitle}>
             <h3>Чек</h3>
-            <span className="text-muted">{cart.length} поз.</span>
+            <span className={layoutStyles.textMuted}>{cart.length} поз.</span>
           </div>
 
-          <div className="table-wrap cart-table-wrap">
-            <div className="cart-table-head" style={{ gridTemplateColumns: CART_TABLE_COLUMNS }}>
+          <div className={[layoutStyles.tableWrap, styles.cartTableWrap].join(' ')}>
+            <div className={styles.cartTableHead} style={{ gridTemplateColumns: CART_TABLE_COLUMNS }}>
               <span>Товар</span>
               <span>Кол-во</span>
               <span>Цена</span>
@@ -1204,64 +1325,64 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                 return (
                   <div
                     key={line.product.id}
-                    className="cart-table-row"
+                    className={styles.cartTableRow}
                     style={{ gridTemplateColumns: CART_TABLE_COLUMNS }}
                   >
-                    <div className="cart-table-name">
+                    <div className={styles.cartTableName}>
                       <div>{line.product.name}</div>
                       {availableNum !== null && (
-                        <div className="cart-table-stock">
+                        <div className={styles.cartTableStock}>
                           Остаток: {formatQuantity(availableNum)} {unitName(line.product.unit_code)}
                         </div>
                       )}
                     </div>
-                    <div className="cart-table-qty-cell">
-                      <div className="cart-qty-stepper">
+                    <div className={styles.cartTableQtyCell}>
+                      <div className={styles.cartQtyStepper}>
                         <input
                           type="text"
                           inputMode="decimal"
-                          className={overStock ? 'cart-input-warning' : undefined}
+                          className={overStock ? styles.cartInputWarning : undefined}
                           value={line.quantity}
                           onChange={(e) => updateLine(line.product.id, 'quantity', e.target.value)}
                         />
-                        <div className="cart-qty-step-column">
+                        <div className={styles.cartQtyStepColumn}>
                           <IconButton
                             variant="muted"
-                            className="cart-qty-step"
+                            className={styles.cartQtyStep}
                             onClick={() => stepLineQuantity(line.product.id, 1, availableNum)}
                             aria-label="Увеличить количество"
                           >
-                            <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-up" />
+                            <IconChevronRight size={10} stroke={1.8} className={styles.cartQtyStepIconUp} />
                           </IconButton>
                           <IconButton
                             variant="muted"
-                            className="cart-qty-step"
+                            className={styles.cartQtyStep}
                             onClick={() => stepLineQuantity(line.product.id, -1, availableNum)}
                             aria-label="Уменьшить количество"
                           >
-                            <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-down" />
+                            <IconChevronRight size={10} stroke={1.8} className={styles.cartQtyStepIconDown} />
                           </IconButton>
                         </div>
                       </div>
                       {overStock && availableNum !== null && (
-                        <div className="cart-table-warning">
+                        <div className={styles.cartTableWarning}>
                           больше остатка ({formatQuantity(availableNum)})
                         </div>
                       )}
                       {maxReachedProductId === line.product.id && (
-                        <div className="cart-table-max-reached">Больше нет на складе</div>
+                        <div className={styles.cartTableMaxReached}>Больше нет на складе</div>
                       )}
                     </div>
-                    <div className="cart-table-price-cell">
+                    <div className={styles.cartTablePriceCell}>
                       <input
                         type="text"
                         inputMode="decimal"
                         value={line.price}
                         onChange={(e) => updateLine(line.product.id, 'price', e.target.value)}
                       />
-                      <span className="cart-table-price-suffix">₽</span>
+                      <span className={styles.cartTablePriceSuffix}>₽</span>
                     </div>
-                    <div className="cart-table-total">{formatMoney(lineTotal)} ₽</div>
+                    <div className={styles.cartTableTotal}>{formatMoney(lineTotal)} ₽</div>
                     <div>
                       <IconButton
                         onClick={() => removeLine(line.product.id)}
@@ -1276,10 +1397,10 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
             </div>
           </div>
 
-          <div className="sale-checkout-grid">
-            <label className="field">
+          <div className={styles.saleCheckoutGrid}>
+            <label className={layoutStyles.field}>
               Скидка
-              <div className="sale-discount-row">
+              <div className={styles.saleDiscountRow}>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -1289,7 +1410,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                     if (normalized !== null) setDiscount(normalized)
                   }}
                 />
-                <div className="sale-discount-toggle">
+                <div className={styles.saleDiscountToggle}>
                   <Button
                     variant={discountMode === 'amount' ? 'primary' : 'secondary'}
                     onClick={() => setDiscountMode('amount')}
@@ -1305,11 +1426,11 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                 </div>
               </div>
               {discountMode === 'percent' && Number(discount) > 0 && (
-                <span className="text-muted">= {formatMoney(discountAmount)} ₽</span>
+                <span className={layoutStyles.textMuted}>= {formatMoney(discountAmount)} ₽</span>
               )}
             </label>
 
-            <label className="field">
+            <label className={layoutStyles.field}>
               Оплата
               <Select
                 value={payment}
@@ -1319,7 +1440,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
             </label>
 
             {payment === 'cash' && (
-              <label className="field">
+              <label className={layoutStyles.field}>
                 Получено
                 <input
                   type="text"
@@ -1332,7 +1453,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                   }}
                 />
                 {cashReceivedCents > 0 && (
-                  <span className={changeCents < 0 ? 'sale-change-short' : 'text-muted'}>
+                  <span className={changeCents < 0 ? styles.saleChangeShort : layoutStyles.textMuted}>
                     {changeCents >= 0
                       ? `Сдача: ${formatMoney(change)} ₽`
                       : `Не хватает: ${formatMoney(centsToMoney(-changeCents))} ₽`}
@@ -1341,12 +1462,12 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
               </label>
             )}
 
-            <label className="field sale-client-field">
+            <label className={[layoutStyles.field, styles.saleClientField].join(' ')}>
               Клиент
               {payment === 'credit' && (
-                <span className="sale-client-required"> — обязательно для продажи в долг</span>
+                <span className={styles.saleClientRequired}> — обязательно для продажи в долг</span>
               )}
-              <div className="sale-client-row">
+              <div className={styles.saleClientRow}>
                 <Select
                   required={payment === 'credit'}
                   value={String(clientId ?? '')}
@@ -1365,7 +1486,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
                     </Button>
                   }
                   onCreated={(client) => {
-                    setClients((prev) => [...prev, client])
+                    onClientsChange([...clients, client])
                     setClientId(client.id)
                     setShowNewClientForm(false)
                   }}
@@ -1374,7 +1495,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
             </label>
 
             {payment === 'credit' && (
-              <label className="field">
+              <label className={layoutStyles.field}>
                 Долг до
                 <DateInput
                   required
@@ -1386,7 +1507,7 @@ function NewSaleForm({ onClose, onDone }: { onClose: () => void; onDone: () => v
             )}
           </div>
 
-          {error && <p className="error">{error}</p>}
+          {error && <p className={layoutStyles.error}>{error}</p>}
         </div>
       )}
       </div>
@@ -1405,6 +1526,23 @@ const SALE_HISTORY_ACTION_ICONS: Record<string, TablerIcon> = {
   'sale.create': IconCheck,
   'sale.edit': IconPencil,
   'sale.delete': IconTrash,
+  'sale.return': IconReceiptRefund,
+}
+
+function formatSaleHistoryDetail(entry: SaleHistoryEntry): string | null {
+  const d = entry.details
+  switch (entry.action) {
+    case 'sale.create': {
+      const method = d.payment_method as PaymentMethod | undefined
+      return `${formatMoney(String(d.total ?? '0'))} ₽${method ? ` · ${PAYMENT_LABELS[method]}` : ''}`
+    }
+    case 'sale.return':
+      return `Возврат на ${formatMoney(String(d.refund ?? '0'))} ₽`
+    case 'sale.delete':
+      return `Сумма продажи ${formatMoney(String(d.total ?? '0'))} ₽`
+    default:
+      return null
+  }
 }
 
 function LastSaleCard({
@@ -1421,15 +1559,18 @@ function LastSaleCard({
   onUpdated: () => void
 }) {
   const { user } = useAuth()
+  const {
+    products,
+    units,
+    employees,
+    ensureProducts,
+    ensureUnits,
+    ensureEmployees,
+    refresh: refreshCatalog,
+  } = useCatalog()
   const [sale, setSale] = useState(initialSale)
-  const [products, setProducts] = useState<Product[]>([])
-  const [units, setUnits] = useState<Unit[]>([])
-  const [employees, setEmployees] = useState<User[]>([])
   const [returns, setReturns] = useState<SaleReturn[]>([])
   const [clientDebt, setClientDebt] = useState<Debt | null>(null)
-  const [history, setHistory] = useState<SaleHistoryEntry[] | null>(null)
-  const [loadingHistory, setLoadingHistory] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
   const [showReturn, setShowReturn] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
@@ -1447,10 +1588,10 @@ function LastSaleCard({
   const canShareFiles = typeof navigator.share === 'function' && typeof navigator.canShare === 'function'
 
   useEffect(() => {
-    listAllProducts().then(setProducts).catch(() => {})
-    listUnits().then(setUnits).catch(() => {})
+    ensureProducts().catch(() => {})
+    ensureUnits().catch(() => {})
+    ensureEmployees().catch(() => {})
     listSaleReturns(sale.id).then(setReturns).catch(() => {})
-    listEmployees().then(setEmployees).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sale.id])
 
@@ -1484,23 +1625,6 @@ function LastSaleCard({
     user.id === sale.seller_id &&
     Date.now() - new Date(sale.created_at).getTime() < 24 * 60 * 60 * 1000
   const canEdit = canDelete || isOwnSaleWithinWindow
-
-  async function toggleHistory() {
-    if (historyOpen) {
-      setHistoryOpen(false)
-      return
-    }
-    setHistoryOpen(true)
-    if (history !== null) return
-    setLoadingHistory(true)
-    try {
-      setHistory(await getSaleHistory(sale.id))
-    } catch {
-      setHistory([])
-    } finally {
-      setLoadingHistory(false)
-    }
-  }
 
   async function handleSendReceipt() {
     setReceiptError(null)
@@ -1568,6 +1692,7 @@ function LastSaleCard({
     try {
       await returnSale(sale.id, { items })
       setDone(true)
+      refreshCatalog(['stock']).catch(() => {})
       onUpdated()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось оформить возврат')
@@ -1581,6 +1706,7 @@ function LastSaleCard({
     setError(null)
     try {
       await deleteSale(sale.id)
+      refreshCatalog(['stock']).catch(() => {})
       onUpdated()
       onDone()
     } catch (err) {
@@ -1592,9 +1718,9 @@ function LastSaleCard({
   if (done) {
     return (
       <Modal title={`Продажа №${sale.id}`} onClose={onDone}>
-        <div className="stack">
-          <div className="row" style={{ gap: 8 }}>
-            <IconCheck size={18} stroke={1.8} className="icon-accent" />
+        <div className={layoutStyles.stack}>
+          <div className={layoutStyles.row} style={{ gap: 8 }}>
+            <IconCheck size={18} stroke={1.8} className={styles.iconAccent} />
             <p>Возврат по продаже №{sale.id} оформлен, остаток восстановлен</p>
           </div>
         </div>
@@ -1653,15 +1779,15 @@ function LastSaleCard({
 
   return (
     <Modal title={`Продажа №${sale.id}`} onClose={onDone} size="full" headerActions={headerActions}>
-      <div className="stack">
-      <div className="row between wrap" style={{ gap: 10 }}>
+      <div className={layoutStyles.stack}>
+      <div className={[layoutStyles.row, layoutStyles.between, layoutStyles.wrap].join(' ')} style={{ gap: 10 }}>
         {sale.deleted_at ? (
-          <span className="badge danger">Удалена</span>
+          <span className={[layoutStyles.badge, layoutStyles.danger].join(' ')}>Удалена</span>
         ) : (
           <span />
         )}
         {!sale.deleted_at && (
-          <div className="sale-detail-actions">
+          <div className={styles.saleDetailActions}>
             {canEdit && (
               <IconButton
                 variant="muted"
@@ -1697,11 +1823,11 @@ function LastSaleCard({
         )}
       </div>
 
-      {(receiptError || error) && <p className="error">{receiptError || error}</p>}
+      {(receiptError || error) && <p className={layoutStyles.error}>{receiptError || error}</p>}
 
-      <div className="sale-detail-meta">
-        <div className="sale-detail-meta-item">
-          <span className="text-muted">Дата и время</span>
+      <div className={styles.saleDetailMeta}>
+        <div className={styles.saleDetailMetaItem}>
+          <span className={layoutStyles.textMuted}>Дата и время</span>
           <span>
             {new Date(sale.created_at).toLocaleString('ru-RU', {
               day: 'numeric',
@@ -1711,45 +1837,45 @@ function LastSaleCard({
             })}
           </span>
         </div>
-        <div className="sale-detail-meta-item">
-          <span className="text-muted">Склад</span>
+        <div className={styles.saleDetailMetaItem}>
+          <span className={layoutStyles.textMuted}>Склад</span>
           <span>{warehouseName(sale.warehouse_id)}</span>
         </div>
-        <div className="sale-detail-meta-item">
-          <span className="text-muted">Способ оплаты</span>
+        <div className={styles.saleDetailMetaItem}>
+          <span className={layoutStyles.textMuted}>Способ оплаты</span>
           <span className={PAYMENT_BADGE_CLASS[sale.payment_method]}>
             {PAYMENT_LABELS[sale.payment_method]}
           </span>
         </div>
-        <div className="sale-detail-meta-item">
-          <span className="text-muted">Сотрудник</span>
+        <div className={styles.saleDetailMetaItem}>
+          <span className={layoutStyles.textMuted}>Сотрудник</span>
           <span>{seller ? seller.name : `#${sale.seller_id}`}</span>
         </div>
         {sale.payment_method === 'cash' && (
           <>
-            <div className="sale-detail-meta-item">
-              <span className="text-muted">Внесено</span>
+            <div className={styles.saleDetailMetaItem}>
+              <span className={layoutStyles.textMuted}>Внесено</span>
               <span>{sale.cash_received != null ? `${formatMoney(sale.cash_received)} ₽` : '—'}</span>
             </div>
-            <div className="sale-detail-meta-item">
-              <span className="text-muted">Сдача</span>
+            <div className={styles.saleDetailMetaItem}>
+              <span className={layoutStyles.textMuted}>Сдача</span>
               <span>{sale.change != null ? `${formatMoney(sale.change)} ₽` : '—'}</span>
             </div>
           </>
         )}
         {sale.order_id != null && (
-          <div className="sale-detail-meta-item">
-            <span className="text-muted">Из заказа</span>
-            <Link to="/orders" className="badge accent">№{sale.order_id}</Link>
+          <div className={styles.saleDetailMetaItem}>
+            <span className={layoutStyles.textMuted}>Из заказа</span>
+            <Link to="/orders" className={[layoutStyles.badge, layoutStyles.accent].join(' ')}>№{sale.order_id}</Link>
           </div>
         )}
       </div>
 
       {client && (
-        <div className="sale-detail-client-card">
-          <Link to={`/clients?highlight=${client.id}`} className="sale-detail-client-link">
+        <div className={styles.saleDetailClientCard}>
+          <Link to={`/clients?highlight=${client.id}`} className={styles.saleDetailClientLink}>
             <IconUsers size={16} stroke={1.8} />
-            <span className="sale-detail-client-name">{client.name}</span>
+            <span className={styles.saleDetailClientName}>{client.name}</span>
           </Link>
           {clientDebt && !clientDebt.is_closed && (
             <Link
@@ -1763,15 +1889,17 @@ function LastSaleCard({
               {DEBT_STATUS_LABELS[clientDebt.status]}
             </Link>
           )}
-          {clientDebt && clientDebt.is_closed && <span className="badge accent">Долг погашен</span>}
-          <Link to={`/clients?highlight=${client.id}`} className="sale-detail-client-arrow-link">
-            <IconChevronRight size={16} stroke={1.8} className="sale-detail-client-arrow" />
+          {clientDebt && clientDebt.is_closed && (
+            <span className={[layoutStyles.badge, layoutStyles.accent].join(' ')}>Долг погашен</span>
+          )}
+          <Link to={`/clients?highlight=${client.id}`} className={styles.saleDetailClientArrowLink}>
+            <IconChevronRight size={16} stroke={1.8} className={styles.saleDetailClientArrow} />
           </Link>
         </div>
       )}
 
       {returns.length > 0 && (
-        <p className="text-muted">
+        <p className={layoutStyles.textMuted}>
           Возвращено: {formatMoney(totalRefunded)} ₽
           {returns
             .map((r) => r.note.trim())
@@ -1782,22 +1910,22 @@ function LastSaleCard({
         </p>
       )}
 
-      <h3 className="sale-detail-section-title">
-        Товары <span className="text-muted">· {sale.lines.length} поз.</span>
+      <h3 className={styles.saleDetailSectionTitle}>
+        Товары <span className={layoutStyles.textMuted}>· {sale.lines.length} поз.</span>
       </h3>
 
-      <div className="data-table">
-        <div className="data-table-head" style={{ gridTemplateColumns: SALE_LINES_COLUMNS }}>
+      <div className={layoutStyles.dataTable}>
+        <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: SALE_LINES_COLUMNS }}>
           <span>Товар</span>
           <span>Кол-во</span>
           <span>Цена</span>
           <span>Сумма</span>
         </div>
-        <div className="data-table-body">
+        <div className={layoutStyles.dataTableBody}>
           {sale.lines.map((line, i) => (
             <div
               key={line.id}
-              className="data-row sale-history-row-in"
+              className={[layoutStyles.dataRow, styles.saleHistoryRowIn].join(' ')}
               style={
                 {
                   gridTemplateColumns: SALE_LINES_COLUMNS,
@@ -1805,7 +1933,7 @@ function LastSaleCard({
                 } as CSSProperties
               }
             >
-              <span className="data-row-name">{productName(line.product_id)}</span>
+              <span className={layoutStyles.dataRowName}>{productName(line.product_id)}</span>
               <span>
                 {formatQuantity(line.quantity)} {unitName(products.find((p) => p.id === line.product_id)?.unit_code ?? '')}
               </span>
@@ -1816,20 +1944,20 @@ function LastSaleCard({
         </div>
       </div>
 
-      <div className="sale-detail-totals">
+      <div className={styles.saleDetailTotals}>
         {Number(sale.discount) > 0 && (
           <>
-            <div className="sale-detail-totals-row">
+            <div className={styles.saleDetailTotalsRow}>
               <span>Товары</span>
               <span>{formatMoney(sale.subtotal)} ₽</span>
             </div>
-            <div className="sale-detail-totals-row">
+            <div className={styles.saleDetailTotalsRow}>
               <span>{sale.order_id != null ? 'Предоплата по заказу' : 'Скидка'}</span>
               <span>−{formatMoney(sale.discount)} ₽</span>
             </div>
           </>
         )}
-        <div className="sale-detail-totals-row sale-detail-totals-row-sum">
+        <div className={[styles.saleDetailTotalsRow, styles.saleDetailTotalsRowSum].join(' ')}>
           <span>Итого</span>
           <span>{formatMoney(sale.total)} ₽</span>
         </div>
@@ -1837,58 +1965,20 @@ function LastSaleCard({
 
       <SaleNoteEditor sale={sale} canEdit={canEdit} onSaved={setSale} />
 
-      <div className="sale-detail-history">
-        <button
-          type="button"
-          className="disclosure-link"
-          onClick={toggleHistory}
-          disabled={loadingHistory}
-          aria-expanded={historyOpen}
-        >
-          {loadingHistory ? 'Загрузка…' : 'История изменений'}
-          <IconChevronDown size={14} stroke={1.8} />
-        </button>
-        {historyOpen &&
-          (history === null ? null : history.length === 0 ? (
-            <p className="text-muted">Изменений не было</p>
-          ) : (
-            <div className="sale-detail-history-list">
-              {history.map((entry) => (
-                <div key={entry.id} className="sale-detail-history-item">
-                  <span className="sale-detail-history-icon">
-                    {entry.action === 'sale.return' ? (
-                      <IconReceiptRefund size={15} stroke={1.8} />
-                    ) : (
-                      (() => {
-                        const HistoryIcon = SALE_HISTORY_ACTION_ICONS[entry.action] ?? IconPencil
-                        return <HistoryIcon size={15} stroke={1.8} />
-                      })()
-                    )}
-                  </span>
-                  <span className="sale-detail-history-label">
-                    {SALE_HISTORY_ACTION_LABELS[entry.action] ?? entry.action}
-                  </span>
-                  <span className="sale-detail-history-time">
-                    {new Date(entry.created_at).toLocaleString('ru-RU', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ))}
-      </div>
+      <HistoryDisclosure
+        load={() => getSaleHistory(sale.id)}
+        actionLabels={SALE_HISTORY_ACTION_LABELS}
+        actionIcons={SALE_HISTORY_ACTION_ICONS}
+        formatDetail={formatSaleHistoryDetail}
+      />
 
       {showReturn && (
         <Modal title={`Возврат по продаже №${sale.id}`} onClose={() => setShowReturn(false)}>
-          <form className="form" onSubmit={handleSubmit}>
+          <form className={layoutStyles.form} onSubmit={handleSubmit}>
             {sale.lines.map((line) => {
               const remaining = Number(line.quantity) - alreadyReturned(line.id)
               return (
-                <label className="field" key={line.id}>
+                <label className={layoutStyles.field} key={line.id}>
                   {productName(line.product_id)} (доступно к возврату: {formatQuantity(remaining)})
                   <input
                     type="text"
@@ -1906,7 +1996,7 @@ function LastSaleCard({
                 </label>
               )
             })}
-            {error && <p className="error">{error}</p>}
+            {error && <p className={layoutStyles.error}>{error}</p>}
             <Button type="submit" disabled={saving}>
               {saving ? 'Оформление…' : 'Вернуть товар'}
             </Button>
@@ -1930,14 +2020,14 @@ function LastSaleCard({
 
       {showDeleteConfirm && (
         <Modal title="Удалить продажу?" onClose={() => setShowDeleteConfirm(false)}>
-          <div className="stack">
+          <div className={layoutStyles.stack}>
             <p>
               Продажа №{sale.id} будет удалена: все проданные товары вернутся на склад
               {sale.payment_method === 'credit' && ', а связанный долг клиента будет аннулирован'}.
               Это действие нельзя отменить.
             </p>
-            {error && <p className="error">{error}</p>}
-            <div className="row" style={{ gap: 8 }}>
+            {error && <p className={layoutStyles.error}>{error}</p>}
+            <div className={layoutStyles.row} style={{ gap: 8 }}>
               <Button variant="danger" onClick={handleDelete} disabled={deleting}>
                 {deleting ? 'Удаление…' : 'Да, удалить'}
               </Button>
@@ -1997,11 +2087,17 @@ function SaleNoteEditor({
   }
 
   return (
-    <div className="sale-note">
-      <div className="sale-note-header">
-        <span className="sale-note-title">Заметка к продаже</span>
+    <div className={styles.saleNote}>
+      <div className={styles.saleNoteHeader}>
+        <span className={styles.saleNoteTitle}>Заметка к продаже</span>
         <span
-          className={`sale-note-status${status === 'idle' ? ' sale-note-status-hidden' : ''}${status === 'error' ? ' sale-note-status-error' : ''}`}
+          className={[
+            styles.saleNoteStatus,
+            status === 'idle' && styles.saleNoteStatusHidden,
+            status === 'error' && styles.saleNoteStatusError,
+          ]
+            .filter(Boolean)
+            .join(' ')}
         >
           {status === 'saving' && 'Сохранение…'}
           {status === 'saved' && (
@@ -2013,7 +2109,7 @@ function SaleNoteEditor({
         </span>
       </div>
       <textarea
-        className="sale-note-textarea"
+        className={styles.saleNoteTextarea}
         rows={2}
         value={note}
         disabled={!canEdit}
@@ -2052,8 +2148,8 @@ function SaleEditForm({
   }
 
   return (
-    <form className="form" onSubmit={handleSubmit}>
-      <label className="field">
+    <form className={layoutStyles.form} onSubmit={handleSubmit}>
+      <label className={layoutStyles.field}>
         Клиент
         <Select
           value={String(clientId ?? '')}
@@ -2064,7 +2160,7 @@ function SaleEditForm({
           ]}
         />
       </label>
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       <Button type="submit" disabled={saving}>
         {saving ? 'Сохранение…' : 'Сохранить'}
       </Button>

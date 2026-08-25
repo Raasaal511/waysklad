@@ -15,24 +15,13 @@ class SqlAlchemyAuditRepository(SqlAlchemyRepository, IAuditRepository):
         await self._session.flush()
         return AuditMapper.to_entity(model)
 
-    async def list_recent(self, limit: int = 100, offset: int = 0) -> list[AuditEntry]:
-        # join с users — общему журналу нужно имя сотрудника, а не только id
+    async def list_by_entity(self, entity: str, entity_id: int) -> list[AuditEntry]:
+        # join с users — карточка сущности показывает не только "что" произошло,
+        # но и "кто" это сделал, а не просто user_id.
         rows = (
             await self._session.execute(
                 select(AuditLogModel, UserModel.name)
-                .join(UserModel, UserModel.id == AuditLogModel.user_id)
-                .where(AuditLogModel.tenant_id == self._tenant)
-                .order_by(AuditLogModel.id.desc())
-                .limit(limit)
-                .offset(offset)
-            )
-        ).all()
-        return [AuditMapper.to_entity(m, user_name) for m, user_name in rows]
-
-    async def list_by_entity(self, entity: str, entity_id: int) -> list[AuditEntry]:
-        models = (
-            await self._session.execute(
-                select(AuditLogModel)
+                .outerjoin(UserModel, UserModel.id == AuditLogModel.user_id)
                 .where(
                     AuditLogModel.tenant_id == self._tenant,
                     AuditLogModel.entity == entity,
@@ -40,5 +29,5 @@ class SqlAlchemyAuditRepository(SqlAlchemyRepository, IAuditRepository):
                 )
                 .order_by(AuditLogModel.id.desc())
             )
-        ).scalars().all()
-        return [AuditMapper.to_entity(m) for m in models]
+        ).all()
+        return [AuditMapper.to_entity(m, user_name) for m, user_name in rows]
