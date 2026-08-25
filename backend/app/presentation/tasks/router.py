@@ -10,12 +10,14 @@ from app.presentation.deps import (
     ChangeTaskStatusDep,
     CreateTaskDep,
     UowDep,
+    UpdateTaskDep,
 )
 from app.presentation.deps.auth import require_permission
 from app.presentation.tasks.schemas import (
     ChangeTaskStatusRequest,
     TaskCreateRequest,
     TaskResponse,
+    TaskUpdateRequest,
 )
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -48,6 +50,13 @@ async def create_task(
 @router.patch("/{task_id}/status")
 async def change_status(
     task_id: int, body: ChangeTaskStatusRequest, actor: ActorDep, use_case: ChangeTaskStatusDep
+) -> TaskResponse:
+    return TaskResponse.from_entity(await use_case.execute(actor, body.to_command(task_id)))
+
+
+@router.patch("/{task_id}")
+async def update_task(
+    task_id: int, body: TaskUpdateRequest, actor: ActorDep, use_case: UpdateTaskDep
 ) -> TaskResponse:
     return TaskResponse.from_entity(await use_case.execute(actor, body.to_command(task_id)))
 

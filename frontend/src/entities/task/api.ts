@@ -25,6 +25,7 @@ export interface Task {
 export interface TaskHistoryEntry {
   id: number
   user_id: number
+  user_name: string | null
   action: string
   entity: string
   entity_id: number | null
@@ -61,6 +62,16 @@ export function createTask(input: TaskCreateInput) {
 
 export function changeTaskStatus(id: number, newStatus: TaskStatus) {
   return api.patch<Task>(`/tasks/${id}/status`, { new_status: newStatus })
+}
+
+export interface TaskUpdateInput {
+  assigned_user_id?: number | null
+  due_date?: string | null
+  note?: string
+}
+
+export function updateTask(id: number, input: TaskUpdateInput) {
+  return api.patch<Task>(`/tasks/${id}`, input)
 }
 
 export function getTaskHistory(id: number) {

@@ -5,7 +5,8 @@ from pydantic import BaseModel
 
 from app.application.tasks.change_status import ChangeTaskStatusCommand
 from app.application.tasks.create_task import CreateTaskCommand
-from app.domain.tasks.entities import Task, TaskStatus, TaskType
+from app.application.tasks.update_task import UpdateTaskCommand
+from app.domain.tasks.entities import UNSET, Task, TaskStatus, TaskType
 
 
 class TaskCreateRequest(BaseModel):
@@ -36,6 +37,24 @@ class ChangeTaskStatusRequest(BaseModel):
 
     def to_command(self, task_id: int) -> ChangeTaskStatusCommand:
         return ChangeTaskStatusCommand(task_id=task_id, new_status=self.new_status)
+
+
+class TaskUpdateRequest(BaseModel):
+    """PATCH-семантика: поле меняется, только если явно присутствует в теле
+    запроса (model_fields_set), иначе остаётся как есть (UNSET)."""
+
+    assigned_user_id: int | None = None
+    due_date: date | None = None
+    note: str | None = None
+
+    def to_command(self, task_id: int) -> UpdateTaskCommand:
+        fields = self.model_fields_set
+        return UpdateTaskCommand(
+            task_id=task_id,
+            assigned_user_id=self.assigned_user_id if "assigned_user_id" in fields else UNSET,
+            due_date=self.due_date if "due_date" in fields else UNSET,
+            note=self.note if "note" in fields else UNSET,
+        )
 
 
 class TaskResponse(BaseModel):

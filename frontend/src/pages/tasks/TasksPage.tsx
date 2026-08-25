@@ -5,15 +5,16 @@ import {
   listCompletedTasks,
   createTask,
   changeTaskStatus,
+  updateTask,
   getTaskHistory,
   type Task,
   type TaskType,
   type TaskStatus,
   type TaskHistoryEntry,
 } from '../../entities/task/api'
-import { receiveGoods, listStock, listWarehouses, type StockItem, type Warehouse } from '../../entities/inventory/api'
-import { listAllProducts, listUnits, type Product, type Unit } from '../../entities/product/api'
-import { listEmployees } from '../../entities/profile/api'
+import { receiveGoods, type Warehouse, type StockItem } from '../../entities/inventory/api'
+import type { Product, Unit } from '../../entities/product/api'
+import { useCatalog } from '../../app/CatalogContext'
 import type { User } from '../../entities/auth/api'
 import { useAuth } from '../../app/AuthContext'
 import { ApiError } from '../../shared/api/client'
@@ -23,6 +24,7 @@ import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
 import { DateInput } from '../../shared/ui/DateInput'
+import { HistoryDisclosure } from '../../shared/ui/HistoryDisclosure'
 import {
   IconPlus,
   IconClock,
@@ -35,8 +37,11 @@ import {
   IconCalendar,
   IconClipboardCheck,
   IconX,
+  IconUserQuestion,
   type Icon as TablerIcon,
 } from '@tabler/icons-react'
+import layoutStyles from '../../shared/ui/Layout.module.css'
+import styles from './TasksPage.module.css'
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
   new: 'Новые',
@@ -48,6 +53,27 @@ const NEXT_STATUS: Record<TaskStatus, TaskStatus | null> = {
   new: 'in_progress',
   in_progress: 'done',
   done: null,
+}
+
+const TASK_HISTORY_ACTION_LABELS: Record<string, string> = {
+  'task.create': 'Задача создана',
+  'task.status': 'Изменён статус',
+  'task.update': 'Изменены данные задачи',
+}
+
+function formatTaskHistoryDetail(entry: TaskHistoryEntry): string | null {
+  const d = entry.details
+  if (entry.action === 'task.status' && typeof d.status === 'string') {
+    return STATUS_LABELS[d.status as TaskStatus] ?? null
+  }
+  if (entry.action === 'task.update') {
+    const parts: string[] = []
+    if ('assigned_user_id' in d) parts.push(d.assigned_user_id == null ? 'исполнитель снят' : 'назначен исполнитель')
+    if ('due_date' in d) parts.push(d.due_date == null ? 'срок снят' : `срок ${d.due_date}`)
+    if (d.note_changed) parts.push('изменена заметка')
+    return parts.length > 0 ? parts.join(', ') : null
+  }
+  return null
 }
 
 const BOARD_STATUSES: TaskStatus[] = ['new', 'in_progress']
@@ -87,7 +113,7 @@ function toISODate(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
-const TASK_TABLE_COLUMNS = '80px 2fr 1fr 110px 100px 28px'
+const TASK_TABLE_COLUMNS = '80px 2fr 1fr 1fr 110px 100px 28px'
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString('ru-RU', {
@@ -118,13 +144,21 @@ export function TasksPage() {
   const { user } = useAuth()
   const canAssignOthers = user?.role === 'owner' || user?.role === 'manager'
 
+  const {
+    products,
+    warehouses,
+    units,
+    stock,
+    employees,
+    ensureProducts,
+    ensureWarehouses,
+    ensureUnits,
+    ensureStock,
+    ensureEmployees,
+    refresh: refreshCatalog,
+  } = useCatalog()
   const [activeTasks, setActiveTasks] = useState<Task[]>([])
   const [completedTasks, setCompletedTasks] = useState<Task[]>([])
-  const [employees, setEmployees] = useState<User[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
-  const [units, setUnits] = useState<Unit[]>([])
-  const [stock, setStock] = useState<StockItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -152,22 +186,17 @@ export function TasksPage() {
   async function load(silent = false) {
     if (!silent) setLoading(true)
     try {
-      const [active, completed, emp, p, w, u, s] = await Promise.all([
+      const [active, completed] = await Promise.all([
         listActiveTasks(),
         listCompletedTasks(),
-        canAssignOthers ? listEmployees() : Promise.resolve<User[]>([]),
-        listAllProducts(),
-        listWarehouses(),
-        listUnits(),
-        listStock(),
+        canAssignOthers ? ensureEmployees() : Promise.resolve<User[]>([]),
+        ensureProducts(),
+        ensureWarehouses(),
+        ensureUnits(),
+        ensureStock(),
       ])
       setActiveTasks(active)
       setCompletedTasks(completed)
-      setEmployees(emp)
-      setProducts(p)
-      setWarehouses(w)
-      setUnits(u)
-      setStock(s)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось загрузить задачи')
     } finally {
@@ -199,6 +228,7 @@ export function TasksPage() {
           warehouse_id: task.warehouse_id,
           lines: [{ product_id: task.product_id, quantity: task.quantity ?? '1' }],
         })
+        refreshCatalog(['stock']).catch(() => {})
         await changeTaskStatus(task.id, 'done')
         const productName = task.title.replace(/^Дозаказать:\s*/, '')
         setDoneToast(`«${productName}» оформлен на склад — ${formatQuantity(task.quantity ?? '1')} шт`)
@@ -248,8 +278,8 @@ export function TasksPage() {
   const tasks = tab === 'active' ? activeTasks : completedTasks
 
   return (
-    <div className="stack">
-      <div className="section-title">
+    <div className={layoutStyles.stack}>
+      <div className={layoutStyles.sectionTitle}>
         <h2>Задачи</h2>
         <Button onClick={() => setShowForm(true)}>
           <IconPlus size={16} stroke={1.8} /> Задача
@@ -278,9 +308,15 @@ export function TasksPage() {
         <Modal title={selectedTask.title} onClose={() => setSelectedTask(null)}>
           <TaskDetail
             task={selectedTask}
+            employees={employees}
+            canAssignOthers={canAssignOthers}
             onAdvance={(t) => {
               handleAdvance(t)
               setSelectedTask(null)
+            }}
+            onUpdated={(updated) => {
+              setSelectedTask(updated)
+              load(true)
             }}
           />
         </Modal>
@@ -288,19 +324,19 @@ export function TasksPage() {
 
       {doneToast && <RestockDoneToast message={doneToast} onClose={() => setDoneToast(null)} />}
 
-      <div className="row between wrap" style={{ gap: 10 }}>
-        <div className="sale-period-tabs">
+      <div className={`${layoutStyles.row} ${layoutStyles.between} ${layoutStyles.wrap}`} style={{ gap: 10 }}>
+        <div className={styles.periodTabs}>
           <Button variant="secondary" active={tab === 'active'} onClick={() => setTab('active')}>
             Активные
-            {activeTasks.length > 0 && <span className="count-badge">{activeTasks.length}</span>}
+            {activeTasks.length > 0 && <span className={layoutStyles.countBadge}>{activeTasks.length}</span>}
           </Button>
           <Button variant="secondary" active={tab === 'completed'} onClick={() => setTab('completed')}>
             Завершённые
-            {completedTasks.length > 0 && <span className="count-badge">{completedTasks.length}</span>}
+            {completedTasks.length > 0 && <span className={layoutStyles.countBadge}>{completedTasks.length}</span>}
           </Button>
         </div>
         {tab === 'active' && (
-          <div className="view-switcher" role="tablist" aria-label="Вид отображения">
+          <div className={styles.viewSwitcher} role="tablist" aria-label="Вид отображения">
             {VIEW_MODE_OPTIONS.map(({ mode, label, icon: Icon }) => (
               <Button
                 key={mode}
@@ -315,16 +351,16 @@ export function TasksPage() {
         )}
       </div>
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : tab === 'active' && viewMode === 'table' ? (
         <TasksTableView tasks={activeTasks} onSelect={setSelectedTask} />
       ) : tab === 'active' && viewMode === 'list' ? (
         activeTasks.length === 0 ? (
-          <p className="text-muted">Активных задач пока нет</p>
+          <p className={layoutStyles.textMuted}>Активных задач пока нет</p>
         ) : (
-          <div className="orders-history-list">
+          <div className={styles.historyList}>
             {activeTasks.map((t) => (
               <TaskListRow key={t.id} task={t} onSelect={setSelectedTask} onAdvance={handleAdvance} />
             ))}
@@ -333,35 +369,35 @@ export function TasksPage() {
       ) : tab === 'active' && viewMode === 'calendar' ? (
         <TasksCalendarView tasks={activeTasks} onSelect={setSelectedTask} />
       ) : tab === 'active' ? (
-        <div className="orders-board" style={{ '--board-cols': BOARD_STATUSES.length } as CSSProperties}>
+        <div className={styles.board} style={{ '--board-cols': BOARD_STATUSES.length } as CSSProperties}>
           {BOARD_STATUSES.map((status) => {
             const columnTasks = activeTasks.filter((t) => t.status === status)
             return (
               <div
                 key={status}
-                className={`orders-board-column${dragOverStatus === status ? ' orders-board-column-over' : ''}`}
+                className={`${styles.boardColumn}${dragOverStatus === status ? ` ${styles.boardColumnOver}` : ''}`}
                 style={{ '--col-accent': STATUS_ACCENT[status] } as CSSProperties}
                 onDragOver={(e) => handleColumnDragOver(e, status)}
                 onDragLeave={() => setDragOverStatus((s) => (s === status ? null : s))}
                 onDrop={(e) => handleColumnDrop(e, status)}
               >
-                <div className="orders-board-column-head">
-                  <span className="orders-board-dot" />
+                <div className={styles.boardColumnHead}>
+                  <span className={styles.boardDot} />
                   <span>{STATUS_LABELS[status]}</span>
-                  <span className="orders-board-column-count">{columnTasks.length}</span>
+                  <span className={styles.boardColumnCount}>{columnTasks.length}</span>
                 </div>
-                <div className="orders-board-column-body">
+                <div className={styles.boardColumnBody}>
                   {columnTasks.length === 0 ? (
                     status === 'new' ? (
                       <button
                         type="button"
-                        className="orders-board-empty orders-board-empty-action"
+                        className={`${styles.boardEmpty} ${styles.boardEmptyAction}`}
                         onClick={() => setShowForm(true)}
                       >
                         <IconPlus size={16} stroke={1.8} /> Создать задачу
                       </button>
                     ) : (
-                      <div className="orders-board-empty">Пусто</div>
+                      <div className={styles.boardEmpty}>Пусто</div>
                     )
                   ) : (
                     columnTasks.map((t) => {
@@ -369,39 +405,50 @@ export function TasksPage() {
                       return (
                         <div
                           key={t.id}
-                          className={`orders-board-card${draggedId === t.id ? ' orders-board-card-dragging' : ''}`}
+                          className={`${styles.boardCard}${draggedId === t.id ? ` ${styles.boardCardDragging}` : ''}`}
                           draggable
                           onDragStart={() => handleDragStart(t)}
                           onDragEnd={handleDragEnd}
                           onClick={() => setSelectedTask(t)}
                         >
-                          <span className="orders-board-card-accent" />
-                          <div className="orders-board-card-head">
-                            <span className="orders-board-card-number">
+                          <span className={styles.boardCardAccent} />
+                          <div className={styles.boardCardHead}>
+                            <span className={styles.boardCardNumber}>
                               №{t.number ?? t.id}
                             </span>
                             {t.type === 'restock' && (
-                              <span className="badge accent">
+                              <span className={`${layoutStyles.badge} ${layoutStyles.accent}`}>
                                 <IconTruck size={12} stroke={1.8} /> Дозаказ ×{formatQuantity(t.quantity ?? '1')}
                               </span>
                             )}
                           </div>
-                          <strong className="orders-board-card-client">{t.title}</strong>
-                          <div className="orders-board-card-footer">
+                          <strong className={styles.boardCardClient}>{t.title}</strong>
+                          <div className={styles.boardCardFooter}>
                             {t.due_date ? (
                               <span
-                                className={`orders-board-card-due${overdue ? ' orders-board-card-due-overdue' : ''}`}
+                                className={`${styles.boardCardDue}${overdue ? ` ${styles.boardCardDueOverdue}` : ''}`}
                               >
                                 <IconClock size={13} stroke={1.8} /> {formatDueDate(t.due_date)}
                               </span>
                             ) : (
                               <span />
                             )}
-                            {t.assigned_user_name && (
-                              <span className="orders-board-card-avatar" title={t.assigned_user_name}>
-                                {initials(t.assigned_user_name)}
+                            <div className={styles.boardCardPeople}>
+                              {t.created_by_name && (
+                                <span
+                                  className={`${styles.boardCardAvatar} ${styles.boardCardAvatarMuted}`}
+                                  title={`Создал: ${t.created_by_name}`}
+                                >
+                                  {initials(t.created_by_name)}
+                                </span>
+                              )}
+                              <span
+                                className={styles.boardCardAvatar}
+                                title={t.assigned_user_name ? `Назначено: ${t.assigned_user_name}` : 'Не назначено'}
+                              >
+                                {t.assigned_user_name ? initials(t.assigned_user_name) : <IconUserQuestion size={13} stroke={1.8} />}
                               </span>
-                            )}
+                            </div>
                           </div>
                         </div>
                       )
@@ -413,25 +460,36 @@ export function TasksPage() {
           })}
         </div>
       ) : tasks.length === 0 ? (
-        <p className="text-muted">Завершённых задач пока нет</p>
+        <p className={layoutStyles.textMuted}>Завершённых задач пока нет</p>
       ) : (
-        <div className="orders-history-list">
+        <div className={styles.historyList}>
           {tasks.map((t) => (
-            <div key={t.id} className="card orders-history-card" onClick={() => setSelectedTask(t)}>
-              <div className="orders-history-card-main">
-                <div className="orders-history-card-title">
+            <div key={t.id} className={`${layoutStyles.card} ${styles.historyCard}`} onClick={() => setSelectedTask(t)}>
+              <div className={styles.historyCardMain}>
+                <div className={styles.historyCardTitle}>
                   <strong>№{t.number ?? t.id}</strong>
                   <span>{t.title}</span>
                 </div>
                 {t.completed_at && (
-                  <span className="text-muted">Выполнена {formatDateTime(t.completed_at)}</span>
+                  <span className={layoutStyles.textMuted}>Выполнена {formatDateTime(t.completed_at)}</span>
                 )}
               </div>
-              {t.assigned_user_name && (
-                <span className="orders-board-card-avatar" title={t.assigned_user_name}>
-                  {initials(t.assigned_user_name)}
+              <div className={styles.boardCardPeople}>
+                {t.created_by_name && (
+                  <span
+                    className={`${styles.boardCardAvatar} ${styles.boardCardAvatarMuted}`}
+                    title={`Создал: ${t.created_by_name}`}
+                  >
+                    {initials(t.created_by_name)}
+                  </span>
+                )}
+                <span
+                  className={styles.boardCardAvatar}
+                  title={t.assigned_user_name ? `Назначено: ${t.assigned_user_name}` : 'Не назначено'}
+                >
+                  {t.assigned_user_name ? initials(t.assigned_user_name) : <IconUserQuestion size={13} stroke={1.8} />}
                 </span>
-              )}
+              </div>
             </div>
           ))}
         </div>
@@ -442,14 +500,14 @@ export function TasksPage() {
 
 function RestockDoneToast({ message, onClose }: { message: string; onClose: () => void }) {
   return createPortal(
-    <div className="restock-toast" role="status">
-      <span className="restock-toast-icon">
+    <div className={styles.restockToast} role="status">
+      <span className={styles.restockToastIcon}>
         <IconClipboardCheck size={20} stroke={1.8} />
       </span>
-      <div className="restock-toast-body">
-        <span className="restock-toast-title">{message}</span>
+      <div className={styles.restockToastBody}>
+        <span className={styles.restockToastTitle}>{message}</span>
       </div>
-      <button type="button" className="restock-toast-close" onClick={onClose} aria-label="Закрыть">
+      <button type="button" className={styles.restockToastClose} onClick={onClose} aria-label="Закрыть">
         <IconX size={14} stroke={1.8} />
       </button>
     </div>,
@@ -458,25 +516,26 @@ function RestockDoneToast({ message, onClose }: { message: string; onClose: () =
 }
 
 function TasksTableView({ tasks, onSelect }: { tasks: Task[]; onSelect: (task: Task) => void }) {
-  if (tasks.length === 0) return <p className="text-muted">Активных задач пока нет</p>
+  if (tasks.length === 0) return <p className={layoutStyles.textMuted}>Активных задач пока нет</p>
   return (
-    <div className="data-table">
-      <div className="data-table-head" style={{ gridTemplateColumns: TASK_TABLE_COLUMNS }}>
+    <div className={layoutStyles.dataTable}>
+      <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: TASK_TABLE_COLUMNS }}>
         <span>№</span>
         <span>Название</span>
         <span>Исполнитель</span>
+        <span>Создал</span>
         <span>Статус</span>
         <span>Срок</span>
         <span />
       </div>
-      <div className="data-table-body">
+      <div className={layoutStyles.dataTableBody}>
         {tasks.map((t, i) => {
           const overdue = t.due_date != null && isOverdue(t.due_date)
           return (
             <button
               key={t.id}
               type="button"
-              className="data-row data-row-link sale-history-row-in"
+              className={`${layoutStyles.dataRow} ${layoutStyles.dataRowLink} ${styles.rowIn}`}
               style={
                 {
                   gridTemplateColumns: TASK_TABLE_COLUMNS,
@@ -485,21 +544,22 @@ function TasksTableView({ tasks, onSelect }: { tasks: Task[]; onSelect: (task: T
               }
               onClick={() => onSelect(t)}
             >
-              <span className="data-row-name">№{t.number ?? t.id}</span>
+              <span className={layoutStyles.dataRowName}>№{t.number ?? t.id}</span>
               <span>
                 {t.title}
                 {t.type === 'restock' && (
-                  <span className="badge accent" style={{ marginLeft: 6 }}>
+                  <span className={`${layoutStyles.badge} ${layoutStyles.accent}`} style={{ marginLeft: 6 }}>
                     <IconTruck size={12} stroke={1.8} /> Дозаказ ×{formatQuantity(t.quantity ?? '1')}
                   </span>
                 )}
               </span>
-              <span className="text-muted">{t.assigned_user_name ?? '—'}</span>
-              <span className="badge">{STATUS_LABELS[t.status]}</span>
-              <span className={overdue ? 'orders-board-card-due-overdue' : 'text-muted'}>
+              <span className={layoutStyles.textMuted}>{t.assigned_user_name ?? '—'}</span>
+              <span className={layoutStyles.textMuted}>{t.created_by_name ?? '—'}</span>
+              <span className={layoutStyles.badge}>{STATUS_LABELS[t.status]}</span>
+              <span className={overdue ? styles.boardCardDueOverdue : layoutStyles.textMuted}>
                 {t.due_date ? formatDueDate(t.due_date) : '—'}
               </span>
-              <IconChevronRight size={16} stroke={1.8} className="data-row-chevron" />
+              <IconChevronRight size={16} stroke={1.8} className={layoutStyles.dataRowChevron} />
             </button>
           )
         })}
@@ -520,29 +580,40 @@ function TaskListRow({
   const next = NEXT_STATUS[task.status]
   const overdue = task.due_date != null && isOverdue(task.due_date)
   return (
-    <div className="card orders-history-card" onClick={() => onSelect(task)}>
-      <div className="orders-history-card-main">
-        <div className="orders-history-card-title">
+    <div className={`${layoutStyles.card} ${styles.historyCard}`} onClick={() => onSelect(task)}>
+      <div className={styles.historyCardMain}>
+        <div className={styles.historyCardTitle}>
           <strong>№{task.number ?? task.id}</strong>
           <span>{task.title}</span>
           {task.type === 'restock' && (
-            <span className="badge accent">
+            <span className={`${layoutStyles.badge} ${layoutStyles.accent}`}>
               <IconTruck size={12} stroke={1.8} /> Дозаказ ×{formatQuantity(task.quantity ?? '1')}
             </span>
           )}
         </div>
         {task.due_date && (
-          <span className={overdue ? 'orders-board-card-due-overdue' : 'text-muted'}>
+          <span className={overdue ? styles.boardCardDueOverdue : layoutStyles.textMuted}>
             <IconClock size={13} stroke={1.8} /> до {formatDueDate(task.due_date)}
           </span>
         )}
       </div>
-      <div className="row" style={{ gap: 10 }}>
-        {task.assigned_user_name && (
-          <span className="orders-board-card-avatar" title={task.assigned_user_name}>
-            {initials(task.assigned_user_name)}
+      <div className={layoutStyles.row} style={{ gap: 10 }}>
+        <div className={styles.boardCardPeople}>
+          {task.created_by_name && (
+            <span
+              className={`${styles.boardCardAvatar} ${styles.boardCardAvatarMuted}`}
+              title={`Создал: ${task.created_by_name}`}
+            >
+              {initials(task.created_by_name)}
+            </span>
+          )}
+          <span
+            className={styles.boardCardAvatar}
+            title={task.assigned_user_name ? `Назначено: ${task.assigned_user_name}` : 'Не назначено'}
+          >
+            {task.assigned_user_name ? initials(task.assigned_user_name) : <IconUserQuestion size={13} stroke={1.8} />}
           </span>
-        )}
+        </div>
         {next && (
           <Button
             variant={next === 'done' ? 'primary' : 'secondary'}
@@ -590,9 +661,9 @@ function TasksCalendarView({ tasks, onSelect }: { tasks: Task[]; onSelect: (task
   const todayISO = toISODate(new Date())
 
   return (
-    <div className="view-calendar">
-      <div className="view-calendar-header">
-        <div className="view-calendar-nav">
+    <div className={styles.viewCalendar}>
+      <div className={styles.viewCalendarHeader}>
+        <div className={styles.viewCalendarNav}>
           <IconButton
             variant="muted"
             onClick={() => setCursor(new Date(year, month - 1, 1))}
@@ -608,19 +679,19 @@ function TasksCalendarView({ tasks, onSelect }: { tasks: Task[]; onSelect: (task
             <IconChevronRight size={16} stroke={1.8} />
           </IconButton>
         </div>
-        <span className="view-calendar-title">
+        <span className={styles.viewCalendarTitle}>
           {MONTHS[month]} {year}
         </span>
         <Button variant="secondary" onClick={() => setCursor(new Date())}>
           Сегодня
         </Button>
       </div>
-      <div className="view-calendar-weekdays">
+      <div className={styles.viewCalendarWeekdays}>
         {WEEKDAYS.map((w) => (
           <span key={w}>{w}</span>
         ))}
       </div>
-      <div className="view-calendar-grid">
+      <div className={styles.viewCalendarGrid}>
         {cells.map((date, i) => {
           const iso = toISODate(date)
           const inMonth = date.getMonth() === month
@@ -628,43 +699,56 @@ function TasksCalendarView({ tasks, onSelect }: { tasks: Task[]; onSelect: (task
           const visible = dayTasks.slice(0, 3)
           const overflow = dayTasks.length - visible.length
           return (
-            <div key={i} className={`view-calendar-cell${inMonth ? '' : ' view-calendar-cell-outside'}`}>
-              <span className={`view-calendar-date${iso === todayISO ? ' view-calendar-date-today' : ''}`}>
+            <div key={i} className={`${styles.viewCalendarCell}${inMonth ? '' : ` ${styles.viewCalendarCellOutside}`}`}>
+              <span className={`${styles.viewCalendarDate}${iso === todayISO ? ` ${styles.viewCalendarDateToday}` : ''}`}>
                 {date.getDate()}
               </span>
               {visible.map((t) => (
                 <button
                   key={t.id}
                   type="button"
-                  className="view-calendar-entry"
+                  className={styles.viewCalendarEntry}
                   onClick={() => onSelect(t)}
                   title={`№${t.number ?? t.id} · ${t.title}`}
                 >
                   {t.title}
                 </button>
               ))}
-              {overflow > 0 && <span className="view-calendar-entry view-calendar-entry-more">+{overflow}</span>}
+              {overflow > 0 && (
+                <span className={`${styles.viewCalendarEntry} ${styles.viewCalendarEntryMore}`}>+{overflow}</span>
+              )}
             </div>
           )
         })}
       </div>
       {unscheduled.length > 0 && (
-        <div className="view-calendar-unscheduled">
-          <span className="view-calendar-unscheduled-title">Без срока · {unscheduled.length}</span>
-          <div className="orders-history-list">
+        <div className={styles.viewCalendarUnscheduled}>
+          <span className={styles.viewCalendarUnscheduledTitle}>Без срока · {unscheduled.length}</span>
+          <div className={styles.historyList}>
             {unscheduled.map((t) => (
-              <div key={t.id} className="card orders-history-card" onClick={() => onSelect(t)}>
-                <div className="orders-history-card-main">
-                  <div className="orders-history-card-title">
+              <div key={t.id} className={`${layoutStyles.card} ${styles.historyCard}`} onClick={() => onSelect(t)}>
+                <div className={styles.historyCardMain}>
+                  <div className={styles.historyCardTitle}>
                     <strong>№{t.number ?? t.id}</strong>
                     <span>{t.title}</span>
                   </div>
                 </div>
-                {t.assigned_user_name && (
-                  <span className="orders-board-card-avatar" title={t.assigned_user_name}>
-                    {initials(t.assigned_user_name)}
+                <div className={styles.boardCardPeople}>
+                  {t.created_by_name && (
+                    <span
+                      className={`${styles.boardCardAvatar} ${styles.boardCardAvatarMuted}`}
+                      title={`Создал: ${t.created_by_name}`}
+                    >
+                      {initials(t.created_by_name)}
+                    </span>
+                  )}
+                  <span
+                    className={styles.boardCardAvatar}
+                    title={t.assigned_user_name ? `Назначено: ${t.assigned_user_name}` : 'Не назначено'}
+                  >
+                    {t.assigned_user_name ? initials(t.assigned_user_name) : <IconUserQuestion size={13} stroke={1.8} />}
                   </span>
-                )}
+                </div>
               </div>
             ))}
           </div>
@@ -674,33 +758,60 @@ function TasksCalendarView({ tasks, onSelect }: { tasks: Task[]; onSelect: (task
   )
 }
 
-function TaskDetail({ task, onAdvance }: { task: Task; onAdvance?: (task: Task) => void }) {
-  const [history, setHistory] = useState<TaskHistoryEntry[] | null>(null)
-  const [open, setOpen] = useState(false)
+function TaskDetail({
+  task,
+  employees,
+  canAssignOthers,
+  onAdvance,
+  onUpdated,
+}: {
+  task: Task
+  employees: User[]
+  canAssignOthers: boolean
+  onAdvance?: (task: Task) => void
+  onUpdated: (task: Task) => void
+}) {
   const next = NEXT_STATUS[task.status]
+  const [saving, setSaving] = useState(false)
+  const [noteDraft, setNoteDraft] = useState(task.note)
+  const [noteFocused, setNoteFocused] = useState(false)
 
-  async function toggleHistory() {
-    if (!open && history === null) {
-      try {
-        setHistory(await getTaskHistory(task.id))
-      } catch {
-        setHistory([])
-      }
+  const canEditAssignee = canAssignOthers || task.assigned_user_id == null
+  const assigneeOptions = [
+    { value: '', label: 'Не назначен' },
+    ...employees.map((e) => ({ value: String(e.id), label: e.name })),
+  ]
+
+  // Пока заметка не в фокусе, черновик всегда синхронизирован с задачей —
+  // без этого после сохранения другого поля (onUpdated меняет task) заметка
+  // могла бы показать устаревший черновик.
+  if (!noteFocused && noteDraft !== task.note) setNoteDraft(task.note)
+
+  async function save(patch: Parameters<typeof updateTask>[1]) {
+    setSaving(true)
+    try {
+      const updated = await updateTask(task.id, patch)
+      onUpdated(updated)
+    } finally {
+      setSaving(false)
     }
-    setOpen((v) => !v)
+  }
+
+  function saveNoteIfChanged() {
+    setNoteFocused(false)
+    if (noteDraft !== task.note) save({ note: noteDraft })
   }
 
   return (
-    <div className="stack">
-      <div className="row between wrap" style={{ gap: 8 }}>
-        <div className="row wrap" style={{ gap: 6 }}>
-          <span className="badge accent">{STATUS_LABELS[task.status]}</span>
+    <div className={layoutStyles.stack}>
+      <div className={`${layoutStyles.row} ${layoutStyles.between} ${layoutStyles.wrap}`} style={{ gap: 8 }}>
+        <div className={`${layoutStyles.row} ${layoutStyles.wrap}`} style={{ gap: 6 }}>
+          <span className={`${layoutStyles.badge} ${layoutStyles.accent}`}>{STATUS_LABELS[task.status]}</span>
           {task.type === 'restock' && (
-            <span className="badge">
+            <span className={layoutStyles.badge}>
               <IconTruck size={12} stroke={1.8} /> Дозаказ
             </span>
           )}
-          {task.due_date && <span className="badge">до {task.due_date}</span>}
         </div>
         {next && onAdvance && (
           <Button variant={next === 'done' ? 'primary' : 'secondary'} onClick={() => onAdvance(task)}>
@@ -709,42 +820,69 @@ function TaskDetail({ task, onAdvance }: { task: Task; onAdvance?: (task: Task) 
         )}
       </div>
       {task.type === 'restock' && task.quantity != null && (
-        <div className="stack" style={{ gap: 2 }}>
-          <span className="field-label">Количество для дозаказа</span>
+        <div className={layoutStyles.stack} style={{ gap: 2 }}>
+          <span className={layoutStyles.fieldLabel}>Количество для дозаказа</span>
           <strong>{formatQuantity(task.quantity)}</strong>
         </div>
       )}
-      {task.assigned_user_name && (
-        <div className="stack" style={{ gap: 2 }}>
-          <span className="field-label">Исполнитель</span>
-          <strong>{task.assigned_user_name}</strong>
+      <div className={styles.metaGrid}>
+        <div className={styles.personCard}>
+          <span className={`${styles.boardCardAvatar} ${styles.personCardAvatar}`}>
+            {task.assigned_user_name ? initials(task.assigned_user_name) : <IconUserQuestion size={16} stroke={1.8} />}
+          </span>
+          <span className={styles.personCardBody}>
+            <span className={layoutStyles.fieldLabel}>Исполнитель</span>
+            <Select
+              className={styles.inlineEditSelect}
+              value={task.assigned_user_id != null ? String(task.assigned_user_id) : ''}
+              onChange={(v) => save({ assigned_user_id: v ? Number(v) : null })}
+              options={assigneeOptions}
+              disabled={!canEditAssignee || saving}
+            />
+            {task.created_by_name && (
+              <span className={styles.createdByHint}>Создал: {task.created_by_name}</span>
+            )}
+          </span>
         </div>
-      )}
-      {task.note && (
-        <div className="stack" style={{ gap: 2 }}>
-          <span className="field-label">Заметка</span>
-          <span className="text-muted">{task.note}</span>
-        </div>
-      )}
-      <button type="button" className="disclosure-link" onClick={toggleHistory}>
-        {open ? 'Скрыть историю' : 'История изменений'}
-      </button>
-      {open && (
-        <div className="stack" style={{ gap: 4 }}>
-          {history === null ? (
-            <span className="text-muted">Загрузка…</span>
-          ) : history.length === 0 ? (
-            <span className="text-muted">Записей нет</span>
-          ) : (
-            history.map((h) => (
-              <div key={h.id} className="sale-history-row">
-                <span>{h.action}</span>
-                <span className="text-muted">{formatDateTime(h.created_at)}</span>
-              </div>
-            ))
+        <div className={layoutStyles.stack} style={{ gap: 2 }}>
+          <span className={layoutStyles.fieldLabel}>Срок</span>
+          <DateInput
+            className={styles.inlineEditDate}
+            value={task.due_date ?? ''}
+            onChange={(v) => save({ due_date: v || null })}
+            disabled={saving}
+          />
+          {task.due_date && (
+            <button
+              type="button"
+              className={styles.inlineClearBtn}
+              onClick={() => save({ due_date: null })}
+              disabled={saving}
+            >
+              Снять срок
+            </button>
           )}
         </div>
-      )}
+      </div>
+      <div className={layoutStyles.stack} style={{ gap: 2 }}>
+        <span className={layoutStyles.fieldLabel}>Заметка</span>
+        <textarea
+          className={styles.inlineEditTextarea}
+          value={noteDraft}
+          onChange={(e) => setNoteDraft(e.target.value)}
+          onFocus={() => setNoteFocused(true)}
+          onBlur={saveNoteIfChanged}
+          placeholder="Добавить заметку"
+          disabled={saving}
+          rows={2}
+        />
+      </div>
+      <HistoryDisclosure
+        load={() => getTaskHistory(task.id)}
+        actionLabels={TASK_HISTORY_ACTION_LABELS}
+        formatDetail={formatTaskHistoryDetail}
+        emptyMessage="Записей нет"
+      />
     </div>
   )
 }
@@ -842,8 +980,8 @@ function NewTaskForm({
   }
 
   return (
-    <form className="form" onSubmit={handleSubmit}>
-      <label className="field">
+    <form className={layoutStyles.form} onSubmit={handleSubmit}>
+      <label className={layoutStyles.field}>
         Тип задачи
         <Select
           value={type}
@@ -853,7 +991,7 @@ function NewTaskForm({
       </label>
       {type === 'restock' ? (
         <>
-          <label className="field">
+          <label className={layoutStyles.field}>
             Товар
             <Select
               value={productId != null ? String(productId) : ''}
@@ -862,7 +1000,7 @@ function NewTaskForm({
               placeholder="Выберите товар"
             />
           </label>
-          <label className="field">
+          <label className={layoutStyles.field}>
             Склад
             <Select
               value={warehouseId != null ? String(warehouseId) : ''}
@@ -871,9 +1009,9 @@ function NewTaskForm({
               placeholder="Выберите склад"
             />
           </label>
-          <label className="field">
+          <label className={layoutStyles.field}>
             Количество
-            <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <div className={layoutStyles.row} style={{ gap: 8, alignItems: 'center' }}>
               <input
                 type="text"
                 inputMode="decimal"
@@ -886,10 +1024,10 @@ function NewTaskForm({
                 }}
                 style={{ maxWidth: 100 }}
               />
-              {selectedProduct && <span className="text-muted">{unitName(selectedProduct.unit_code)}</span>}
+              {selectedProduct && <span className={layoutStyles.textMuted}>{unitName(selectedProduct.unit_code)}</span>}
             </div>
             {availableQty !== null && (
-              <span className="text-muted" style={{ fontSize: 12 }}>
+              <span className={layoutStyles.textMuted} style={{ fontSize: 12 }}>
                 Остаток на складе: {formatQuantity(String(availableQty))}{' '}
                 {selectedProduct ? unitName(selectedProduct.unit_code) : ''}
               </span>
@@ -897,13 +1035,13 @@ function NewTaskForm({
           </label>
         </>
       ) : (
-        <label className="field">
+        <label className={layoutStyles.field}>
           Название
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Позвонить поставщику" autoFocus />
         </label>
       )}
       {canAssignOthers && (
-        <label className="field">
+        <label className={layoutStyles.field}>
           Исполнитель
           <Select
             value={assignedUserId != null ? String(assignedUserId) : ''}
@@ -912,15 +1050,15 @@ function NewTaskForm({
           />
         </label>
       )}
-      <label className="field">
+      <label className={layoutStyles.field}>
         Срок
         <DateInput value={dueDate} onChange={setDueDate} />
       </label>
-      <label className="field">
+      <label className={layoutStyles.field}>
         Заметка
         <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="детали…" />
       </label>
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
       <Button
         type="submit"
         disabled={saving || (type === 'restock' ? productId == null || warehouseId == null || !quantity.trim() : !title.trim())}

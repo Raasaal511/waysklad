@@ -8,6 +8,13 @@ from app.domain.common.exceptions import DomainError
 from app.domain.common.quantity import Quantity
 
 
+class Unset:
+    __slots__ = ()
+
+
+UNSET = Unset()
+
+
 class TaskType(StrEnum):
     GENERAL = "general"
     RESTOCK = "restock"
@@ -66,3 +73,18 @@ class Task:
             raise DomainError(f"Нельзя перевести задачу из «{self.status}» в «{new}»")
         self.status = new
         self.completed_at = datetime.now(timezone.utc) if new is TaskStatus.DONE else None
+
+    def update_fields(
+        self,
+        assigned_user_id: int | None | Unset = UNSET,
+        due_date: date | None | Unset = UNSET,
+        note: str | Unset = UNSET,
+    ) -> None:
+        """Точечное обновление редактируемых инлайн полей — сентинел UNSET
+        отличает «не трогать поле» от «сбросить в None» (due_date можно снять)."""
+        if assigned_user_id is not UNSET:
+            self.assigned_user_id = assigned_user_id
+        if due_date is not UNSET:
+            self.due_date = due_date
+        if note is not UNSET:
+            self.note = note

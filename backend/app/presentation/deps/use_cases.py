@@ -4,9 +4,11 @@ from fastapi import Depends
 
 from app.application.analytics.dashboard import GetDashboardUseCase
 from app.application.analytics.dead_stock import GetDeadStockUseCase, GetStockValueUseCase
+from app.application.analytics.period_totals import GetPeriodTotalsUseCase
 from app.application.analytics.restock_recommendations import (
     GetRestockRecommendationsUseCase,
 )
+from app.application.analytics.revenue_timeline import GetRevenueTimelineUseCase
 from app.application.analytics.top_products import (
     GetCategoryProfitUseCase,
     GetTopProductsUseCase,
@@ -58,6 +60,7 @@ from app.application.sales.edit_sale import EditSaleUseCase
 from app.application.sales.return_sale import ReturnSaleUseCase
 from app.application.sync.apply_offline_ops import ApplyOfflineSalesUseCase
 from app.application.tasks.change_status import ChangeTaskStatusUseCase
+from app.application.tasks.update_task import UpdateTaskUseCase
 from app.application.tasks.create_task import CreateTaskUseCase
 from app.presentation.deps.notifier import NotifierDep
 from app.presentation.deps.security import FileStorageDep, HasherDep
@@ -124,6 +127,8 @@ get_create_client = _with_uow(CreateClientUseCase)
 get_update_client = _with_uow(UpdateClientUseCase)
 get_create_supplier = _with_uow(CreateSupplierUseCase)
 get_dashboard = _with_uow(GetDashboardUseCase)
+get_period_totals = _with_uow(GetPeriodTotalsUseCase)
+get_revenue_timeline = _with_uow(GetRevenueTimelineUseCase)
 get_top_products = _with_uow(GetTopProductsUseCase)
 get_category_profit = _with_uow(GetCategoryProfitUseCase)
 get_dead_stock = _with_uow(GetDeadStockUseCase)
@@ -142,6 +147,10 @@ def get_create_task(uow: UowDep, notifier: NotifierDep) -> CreateTaskUseCase:
 
 def get_change_task_status(uow: UowDep, notifier: NotifierDep) -> ChangeTaskStatusUseCase:
     return ChangeTaskStatusUseCase(uow, notifier)
+
+
+def get_update_task(uow: UowDep, notifier: NotifierDep) -> UpdateTaskUseCase:
+    return UpdateTaskUseCase(uow, notifier)
 
 # готовые зависимости для сигнатур роутов
 RegisterShopDep = Annotated[RegisterShopUseCase, Depends(get_register_shop)]
@@ -185,6 +194,8 @@ CreateClientDep = Annotated[CreateClientUseCase, Depends(get_create_client)]
 UpdateClientDep = Annotated[UpdateClientUseCase, Depends(get_update_client)]
 CreateSupplierDep = Annotated[CreateSupplierUseCase, Depends(get_create_supplier)]
 GetDashboardDep = Annotated[GetDashboardUseCase, Depends(get_dashboard)]
+GetPeriodTotalsDep = Annotated[GetPeriodTotalsUseCase, Depends(get_period_totals)]
+GetRevenueTimelineDep = Annotated[GetRevenueTimelineUseCase, Depends(get_revenue_timeline)]
 GetTopProductsDep = Annotated[GetTopProductsUseCase, Depends(get_top_products)]
 GetCategoryProfitDep = Annotated[GetCategoryProfitUseCase, Depends(get_category_profit)]
 GetDeadStockDep = Annotated[GetDeadStockUseCase, Depends(get_dead_stock)]
@@ -200,6 +211,7 @@ UpdateShopDep = Annotated[UpdateShopUseCase, Depends(get_update_shop)]
 ChangePasswordDep = Annotated[ChangePasswordUseCase, Depends(get_change_password)]
 CreateTaskDep = Annotated[CreateTaskUseCase, Depends(get_create_task)]
 ChangeTaskStatusDep = Annotated[ChangeTaskStatusUseCase, Depends(get_change_task_status)]
+UpdateTaskDep = Annotated[UpdateTaskUseCase, Depends(get_update_task)]
 MarkNotificationReadDep = Annotated[
     MarkNotificationReadUseCase, Depends(get_mark_notification_read)
 ]
