@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { connectTelegram, getShop, updateShop, changePassword } from '../../entities/profile/api'
 import type { Role } from '../../entities/auth/api'
-import type { Tenant } from '../../entities/profile/api'
+import type { Tenant, UpdateShopInput } from '../../entities/profile/api'
 import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
 import { useTheme, type AccentColor } from '../../app/ThemeContext'
@@ -12,6 +12,7 @@ import { Modal } from '../../shared/ui/Modal'
 import { IconCheck, IconBuildingWarehouse, IconChevronRight, IconPencil } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
+import { Select } from '../../shared/ui/Select'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './ProfilePage.module.css'
 
@@ -271,19 +272,21 @@ function ConnectionsTab() {
 }
 
 function TelegramSettings() {
-  const [connectedChatId, setConnectedChatId] = useState<string | null>(null)
+  const [shop, setShop] = useState<Tenant | null>(null)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
 
   function load() {
     setLoading(true)
     getShop()
-      .then((s) => setConnectedChatId(s.owner_telegram_chat_id))
+      .then(setShop)
       .catch(() => {})
       .finally(() => setLoading(false))
   }
 
   useEffect(load, [])
+
+  const connectedChatId = shop?.owner_telegram_chat_id ?? null
 
   return (
     <div className={[layoutStyles.card, layoutStyles.cardFull, layoutStyles.stack].join(' ')}>
@@ -291,7 +294,9 @@ function TelegramSettings() {
         <div>
           <h3>Telegram-сводка</h3>
           <p className={layoutStyles.textMuted}>
-            Каждый вечер бот присылает продажи, выручку, прибыль и суммы, выданные в долг.
+            Бот присылает сообщение с продажами, выручкой, прибылью и долгами, а следом — файл
+            Excel с подробностями на нескольких страницах: «Итоги», «Товары», «Долги», и «По
+            складам», если складов больше одного.
           </p>
         </div>
         {!loading && (
@@ -324,6 +329,8 @@ function TelegramSettings() {
         </Button>
       )}
 
+      {!loading && connectedChatId && shop && <SummaryScheduleSettings shop={shop} onSaved={setShop} />}
+
       {showForm && (
         <Modal title="Telegram-сводка" onClose={() => setShowForm(false)}>
           <TelegramConnectForm
@@ -334,6 +341,84 @@ function TelegramSettings() {
           />
         </Modal>
       )}
+    </div>
+  )
+}
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
+  value: String(h),
+  label: `${String(h).padStart(2, '0')}:00 по Москве`,
+}))
+
+function SummaryScheduleSettings({
+  shop,
+  onSaved,
+}: {
+  shop: Tenant
+  onSaved: (shop: Tenant) => void
+}) {
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function toggle(patch: Partial<UpdateShopInput>) {
+    setError(null)
+    setSaving(true)
+    try {
+      const updated = await updateShop({ name: shop.name, ...patch })
+      onSaved(updated)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось сохранить настройки')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className={[layoutStyles.stack, styles.summarySchedule].join(' ')}>
+      <span className={layoutStyles.fieldLabel}>Когда присылать сводку</span>
+
+      <div className={styles.summaryRow}>
+        <label className={styles.summaryCheckbox}>
+          <input
+            type="checkbox"
+            checked={shop.summary_daily_enabled}
+            disabled={saving}
+            onChange={(e) => toggle({ summary_daily_enabled: e.target.checked })}
+          />
+          Ежедневно
+        </label>
+        {shop.summary_daily_enabled && (
+          <Select
+            className={styles.summaryHourSelect}
+            value={String(shop.summary_daily_hour_msk)}
+            onChange={(v) => toggle({ summary_daily_hour_msk: Number(v) })}
+            options={HOUR_OPTIONS}
+            disabled={saving}
+          />
+        )}
+      </div>
+
+      <label className={styles.summaryCheckbox}>
+        <input
+          type="checkbox"
+          checked={shop.summary_weekly_enabled}
+          disabled={saving}
+          onChange={(e) => toggle({ summary_weekly_enabled: e.target.checked })}
+        />
+        Еженедельно, по воскресеньям
+      </label>
+
+      <label className={styles.summaryCheckbox}>
+        <input
+          type="checkbox"
+          checked={shop.summary_monthly_enabled}
+          disabled={saving}
+          onChange={(e) => toggle({ summary_monthly_enabled: e.target.checked })}
+        />
+        Ежемесячно, в последний день месяца
+      </label>
+
+      {error && <p className={layoutStyles.error}>{error}</p>}
     </div>
   )
 }

@@ -26,6 +26,10 @@ export interface Tenant {
   id: number
   name: string
   owner_telegram_chat_id: string | null
+  summary_daily_enabled: boolean
+  summary_weekly_enabled: boolean
+  summary_monthly_enabled: boolean
+  summary_daily_hour_msk: number
 }
 
 export function connectTelegram(chatId: string) {
@@ -36,7 +40,15 @@ export function getShop() {
   return api.get<Tenant>('/auth/shop')
 }
 
-export function updateShop(input: { name: string }) {
+export interface UpdateShopInput {
+  name: string
+  summary_daily_enabled?: boolean
+  summary_weekly_enabled?: boolean
+  summary_monthly_enabled?: boolean
+  summary_daily_hour_msk?: number
+}
+
+export function updateShop(input: UpdateShopInput) {
   return api.patch<Tenant>('/auth/shop', input)
 }
 
