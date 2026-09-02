@@ -1,11 +1,18 @@
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.application.products.apply_import import (
+    ApplyImportCommand,
+    ApplyImportResult,
+    ApplyImportRow,
+)
 from app.application.products.create_category import CreateCategoryCommand
 from app.application.products.create_product import CreateProductCommand, VariantInput
 from app.application.products.create_unit import CreateUnitCommand
 from app.application.products.import_excel import ImportProductsResult, RowError
+from app.application.products.import_preview import PreviewProductsResult, PreviewRow
 from app.application.products.update_product import (
     UpdateProductCommand,
     UpdateVariantInput,
@@ -145,6 +152,141 @@ class ImportProductsResponse(BaseModel):
         return cls(
             created=result.created,
             errors=[RowErrorResponse.from_entity(e) for e in result.errors],
+        )
+
+
+class ExistingProductSnapshotResponse(BaseModel):
+    id: int
+    name: str
+    sku: str
+    barcode: str | None
+    unit_code: str
+    purchase_price: Decimal
+    retail_price: Decimal
+    category_id: int | None
+    min_stock: Decimal
+
+
+class DuplicateCandidateResponse(BaseModel):
+    matched_by: Literal["barcode", "sku", "name"]
+    product: ExistingProductSnapshotResponse
+
+
+class PreviewRowResponse(BaseModel):
+    row: int
+    name: str
+    sku: str
+    barcode: str | None
+    unit_code: str
+    category_id: int | None
+    purchase_price: Decimal | None
+    retail_price: Decimal | None
+    min_stock: Decimal
+    parse_error: str | None
+    status: Literal["no_match", "match", "ambiguous_match"]
+    candidates: list[DuplicateCandidateResponse]
+
+    @classmethod
+    def from_entity(cls, row: PreviewRow) -> "PreviewRowResponse":
+        return cls(
+            row=row.row,
+            name=row.name,
+            sku=row.sku,
+            barcode=row.barcode,
+            unit_code=row.unit_code,
+            category_id=row.category_id,
+            purchase_price=row.purchase_price,
+            retail_price=row.retail_price,
+            min_stock=row.min_stock,
+            parse_error=row.parse_error,
+            status=row.status,
+            candidates=[
+                DuplicateCandidateResponse(
+                    matched_by=c.matched_by,
+                    product=ExistingProductSnapshotResponse(
+                        id=c.product.id,
+                        name=c.product.name,
+                        sku=c.product.sku,
+                        barcode=c.product.barcode,
+                        unit_code=c.product.unit_code,
+                        purchase_price=c.product.purchase_price,
+                        retail_price=c.product.retail_price,
+                        category_id=c.product.category_id,
+                        min_stock=c.product.min_stock,
+                    ),
+                )
+                for c in row.candidates
+            ],
+        )
+
+
+class PreviewProductsResponse(BaseModel):
+    rows: list[PreviewRowResponse]
+
+    @classmethod
+    def from_result(cls, result: PreviewProductsResult) -> "PreviewProductsResponse":
+        return cls(rows=[PreviewRowResponse.from_entity(r) for r in result.rows])
+
+
+class ApplyImportRowRequest(BaseModel):
+    client_row_id: str
+    action: Literal["create", "update", "skip"]
+    name: str = ""
+    sku: str = ""
+    barcode: str | None = None
+    unit_code: str = "pcs"
+    purchase_price: Decimal = Decimal("0")
+    retail_price: Decimal = Decimal("0")
+    category_id: int | None = None
+    min_stock: Decimal = Decimal("0")
+    existing_product_id: int | None = None
+
+
+class ApplyImportRequest(BaseModel):
+    rows: list[ApplyImportRowRequest]
+
+    def to_command(self) -> ApplyImportCommand:
+        return ApplyImportCommand(
+            rows=[
+                ApplyImportRow(
+                    client_row_id=r.client_row_id,
+                    action=r.action,
+                    name=r.name,
+                    sku=r.sku,
+                    barcode=r.barcode,
+                    unit_code=r.unit_code,
+                    purchase_price=r.purchase_price,
+                    retail_price=r.retail_price,
+                    category_id=r.category_id,
+                    min_stock=r.min_stock,
+                    existing_product_id=r.existing_product_id,
+                )
+                for r in self.rows
+            ]
+        )
+
+
+class ApplyImportRowErrorResponse(BaseModel):
+    client_row_id: str
+    message: str
+
+
+class ApplyImportResponse(BaseModel):
+    created: int
+    updated: int
+    skipped: int
+    errors: list[ApplyImportRowErrorResponse]
+
+    @classmethod
+    def from_result(cls, result: ApplyImportResult) -> "ApplyImportResponse":
+        return cls(
+            created=result.created,
+            updated=result.updated,
+            skipped=result.skipped,
+            errors=[
+                ApplyImportRowErrorResponse(client_row_id=e.client_row_id, message=e.message)
+                for e in result.errors
+            ],
         )
 
 

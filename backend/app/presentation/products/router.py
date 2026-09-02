@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Response, UploadFile
 
 from app.application.products.import_excel import ImportProductsCommand
+from app.application.products.import_preview import PreviewProductsCommand
 from app.application.products.set_product_photo import SetProductPhotoCommand
 from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Product
@@ -11,10 +12,12 @@ from app.infrastructure.products_export import (
 )
 from app.presentation.deps import (
     ActorDep,
+    ApplyImportProductsDep,
     CreateCategoryDep,
     CreateProductDep,
     CreateUnitDep,
     ImportProductsDep,
+    PreviewImportProductsDep,
     SetProductPhotoDep,
     ShowPurchaseDep,
     UowDep,
@@ -22,9 +25,12 @@ from app.presentation.deps import (
 )
 from app.presentation.audit.schemas import AuditEntryResponse
 from app.presentation.products.schemas import (
+    ApplyImportRequest,
+    ApplyImportResponse,
     CategoryCreateRequest,
     CategoryResponse,
     ImportProductsResponse,
+    PreviewProductsResponse,
     ProductCreateRequest,
     ProductResponse,
     ProductUpdateRequest,
@@ -47,6 +53,12 @@ async def _import_command(file: UploadFile) -> ImportProductsCommand:
     filename = (file.filename or "").lower()
     file_format = "csv" if filename.endswith(".csv") else "xlsx"
     return ImportProductsCommand(await file.read(), file_format=file_format)
+
+
+async def _preview_command(file: UploadFile) -> PreviewProductsCommand:
+    filename = (file.filename or "").lower()
+    file_format = "csv" if filename.endswith(".csv") else "xlsx"
+    return PreviewProductsCommand(await file.read(), file_format=file_format)
 
 
 async def _load_export_data(uow: UowDep) -> tuple[list[Product], dict[int, str], str]:
@@ -99,6 +111,22 @@ async def import_products(
 ) -> ImportProductsResponse:
     result = await use_case.execute(actor, await _import_command(file))
     return ImportProductsResponse.from_result(result)
+
+
+@router.post("/import/preview")
+async def preview_import_products(
+    actor: ActorDep, file: UploadFile, use_case: PreviewImportProductsDep
+) -> PreviewProductsResponse:
+    result = await use_case.execute(actor, await _preview_command(file))
+    return PreviewProductsResponse.from_result(result)
+
+
+@router.post("/import/apply", status_code=201)
+async def apply_import_products(
+    body: ApplyImportRequest, actor: ActorDep, use_case: ApplyImportProductsDep
+) -> ApplyImportResponse:
+    result = await use_case.execute(actor, body.to_command())
+    return ApplyImportResponse.from_result(result)
 
 
 @router.post("/units", status_code=201)

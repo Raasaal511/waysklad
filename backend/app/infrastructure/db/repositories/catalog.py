@@ -2,7 +2,13 @@ from sqlalchemy import func, or_, select
 
 from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Category, Product
-from app.domain.catalog.repository import ICategoryRepository, IProductRepository, IUnitRepository
+from app.domain.catalog.repository import (
+    DuplicateLookupKey,
+    DuplicateMatch,
+    ICategoryRepository,
+    IProductRepository,
+    IUnitRepository,
+)
 from app.domain.common.exceptions import NotFoundError
 from app.domain.common.quantity import Unit
 from app.infrastructure.db.mappers.catalog import (
@@ -207,6 +213,86 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
             if model is None:
                 return None
         return ProductMapper.to_entity(model, await self._units_map())
+
+    async def find_duplicates(self, keys: list[DuplicateLookupKey]) -> list[DuplicateMatch]:
+        if not keys:
+            return []
+        names = {k.name for k in keys if k.name}
+        skus = {k.sku for k in keys if k.sku}
+        barcodes = {k.barcode for k in keys if k.barcode}
+
+        conditions = []
+        if names:
+            conditions.append(ProductModel.name.in_(names))
+        if skus:
+            conditions.append(ProductModel.sku.in_(skus))
+        if barcodes:
+            conditions.append(ProductModel.barcode.in_(barcodes))
+        if not conditions:
+            return []
+
+        models = (
+            await self._session.execute(
+                select(ProductModel).where(
+                    ProductModel.tenant_id == self._tenant,
+                    ProductModel.is_active.is_(True),
+                    or_(*conditions),
+                )
+            )
+        ).scalars().all()
+
+        variant_models: list[ProductVariantModel] = []
+        if barcodes:
+            variant_models = (
+                await self._session.execute(
+                    select(ProductVariantModel)
+                    .join(ProductModel, ProductModel.id == ProductVariantModel.product_id)
+                    .where(
+                        ProductVariantModel.tenant_id == self._tenant,
+                        ProductModel.is_active.is_(True),
+                        ProductVariantModel.barcode.in_(barcodes),
+                    )
+                )
+            ).scalars().all()
+            known_ids = {m.id for m in models}
+            missing_ids = {vm.product_id for vm in variant_models} - known_ids
+            if missing_ids:
+                extra = (
+                    await self._session.execute(
+                        select(ProductModel).where(ProductModel.id.in_(missing_ids))
+                    )
+                ).scalars().all()
+                models = [*models, *extra]
+
+        by_name: dict[str, ProductModel] = {m.name: m for m in models}
+        by_sku: dict[str, ProductModel] = {m.sku: m for m in models if m.sku}
+        by_barcode: dict[str, ProductModel] = {m.barcode: m for m in models if m.barcode}
+        models_by_id = {m.id: m for m in models}
+        by_variant_barcode: dict[str, ProductModel] = {
+            vm.barcode: models_by_id[vm.product_id]
+            for vm in variant_models
+            if vm.barcode and vm.product_id in models_by_id
+        }
+
+        units = await self._units_map()
+        entity_cache: dict[int, Product] = {}
+
+        def _entity(m: ProductModel) -> Product:
+            if m.id not in entity_cache:
+                entity_cache[m.id] = ProductMapper.to_entity(m, units)
+            return entity_cache[m.id]
+
+        results: list[DuplicateMatch] = []
+        for key in keys:
+            if key.barcode:
+                m = by_barcode.get(key.barcode) or by_variant_barcode.get(key.barcode)
+                if m is not None:
+                    results.append(DuplicateMatch(key.row_index, _entity(m), "barcode"))
+            if key.sku and key.sku in by_sku:
+                results.append(DuplicateMatch(key.row_index, _entity(by_sku[key.sku]), "sku"))
+            if key.name and key.name in by_name:
+                results.append(DuplicateMatch(key.row_index, _entity(by_name[key.name]), "name"))
+        return results
 
     async def _get_model(self, product_id: int) -> ProductModel | None:
         return (
