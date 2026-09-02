@@ -145,6 +145,7 @@ export interface DebtsOverview {
   supplier_total_balance: string
   supplier_debt_count: number
   upcoming_payments: UpcomingPayment[]
+  has_scheduled_payments: boolean
 }
 
 /** Сводка по ВСЕМ активным долгам сразу — не зависит от фильтров списка (направление/

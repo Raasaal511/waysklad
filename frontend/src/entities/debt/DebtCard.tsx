@@ -681,7 +681,7 @@ function InstallmentSchedule({ debt, onDone }: { debt: Debt; onDone: () => void 
                 <span className={styles['debt-installment-date']}>
                   {formatDate(s.due_date)}
                   {!s.paid && i === nextUnpaidIndex && (
-                    <span className={[layoutStyles.badge, layoutStyles.accent].join(' ')}>Следующий</span>
+                    <span className="badge accent">Следующий</span>
                   )}
                   {!s.paid && daysOverdue(s.due_date) > 0 && (
                     <span className={layoutStyles.textDanger}>

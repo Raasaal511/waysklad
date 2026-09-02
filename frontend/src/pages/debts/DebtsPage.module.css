@@ -313,6 +313,29 @@
   color: var(--accent);
 }
 
+/* Список долгов — плавно проявляется при смене статус-фильтра
+   (Все/Просрочен/Скоро срок/...), вместо резкой подмены содержимого. */
+.debt-list-in {
+  animation: debtListIn 0.2s ease;
+}
+
+@keyframes debtListIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .debt-list-in {
+    animation: none;
+  }
+}
+
 .debt-row-chevron {
   flex-shrink: 0;
   color: var(--text-muted);

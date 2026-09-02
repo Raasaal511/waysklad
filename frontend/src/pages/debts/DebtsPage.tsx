@@ -11,11 +11,13 @@ import {
   type Debt,
   type DebtsOverview,
 } from '../../entities/debt/api'
-import { searchClients, listSuppliers, type Client, type Supplier } from '../../entities/counterparty/api'
+import { searchClients, type Client, type Supplier } from '../../entities/counterparty/api'
+import { useCatalog } from '../../app/CatalogContext'
 import {
   type InstallmentPeriod,
   INSTALLMENT_PERIOD_OPTIONS,
   buildInstallmentSchedule,
+  estimatePartsCount,
 } from '../../entities/debt/installmentSchedule'
 import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
@@ -115,6 +117,18 @@ function DueDatePresets({ value, onChange }: { value: string; onChange: (v: stri
 
 const PAGE_SIZE = 50
 
+const DEBTS_VIEW_KEY = 'debts_view'
+const DEBTS_DIRECTION_KEY = 'debts_direction'
+const DEBTS_STATUS_FILTER_KEY = 'debts_status_filter'
+const DEBT_STATUS_VALUES: (Debt['status'] | 'all')[] = [
+  'all',
+  'active',
+  'due_soon',
+  'overdue',
+  'partially_paid',
+  'closed',
+]
+
 export function DebtsPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -126,16 +140,34 @@ export function DebtsPage() {
   const [closedTotal, setClosedTotal] = useState(0)
   const [closedLoaded, setClosedLoaded] = useState(false)
   const [loadingClosed, setLoadingClosed] = useState(false)
+  const { suppliers, ensureSuppliers } = useCatalog()
   const [clients, setClients] = useState<Client[]>([])
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [overview, setOverview] = useState<DebtsOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [showUpcoming, setShowUpcoming] = useState(false)
-  const [view, setView] = useState<'active' | 'closed'>('active')
-  const [direction, setDirection] = useState<'clients' | 'suppliers'>('clients')
-  const [statusFilter, setStatusFilter] = useState<Debt['status'] | 'all'>('all')
+  // Вкладки/фильтр просмотра — предпочтение устройства, переживает обновление страницы.
+  const [view, setView] = useState<'active' | 'closed'>(
+    () => (localStorage.getItem(DEBTS_VIEW_KEY) === 'closed' ? 'closed' : 'active'),
+  )
+  const [direction, setDirection] = useState<'clients' | 'suppliers'>(
+    () => (localStorage.getItem(DEBTS_DIRECTION_KEY) === 'suppliers' ? 'suppliers' : 'clients'),
+  )
+  const [statusFilter, setStatusFilter] = useState<Debt['status'] | 'all'>(() => {
+    const saved = localStorage.getItem(DEBTS_STATUS_FILTER_KEY)
+    return saved && (DEBT_STATUS_VALUES as string[]).includes(saved) ? (saved as Debt['status'] | 'all') : 'all'
+  })
+
+  useEffect(() => {
+    localStorage.setItem(DEBTS_VIEW_KEY, view)
+  }, [view])
+  useEffect(() => {
+    localStorage.setItem(DEBTS_DIRECTION_KEY, direction)
+  }, [direction])
+  useEffect(() => {
+    localStorage.setItem(DEBTS_STATUS_FILTER_KEY, statusFilter)
+  }, [statusFilter])
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
 
@@ -153,15 +185,14 @@ export function DebtsPage() {
   async function load() {
     setLoading(true)
     try {
-      const [{ items, total: t }, clientList, supplierList] = await Promise.all([
+      const [{ items, total: t }, clientList] = await Promise.all([
         listActiveDebts({ direction, status: statusFilter, query: debouncedQuery, limit: PAGE_SIZE }),
         searchClients(),
-        listSuppliers(),
+        ensureSuppliers(),
       ])
       setDebts(items)
       setTotal(t)
       setClients(clientList)
-      setSuppliers(supplierList)
       refreshOverview()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось загрузить долги')
@@ -278,10 +309,10 @@ export function DebtsPage() {
       <div className={layoutStyles.sectionTitle}>
         <h2>Долги</h2>
         <div className={layoutStyles.row} style={{ gap: 8 }}>
-          {upcoming.length > 0 && (
+          {overview?.has_scheduled_payments && (
             <Button variant="secondary" onClick={() => setShowUpcoming(true)}>
               <IconClockHour4 size={16} stroke={1.8} /> Выплаты
-              <span className={layoutStyles.countBadge}>{upcoming.length}</span>
+              {upcoming.length > 0 && <span className={layoutStyles.countBadge}>{upcoming.length}</span>}
             </Button>
           )}
           <Button onClick={() => setShowForm(true)}>
@@ -308,6 +339,9 @@ export function DebtsPage() {
 
       {showUpcoming && (
         <Modal title="Ближайшие выплаты" size="wide" onClose={() => setShowUpcoming(false)}>
+          {upcoming.length === 0 && (
+            <p className={layoutStyles.textMuted}>В ближайший месяц выплат нет</p>
+          )}
           <div className={`${styles['debt-upcoming-list']} ${styles['debt-upcoming-list-modal']}`}>
             {upcoming.map((p, i) => {
               const overdue = daysOverdue(p.due_date) > 0
@@ -431,10 +465,16 @@ export function DebtsPage() {
                 : 'Долгов с таким статусом нет'}
           </p>
         ) : (
-          <div className={layoutStyles.stack}>
+          <div key={`${direction}-${statusFilter}`} className={layoutStyles.stack}>
             <div className={styles['debt-row-list']}>
-              {debts.map((d) => (
-                <DebtRow key={d.id} debt={d} name={counterpartyName(d)} onOpen={() => navigate(`/debts/${d.id}`)} />
+              {debts.map((d, i) => (
+                <DebtRow
+                  key={d.id}
+                  debt={d}
+                  name={counterpartyName(d)}
+                  onOpen={() => navigate(`/debts/${d.id}`)}
+                  index={i}
+                />
               ))}
             </div>
             {debts.length < total && (
@@ -474,13 +514,28 @@ export function DebtsPage() {
   )
 }
 
-function DebtRow({ debt, name, onOpen }: { debt: Debt; name: string; onOpen: () => void }) {
+function DebtRow({
+  debt,
+  name,
+  onOpen,
+  index = 0,
+}: {
+  debt: Debt
+  name: string
+  onOpen: () => void
+  index?: number
+}) {
   const Icon = debt.client_id != null ? IconUser : IconTruck
 
   return (
     <div
-      className={styles['debt-row']}
-      style={{ '--debt-accent': DEBT_STATUS_ACCENT[debt.status] } as CSSProperties}
+      className={[styles['debt-row'], styles['debt-row-in']].join(' ')}
+      style={
+        {
+          '--debt-accent': DEBT_STATUS_ACCENT[debt.status],
+          '--row-delay': `${Math.min(index, 12) * 25}ms`,
+        } as CSSProperties
+      }
       role="button"
       tabIndex={0}
       onClick={onOpen}
@@ -538,9 +593,19 @@ function IssueDebtForm({
   const [note, setNote] = useState('')
   const [withInstallment, setWithInstallment] = useState(false)
   const [downPayment, setDownPayment] = useState('')
-  const [parts, setParts] = useState(3)
+  const [partsInput, setPartsInput] = useState('3')
+  const [partsTouched, setPartsTouched] = useState(false)
+  const parts = Math.min(Math.max(Number(partsInput) || 0, 1), 60)
   const [period, setPeriod] = useState<InstallmentPeriod>('month')
   const [firstPaymentDate, setFirstPaymentDate] = useState(new Date().toISOString().slice(0, 10))
+
+  // Пока пользователь не поправил «Платежей» руками, число платежей само
+  // подстраивается под срок долга и периодичность — например, год с разбивкой
+  // раз в месяц сразу даёт 12 платежей, а не дефолтные 3.
+  useEffect(() => {
+    if (!withInstallment || partsTouched || !dueDate || !firstPaymentDate) return
+    setPartsInput(String(estimatePartsCount(firstPaymentDate, dueDate, period)))
+  }, [withInstallment, partsTouched, dueDate, firstPaymentDate, period])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -560,6 +625,10 @@ function IssueDebtForm({
     }
     if (withInstallment && downPaymentInvalid) {
       setError('Первый взнос должен быть меньше суммы долга')
+      return
+    }
+    if (withInstallment && parts < 2) {
+      setError('Платежей должно быть не меньше двух')
       return
     }
     setError(null)
@@ -603,6 +672,7 @@ function IssueDebtForm({
           Клиент
           <div className="sale-client-row">
             <Select
+              className="sale-client-select"
               value={clientId != null ? String(clientId) : ''}
               onChange={(v) => setClientId(Number(v))}
               options={clients.map((c) => ({ value: String(c.id), label: c.name }))}
@@ -666,7 +736,10 @@ function IssueDebtForm({
         <input
           type="checkbox"
           checked={withInstallment}
-          onChange={(e) => setWithInstallment(e.target.checked)}
+          onChange={(e) => {
+            setWithInstallment(e.target.checked)
+            if (!e.target.checked) setPartsTouched(false)
+          }}
         />
         С рассрочкой
       </label>
@@ -699,9 +772,13 @@ function IssueDebtForm({
               <input
                 type="number"
                 min={2}
-                max={12}
-                value={parts}
-                onChange={(e) => setParts(Number(e.target.value))}
+                max={60}
+                value={partsInput}
+                onChange={(e) => {
+                  setPartsInput(e.target.value.replace(/^0+(?=\d)/, ''))
+                  setPartsTouched(true)
+                }}
+                onBlur={() => setPartsInput(String(parts))}
               />
             </label>
             <label className={layoutStyles.field} style={{ flex: 1 }}>
