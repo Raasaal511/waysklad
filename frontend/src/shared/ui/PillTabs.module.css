@@ -1,0 +1,55 @@
+.pill-tabs {
+  position: relative;
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-sm) + 4px);
+}
+
+.pill-tabs-indicator {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  bottom: 4px;
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+  transition: transform 0.35s cubic-bezier(0.65, 0, 0.35, 1), width 0.35s cubic-bezier(0.65, 0, 0.35, 1);
+  will-change: transform;
+  z-index: 0;
+}
+
+.pill-tabs-item {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.pill-tabs-item:hover {
+  color: var(--text);
+}
+
+.pill-tabs-item-active {
+  color: #fff;
+  font-weight: 600;
+}
+
+.pill-tabs-item-active:hover {
+  color: #fff;
+}
