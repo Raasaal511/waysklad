@@ -9,7 +9,7 @@ import {
   type FormEvent,
 } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { listAllProducts, getByBarcode, type Product } from '../../entities/product/api'
+import { listProducts, getByBarcode, type Product } from '../../entities/product/api'
 import { type Warehouse } from '../../entities/inventory/api'
 import { searchClients, type Client } from '../../entities/counterparty/api'
 import { listClientDebts, type Debt } from '../../entities/debt/api'
@@ -36,6 +36,7 @@ import {
 import {
   IconReceiptRefund,
   IconPlus,
+  IconMinus,
   IconX,
   IconBuildingWarehouse,
   IconUsers,
@@ -51,6 +52,7 @@ import {
 } from '@tabler/icons-react'
 import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
+import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
@@ -60,6 +62,7 @@ import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
 import { InfoHint } from '../../shared/ui/InfoHint'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
+import { PillTabs } from '../../shared/ui/PillTabs'
 import { HistoryDisclosure } from '../../shared/ui/HistoryDisclosure'
 import { isBarcodeScannerSupported } from '../../entities/barcode/barcodeSupport'
 import { queueSale } from '../../shared/offline/outbox'
@@ -80,13 +83,12 @@ import {
 } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
 import { useAuth } from '../../app/AuthContext'
+import { scopedKey } from '../../shared/lib/scopedStorage'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './SalePage.module.css'
 
-const DRAFT_KEY = 'waysklad:sale-draft'
-const SALE_LINES_COLUMNS = '2fr 1fr 1fr 1fr'
-const CART_TABLE_COLUMNS = '40% 18% 17% 17% 8%'
 const PAGE_SIZE = 50
+const PRODUCTS_PAGE_SIZE = 32
 
 interface CartLine {
   product: Product
@@ -105,7 +107,7 @@ interface SaleDraft {
 
 function loadDraft(): SaleDraft | null {
   try {
-    const raw = localStorage.getItem(DRAFT_KEY)
+    const raw = localStorage.getItem(scopedKey('sale-draft'))
     return raw ? (JSON.parse(raw) as SaleDraft) : null
   } catch {
     return null
@@ -114,14 +116,14 @@ function loadDraft(): SaleDraft | null {
 
 function saveDraft(draft: SaleDraft) {
   try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    localStorage.setItem(scopedKey('sale-draft'), JSON.stringify(draft))
   } catch {
     // localStorage недоступен (приватный режим и т.п.) — черновик просто не переживёт перезагрузку
   }
 }
 
 function clearDraft() {
-  localStorage.removeItem(DRAFT_KEY)
+  localStorage.removeItem(scopedKey('sale-draft'))
 }
 
 const PAYMENT_LABELS: Record<PaymentMethod, string> = {
@@ -137,6 +139,9 @@ const PAYMENT_BADGE_CLASS: Record<PaymentMethod, string> = {
 }
 
 type PeriodFilter = 'today' | 'week' | 'month' | 'all'
+
+const PERIOD_FILTER_KEY = 'sales_period_filter'
+const PERIOD_VALUES: PeriodFilter[] = ['today', 'week', 'month', 'all']
 
 const PERIOD_LABELS: Record<PeriodFilter, string> = {
   all: 'Всё',
@@ -238,11 +243,23 @@ export function SalePage() {
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  const [period, setPeriod] = useState<PeriodFilter>('all')
+  // Выбор периода (День/Неделя/Месяц/Всё) — предпочтение устройства, не аккаунта
+  // (как тема/вид доски), переживает обновление страницы.
+  const [period, setPeriod] = useState<PeriodFilter>(() => {
+    const saved = localStorage.getItem(PERIOD_FILTER_KEY)
+    return saved && (PERIOD_VALUES as string[]).includes(saved) ? (saved as PeriodFilter) : 'all'
+  })
+
+  useEffect(() => {
+    localStorage.setItem(PERIOD_FILTER_KEY, period)
+  }, [period])
+  const [specificDateFrom, setSpecificDateFrom] = useState('')
+  const [specificDateTo, setSpecificDateTo] = useState('')
   const [paymentFilter, setPaymentFilter] = useState<PaymentMethod | 'all'>('all')
   const [warehouseFilter, setWarehouseFilter] = useState<number | 'all'>('all')
   const [clientQuery, setClientQuery] = useState('')
   const [debouncedClientQuery, setDebouncedClientQuery] = useState('')
+  const [productFilter, setProductFilter] = useState<{ id: number; name: string } | null>(null)
   const [sortMode, setSortMode] = useState<SaleSortMode>('date_desc')
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
   const [pinned, setPinned] = useState(false)
@@ -266,19 +283,25 @@ export function SalePage() {
     return () => clearTimeout(timer)
   }, [clientQuery])
 
-  const dateRange = useMemo(() => periodToDateRange(period), [period])
+  const dateRange = useMemo(
+    () => (specificDateFrom ? { from: specificDateFrom, to: specificDateTo || specificDateFrom } : periodToDateRange(period)),
+    [period, specificDateFrom, specificDateTo],
+  )
 
 async function loadSalesPage(params: {
     warehouseFilter: number | 'all'
     paymentFilter: PaymentMethod | 'all'
+    productId: number | null
     dateRange: { from: string | null; to: string | null }
     sortMode: SaleSortMode
+    offset?: number
   }) {
     return listSales({
       limit: PAGE_SIZE,
-      offset: 0,
+      offset: params.offset ?? 0,
       warehouseId: params.warehouseFilter === 'all' ? null : params.warehouseFilter,
       paymentMethod: params.paymentFilter,
+      productId: params.productId,
       dateFrom: params.dateRange.from,
       dateTo: params.dateRange.to,
       sort: params.sortMode,
@@ -291,7 +314,7 @@ async function loadSalesPage(params: {
     setLoading(true)
     try {
       const [{ items, total: t }, , c] = await Promise.all([
-        loadSalesPage({ warehouseFilter, paymentFilter, dateRange, sortMode }),
+        loadSalesPage({ warehouseFilter, paymentFilter, productId: productFilter?.id ?? null, dateRange, sortMode }),
         ensureWarehouses(),
         searchClients(),
       ])
@@ -311,7 +334,9 @@ async function loadSalesPage(params: {
   // без повторных запросов клиентов/складов (они не зависят от фильтра продаж).
   async function reloadSales() {
     try {
-      const { items, total: t } = await loadSalesPage({ warehouseFilter, paymentFilter, dateRange, sortMode })
+      const { items, total: t } = await loadSalesPage({
+        warehouseFilter, paymentFilter, productId: productFilter?.id ?? null, dateRange, sortMode,
+      })
       setSales(items)
       setTotal(t)
     } catch (err) {
@@ -322,14 +347,9 @@ async function loadSalesPage(params: {
   async function loadMore() {
     setLoadingMore(true)
     try {
-      const { items, total: t } = await listSales({
-        limit: PAGE_SIZE,
+      const { items, total: t } = await loadSalesPage({
+        warehouseFilter, paymentFilter, productId: productFilter?.id ?? null, dateRange, sortMode,
         offset: sales.length,
-        warehouseId: warehouseFilter === 'all' ? null : warehouseFilter,
-        paymentMethod: paymentFilter,
-        dateFrom: dateRange.from,
-        dateTo: dateRange.to,
-        sort: sortMode,
       })
       setSales((prev) => [...prev, ...items])
       setTotal(t)
@@ -348,7 +368,7 @@ async function loadSalesPage(params: {
       reloadSales()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [warehouseFilter, paymentFilter, sortMode, dateRange.from, dateRange.to])
+  }, [warehouseFilter, paymentFilter, productFilter?.id, sortMode, dateRange.from, dateRange.to])
 
   useEffect(() => {
     getSalesSummary({
@@ -429,7 +449,8 @@ async function loadSalesPage(params: {
     (warehouseFilter !== 'all' ? 1 : 0) +
     (paymentFilter !== 'all' ? 1 : 0) +
     (sortMode !== 'date_desc' ? 1 : 0) +
-    (clientQuery.trim() !== '' ? 1 : 0)
+    (clientQuery.trim() !== '' ? 1 : 0) +
+    (productFilter ? 1 : 0)
 
   const showPaymentTag = sortMode !== 'payment'
   const singleWarehouseId =
@@ -459,27 +480,47 @@ async function loadSalesPage(params: {
 
       <div ref={sentinelRef} style={{ height: 1, marginBottom: -1 }} />
       <div className={[styles.saleFiltersBar, pinned && styles.isPinned].filter(Boolean).join(' ')}>
-        <div className={styles.salePeriodTabs}>
-          {(Object.keys(PERIOD_LABELS) as PeriodFilter[]).map((p) => (
-            <button
-              key={p}
-              type="button"
-              translate="no"
-              className={period === p ? styles.pillTabActive : styles.pillTab}
-              onClick={() => setPeriod(p)}
-            >
-              {PERIOD_LABELS[p]}
-            </button>
-          ))}
+        <div className={styles.salePeriodRow}>
+          <PillTabs
+            value={period}
+            options={Object.keys(PERIOD_LABELS) as PeriodFilter[]}
+            labels={PERIOD_LABELS}
+            onChange={(v) => {
+              setPeriod(v)
+              setSpecificDateFrom('')
+              setSpecificDateTo('')
+            }}
+          />
+          <DateInput
+            className={[styles.saleDatePicker, specificDateFrom && styles.saleFilterActive].filter(Boolean).join(' ')}
+            value={specificDateFrom}
+            rangeEnd={specificDateTo}
+            max={toISODate(new Date())}
+            // не вызывается: с onRangeChange DateInput всегда работает в
+            // режиме диапазона (клик на один день дважды даёт from === to)
+            onChange={() => {}}
+            onRangeChange={(from, to) => {
+              setSpecificDateFrom(from)
+              setSpecificDateTo(to)
+              setPeriod('all')
+            }}
+          />
         </div>
         <div className={styles.saleFiltersScroll}>
           <input
             className={[styles.saleClientSearch, clientQuery.trim() !== '' && styles.saleFilterActive]
               .filter(Boolean)
               .join(' ')}
-            placeholder="Клиент"
+            placeholder="Поиск по клиенту"
+            aria-label="Поиск по клиенту"
             value={clientQuery}
             onChange={(e) => setClientQuery(e.target.value)}
+          />
+          <ProductFilterSearch
+            value={productFilter}
+            onChange={setProductFilter}
+            className={styles.saleClientSearch}
+            activeClassName={styles.saleFilterActive}
           />
           {warehouses.length > 1 && (
             <label className={styles.saleSortField}>
@@ -512,6 +553,7 @@ async function loadSalesPage(params: {
                 setSortMode('date_desc')
                 setWarehouseFilter('all')
                 setClientQuery('')
+                setProductFilter(null)
               }}
             />
           )}
@@ -543,7 +585,7 @@ async function loadSalesPage(params: {
                 .join(' ')}
               onClick={() => setPaymentFilter('all')}
             >
-              <span className={[layoutStyles.badge, styles.salePaymentBadgeAll].join(' ')}>Все способы</span>
+              <span className={['badge', styles.salePaymentBadgeAll].join(' ')}>Все способы</span>
               <span>
                 {periodCountAll} · {formatMoney(periodTotalAll)} ₽
               </span>
@@ -597,7 +639,7 @@ async function loadSalesPage(params: {
           {total === 0 ? 'Продаж пока нет — начните первую' : 'За этот период продаж нет'}
         </p>
       ) : (
-        <div className={layoutStyles.stack} style={{ gap: 16 }}>
+        <div key={`${dateRange.from}-${dateRange.to}`} className={layoutStyles.stack} style={{ gap: 16 }}>
           {groups.map((group) => (
             <div className={styles.saleDayGroup} key={group.label}>
               <div className={styles.saleDayHeader}>
@@ -709,6 +751,102 @@ async function loadSalesPage(params: {
   )
 }
 
+/** Поиск товара для фильтра списка продаж — печатаете название, выбираете
+ * один из подсказанных вариантов, список продаж фильтруется по product_id
+ * на сервере (в отличие от поиска по клиенту, который остаётся клиентским). */
+function ProductFilterSearch({
+  value,
+  onChange,
+  className,
+  activeClassName,
+}: {
+  value: { id: number; name: string } | null
+  onChange: (v: { id: number; name: string } | null) => void
+  className?: string
+  activeClassName?: string
+}) {
+  const [query, setQuery] = useState(value?.name ?? '')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [results, setResults] = useState<Product[]>([])
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setQuery(value?.name ?? '')
+  }, [value])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [query])
+
+  useEffect(() => {
+    // выбранный товар не переискивается по своему же названию — только когда
+    // пользователь реально печатает что-то новое поверх выбора
+    if (!debouncedQuery || debouncedQuery === value?.name) {
+      setResults([])
+      return
+    }
+    let cancelled = false
+    listProducts({ query: debouncedQuery, limit: 8 })
+      .then(({ items }) => {
+        if (!cancelled) setResults(items)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [debouncedQuery, value?.name])
+
+  useEffect(() => {
+    if (!open) return
+    function handleClickOutside(e: MouseEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [open])
+
+  function selectProduct(p: Product) {
+    onChange({ id: p.id, name: p.name })
+    setQuery(p.name)
+    setOpen(false)
+  }
+
+  function handleQueryChange(next: string) {
+    setQuery(next)
+    setOpen(true)
+    if (value && next !== value.name) onChange(null)
+  }
+
+  return (
+    <div ref={rootRef} className={styles.saleProductSearch}>
+      <input
+        // Подсветка "фильтр активен" — только когда товар реально выбран из
+        // списка (value), а не просто напечатан текст: иначе рамка загоралась
+        // до применения фильтра и создавала впечатление, что он уже сработал.
+        className={[className, value && activeClassName].filter(Boolean).join(' ')}
+        placeholder="Поиск по товару"
+        aria-label="Поиск по товару"
+        value={query}
+        onChange={(e) => handleQueryChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+      />
+      {open && results.length > 0 && (
+        <ul className={styles.saleProductSearchDropdown} role="listbox">
+          {results.map((p) => (
+            <li key={p.id} role="option" aria-selected={value?.id === p.id}>
+              <button type="button" onClick={() => selectProduct(p)}>
+                {p.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 function NewSaleForm({
   clients: initialClients,
   onClientsChange,
@@ -734,7 +872,9 @@ function NewSaleForm({
   } = useCatalog()
 
   const [products, setProducts] = useState<Product[]>([])
+  const [productsTotal, setProductsTotal] = useState(0)
   const [productsLoading, setProductsLoading] = useState(false)
+  const [productsLoadingMore, setProductsLoadingMore] = useState(false)
   const [warehouseId, setWarehouseId] = useState<number | null>(draft?.warehouseId ?? null)
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -758,6 +898,7 @@ function NewSaleForm({
   const [showNewClientForm, setShowNewClientForm] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [offlineQueued, setOfflineQueued] = useState<{ itemsCount: number; total: string } | null>(null)
@@ -767,13 +908,55 @@ function NewSaleForm({
     return () => clearTimeout(timer)
   }, [query])
 
+  // "По остатку" сервер не умеет (остатки — отдельная таблица по складам) — просим
+  // sort=name вместо него, чтобы offset-пагинация была стабильной между страницами
+  // (без ORDER BY на сервере одна и та же страница могла бы вернуть разный набор
+  // строк при повторном запросе), а порядок "по остатку" считаем в filtered ниже.
+  const serverSort = sortMode === 'stock_desc' ? 'name' : sortMode
+
   useEffect(() => {
     setProductsLoading(true)
-    listAllProducts(debouncedQuery, categoryId)
-      .then(setProducts)
+    setProducts([])
+    listProducts({ query: debouncedQuery, categoryId, sort: serverSort, limit: PRODUCTS_PAGE_SIZE, offset: 0 })
+      .then(({ items, total }) => {
+        setProducts(items)
+        setProductsTotal(total)
+      })
       .catch(() => {})
       .finally(() => setProductsLoading(false))
-  }, [debouncedQuery, categoryId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery, categoryId, serverSort])
+
+  function loadMoreProducts() {
+    if (productsLoadingMore || products.length >= productsTotal) return
+    setProductsLoadingMore(true)
+    listProducts({
+      query: debouncedQuery,
+      categoryId,
+      sort: serverSort,
+      limit: PRODUCTS_PAGE_SIZE,
+      offset: products.length,
+    })
+      .then(({ items, total }) => {
+        setProducts((prev) => [...prev, ...items])
+        setProductsTotal(total)
+      })
+      .catch(() => {})
+      .finally(() => setProductsLoadingMore(false))
+  }
+
+  const productsSentinelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = productsSentinelRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) loadMoreProducts()
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products.length, productsTotal, productsLoadingMore, debouncedQuery, categoryId, serverSort])
 
   useEffect(() => {
     ensureCategories().catch(() => {})
@@ -872,26 +1055,18 @@ function NewSaleForm({
   const isFractional = (code: string) => units.find((u) => u.code === code)?.fractional ?? false
 
   const filtered = useMemo(() => {
-    // categoryId уже применён на сервере (listAllProducts выше) — здесь остаются
-    // только showAllStock/сортировка, которые требуют остатков по складу, а их
-    // на сервере для этого списка нет.
+    // categoryId, query и name/price_* сортировка уже применены на сервере —
+    // здесь остаются только showAllStock-фильтр и sort=stock_desc, которым
+    // нужны остатки по складу, а их на сервере для этого списка нет.
+    // Сортирует только уже загруженную страницу — при подгрузке следующей
+    // порядок "по остатку" внутри неё не переплетается с предыдущей.
     let list = products
     if (warehouseId != null && !showAllStock) {
       list = list.filter((p) => Number(stockFor(p.id) ?? 0) > 0)
     }
+    if (sortMode !== 'stock_desc') return list
     const sorted = [...list]
-    sorted.sort((a, b) => {
-      switch (sortMode) {
-        case 'price_asc':
-          return Number(a.retail_price) - Number(b.retail_price)
-        case 'price_desc':
-          return Number(b.retail_price) - Number(a.retail_price)
-        case 'stock_desc':
-          return Number(stockFor(b.id) ?? 0) - Number(stockFor(a.id) ?? 0)
-        default:
-          return a.name.localeCompare(b.name, 'ru')
-      }
-    })
+    sorted.sort((a, b) => Number(stockFor(b.id) ?? 0) - Number(stockFor(a.id) ?? 0))
     return sorted
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, showAllStock, sortMode, stock, warehouseId])
@@ -940,7 +1115,7 @@ function NewSaleForm({
     if (blocked) notifyMaxReached(product.id)
   }
 
-  function updateLine(productId: number, field: 'quantity' | 'price', rawValue: string) {
+  function updateLine(productId: number, field: 'quantity' | 'price', rawValue: string, max?: number | null) {
     const normalized = normalizeDecimalInput(rawValue)
     if (normalized === null) return
     setCart((prev) =>
@@ -949,6 +1124,9 @@ function NewSaleForm({
         let value = normalized
         if (field === 'quantity' && !isFractional(l.product.unit_code) && value.includes('.')) {
           value = value.split('.')[0] || '0'
+        }
+        if (field === 'quantity' && max != null && value !== '' && Number(value) > max) {
+          value = isFractional(l.product.unit_code) ? String(max) : String(Math.floor(max))
         }
         return { ...l, [field]: value }
       }),
@@ -981,10 +1159,7 @@ function NewSaleForm({
     setCart((prev) => prev.filter((l) => l.product.id !== productId))
   }
 
-  function handleClear() {
-    if (cart.length > 0 && !window.confirm('Очистить чек? Набранные товары будут удалены.')) {
-      return
-    }
+  function clearCart() {
     clearDraft()
     setCart([])
     setDiscount('0')
@@ -994,6 +1169,14 @@ function NewSaleForm({
     setDebtDueDate('')
     setCashReceived('')
     setError(null)
+  }
+
+  function handleClear() {
+    if (cart.length > 0) {
+      setShowClearConfirm(true)
+      return
+    }
+    clearCart()
   }
 
   const subtotalCents = cart.reduce((sum, l) => sum + lineTotalCents(l.quantity, l.price), 0)
@@ -1087,13 +1270,14 @@ function NewSaleForm({
             {offlineQueued.itemsCount}) сохранена на устройстве и отправится на сервер автоматически, как
             только появится сеть.
           </p>
-          <Button onClick={onClose}>Понятно</Button>
+          <Button onClick={onClose} style={{ alignSelf: 'center' }}>Понятно</Button>
         </div>
       </Modal>
     )
   }
 
   return (
+    <>
     <Modal
       title="Новая продажа"
       onClose={onClose}
@@ -1197,15 +1381,27 @@ function NewSaleForm({
       <div className={styles.saleResultsPanel}>
         <div className={styles.saleResultsHeader}>
           <span>Товары</span>
+          {/* Счётчик — по реально видимому списку (filtered), а не по серверному
+              productsTotal: сервер считает по query/категории без учёта склада,
+              а warehouseId+!showAllStock ещё прячет товары без остатка — раньше
+              счётчик и список расходились ("1 найдено" при пустом списке). */}
           {!productsLoading && <span className={layoutStyles.textMuted}>{filtered.length} найдено</span>}
         </div>
 
         {productsLoading ? (
           <p className={layoutStyles.textMuted}>Загрузка…</p>
+        ) : filtered.length === 0 && products.length > 0 && warehouseId != null && !showAllStock ? (
+          <p className={layoutStyles.textMuted}>
+            {products.length === 1 ? 'Найден 1 товар' : `Найдено товаров: ${products.length}`}, но
+            {products.length === 1 ? ' его' : ' их'} нет на этом складе —{' '}
+            <button type="button" className={layoutStyles.disclosureLink} onClick={() => setShowAllStock(true)}>
+              показать
+            </button>
+          </p>
         ) : filtered.length === 0 ? (
           <p className={layoutStyles.textMuted}>Ничего не найдено</p>
         ) : (
-          <div className={layoutStyles.productGrid} style={{ maxHeight: 480, minHeight: 220, overflowY: 'auto' }}>
+          <div className={layoutStyles.productGrid}>
             {filtered.map((p) => {
               const qty = stockFor(p.id)
               const reserved = reservedFor(p.id)
@@ -1269,6 +1465,7 @@ function NewSaleForm({
                       <>
                         {formatQuantity(inCartQty)}
                         <IconButton
+                          variant="neutral"
                           className={layoutStyles.productTileRemove}
                           onClick={(e) => {
                             e.stopPropagation()
@@ -1276,7 +1473,7 @@ function NewSaleForm({
                           }}
                           aria-label="Убрать из чека"
                         >
-                          <IconX size={10} stroke={1.8} />
+                          <IconX size={10} stroke={2} />
                         </IconButton>
                       </>
                     ) : (
@@ -1289,6 +1486,13 @@ function NewSaleForm({
                 </div>
               )
             })}
+          </div>
+        )}
+        {!productsLoading && products.length < productsTotal && (
+          <div ref={productsSentinelRef} className={layoutStyles.stack} style={{ alignItems: 'center' }}>
+            <span className={layoutStyles.textMuted}>
+              {productsLoadingMore ? 'Загрузка…' : 'Прокрутите ниже для ещё товаров'}
+            </span>
           </div>
         )}
       </div>
@@ -1308,61 +1512,59 @@ function NewSaleForm({
             <span className={layoutStyles.textMuted}>{cart.length} поз.</span>
           </div>
 
-          <div className={[layoutStyles.tableWrap, styles.cartTableWrap].join(' ')}>
-            <div className={styles.cartTableHead} style={{ gridTemplateColumns: CART_TABLE_COLUMNS }}>
-              <span>Товар</span>
-              <span>Кол-во</span>
-              <span>Цена</span>
-              <span>Сумма</span>
-              <span />
-            </div>
-            <div>
-              {cart.map((line) => {
-                const lineTotal = centsToMoney(lineTotalCents(line.quantity, line.price))
-                const available = stockFor(line.product.id)
-                const availableNum = available !== null ? Number(available) : null
-                const overStock = availableNum !== null && Number(line.quantity || 0) > availableNum
-                return (
-                  <div
-                    key={line.product.id}
-                    className={styles.cartTableRow}
-                    style={{ gridTemplateColumns: CART_TABLE_COLUMNS }}
+          <div className={styles.cartList}>
+            {cart.map((line) => {
+              const lineTotal = centsToMoney(lineTotalCents(line.quantity, line.price))
+              const available = stockFor(line.product.id)
+              const availableNum = available !== null ? Number(available) : null
+              const overStock = availableNum !== null && Number(line.quantity || 0) > availableNum
+              return (
+                <div key={line.product.id} className={styles.cartRow}>
+                  <IconButton
+                    variant="neutral"
+                    className={styles.cartRemoveBtn}
+                    onClick={() => removeLine(line.product.id)}
+                    aria-label="Убрать из чека"
                   >
-                    <div className={styles.cartTableName}>
-                      <div>{line.product.name}</div>
-                      {availableNum !== null && (
-                        <div className={styles.cartTableStock}>
-                          Остаток: {formatQuantity(availableNum)} {unitName(line.product.unit_code)}
-                        </div>
-                      )}
-                    </div>
-                    <div className={styles.cartTableQtyCell}>
+                    <IconX size={14} stroke={2} />
+                  </IconButton>
+
+                  <div className={styles.cartRowName}>
+                    <div>{line.product.name}</div>
+                    {availableNum !== null && (
+                      <div className={styles.cartTableStock}>
+                        Остаток: {formatQuantity(availableNum)} {unitName(line.product.unit_code)}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={styles.cartRowFields}>
+                    <label className={styles.cartField}>
+                      <span className={styles.cartFieldLabel}>Кол-во</span>
                       <div className={styles.cartQtyStepper}>
+                        <IconButton
+                          variant="muted"
+                          className={styles.cartQtyStep}
+                          onClick={() => stepLineQuantity(line.product.id, -1, availableNum)}
+                          aria-label="Уменьшить количество"
+                        >
+                          <IconMinus size={12} stroke={2} />
+                        </IconButton>
                         <input
                           type="text"
                           inputMode="decimal"
                           className={overStock ? styles.cartInputWarning : undefined}
                           value={line.quantity}
-                          onChange={(e) => updateLine(line.product.id, 'quantity', e.target.value)}
+                          onChange={(e) => updateLine(line.product.id, 'quantity', e.target.value, availableNum)}
                         />
-                        <div className={styles.cartQtyStepColumn}>
-                          <IconButton
-                            variant="muted"
-                            className={styles.cartQtyStep}
-                            onClick={() => stepLineQuantity(line.product.id, 1, availableNum)}
-                            aria-label="Увеличить количество"
-                          >
-                            <IconChevronRight size={10} stroke={1.8} className={styles.cartQtyStepIconUp} />
-                          </IconButton>
-                          <IconButton
-                            variant="muted"
-                            className={styles.cartQtyStep}
-                            onClick={() => stepLineQuantity(line.product.id, -1, availableNum)}
-                            aria-label="Уменьшить количество"
-                          >
-                            <IconChevronRight size={10} stroke={1.8} className={styles.cartQtyStepIconDown} />
-                          </IconButton>
-                        </div>
+                        <IconButton
+                          variant="muted"
+                          className={styles.cartQtyStep}
+                          onClick={() => stepLineQuantity(line.product.id, 1, availableNum)}
+                          aria-label="Увеличить количество"
+                        >
+                          <IconPlus size={12} stroke={2} />
+                        </IconButton>
                       </div>
                       {overStock && availableNum !== null && (
                         <div className={styles.cartTableWarning}>
@@ -1372,99 +1574,106 @@ function NewSaleForm({
                       {maxReachedProductId === line.product.id && (
                         <div className={styles.cartTableMaxReached}>Больше нет на складе</div>
                       )}
-                    </div>
-                    <div className={styles.cartTablePriceCell}>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={line.price}
-                        onChange={(e) => updateLine(line.product.id, 'price', e.target.value)}
-                      />
-                      <span className={styles.cartTablePriceSuffix}>₽</span>
-                    </div>
-                    <div className={styles.cartTableTotal}>{formatMoney(lineTotal)} ₽</div>
-                    <div>
-                      <IconButton
-                        onClick={() => removeLine(line.product.id)}
-                        aria-label="Убрать из чека"
-                      >
-                        <IconX size={16} stroke={1.8} />
-                      </IconButton>
+                    </label>
+
+                    <label className={styles.cartField}>
+                      <span className={styles.cartFieldLabel}>Цена за шт.</span>
+                      <div className={styles.cartPriceInputWrap}>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          className={styles.cartPriceInput}
+                          value={line.price}
+                          onChange={(e) => updateLine(line.product.id, 'price', e.target.value)}
+                        />
+                        <span className={styles.cartTablePriceSuffix}>₽</span>
+                      </div>
+                    </label>
+
+                    <div className={styles.cartField}>
+                      <span className={styles.cartFieldLabel}>Сумма</span>
+                      <div className={styles.cartTableTotal}>{formatMoney(lineTotal)} ₽</div>
                     </div>
                   </div>
-                )
-              })}
-            </div>
+                </div>
+              )
+            })}
           </div>
 
-          <div className={styles.saleCheckoutGrid}>
-            <label className={layoutStyles.field}>
-              Скидка
-              <div className={styles.saleDiscountRow}>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={discount}
-                  onChange={(e) => {
-                    const normalized = normalizeDecimalInput(e.target.value)
-                    if (normalized !== null) setDiscount(normalized)
-                  }}
-                />
-                <div className={styles.saleDiscountToggle}>
-                  <Button
-                    variant={discountMode === 'amount' ? 'primary' : 'secondary'}
-                    onClick={() => setDiscountMode('amount')}
-                  >
-                    ₽
-                  </Button>
-                  <Button
-                    variant={discountMode === 'percent' ? 'primary' : 'secondary'}
-                    onClick={() => setDiscountMode('percent')}
-                  >
-                    %
-                  </Button>
+          <div className={styles.saleCheckoutSection}>
+            <div className={styles.saleCheckoutRow}>
+              <label className={[layoutStyles.field, styles.saleDiscountField].join(' ')}>
+                Скидка
+                <div className={styles.saleDiscountRow}>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={discount}
+                    onChange={(e) => {
+                      const normalized = normalizeDecimalInput(e.target.value)
+                      if (normalized !== null) setDiscount(normalized)
+                    }}
+                  />
+                  <div className={styles.saleDiscountToggle}>
+                    <Button
+                      variant={discountMode === 'amount' ? 'primary' : 'secondary'}
+                      onClick={() => setDiscountMode('amount')}
+                    >
+                      ₽
+                    </Button>
+                    <Button
+                      variant={discountMode === 'percent' ? 'primary' : 'secondary'}
+                      onClick={() => setDiscountMode('percent')}
+                    >
+                      %
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              {discountMode === 'percent' && Number(discount) > 0 && (
-                <span className={layoutStyles.textMuted}>= {formatMoney(discountAmount)} ₽</span>
-              )}
-            </label>
-
-            <label className={layoutStyles.field}>
-              Оплата
-              <Select
-                value={payment}
-                onChange={(v) => setPayment(v as PaymentMethod)}
-                options={Object.entries(PAYMENT_LABELS).map(([value, label]) => ({ value, label }))}
-              />
-            </label>
-
-            {payment === 'cash' && (
-              <label className={layoutStyles.field}>
-                Получено
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder={formatMoney(total)}
-                  value={cashReceived}
-                  onChange={(e) => {
-                    const normalized = normalizeDecimalInput(e.target.value)
-                    if (normalized !== null) setCashReceived(normalized)
-                  }}
-                />
-                {cashReceivedCents > 0 && (
-                  <span className={changeCents < 0 ? styles.saleChangeShort : layoutStyles.textMuted}>
-                    {changeCents >= 0
-                      ? `Сдача: ${formatMoney(change)} ₽`
-                      : `Не хватает: ${formatMoney(centsToMoney(-changeCents))} ₽`}
-                  </span>
+                {discountMode === 'percent' && Number(discount) > 0 && (
+                  <span className={layoutStyles.textMuted}>= {formatMoney(discountAmount)} ₽</span>
                 )}
               </label>
-            )}
 
-            <label className={[layoutStyles.field, styles.saleClientField].join(' ')}>
+              {/* div, а не label — иначе клик мимо Select (по пустому месту в блоке)
+                  браузер трактует как implicit label click и открывает список сам */}
+              <div className={[layoutStyles.field, styles.salePaymentField].join(' ')}>
+                Оплата
+                <Select
+                  value={payment}
+                  onChange={(v) => setPayment(v as PaymentMethod)}
+                  options={Object.entries(PAYMENT_LABELS).map(([value, label]) => ({ value, label }))}
+                />
+              </div>
+
+              {payment === 'cash' && (
+                <label className={[layoutStyles.field, styles.saleReceivedField].join(' ')}>
+                  Получено
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder={formatMoney(total)}
+                    value={cashReceived}
+                    onChange={(e) => {
+                      const normalized = normalizeDecimalInput(e.target.value)
+                      if (normalized !== null) setCashReceived(normalized)
+                    }}
+                  />
+                  {cashReceivedCents > 0 && (
+                    <span className={changeCents < 0 ? styles.saleChangeShort : layoutStyles.textMuted}>
+                      {changeCents >= 0
+                        ? `Сдача: ${formatMoney(change)} ₽`
+                        : `Не хватает: ${formatMoney(centsToMoney(-changeCents))} ₽`}
+                    </span>
+                  )}
+                </label>
+              )}
+            </div>
+
+            {/* div, а не label — иначе клик мимо Select (по пустому месту в блоке)
+                браузер трактует как implicit label click и открывает список сам */}
+            <div className={[layoutStyles.field, styles.saleClientField].join(' ')}>
               Клиент
-              {payment === 'credit' && (
+              {payment === 'credit' && !clientId && (
                 <span className={styles.saleClientRequired}> — обязательно для продажи в долг</span>
               )}
               <div className={styles.saleClientRow}>
@@ -1492,10 +1701,10 @@ function NewSaleForm({
                   }}
                 />
               </div>
-            </label>
+            </div>
 
             {payment === 'credit' && (
-              <label className={layoutStyles.field}>
+              <div className={[layoutStyles.field, styles.saleDebtDueField].join(' ')}>
                 Долг до
                 <DateInput
                   required
@@ -1503,7 +1712,7 @@ function NewSaleForm({
                   min={new Date().toISOString().slice(0, 10)}
                   onChange={setDebtDueDate}
                 />
-              </label>
+              </div>
             )}
           </div>
 
@@ -1512,6 +1721,17 @@ function NewSaleForm({
       )}
       </div>
     </Modal>
+    {showClearConfirm && (
+      <ConfirmDialog
+        title="Очистить чек?"
+        message="Набранные товары будут удалены."
+        confirmLabel="Очистить"
+        danger
+        onConfirm={clearCart}
+        onClose={() => setShowClearConfirm(false)}
+      />
+    )}
+    </>
   )
 }
 
@@ -1782,7 +2002,7 @@ function LastSaleCard({
       <div className={layoutStyles.stack}>
       <div className={[layoutStyles.row, layoutStyles.between, layoutStyles.wrap].join(' ')} style={{ gap: 10 }}>
         {sale.deleted_at ? (
-          <span className={[layoutStyles.badge, layoutStyles.danger].join(' ')}>Удалена</span>
+          <span className="badge danger">Удалена</span>
         ) : (
           <span />
         )}
@@ -1866,7 +2086,7 @@ function LastSaleCard({
         {sale.order_id != null && (
           <div className={styles.saleDetailMetaItem}>
             <span className={layoutStyles.textMuted}>Из заказа</span>
-            <Link to="/orders" className={[layoutStyles.badge, layoutStyles.accent].join(' ')}>№{sale.order_id}</Link>
+            <Link to="/orders" className="badge accent">№{sale.order_id}</Link>
           </div>
         )}
       </div>
@@ -1890,7 +2110,7 @@ function LastSaleCard({
             </Link>
           )}
           {clientDebt && clientDebt.is_closed && (
-            <span className={[layoutStyles.badge, layoutStyles.accent].join(' ')}>Долг погашен</span>
+            <span className="badge accent">Долг погашен</span>
           )}
           <Link to={`/clients?highlight=${client.id}`} className={styles.saleDetailClientArrowLink}>
             <IconChevronRight size={16} stroke={1.8} className={styles.saleDetailClientArrow} />
@@ -1914,50 +2134,38 @@ function LastSaleCard({
         Товары <span className={layoutStyles.textMuted}>· {sale.lines.length} поз.</span>
       </h3>
 
-      <div className={layoutStyles.dataTable}>
-        <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: SALE_LINES_COLUMNS }}>
-          <span>Товар</span>
-          <span>Кол-во</span>
-          <span>Цена</span>
-          <span>Сумма</span>
-        </div>
-        <div className={layoutStyles.dataTableBody}>
-          {sale.lines.map((line, i) => (
-            <div
-              key={line.id}
-              className={[layoutStyles.dataRow, styles.saleHistoryRowIn].join(' ')}
-              style={
-                {
-                  gridTemplateColumns: SALE_LINES_COLUMNS,
-                  '--row-delay': `${Math.min(i, 12) * 25}ms`,
-                } as CSSProperties
-              }
-            >
-              <span className={layoutStyles.dataRowName}>{productName(line.product_id)}</span>
-              <span>
-                {formatQuantity(line.quantity)} {unitName(products.find((p) => p.id === line.product_id)?.unit_code ?? '')}
-              </span>
-              <span>{formatMoney(line.price)} ₽</span>
-              <span>{formatMoney(line.total)} ₽</span>
-            </div>
-          ))}
-        </div>
+      <div className={styles.saleLineList}>
+        {sale.lines.map((line, i) => (
+          <div
+            key={line.id}
+            className={[styles.saleLineRow, styles.saleHistoryRowIn].join(' ')}
+            style={{ '--row-delay': `${Math.min(i, 12) * 25}ms` } as CSSProperties}
+          >
+            <span className={styles.saleLineName}>{productName(line.product_id)}</span>
+            <span className={styles.saleLineMeta}>
+              {formatQuantity(line.quantity)} {unitName(products.find((p) => p.id === line.product_id)?.unit_code ?? '')}
+              {' × '}
+              {formatMoney(line.price)} ₽
+            </span>
+            <span className={styles.saleLineTotal}>{formatMoney(line.total)} ₽</span>
+          </div>
+        ))}
       </div>
 
-      <div className={styles.saleDetailTotals}>
+      <div className="sale-detail-totals">
         {Number(sale.discount) > 0 && (
           <>
-            <div className={styles.saleDetailTotalsRow}>
+            <div className="sale-detail-totals-row">
               <span>Товары</span>
               <span>{formatMoney(sale.subtotal)} ₽</span>
             </div>
-            <div className={styles.saleDetailTotalsRow}>
+            <div className="sale-detail-totals-row">
               <span>{sale.order_id != null ? 'Предоплата по заказу' : 'Скидка'}</span>
               <span>−{formatMoney(sale.discount)} ₽</span>
             </div>
           </>
         )}
-        <div className={[styles.saleDetailTotalsRow, styles.saleDetailTotalsRowSum].join(' ')}>
+        <div className="sale-detail-totals-row sale-detail-totals-row-sum">
           <span>Итого</span>
           <span>{formatMoney(sale.total)} ₽</span>
         </div>

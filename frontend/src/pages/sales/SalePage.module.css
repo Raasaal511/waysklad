@@ -34,86 +34,32 @@
   color: var(--text);
 }
 
-.saleDetailTotals {
+/* Cart list — карточный вид вместо табличной сетки: не зависит от общей ширины
+   строки и не ломается горизонтальным скроллом (было в старой grid-реализации,
+   где sticky-заголовок расходился со строками при overflow-x). Без собственного
+   overflow — скроллится вместе со всей модалкой (modal-body), а не отдельно,
+   чтобы в модалке был один скролл, а не несколько вложенных. */
+
+.cartList {
+  padding-right: 8px;
+  margin-right: -8px;
+}
+
+.cartRow {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  align-self: flex-end;
-  min-width: 180px;
+  gap: 10px;
+  padding: 14px 36px 18px 0;
 }
 
-.saleDetailTotalsRow {
-  display: flex;
-  justify-content: space-between;
+.cartRow:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.cartRowName {
   width: 100%;
-  gap: 16px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.saleDetailTotalsRowSum {
-  margin-top: 4px;
-  padding-top: 6px;
-  border-top: 1px solid var(--border);
-  font-weight: 600;
-  font-size: 15px;
-  color: var(--text);
-}
-
-/* Cart table */
-
-.cartTableWrap {
-  max-height: 360px;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.cartTableHead {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: grid;
-  gap: 0;
-  padding: 10px 16px;
-  background: var(--bg-muted);
-  color: var(--text-muted);
-  font-weight: 500;
-  font-size: 13px;
-  border-bottom: 1px solid var(--border);
-}
-
-.cartTableRow {
-  display: grid;
-  gap: 0;
-  align-items: start;
-  padding: 10px 16px;
-}
-
-.cartTableRow:not(:last-child) {
-  border-bottom: 1px solid var(--border);
-}
-
-.cartTableHead > *,
-.cartTableRow > * {
   min-width: 0;
-}
-
-.cartTableHead > *:not(:first-child):not(:last-child),
-.cartTableRow > *:not(:first-child):not(:last-child) {
-  padding-left: 16px;
-  border-left: 1px solid var(--border);
-}
-
-.cartTableRow > *:last-child {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.cartTableName {
   font-weight: 500;
   overflow-wrap: break-word;
 }
@@ -126,74 +72,92 @@
   margin-top: 2px;
 }
 
-.cartTableTotal {
-  font-weight: 600;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+.cartRowFields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 28px;
 }
 
-.cartTableRow input {
-  padding: 6px 8px;
-  width: 100%;
+.cartField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+}
+
+.cartFieldLabel {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cartTableTotal {
+  font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  padding: 7px 0;
 }
 
 .cartQtyStepper {
   display: flex;
   align-items: stretch;
-  gap: 4px;
-  max-width: 96px;
+  gap: 0;
+  width: 96px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg);
 }
 
 .cartQtyStepper input {
   min-width: 0;
   width: 100%;
   text-align: center;
-  padding-right: 4px;
+  padding: 6px 2px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
 }
 
-.cartQtyStepColumn {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 22px;
+.cartQtyStepper input:focus {
+  outline: none;
+  background: var(--accent-soft) !important;
 }
 
 button.cartQtyStep {
-  flex: 1;
+  flex-shrink: 0;
+  width: 28px;
   padding: 0;
   background: var(--bg-muted);
   color: var(--text-muted);
-  border: 1px solid var(--border);
+  border: none;
   line-height: 1;
+  border-radius: 0;
 }
 
 button.cartQtyStep:hover:not(:disabled) {
   background: var(--accent-soft);
   color: var(--accent);
-  border-color: var(--accent);
 }
 
-.cartQtyStepIconUp {
-  transform: rotate(-90deg);
-}
-
-.cartQtyStepIconDown {
-  transform: rotate(90deg);
-}
-
-.cartTablePriceCell input {
-  padding-right: 24px;
-}
-
-.cartTableQtyCell,
-.cartTablePriceCell {
+.cartPriceInputWrap {
   position: relative;
+  width: 132px;
+}
+
+.cartPriceInput {
+  width: 100%;
+  text-align: left;
+  padding-right: 26px !important;
 }
 
 .cartTablePriceSuffix {
   position: absolute;
-  right: 22px;
+  right: 10px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-muted);
@@ -210,12 +174,8 @@ button.cartQtyStep:hover:not(:disabled) {
 }
 
 .cartTableWarning {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  margin-top: 2px;
-  font-size: 12px;
+  max-width: 116px;
+  font-size: 11px;
   color: var(--danger);
   white-space: normal;
   line-height: 1.3;
@@ -225,17 +185,29 @@ button.cartQtyStep:hover:not(:disabled) {
   position: absolute;
   top: 100%;
   left: 0;
-  margin-top: 2px;
+  margin-top: 4px;
   padding: 3px 8px;
   border-radius: var(--radius-sm);
   background: var(--bg);
-  border: 2px solid var(--accent);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent);
-  white-space: nowrap;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.16);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
   z-index: 5;
+}
+
+.cartRemoveBtn {
+  position: absolute;
+  top: 14px;
+  right: 0;
+  color: var(--text-muted) !important;
+  background: var(--bg-muted) !important;
+}
+
+.cartRemoveBtn:hover:not(:disabled) {
+  color: var(--danger) !important;
+  background: var(--danger-bg) !important;
 }
 
 /* Sale history */
@@ -258,51 +230,16 @@ button.cartQtyStep:hover:not(:disabled) {
   box-shadow: 0 8px 12px -8px rgba(0, 0, 0, 0.35);
 }
 
-.salePeriodTabs {
-  display: inline-flex;
-  flex-wrap: nowrap;
-  gap: 4px;
-  width: fit-content;
-  max-width: 100%;
-  padding: 4px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius-sm) + 4px);
+.salePeriodRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.salePeriodTabs > button {
+.saleDatePicker {
+  width: auto;
   flex-shrink: 0;
-}
-
-.pillTab,
-.pillTabActive {
-  padding: 7px 14px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 14px;
-  font-weight: 500;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.pillTab:hover {
-  color: var(--text);
-  background: var(--bg-muted);
-}
-
-.pillTabActive {
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-}
-
-.pillTabActive:hover {
-  background: var(--accent-hover);
 }
 
 .saleFiltersScroll {
@@ -345,6 +282,51 @@ input.saleClientSearch:not([type='checkbox']):not([type='radio']) {
 .saleFiltersScroll input.saleFilterActive:not([type='checkbox']):not([type='radio']),
 .saleFiltersScroll select.saleFilterActive {
   border-color: var(--accent);
+}
+
+.saleProductSearch {
+  position: relative;
+  flex: 1 1 140px;
+  min-width: 120px;
+  max-width: 220px;
+}
+
+.saleProductSearch input.saleClientSearch:not([type='checkbox']):not([type='radio']) {
+  max-width: none;
+  width: 100%;
+}
+
+.saleProductSearchDropdown {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.saleProductSearchDropdown button {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.saleProductSearchDropdown button:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .saleDayGroup {
@@ -660,15 +642,39 @@ input.saleSearchInput:not([type='checkbox']):not([type='radio']):focus {
   cursor: not-allowed;
 }
 
-.saleCheckoutGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 200px));
+.saleCheckoutSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.saleCheckoutRow {
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
+.saleDiscountField {
+  flex: 1 1 160px;
+  max-width: 220px;
+}
+
+.salePaymentField {
+  flex: 1 1 160px;
+  max-width: 200px;
+}
+
+.saleReceivedField {
+  flex: 1 1 160px;
+  max-width: 200px;
+}
+
 .saleClientField {
-  grid-column: 1 / -1;
-  max-width: 480px;
+  max-width: 420px;
+}
+
+.saleDebtDueField {
+  max-width: 220px;
 }
 
 .saleClientRequired {
@@ -701,31 +707,27 @@ input.saleSearchInput:not([type='checkbox']):not([type='radio']):focus {
   padding: 10px 12px;
 }
 
+/* Select "Клиент" и кнопка "+ Клиент" — в одну строку через grid с фиксированной
+   колонкой под кнопку (не flex-wrap): при переносе по ширине кнопка "прыгала" в
+   непредсказуемое место и всплывающая панель "Новый клиент" открывалась не там,
+   где её ожидали увидеть — grid не переносит колонки, поэтому кнопка стабильна. */
 .saleClientRow {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
   gap: 8px;
 }
 
-/* Компонент Select рендерит <button class="selectTrigger">, а не нативный
-   <select> — таргетить нужно именно его, иначе он не сжимается и толкает
-   кнопку "+ Клиент" за пределы модалки (не просто узко — совсем убегает). */
 .saleClientRow :global(.selectTrigger) {
-  flex: 1 1 160px;
-  min-width: 0;
-}
-
-.saleClientRow :global(.inline-popover-anchor) {
-  flex-shrink: 0;
+  width: 100%;
 }
 
 .saleDetailMeta {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
-  padding: 12px;
-  background: var(--bg-muted);
-  border-radius: var(--radius);
+  gap: 14px 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
 }
 
 .saleDetailMetaItem {
@@ -744,6 +746,59 @@ input.saleSearchInput:not([type='checkbox']):not([type='radio']):focus {
 
 .saleDetailSectionTitle {
   margin: 0;
+}
+
+.saleLineList {
+  display: flex;
+  flex-direction: column;
+}
+
+.saleLineRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.saleLineRow:first-child {
+  border-top: none;
+}
+
+.saleLineName {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: break-word;
+}
+
+.saleLineMeta {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.saleLineTotal {
+  flex-shrink: 0;
+  min-width: 80px;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+  .saleLineRow {
+    flex-wrap: wrap;
+  }
+
+  .saleLineMeta {
+    order: 3;
+    flex-basis: 100%;
+  }
 }
 
 .saleDetailClientCard {
