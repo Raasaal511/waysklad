@@ -13,6 +13,11 @@ interface DateInputProps {
   disabled?: boolean
   required?: boolean
   id?: string
+  /** Включает выбор промежутка вместо одной даты: value — начало, rangeEnd — конец.
+   * Первый клик в календаре задаёт начало и сбрасывает конец, второй — завершает
+   * диапазон (комитится через onRangeChange) и закрывает попап. */
+  rangeEnd?: string
+  onRangeChange?: (start: string, end: string) => void
 }
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
@@ -51,10 +56,19 @@ function buildMonthGrid(year: number, month: number): (Date | null)[] {
   return cells
 }
 
-export function DateInput({ value, onChange, min, max, className, disabled, required, id }: DateInputProps) {
+export function DateInput({
+  value, onChange, min, max, className, disabled, required, id, rangeEnd, onRangeChange,
+}: DateInputProps) {
+  const isRange = onRangeChange != null
   const [open, setOpen] = useState(false)
   const [menuStyle, setMenuStyle] = useState<{ top: number; left: number } | null>(null)
   const selected = parseISO(value)
+  const selectedEnd = parseISO(rangeEnd ?? '')
+  // В процессе выбора диапазона (первый клик уже сделан, второй ещё нет) —
+  // локальный "черновик" начала, который ещё не закоммичен через onRangeChange.
+  const [rangeAnchor, setRangeAnchor] = useState<Date | null>(null)
+  // Дата под курсором после выбора начала — превью диапазона до второго клика.
+  const [hoverDate, setHoverDate] = useState<Date | null>(null)
   const [viewYear, setViewYear] = useState(() => (selected ?? new Date()).getFullYear())
   const [viewMonth, setViewMonth] = useState(() => (selected ?? new Date()).getMonth())
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -69,42 +83,49 @@ export function DateInput({ value, onChange, min, max, className, disabled, requ
       const trigger = triggerRef.current
       if (!trigger) return
       const rect = trigger.getBoundingClientRect()
+      // кнопка полностью ушла за пределы окна (проскроллили мимо) — закрываем попап,
+      // а не тащим его вникуда за кнопкой
+      if (rect.bottom < 0 || rect.top > window.innerHeight) {
+        setOpen(false)
+        return
+      }
       const menuWidth = 280 // совпадает с шириной .date-picker в DateInput.module.css
-      const menuHeight = menuRef.current?.offsetHeight ?? 340
       const margin = 8
       const left = Math.min(
         Math.max(rect.left, margin),
         window.innerWidth - menuWidth - margin,
       )
-      const fitsBelow = rect.bottom + 4 + menuHeight <= window.innerHeight - margin
-      const top = fitsBelow
-        ? rect.bottom + 4
-        : Math.max(rect.top - 4 - menuHeight, margin)
+      // если снизу не хватает места в границах модалки/окна, поднимаем попап
+      // выше, чтобы он целиком поместился, а не обрезался нижним краем экрана
+      const dialog = trigger.closest('[role="dialog"]')
+      const dialogRect = dialog?.getBoundingClientRect()
+      const footer = dialog?.querySelector('[class*="modal-footer"]')
+      const boundary = footer
+        ? footer.getBoundingClientRect().top
+        : (dialogRect ? dialogRect.bottom : window.innerHeight)
+      const menuHeight = menuRef.current?.offsetHeight ?? 0
+      const top = Math.max(margin, Math.min(rect.bottom + 4, boundary - menuHeight - margin))
       setMenuStyle({ top, left })
     }
     updatePosition()
+    // после первого прохода попап ещё не был в DOM, и его реальная высота не
+    // учтена (menuHeight=0) — пересчитываем на следующем кадре, когда он уже отрендерен
+    const raf = requestAnimationFrame(updatePosition)
     window.addEventListener('resize', updatePosition)
     window.addEventListener('scroll', updatePosition, true)
     return () => {
+      cancelAnimationFrame(raf)
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
   }, [open])
 
-  // после первого рендера попапа известна его реальная высота — уточняем позицию
-  useLayoutEffect(() => {
-    if (!open || !menuStyle) return
-    const trigger = triggerRef.current
-    const menu = menuRef.current
-    if (!trigger || !menu) return
-    const rect = trigger.getBoundingClientRect()
-    const menuHeight = menu.offsetHeight
-    const margin = 8
-    const fitsBelow = rect.bottom + 4 + menuHeight <= window.innerHeight - margin
-    const top = fitsBelow ? rect.bottom + 4 : Math.max(rect.top - 4 - menuHeight, margin)
-    if (top !== menuStyle.top) setMenuStyle((s) => (s ? { ...s, top } : s))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, menuStyle?.left])
+  useEffect(() => {
+    if (!open) {
+      setRangeAnchor(null)
+      setHoverDate(null)
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -164,7 +185,21 @@ export function DateInput({ value, onChange, min, max, className, disabled, requ
 
   function commit(date: Date) {
     if (isDisabled(date)) return
-    onChange(toISO(date))
+    if (!isRange) {
+      onChange(toISO(date))
+      setOpen(false)
+      triggerRef.current?.focus()
+      return
+    }
+    if (!rangeAnchor) {
+      // первый клик — задаём начало, пока не коммитим наружу (диапазон из
+      // одной точки не имеет смысла для потребителя, ждём вторую дату)
+      setRangeAnchor(date)
+      return
+    }
+    const [start, end] = date < rangeAnchor ? [date, rangeAnchor] : [rangeAnchor, date]
+    onRangeChange!(toISO(start), toISO(end))
+    setRangeAnchor(null)
     setOpen(false)
     triggerRef.current?.focus()
   }
@@ -174,6 +209,13 @@ export function DateInput({ value, onChange, min, max, className, disabled, requ
   if (className) classes.push(className)
 
   const cells = buildMonthGrid(viewYear, viewMonth)
+
+  // Диапазон для подсветки в гриде: во время выбора второй даты (rangeAnchor
+  // задан) — превью от начала до даты под курсором, до второго клика; иначе —
+  // уже закоммиченный диапазон value..rangeEnd.
+  const previewEnd = rangeAnchor && hoverDate ? hoverDate : null
+  const rangeStart = isRange ? (rangeAnchor ?? selected) : null
+  const rangeFinish = isRange ? (rangeAnchor ? previewEnd : selectedEnd) : null
 
   return (
     <>
@@ -189,7 +231,15 @@ export function DateInput({ value, onChange, min, max, className, disabled, requ
       >
         <IconCalendar size={16} stroke={1.8} className={styles['date-input-icon']} />
         <span className={value ? layoutStyles.selectTriggerValue : layoutStyles.selectTriggerPlaceholder}>
-          {value ? formatDisplay(value) : 'Выберите дату'}
+          {isRange
+            ? value && rangeEnd
+              ? value === rangeEnd
+                ? formatDisplay(value)
+                : `${formatDisplay(value)} — ${formatDisplay(rangeEnd)}`
+              : 'Выберите дату'
+            : value
+              ? formatDisplay(value)
+              : 'Выберите дату'}
         </span>
       </button>
 
@@ -229,27 +279,41 @@ export function DateInput({ value, onChange, min, max, className, disabled, requ
               ))}
             </div>
             <div className={styles['date-picker-grid']}>
-              {cells.map((date, i) =>
-                date ? (
+              {cells.map((date, i) => {
+                if (!date) return <span key={i} />
+                // rangeFinish (hover-превью) может оказаться раньше rangeStart,
+                // если навели на дату до уже выбранного начала — нормализуем
+                // порядок, иначе диапазон "наоборот" просто не подсветится.
+                const [rangeLo, rangeHi] =
+                  rangeStart && rangeFinish
+                    ? rangeStart <= rangeFinish
+                      ? [rangeStart, rangeFinish]
+                      : [rangeFinish, rangeStart]
+                    : [null, null]
+                const isEndpoint =
+                  (rangeStart && isSameDay(date, rangeStart)) || (rangeFinish && isSameDay(date, rangeFinish))
+                const isInRange = isRange && rangeLo && rangeHi && date > rangeLo && date < rangeHi
+                return (
                   <button
                     key={i}
                     type="button"
                     className={[
                       styles['date-picker-day'],
-                      selected && isSameDay(date, selected) ? styles['date-picker-day-selected'] : '',
+                      !isRange && selected && isSameDay(date, selected) ? styles['date-picker-day-selected'] : '',
+                      isRange && isEndpoint ? styles['date-picker-day-selected'] : '',
+                      isRange && isInRange ? styles['date-picker-day-in-range'] : '',
                       isSameDay(date, new Date()) ? styles['date-picker-day-today'] : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}
                     disabled={isDisabled(date)}
                     onClick={() => commit(date)}
+                    onMouseEnter={() => rangeAnchor && setHoverDate(date)}
                   >
                     {date.getDate()}
                   </button>
-                ) : (
-                  <span key={i} />
-                ),
-              )}
+                )
+              })}
             </div>
           </div>,
           document.body,

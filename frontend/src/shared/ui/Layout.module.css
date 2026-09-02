@@ -9,6 +9,13 @@
   gap: 12px;
 }
 
+/* Тот же баг, что и в .form: кнопка-одиночка как прямой ребёнок flex-column
+   без align-items наследует stretch и раздувается на 100% ширины. */
+.stack > button,
+.stack > :global(.btn) {
+  align-self: flex-start;
+}
+
 .row {
   display: flex;
   align-items: center;
@@ -47,6 +54,14 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+/* Поля растягиваются на всю ширину формы (stretch по умолчанию), а кнопка
+   отправки — нет: иначе она наследует stretch и раздувается на 100% ширины
+   вместо обычного размера. */
+.form > button,
+.form > :global(.btn) {
+  align-self: flex-start;
 }
 
 .field {
@@ -110,36 +125,6 @@
 }
 
 .textWarning {
-  color: var(--warning);
-}
-
-.badge {
-  display: inline-block;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--bg-muted);
-  color: var(--text-muted);
-  text-decoration: none;
-}
-
-a.badge:hover {
-  filter: brightness(0.94);
-}
-
-.badge.accent {
-  background: color-mix(in srgb, var(--accent) 22%, var(--bg-muted));
-  color: var(--accent);
-}
-
-.badge.danger {
-  background: var(--danger-bg);
-  color: var(--danger);
-}
-
-.badge.warning {
-  background: var(--warning-bg);
   color: var(--warning);
 }
 
@@ -564,6 +549,9 @@ a.badge:hover {
   border: 2px solid var(--border);
   border-radius: var(--radius-sm);
   cursor: pointer;
+  /* карточка кликабельна (role="button") — при быстрых повторных кликах браузер
+     иначе трактует их как выделение текста внутри, показывая рамку выделения */
+  user-select: none;
   transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.2s ease,
     transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -573,11 +561,10 @@ a.badge:hover {
   left: 50%;
   bottom: 100%;
   transform: translateX(-50%);
-  margin-bottom: 2px;
-  padding: 4px 10px;
+  margin-bottom: 4px;
+  padding: 3px 8px;
   border-radius: var(--radius-sm);
   background: var(--bg);
-  border: 2px solid var(--accent);
   color: var(--accent);
   font-size: 11px;
   font-weight: 600;
@@ -610,6 +597,9 @@ a.badge:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--text);
+  /* без scale — иначе кнопка удаления в бейдже смещается под курсором при hover
+     и промахивается (курсор целится в позицию ДО применения transform) */
+  transform: none;
 }
 
 .productTileBody {
@@ -628,16 +618,16 @@ a.badge:hover {
 
 .productTileCartBadge {
   position: absolute;
-  top: -6px;
-  right: -6px;
+  top: -4px;
+  right: -4px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
+  gap: 2px;
+  padding: 2px 2px 2px 8px;
   border-radius: 999px;
   background: var(--accent);
   color: #fff;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1.4;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
@@ -649,16 +639,18 @@ a.badge:hover {
 
 .productTileRemove {
   flex-shrink: 0;
-  padding: 0;
-  width: 13px;
-  height: 13px;
-  background: rgba(255, 255, 255, 0.25);
-  color: #fff;
-  border: none;
+  padding: 0 !important;
+  width: 16px !important;
+  height: 16px !important;
+  background: var(--accent) !important;
+  color: #fff !important;
+  border: 1.5px solid #fff !important;
+  border-radius: 50% !important;
 }
 
-.productTileRemove:hover {
-  background: rgba(255, 255, 255, 0.4);
+.productTileRemove:hover:not(:disabled) {
+  background: var(--danger) !important;
+  color: #fff !important;
 }
 
 .productTileName {
