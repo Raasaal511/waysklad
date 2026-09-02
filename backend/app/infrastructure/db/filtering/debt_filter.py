@@ -50,13 +50,19 @@ def _counterparty_name_expr():
     """Имя клиента либо поставщика — ровно один из client_id/supplier_id заполнен."""
     client_name = (
         select(ClientModel.name)
-        .where(ClientModel.id == DebtModel.client_id)
+        .where(
+            ClientModel.id == DebtModel.client_id,
+            ClientModel.tenant_id == DebtModel.tenant_id,
+        )
         .correlate(DebtModel)
         .scalar_subquery()
     )
     supplier_name = (
         select(SupplierModel.name)
-        .where(SupplierModel.id == DebtModel.supplier_id)
+        .where(
+            SupplierModel.id == DebtModel.supplier_id,
+            SupplierModel.tenant_id == DebtModel.tenant_id,
+        )
         .correlate(DebtModel)
         .scalar_subquery()
     )

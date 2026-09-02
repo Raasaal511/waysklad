@@ -171,11 +171,20 @@ class SqlAlchemyWarehouseRepository(SqlAlchemyRepository, IWarehouseRepository):
     async def _assigned_user_ids(self, warehouse_ids: list[int]) -> dict[int, list[int]]:
         if not warehouse_ids:
             return {}
+        # WarehouseAssignmentModel сам не хранит tenant_id (чисто связующая таблица
+        # warehouse_id<->user_id) — join на WarehouseModel.tenant_id страхует от
+        # утечки, если warehouse_ids когда-нибудь придёт без предварительной
+        # tenant-проверки выше по стеку
         rows = (
             await self._session.execute(
                 select(
                     WarehouseAssignmentModel.warehouse_id, WarehouseAssignmentModel.user_id
-                ).where(WarehouseAssignmentModel.warehouse_id.in_(warehouse_ids))
+                )
+                .join(WarehouseModel, WarehouseModel.id == WarehouseAssignmentModel.warehouse_id)
+                .where(
+                    WarehouseAssignmentModel.warehouse_id.in_(warehouse_ids),
+                    WarehouseModel.tenant_id == self._tenant,
+                )
             )
         ).all()
         result: dict[int, list[int]] = {wid: [] for wid in warehouse_ids}
@@ -228,15 +237,21 @@ class SqlAlchemyWarehouseRepository(SqlAlchemyRepository, IWarehouseRepository):
     async def is_assigned(self, warehouse_id: int, user_id: int) -> bool:
         result = (
             await self._session.execute(
-                select(WarehouseAssignmentModel.id).where(
+                select(WarehouseAssignmentModel.id)
+                .join(WarehouseModel, WarehouseModel.id == WarehouseAssignmentModel.warehouse_id)
+                .where(
                     WarehouseAssignmentModel.warehouse_id == warehouse_id,
                     WarehouseAssignmentModel.user_id == user_id,
+                    WarehouseModel.tenant_id == self._tenant,
                 )
             )
         ).scalar_one_or_none()
         return result is not None
 
     async def set_assignments(self, warehouse_id: int, user_ids: list[int]) -> Warehouse:
+        # get() уже кидает NotFoundError, если склад не принадлежит текущему
+        # tenant — гарантирует, что warehouse_id ниже принадлежит tenant
+        await self.get(warehouse_id)
         await self._session.execute(
             delete(WarehouseAssignmentModel).where(
                 WarehouseAssignmentModel.warehouse_id == warehouse_id
@@ -250,6 +265,7 @@ class SqlAlchemyWarehouseRepository(SqlAlchemyRepository, IWarehouseRepository):
         return await self.get(warehouse_id)
 
     async def add_assignment(self, warehouse_id: int, user_id: int) -> None:
+        await self.get(warehouse_id)  # проверяет принадлежность tenant, кидает NotFoundError иначе
         already = (
             await self._session.execute(
                 select(WarehouseAssignmentModel.id).where(
@@ -266,12 +282,25 @@ class SqlAlchemyWarehouseRepository(SqlAlchemyRepository, IWarehouseRepository):
         await self._session.flush()
 
     async def set_user_assignments(self, user_id: int, warehouse_ids: list[int]) -> None:
+        # только назначения на склады текущего tenant — если warehouse_ids
+        # когда-нибудь придёт непровалидированным, чужой склад тут не пройдёт
+        tenant_warehouse_ids = {
+            wid
+            for wid in (
+                await self._session.execute(
+                    select(WarehouseModel.id).where(
+                        WarehouseModel.id.in_(warehouse_ids),
+                        WarehouseModel.tenant_id == self._tenant,
+                    )
+                )
+            ).scalars()
+        }
         await self._session.execute(
             delete(WarehouseAssignmentModel).where(
                 WarehouseAssignmentModel.user_id == user_id
             )
         )
-        for warehouse_id in set(warehouse_ids):
+        for warehouse_id in tenant_warehouse_ids:
             self._session.add(
                 WarehouseAssignmentModel(warehouse_id=warehouse_id, user_id=user_id)
             )

@@ -259,7 +259,10 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
             if missing_ids:
                 extra = (
                     await self._session.execute(
-                        select(ProductModel).where(ProductModel.id.in_(missing_ids))
+                        select(ProductModel).where(
+                            ProductModel.id.in_(missing_ids),
+                            ProductModel.tenant_id == self._tenant,
+                        )
                     )
                 ).scalars().all()
                 models = [*models, *extra]

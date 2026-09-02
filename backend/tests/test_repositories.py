@@ -238,6 +238,34 @@ async def test_tenant_isolation(make_uow, create_shop, create_product):
         assert found == [] and total == 0
 
 
+async def test_warehouse_assignment_scoped_to_tenant(make_uow, create_shop):
+    # WarehouseAssignmentModel — чисто связующая таблица, у неё физически нет
+    # tenant_id; изоляция держится на явном JOIN на WarehouseModel.tenant_id
+    # в репозитории. Проверяем, что чужой склад не получится ни назначить, ни
+    # прочитать назначения через методы, которые раньше не фильтровали tenant.
+    tenant_a, _, owner_a = await create_shop()
+    tenant_b, _, _ = await create_shop()
+
+    async with make_uow(tenant_b) as uow:
+        foreign_warehouse = await uow.warehouses.add(Warehouse(id=None, name="Чужой склад"))
+        await uow.commit()
+        foreign_warehouse_id = foreign_warehouse.id
+
+    async with make_uow(tenant_a) as uow:
+        with pytest.raises(NotFoundError):
+            await uow.warehouses.set_assignments(foreign_warehouse_id, [owner_a])
+
+        with pytest.raises(NotFoundError):
+            await uow.warehouses.add_assignment(foreign_warehouse_id, owner_a)
+
+        assert await uow.warehouses.is_assigned(foreign_warehouse_id, owner_a) is False
+
+        # id чужого склада в списке — тихо игнорируется, не создаёт назначение
+        await uow.warehouses.set_user_assignments(owner_a, [foreign_warehouse_id])
+        await uow.commit()
+        assert await uow.warehouses.list_for_user(owner_a) == []
+
+
 async def test_sale_roundtrip(make_uow, create_shop, create_product):
     tenant_id, _, seller_id = await create_shop()
     product = await create_product(tenant_id, name="Духи масляные 6мл")
