@@ -148,7 +148,9 @@ export function LoginPage() {
                     tabIndex={mode === 'login' ? 0 : -1}
                     aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                   >
-                    {showPassword ? <IconEyeOff size={18} stroke={1.8} /> : <IconEye size={18} stroke={1.8} />}
+                    <span key={showPassword ? 'off' : 'on'} className={styles['auth-password-toggle-icon']}>
+                      {showPassword ? <IconEyeOff size={18} stroke={1.8} /> : <IconEye size={18} stroke={1.8} />}
+                    </span>
                   </button>
                 </div>
               </label>
@@ -221,7 +223,9 @@ export function LoginPage() {
                     tabIndex={mode === 'register' ? 0 : -1}
                     aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                   >
-                    {showPassword ? <IconEyeOff size={18} stroke={1.8} /> : <IconEye size={18} stroke={1.8} />}
+                    <span key={showPassword ? 'off' : 'on'} className={styles['auth-password-toggle-icon']}>
+                      {showPassword ? <IconEyeOff size={18} stroke={1.8} /> : <IconEye size={18} stroke={1.8} />}
+                    </span>
                   </button>
                 </div>
               </label>

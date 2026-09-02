@@ -10,25 +10,17 @@
 
 .restock-tile {
   position: relative;
-  cursor: default;
+  cursor: pointer;
 }
 
 .restock-tile-photo-link {
   display: block;
   flex-shrink: 0;
-  padding: 0;
-  border: none;
-  background: none;
-  cursor: pointer;
 }
 
 .restock-tile-name-btn {
   width: 100%;
-  padding: 0;
-  border: none;
-  background: none;
   text-align: left;
-  cursor: pointer;
 }
 
 .restock-tile-add {
@@ -36,17 +28,20 @@
   top: 8px;
   right: 8px;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
+  color: var(--text-muted);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .restock-tile-add-checked {
-  background: #1f9d55;
-  color: #fff;
-}
-
-.restock-tile-add-checked:hover:not(:disabled) {
-  background: #1c8c4c;
+  background: var(--accent);
   color: #fff;
 }
 
@@ -116,8 +111,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: none;
-  background: #fff;
+  border: 1px solid var(--border);
+  background: var(--bg);
   color: var(--accent);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
   cursor: pointer;
@@ -144,8 +139,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: #1f9d55;
-  border: 2px solid #fff;
+  background: var(--accent);
+  border: 2px solid var(--bg);
   color: #fff;
   font-size: 12px;
   font-weight: 700;
@@ -167,8 +162,10 @@
   position: fixed;
   z-index: 150;
   right: 20px;
+  left: 20px;
   bottom: calc(76px + 46px + env(safe-area-inset-bottom));
-  width: 300px;
+  width: min(300px, calc(100vw - 40px));
+  margin-left: auto;
   max-height: min(400px, calc(100vh - 220px));
   display: flex;
   flex-direction: column;
@@ -237,8 +234,15 @@
 
 .restock-cart-row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
+  /* Фиксированные (не auto) ширины для колонок количества/единицы и крестика —
+     .restock-cart-row у каждой строки свой независимый grid-контейнер (не общий
+     на весь список), поэтому auto-колонки не выравниваются между строками и
+     "плавают" в зависимости от длины названия товара в этой конкретной строке. */
+  grid-template-columns: 1fr 74px 28px;
+  /* baseline, не center/start — при переносе названия на 2 строки инпут и
+     крестик всё равно встают вровень с первой строкой текста, без ручной
+     подгонки отступов под конкретные font-size/line-height. */
+  align-items: baseline;
   gap: 8px;
   padding: 8px 10px;
   border: 1px solid var(--border);
@@ -254,10 +258,15 @@
 
 .restock-cart-row-qty {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 4px;
-  flex-shrink: 0;
+  min-width: 0;
   font-size: 12px;
+}
+
+.restock-cart-row-unit {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -277,6 +286,13 @@
 .restock-cart-row-qty input:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.restock-cart-row-remove {
+  /* IconButton — не текстовый инлайн-элемент, у него нет собственной базовой
+     линии для align-items: baseline на родителе — просто прижимаем к верху
+     первой строки названия, как и вторую колонку. */
+  align-self: start;
 }
 
 .restock-cart-submit {

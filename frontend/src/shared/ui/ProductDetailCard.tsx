@@ -101,7 +101,7 @@ export function ProductDetailCard({
             </div>
             <div className={styles['product-detail-header-tags']}>
               {categoryName(product.category_id) && (
-                <span className={`${layoutStyles.badge} ${layoutStyles.accent}`}>
+                <span className="badge accent">
                   {categoryName(product.category_id)}
                 </span>
               )}

@@ -10,6 +10,7 @@ import { IconPlus, IconChevronRight, IconUsersGroup, IconBuildingWarehouse } fro
 import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
+import { Avatar } from '../../shared/ui/Avatar'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './EmployeesPage.module.css'
 
@@ -34,13 +35,6 @@ const ROLE_BADGE_VARIANT: Record<Role, 'accent' | 'warning' | 'default'> = {
   seller: 'default',
   storekeeper: 'default',
   analyst: 'warning',
-}
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '?'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return (parts[0][0] + parts[1][0]).toUpperCase()
 }
 
 export function EmployeesPage() {
@@ -170,19 +164,19 @@ export function EmployeesPage() {
                 disabled={!editable}
                 onClick={() => editable && setEditingEmployee(e)}
               >
-                <span className={styles.employeeAvatar}>{initials(e.name)}</span>
+                <Avatar name={e.name} size="lg" />
                 <div className={styles.employeeBody}>
                   <div className={styles.employeeNameRow}>
                     <strong className={styles.employeeName}>{e.name}</strong>
-                    {!e.is_active && <span className={layoutStyles.badge}>Отключён</span>}
+                    {!e.is_active && <span className="badge">Отключён</span>}
                   </div>
                   <span className={layoutStyles.textMuted}>{e.phone}</span>
                   <div className={styles.employeeMetaRow}>
                     <span
                       className={[
-                        layoutStyles.badge,
-                        ROLE_BADGE_VARIANT[e.role] === 'accent' && layoutStyles.accent,
-                        ROLE_BADGE_VARIANT[e.role] === 'warning' && layoutStyles.warning,
+                        'badge',
+                        ROLE_BADGE_VARIANT[e.role] === 'accent' && 'accent',
+                        ROLE_BADGE_VARIANT[e.role] === 'warning' && 'warning',
                       ]
                         .filter(Boolean)
                         .join(' ')}

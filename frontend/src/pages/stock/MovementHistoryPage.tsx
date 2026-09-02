@@ -8,6 +8,7 @@ import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
 import { DropdownMenu } from '../../shared/ui/DropdownMenu'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
+import { PillTabs } from '../../shared/ui/PillTabs'
 import { formatQuantity, formatMoney } from '../../shared/lib/format'
 import { IconChevronLeft, IconDownload, IconChevronDown } from '@tabler/icons-react'
 import layoutStyles from '../../shared/ui/Layout.module.css'
@@ -176,19 +177,12 @@ export function MovementHistoryPage() {
       </div>
       {exportError && <p className={layoutStyles.error}>{exportError}</p>}
 
-      <div className={styles['period-tabs']}>
-        {(Object.keys(PERIOD_LABELS) as PeriodFilter[]).map((p) => (
-          <button
-            key={p}
-            type="button"
-            translate="no"
-            className={period === p ? styles.pillTabActive : styles.pillTab}
-            onClick={() => setPeriod(p)}
-          >
-            {PERIOD_LABELS[p]}
-          </button>
-        ))}
-      </div>
+      <PillTabs
+        value={period}
+        options={Object.keys(PERIOD_LABELS) as PeriodFilter[]}
+        labels={PERIOD_LABELS}
+        onChange={setPeriod}
+      />
 
       <div className={[layoutStyles.row, layoutStyles.wrap].join(' ')} style={{ gap: 14, alignItems: 'end' }}>
         {warehouses.length > 1 && (
@@ -267,7 +261,7 @@ export function MovementHistoryPage() {
                 >
                   <div className={layoutStyles.stack} style={{ gap: 4, flex: 1 }}>
                     <div className={[layoutStyles.row, layoutStyles.wrap].join(' ')} style={{ gap: 8 }}>
-                      <span className={[layoutStyles.badge, layoutStyles.accent].join(' ')}>
+                      <span className="badge accent">
                         {MODE_LABELS[doc.type]}
                       </span>
                       <span className={layoutStyles.textMuted}>№{doc.number}</span>

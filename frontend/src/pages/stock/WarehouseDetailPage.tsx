@@ -103,7 +103,14 @@ export function WarehouseDetailPage() {
   const [showAllProducts, setShowAllProducts] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
 
+  // При быстром переключении между складами более старый ответ
+  // getRestockRecommendations(prevId) может прийти позже нового —
+  // currentIdRef защищает от перезаписи состояния данными чужого склада.
+  const currentIdRef = useRef(warehouseId)
+
   async function load(silent = false) {
+    const requestedId = warehouseId
+    currentIdRef.current = requestedId
     if (!silent) setLoading(true)
     try {
       const [, , p, , , , rec, activeTasks] = await Promise.all([
@@ -116,6 +123,7 @@ export function WarehouseDetailPage() {
         getRestockRecommendations(warehouseId),
         listActiveTasks(),
       ])
+      if (currentIdRef.current !== requestedId) return
       setRecommendations(rec)
       setRestockedProductIds(
         new Set(
@@ -144,9 +152,11 @@ export function WarehouseDetailPage() {
         })
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось загрузить остатки')
+      if (currentIdRef.current === requestedId) {
+        setError(err instanceof ApiError ? err.message : 'Не удалось загрузить остатки')
+      }
     } finally {
-      if (!silent) setLoading(false)
+      if (!silent && currentIdRef.current === requestedId) setLoading(false)
     }
   }
 
@@ -476,48 +486,52 @@ export function WarehouseDetailPage() {
               const product = productById(rec.product_id)
               const inCart = restockCartIds.includes(rec.product_id)
               const alreadyRestocked = restockedProductIds.has(rec.product_id)
+              function toggleCart() {
+                setRestockCartIds((prev) =>
+                  inCart ? prev.filter((id) => id !== rec.product_id) : [...prev, rec.product_id],
+                )
+                setRestockCartQuantities((prev) => {
+                  if (inCart) {
+                    const { [rec.product_id]: _removed, ...rest } = prev
+                    return rest
+                  }
+                  return { ...prev, [rec.product_id]: '1' }
+                })
+              }
               return (
-                <div key={rec.product_id} className={`product-tile ${styles['restock-tile']}`}>
+                <div
+                  key={rec.product_id}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={inCart}
+                  aria-label={`${rec.product_name} — ${inCart ? 'убрать из списка дозаказа' : 'добавить в список дозаказа'}`}
+                  className={`product-tile ${styles['restock-tile']}`}
+                  onClick={toggleCart}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      toggleCart()
+                    }
+                  }}
+                >
                   {alreadyRestocked && (
                     <span className={styles['restock-tile-badge']} title="Уже есть активная задача на дозаказ">
                       <IconTruck size={11} stroke={2} /> В задаче
                     </span>
                   )}
-                  <IconButton
-                    variant="muted"
-                    tooltip={inCart ? 'Убрать из списка дозаказа' : 'Добавить в список дозаказа'}
-                    aria-label={inCart ? 'Убрать из списка дозаказа' : 'Добавить в список дозаказа'}
+                  <span
+                    aria-hidden="true"
                     className={[styles['restock-tile-add'], inCart && styles['restock-tile-add-checked']].filter(Boolean).join(' ')}
-                    onClick={() => {
-                      setRestockCartIds((prev) =>
-                        inCart ? prev.filter((id) => id !== rec.product_id) : [...prev, rec.product_id],
-                      )
-                      setRestockCartQuantities((prev) => {
-                        if (inCart) {
-                          const { [rec.product_id]: _removed, ...rest } = prev
-                          return rest
-                        }
-                        return { ...prev, [rec.product_id]: '1' }
-                      })
-                    }}
                   >
                     {inCart ? <IconCheck size={16} stroke={1.8} /> : <IconPlus size={16} stroke={1.8} />}
-                  </IconButton>
-                  <button
-                    type="button"
-                    className={styles['restock-tile-photo-link']}
-                    onClick={() => product && setSelectedProduct(product)}
-                  >
+                  </span>
+                  <div className={styles['restock-tile-photo-link']}>
                     <ProductPhoto src={product?.photo ?? ''} />
-                  </button>
+                  </div>
                   <div className="product-tile-body">
-                    <button
-                      type="button"
-                      className={`product-tile-name ${styles['restock-tile-name-btn']}`}
-                      onClick={() => product && setSelectedProduct(product)}
-                    >
+                    <span className={`product-tile-name ${styles['restock-tile-name-btn']}`}>
                       {rec.product_name}
-                    </button>
+                    </span>
                     <span className="product-tile-stock product-tile-stock-out">
                       <span className="product-tile-stock-label">Остаток:</span>
                       <span className="product-tile-stock-value-wrap">
@@ -748,9 +762,13 @@ function RestockCartMenu({
                       }}
                       onClick={(e) => e.stopPropagation()}
                     />
-                    <span className="text-muted">{unit}</span>
+                    <span className={`text-muted ${styles['restock-cart-row-unit']}`}>{unit}</span>
                   </label>
-                  <IconButton aria-label="Убрать из списка" onClick={() => removeItem(rec.product_id)}>
+                  <IconButton
+                    className={styles['restock-cart-row-remove']}
+                    aria-label="Убрать из списка"
+                    onClick={() => removeItem(rec.product_id)}
+                  >
                     <IconX size={14} stroke={1.8} />
                   </IconButton>
                 </div>
