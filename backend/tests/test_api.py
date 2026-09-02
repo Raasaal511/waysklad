@@ -3,6 +3,7 @@ from decimal import Decimal
 from io import BytesIO
 
 import openpyxl
+import pytest
 from PIL import Image
 
 
@@ -743,6 +744,50 @@ async def test_order_edit_and_cancel_via_api(client, owner_headers):
         },
     )
     assert response.status_code == 400
+
+
+async def test_notifications_websocket_push(client, owner_headers, random_phone, db_session_factory):
+    # push вместо периодического опроса GET /notifications: задача, назначенная
+    # сотруднику, должна прилететь в открытый WS-сокет этого сотрудника сразу
+    from starlette.testclient import TestClient
+
+    from app.main import app as fastapi_app
+
+    phone = random_phone()
+    response = await client.post(
+        "/api/auth/employees",
+        headers=owner_headers,
+        json={"name": "Хеда", "phone": phone, "password": "secret123", "role": "seller"},
+    )
+    employee_id = response.json()["id"]
+    login = await client.post("/api/auth/login", json={"phone": phone, "password": "secret123"})
+    employee_token = login.json()["access_token"]
+
+    sync_client = TestClient(fastapi_app)
+    with sync_client.websocket_connect(f"/api/notifications/ws?token={employee_token}") as ws:
+        response = await client.post(
+            "/api/tasks",
+            headers=owner_headers,
+            json={"title": "Через WS", "assigned_user_id": employee_id},
+        )
+        assert response.status_code == 201, response.text
+        task_id = response.json()["id"]
+
+        event = ws.receive_json()
+        assert event["kind"] == "task_assigned"
+        assert event["entity_id"] == task_id
+
+
+async def test_notifications_websocket_rejects_invalid_token(client, owner_headers):
+    from starlette.testclient import TestClient
+    from starlette.websockets import WebSocketDisconnect
+
+    from app.main import app as fastapi_app
+
+    sync_client = TestClient(fastapi_app)
+    with pytest.raises(WebSocketDisconnect):
+        with sync_client.websocket_connect("/api/notifications/ws?token=garbage"):
+            pass
 
 
 async def test_task_full_lifecycle_via_api(client, owner_headers, random_phone):

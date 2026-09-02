@@ -16,6 +16,7 @@ from app.presentation.deps.security import (  # noqa: F401
 from app.presentation.deps.notifier import NotifierDep, get_notifier  # noqa: F401
 from app.presentation.deps.uow import (  # noqa: F401
     PublicUowDep,
+    SessionFactoryDep,
     UowDep,
     get_public_uow,
     get_session_factory,

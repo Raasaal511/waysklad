@@ -25,14 +25,9 @@ class CurrentUser:
     role: Role
 
 
-async def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
-    factory: SessionFactoryDep,
-) -> CurrentUser:
-    if credentials is None:
-        raise HTTPException(status_code=401, detail="Требуется авторизация")
+async def _resolve_current_user(token: str, factory: SessionFactoryDep) -> CurrentUser:
     try:
-        payload = decode_access_token(credentials.credentials)
+        payload = decode_access_token(token)
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Недействительный токен")
     user_id = int(payload["sub"])
@@ -50,6 +45,23 @@ async def get_current_user(
         tenant_id=tenant_id,
         role=Role(payload["role"]),
     )
+
+
+async def get_current_user(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    factory: SessionFactoryDep,
+) -> CurrentUser:
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    return await _resolve_current_user(credentials.credentials, factory)
+
+
+async def get_current_user_ws(token: str, factory: SessionFactoryDep) -> CurrentUser:
+    """Для WebSocket-хендшейка: браузер не может выставить кастомный заголовок
+    Authorization при открытии сокета — токен передаётся query-параметром
+    (?token=...). HTTPException(401) FastAPI сам превращает в закрытие
+    хендшейка с кодом 403, что и требуется для непройденной авторизации."""
+    return await _resolve_current_user(token, factory)
 
 
 async def get_actor(

@@ -1,18 +1,40 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.presentation.deps import (
     ActorDep,
     MarkAllNotificationsReadDep,
     MarkNotificationReadDep,
+    SessionFactoryDep,
     UowDep,
 )
+from app.presentation.deps.auth import get_current_user_ws
 from app.presentation.notifications.schemas import (
     MarkAllReadResponse,
     NotificationListResponse,
     NotificationResponse,
 )
+from app.infrastructure.ws_broadcast import broadcaster
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
+
+
+@router.websocket("/ws")
+async def notifications_ws(websocket: WebSocket, token: str, factory: SessionFactoryDep) -> None:
+    """Push-канал взамен периодического опроса GET /notifications. Браузер не
+    может выставить заголовок Authorization при открытии сокета — токен
+    передаётся query-параметром (?token=...)."""
+    user = await get_current_user_ws(token, factory)
+    await websocket.accept()
+    broadcaster.registry.add(user.id, websocket)
+    try:
+        while True:
+            # клиент ничего не обязан присылать — просто держим соединение
+            # открытым и ждём either новое сообщение (игнорируем), либо разрыв
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        broadcaster.registry.remove(user.id, websocket)
 
 
 @router.get("")

@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     # реальный лимит становится в N раз больше заявленного. Задаётся в .env как
     # redis://redis:6379/0 (см. docker-compose.prod.yml).
     rate_limit_storage_uri: str | None = None
+    # None (по умолчанию) — WebSocket-push уведомлений форвардится в памяти
+    # процесса: ок для одного uvicorn-воркера (dev, --reload без --workers).
+    # В проде (--workers 4) открытое соединение клиента живёт только в одном
+    # воркере — без Redis pub/sub уведомление, созданное в другом воркере
+    # (другой HTTP-запрос), никогда не дойдёт до открытого сокета. Задаётся в
+    # .env как redis://redis:6379/1 (тот же Redis, что и rate limit, другая БД).
+    notifications_redis_url: str | None = None
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

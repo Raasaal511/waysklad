@@ -34,6 +34,10 @@ services:
       # (реальный лимит стал бы в 4 раза мягче заявленного) — Redis даёт им
       # один общий счётчик.
       RATE_LIMIT_STORAGE_URI: redis://redis:6379/0
+      # тот же Redis, отдельная логическая БД (/1) — pub/sub для WebSocket-push
+      # уведомлений между воркерами (открытое соединение клиента живёт только
+      # в одном воркере, событие может создаться HTTP-запросом в другом).
+      NOTIFICATIONS_REDIS_URL: redis://redis:6379/1
     # --proxy-headers/--forwarded-allow-ips — доверяем X-Forwarded-For от nginx
     # (см. frontend/nginx.conf), иначе rate_limit.py видит один и тот же IP
     # (адрес nginx) для всех клиентов и лимитирует их одним общим счётчиком.

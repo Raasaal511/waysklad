@@ -4,6 +4,7 @@ from app.domain.common.notifier import INotifier
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.entities import Role
 from app.domain.notifications.entities import Notification, NotificationKind
+from app.infrastructure.ws_broadcast import broadcaster
 
 
 async def notify_user(
@@ -16,10 +17,25 @@ async def notify_user(
     link: str = "",
     entity_id: int | None = None,
 ) -> None:
-    """In-app уведомление — всем; Telegram — только владельцу (один чат на магазин)."""
-    await uow.notifications.add(
+    """In-app уведомление — всем; WebSocket-push — всем с открытым соединением;
+    Telegram — только владельцу (один чат на магазин)."""
+    saved = await uow.notifications.add(
         Notification(id=None, user_id=user_id, kind=kind, text=text, link=link, entity_id=entity_id)
     )
+    try:
+        await broadcaster.publish(
+            user_id,
+            {
+                "id": saved.id,
+                "kind": kind.value,
+                "text": text,
+                "link": link,
+                "entity_id": entity_id,
+            },
+        )
+    except Exception:
+        pass  # WS-push не должен валить бизнес-операцию — клиент досчитает через REST
+
     if notifier is None:
         return
     recipient = await uow.users.get(user_id)

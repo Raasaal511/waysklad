@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -9,9 +11,17 @@ from app.infrastructure.config import settings
 from app.infrastructure.files import UPLOAD_DIR
 from app.infrastructure.logging import configure_logging
 from app.infrastructure.rate_limit import limiter
+from app.infrastructure.ws_broadcast import broadcaster
 from app.presentation.errors import register_exception_handlers
 
 configure_logging()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await broadcaster.start()
+    yield
+    await broadcaster.stop()
 
 # Дефолтный SECRET_KEY в проде = любой может подделать JWT с любым tenant_id/ролью.
 # debug=True допускается только локально, где .env обычно не переопределяет секрет.
@@ -28,7 +38,7 @@ _docs_kwargs = (
     else {"docs_url": None, "redoc_url": None, "openapi_url": None}
 )
 
-app = FastAPI(title="ВайСклад API", version="0.1.0", **_docs_kwargs)
+app = FastAPI(title="ВайСклад API", version="0.1.0", lifespan=lifespan, **_docs_kwargs)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
