@@ -121,11 +121,6 @@ export function ClientDetailPage() {
   const [debtReceipt, setDebtReceipt] = useState<DocumentHistoryEntry | null>(null)
   const [debtLoading, setDebtLoading] = useState(false)
 
-  async function loadClient() {
-    const clients = await searchClients('', true)
-    setClient(clients.find((c) => c.id === clientId) ?? null)
-  }
-
   async function openDebt(debtId: number) {
     setOpenDebtId(debtId)
     setDebtLoading(true)
@@ -253,7 +248,7 @@ export function ClientDetailPage() {
             <div className={styles['client-detail-heading']}>
               <div className={layoutStyles.row} style={{ gap: 6 }}>
                 <h2>{client.name}</h2>
-                {!client.is_active && <span className={layoutStyles.badge}>Неактивен</span>}
+                {!client.is_active && <span className="badge">Неактивен</span>}
                 <IconButton
                   variant="muted"
                   tooltip="Изменить клиента"
@@ -318,10 +313,10 @@ export function ClientDetailPage() {
 
           <div className="sale-period-tabs">
             <Button variant="secondary" active={tab === 'debts'} onClick={() => setTab('debts')}>
-              Долги{debts ? ` ${debts.length}` : ''}
+              Долги{debts && debts.length > 0 && <span className={layoutStyles.countBadge}>{debts.length}</span>}
             </Button>
             <Button variant="secondary" active={tab === 'sales'} onClick={() => setTab('sales')}>
-              Покупки{sales ? ` ${sales.length}` : ''}
+              Покупки{sales && sales.length > 0 && <span className={layoutStyles.countBadge}>{sales.length}</span>}
             </Button>
             <Button variant="secondary" active={tab === 'history'} onClick={() => setTab('history')}>
               История
@@ -488,9 +483,9 @@ export function ClientDetailPage() {
         <Modal title="Изменить клиента" onClose={() => setShowEdit(false)}>
           <EditClientForm
             client={client}
-            onDone={() => {
+            onDone={(updated) => {
               setShowEdit(false)
-              loadClient()
+              setClient(updated)
             }}
           />
         </Modal>
@@ -499,7 +494,7 @@ export function ClientDetailPage() {
   )
 }
 
-function EditClientForm({ client, onDone }: { client: Client; onDone: () => void }) {
+function EditClientForm({ client, onDone }: { client: Client; onDone: (updated: Client) => void }) {
   const [name, setName] = useState(client.name)
   const [phone, setPhone] = useState(client.phone)
   const [city, setCity] = useState(client.city)
@@ -513,14 +508,14 @@ function EditClientForm({ client, onDone }: { client: Client; onDone: () => void
     setError(null)
     setSaving(true)
     try {
-      await updateClient(client.id, {
+      const updated = await updateClient(client.id, {
         name,
         phone,
         city,
         debt_limit: debtLimit || null,
         is_active: isActive,
       })
-      onDone()
+      onDone(updated)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось сохранить клиента')
     } finally {

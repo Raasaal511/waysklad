@@ -76,6 +76,8 @@ import { isBarcodeScannerSupported } from '../../entities/barcode/barcodeSupport
 import { useAuth } from '../../app/AuthContext'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './OrdersPage.module.css'
+import kanban from '../../shared/ui/KanbanBoard.module.css'
+import { Avatar } from '../../shared/ui/Avatar'
 
 const BarcodeScanner = lazy(() =>
   import('../../entities/barcode/BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })),
@@ -148,6 +150,7 @@ type Tab = 'active' | 'completed'
 type ViewMode = 'board' | 'table' | 'list' | 'calendar'
 
 const VIEW_MODE_KEY = 'orders_view_mode'
+const TAB_KEY = 'orders_tab'
 
 const VIEW_MODE_OPTIONS: { mode: ViewMode; label: string; icon: TablerIcon }[] = [
   { mode: 'board', label: 'Доска', icon: IconLayoutKanban },
@@ -196,10 +199,6 @@ function isOverdue(dueDate: string) {
   return new Date(dueDate) < today
 }
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/)
-  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase()
-}
 
 export function OrdersPage() {
   const { user } = useAuth()
@@ -213,7 +212,9 @@ export function OrdersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [tab, setTab] = useState<Tab>('active')
+  const [tab, setTab] = useState<Tab>(
+    () => (localStorage.getItem(TAB_KEY) === 'completed' ? 'completed' : 'active'),
+  )
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem(VIEW_MODE_KEY)
     return isViewMode(saved) ? saved : 'board'
@@ -229,6 +230,10 @@ export function OrdersPage() {
   useEffect(() => {
     localStorage.setItem(VIEW_MODE_KEY, viewMode)
   }, [viewMode])
+
+  useEffect(() => {
+    localStorage.setItem(TAB_KEY, tab)
+  }, [tab])
 
   function dismissOnboarding() {
     setShowOnboarding(false)
@@ -267,8 +272,24 @@ export function OrdersPage() {
   async function moveTo(order: Order, newStatus: OrderStatus) {
     if (order.status === newStatus) return
     try {
-      await changeOrderStatus(order.id, newStatus)
-      load(true)
+      const updated = await changeOrderStatus(order.id, newStatus)
+      const wasTerminal = order.status === 'issued' || order.status === 'cancelled'
+      const isTerminalNow = newStatus === 'issued' || newStatus === 'cancelled'
+      if (wasTerminal === isTerminalNow) {
+        // остаёмся в той же вкладке (активные/завершённые) — просто заменяем карточку
+        const updater = (prev: Order[]) => prev.map((o) => (o.id === order.id ? updated : o))
+        if (isTerminalNow) setCompletedOrders(updater)
+        else setActiveOrders(updater)
+      } else {
+        // переезжаем между активными и завершёнными — убираем из одного списка, добавляем в другой
+        if (isTerminalNow) {
+          setActiveOrders((prev) => prev.filter((o) => o.id !== order.id))
+          setCompletedOrders((prev) => [updated, ...prev])
+        } else {
+          setCompletedOrders((prev) => prev.filter((o) => o.id !== order.id))
+          setActiveOrders((prev) => [updated, ...prev])
+        }
+      }
     } catch {
       load(true)
     }
@@ -447,13 +468,13 @@ export function OrdersPage() {
       ) : tab === 'active' && viewMode === 'calendar' ? (
         <OrdersCalendarView orders={activeOrders} clientName={clientName} onSelect={setSelectedOrder} />
       ) : tab === 'active' ? (
-        <div className={styles.ordersBoard} style={{ '--board-cols': BOARD_STATUSES.length } as CSSProperties}>
+        <div className={kanban.board} style={{ '--board-cols': BOARD_STATUSES.length } as CSSProperties}>
           {BOARD_STATUSES.map((status) => {
             const columnOrders = activeOrders.filter((o) => o.status === status)
             return (
               <div
                 key={status}
-                className={[styles.ordersBoardColumn, dragOverStatus === status ? styles.ordersBoardColumnOver : null]
+                className={[kanban.column, dragOverStatus === status ? kanban.columnOver : null]
                   .filter(Boolean)
                   .join(' ')}
                 style={{ '--col-accent': STATUS_ACCENT[status] } as CSSProperties}
@@ -461,11 +482,11 @@ export function OrdersPage() {
                 onDragLeave={() => setDragOverStatus((s) => (s === status ? null : s))}
                 onDrop={(e) => handleColumnDrop(e, status)}
               >
-                <div className={styles.ordersBoardColumnHead}>
-                  <span className={styles.ordersBoardDot} />
+                <div className={kanban.columnHead}>
+                  <span className={kanban.dot} />
                   <span>{ORDER_STATUS_LABELS[status]}</span>
-                  <span className={styles.ordersBoardColumnCount}>{columnOrders.length}</span>
-                  {status === 'new' && canManage && (
+                  <span className={kanban.columnCount}>{columnOrders.length}</span>
+                  {status === 'new' && canManage && columnOrders.length > 0 && (
                     <IconButton
                       variant="accent"
                       className={styles.ordersBoardColumnAdd}
@@ -477,18 +498,18 @@ export function OrdersPage() {
                     </IconButton>
                   )}
                 </div>
-                <div className={styles.ordersBoardColumnBody}>
+                <div className={kanban.columnBody}>
                   {columnOrders.length === 0 ? (
                     status === 'new' && canManage ? (
                       <button
                         type="button"
-                        className={[styles.ordersBoardEmpty, styles.ordersBoardEmptyAction].join(' ')}
+                        className={[kanban.empty, kanban.emptyAction].join(' ')}
                         onClick={() => setShowForm(true)}
                       >
                         <IconPlus size={16} stroke={1.8} /> Создать заказ
                       </button>
                     ) : (
-                      <div className={styles.ordersBoardEmpty}>Пусто</div>
+                      <div className={kanban.empty}>Пусто</div>
                     )
                   ) : (
                     columnOrders.map((o) => {
@@ -499,7 +520,7 @@ export function OrdersPage() {
                       return (
                         <div
                           key={o.id}
-                          className={[styles.ordersBoardCard, draggedId === o.id ? styles.ordersBoardCardDragging : null]
+                          className={[kanban.card, draggedId === o.id ? kanban.cardDragging : null]
                             .filter(Boolean)
                             .join(' ')}
                           draggable={canManage}
@@ -507,9 +528,9 @@ export function OrdersPage() {
                           onDragEnd={handleDragEnd}
                           onClick={() => setSelectedOrder(o)}
                         >
-                          <span className={styles.ordersBoardCardAccent} />
-                          <div className={styles.ordersBoardCardHead}>
-                            <span className={styles.ordersBoardCardNumber}>
+                          <span className={kanban.cardAccent} />
+                          <div className={kanban.cardHead}>
+                            <span className={kanban.cardNumber}>
                               №{o.number ?? o.id}{' '}
                               <SourceIcon
                                 size={13}
@@ -520,12 +541,12 @@ export function OrdersPage() {
                             </span>
                             <span className={styles.ordersBoardCardTotal}>{formatMoney(o.total)} ₽</span>
                           </div>
-                          <strong className={styles.ordersBoardCardClient}>{name}</strong>
-                          <div className={styles.ordersBoardCardFooter}>
+                          <strong className={kanban.cardTitle}>{name}</strong>
+                          <div className={kanban.cardFooter}>
                             {o.due_date ? (
                               <span
                                 className={[
-                                  styles.ordersBoardCardDue,
+                                  kanban.cardDue,
                                   overdue ? styles.ordersBoardCardDueOverdue : null,
                                 ]
                                   .filter(Boolean)
@@ -534,15 +555,13 @@ export function OrdersPage() {
                                 <IconClock size={13} stroke={1.8} /> {formatDueDate(o.due_date)}
                               </span>
                             ) : partiallyPrepaid ? (
-                              <span className={[layoutStyles.badge, layoutStyles.warning].join(' ')}>
+                              <span className="badge warning">
                                 предоплата {formatMoney(o.prepayment)} ₽
                               </span>
                             ) : (
                               <span />
                             )}
-                            <span className={styles.ordersBoardCardAvatar} title={name}>
-                              {initials(name)}
-                            </span>
+                            <Avatar name={name} title={name} />
                           </div>
                         </div>
                       )
@@ -1080,7 +1099,9 @@ function OrderDetail({
           {order.due_date && (
             <div className="sale-detail-meta-item">
               <span className={layoutStyles.textMuted}>Дата готовности</span>
-              <span>{formatDueDate(order.due_date)}</span>
+              <span className={isOverdue(order.due_date) ? styles.ordersBoardCardDueOverdue : undefined}>
+                {formatDueDate(order.due_date)}
+              </span>
             </div>
           )}
           {order.created_at && (
@@ -1434,7 +1455,7 @@ function NewOrderForm({
         {filtered.length === 0 ? (
           <p className={layoutStyles.textMuted}>Ничего не найдено</p>
         ) : (
-          <div className={layoutStyles.productGrid} style={{ maxHeight: 480, minHeight: 220, overflowY: 'auto' }}>
+          <div className={layoutStyles.productGrid}>
             {filtered.map((p) => {
               const inLineQty = lines.find((l) => l.product.id === p.id)?.quantity
               const available = stockFor(p.id)

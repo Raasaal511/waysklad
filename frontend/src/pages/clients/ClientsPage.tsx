@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   searchClients,
   createClient,
-  listSuppliers,
   createSupplier,
   type Client,
   type Supplier,
@@ -16,16 +15,25 @@ import { Button } from '../../shared/ui/Button'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
+import { useCatalog } from '../../app/CatalogContext'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './ClientsPage.module.css'
+
+const TAB_KEY = 'clients_tab'
 
 export function ClientsPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const highlightId = searchParams.get('highlight')
-  const [tab, setTab] = useState<'clients' | 'suppliers'>('clients')
+  const { suppliers, ensureSuppliers, refresh: refreshCatalog } = useCatalog()
+  const [tab, setTab] = useState<'clients' | 'suppliers'>(
+    () => (localStorage.getItem(TAB_KEY) === 'suppliers' ? 'suppliers' : 'clients'),
+  )
+
+  useEffect(() => {
+    localStorage.setItem(TAB_KEY, tab)
+  }, [tab])
   const [clients, setClients] = useState<Client[]>([])
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -35,9 +43,8 @@ export function ClientsPage() {
   async function load() {
     setLoading(true)
     try {
-      const [c, s] = await Promise.all([searchClients('', true), listSuppliers()])
+      const c = await searchClients('', true)
       setClients(c)
-      setSuppliers(s)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось загрузить контрагентов')
     } finally {
@@ -47,6 +54,8 @@ export function ClientsPage() {
 
   useEffect(() => {
     load()
+    ensureSuppliers().catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -88,7 +97,7 @@ export function ClientsPage() {
           <NewSupplierForm
             onDone={() => {
               setShowForm(false)
-              load()
+              refreshCatalog(['suppliers'])
             }}
           />
         </Modal>
@@ -127,7 +136,7 @@ export function ClientsPage() {
                 <div className={styles['contact-row-main']}>
                   <div className={styles['contact-row-top']}>
                     <span className={styles['contact-row-name']}>{c.name}</span>
-                    {!c.is_active && <span className={layoutStyles.badge}>Неактивен</span>}
+                    {!c.is_active && <span className="badge">Неактивен</span>}
                   </div>
                   <div className={styles['contact-row-meta']}>
                     {c.phone && (

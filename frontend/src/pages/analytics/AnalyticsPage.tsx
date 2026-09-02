@@ -19,6 +19,7 @@ import {
 import { ApiError } from '../../shared/api/client'
 import { formatQuantity, formatMoney } from '../../shared/lib/format'
 import { BarChart, type BarChartPoint } from '../../shared/ui/BarChart'
+import { PillTabs } from '../../shared/ui/PillTabs'
 import {
   IconReportMoney,
   IconTrendingUp,
@@ -39,6 +40,9 @@ const DEAD_STOCK_COLUMNS = '2fr 1fr 1fr 1fr'
 
 type PeriodKey = 'month' | 'quarter' | 'year'
 
+const PERIOD_FILTER_KEY = 'analytics_period_filter'
+const PERIOD_VALUES: PeriodKey[] = ['month', 'quarter', 'year']
+
 const PERIOD_LABELS: Record<PeriodKey, string> = {
   month: 'Месяц',
   quarter: 'Квартал',
@@ -49,6 +53,15 @@ const PERIOD_BUCKET: Record<PeriodKey, TimelineBucket> = {
   month: 'day',
   quarter: 'week',
   year: 'month',
+}
+
+type MetricKey = 'revenue' | 'profit'
+
+const METRIC_OPTIONS: MetricKey[] = ['revenue', 'profit']
+
+const METRIC_LABELS: Record<MetricKey, string> = {
+  revenue: 'Выручка',
+  profit: 'Прибыль',
 }
 
 /** Календарные границы периода, содержащего anchor (не скользящее окно —
@@ -217,9 +230,17 @@ export function AnalyticsPage() {
   const [stockValue, setStockValue] = useState<StockValue | null>(null)
   const [timeline, setTimeline] = useState<TimelinePoint[]>([])
   const [prevTotals, setPrevTotals] = useState<PeriodTotals | null>(null)
-  const [period, setPeriod] = useState<PeriodKey>('year')
+  // Предпочтение устройства, не аккаунта — переживает обновление страницы.
+  const [period, setPeriod] = useState<PeriodKey>(() => {
+    const saved = localStorage.getItem(PERIOD_FILTER_KEY)
+    return saved && (PERIOD_VALUES as string[]).includes(saved) ? (saved as PeriodKey) : 'year'
+  })
+
+  useEffect(() => {
+    localStorage.setItem(PERIOD_FILTER_KEY, period)
+  }, [period])
   const [anchor, setAnchor] = useState(() => new Date())
-  const [metric, setMetric] = useState<'revenue' | 'profit'>('revenue')
+  const [metric, setMetric] = useState<MetricKey>('revenue')
   const [loading, setLoading] = useState(true)
   const [periodLoading, setPeriodLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -313,10 +334,11 @@ export function AnalyticsPage() {
       ),
       detail: (
         <>
-          <div className={styles.detailItem}>
+          <div className={[styles.detailItem, styles.detailItemHead].join(' ')}>
             <span className={styles.detailLabel}>{formatBucketFull(p.bucket_start, bucket)}</span>
             <span className={styles.detailValue}>{p.sales_count} продаж</span>
           </div>
+          <div className={styles.detailDivider} />
           <div className={styles.detailItem}>
             <span className={styles.detailLabel}>Выручка</span>
             <span className={styles.detailValue}>{formatMoney(revenue)} ₽</span>
@@ -345,18 +367,12 @@ export function AnalyticsPage() {
       <h2>Аналитика</h2>
 
       <div className={styles.periodRow}>
-        <div className={styles.periodTabs}>
-          {(Object.keys(PERIOD_LABELS) as PeriodKey[]).map((key) => (
-            <button
-              key={key}
-              type="button"
-              className={period === key ? styles.pillTabActive : styles.pillTab}
-              onClick={() => changePeriod(key)}
-            >
-              {PERIOD_LABELS[key]}
-            </button>
-          ))}
-        </div>
+        <PillTabs
+          value={period}
+          options={Object.keys(PERIOD_LABELS) as PeriodKey[]}
+          labels={PERIOD_LABELS}
+          onChange={changePeriod}
+        />
         <div className={styles.periodNav}>
           <button
             type="button"
@@ -442,22 +458,13 @@ export function AnalyticsPage() {
             <IconChartBar size={17} stroke={1.8} className={styles.sectionHeadingIcon} />
             <h3>Динамика</h3>
           </div>
-          <div className={styles.metricTabs}>
-            <button
-              type="button"
-              className={metric === 'revenue' ? styles.pillTabActive : styles.pillTab}
-              onClick={() => setMetric('revenue')}
-            >
-              Выручка
-            </button>
-            <button
-              type="button"
-              className={metric === 'profit' ? styles.pillTabActive : styles.pillTab}
-              onClick={() => setMetric('profit')}
-            >
-              Прибыль
-            </button>
-          </div>
+          <PillTabs
+            className={styles.metricTabs}
+            value={metric}
+            options={METRIC_OPTIONS}
+            labels={METRIC_LABELS}
+            onChange={setMetric}
+          />
         </div>
         <p className={styles.chartHint}>
           Группировка {BUCKET_HINT[bucket]} · нажмите на столбец, чтобы посмотреть детали
@@ -551,7 +558,7 @@ export function AnalyticsPage() {
                     <span>{formatMoney(c.profit)} ₽</span>
                     <span className={styles.marginCell}>
                       {catMargin != null ? (
-                        <span className={marginBadgeClass(catMargin, styles)}>{catMargin.toFixed(1)}%</span>
+                        <span className={marginBadgeClass(catMargin)}>{catMargin.toFixed(1)}%</span>
                       ) : (
                         '—'
                       )}
@@ -614,8 +621,8 @@ export function AnalyticsPage() {
   )
 }
 
-function marginBadgeClass(margin: number, s: typeof styles): string {
-  if (margin < 15) return `${s.marginBadge} ${s.marginBadgeLow}`
-  if (margin < 30) return `${s.marginBadge} ${s.marginBadgeMid}`
-  return `${s.marginBadge} ${s.marginBadgeHigh}`
+function marginBadgeClass(margin: number): string {
+  if (margin < 15) return 'badge pill danger'
+  if (margin < 30) return 'badge pill warning'
+  return 'badge pill accent'
 }

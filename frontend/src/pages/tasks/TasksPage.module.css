@@ -171,190 +171,8 @@
   flex-shrink: 0;
 }
 
-/* Доска задач (канбан) */
-
-.board {
-  display: grid;
-  grid-template-columns: repeat(var(--board-cols, 3), minmax(280px, 440px));
-  gap: 20px;
-  align-items: start;
-}
-
-@media (max-width: 900px) {
-  .board {
-    grid-template-columns: 1fr;
-  }
-}
-
-.boardColumn {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-  padding: 14px;
-  background: var(--bg-muted);
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  transition: border-color 0.12s ease, background-color 0.12s ease;
-}
-
-.boardColumnOver {
-  border-color: var(--accent);
-  background: var(--accent-soft-weak);
-}
-
-.boardColumnHead {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 4px 4px;
-  font-size: 12.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
-
-.boardDot {
-  width: 8px;
-  height: 8px;
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: var(--col-accent, var(--text-muted));
-}
-
-.boardColumnCount {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--col-accent, var(--border)) 18%, var(--bg-muted));
-  color: var(--col-accent, var(--text-muted));
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.boardColumnBody {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-height: 60px;
-}
-
-@media (min-width: 900px) {
-  .boardColumn {
-    max-height: calc(100vh - 180px);
-  }
-
-  .boardColumnBody {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding-right: 2px;
-  }
-}
-
-.boardEmpty {
-  padding: 16px 10px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 13px;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-sm);
-}
-
-.boardEmptyAction {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-  transition: border-color 0.12s ease, color 0.12s ease;
-}
-
-.boardEmptyAction:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.boardCard {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  max-width: none;
-  padding: 14px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  cursor: grab;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease, transform 0.12s ease;
-}
-
-.boardCard:hover {
-  border-color: var(--accent-border);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-  transform: translateY(-1px);
-}
-
-.boardCard:active {
-  cursor: grabbing;
-}
-
-.boardCardDragging {
-  opacity: 0.4;
-}
-
-.boardCardAccent {
-  align-self: flex-start;
-  width: 26px;
-  height: 3px;
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: var(--col-accent, var(--border));
-}
-
-.boardCardHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.boardCardNumber {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.boardCardClient {
-  font-size: 15px;
-}
-
-.boardCardFooter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.boardCardDue {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
+/* Доска задач (канбан) — общий каркас в shared/ui/KanbanBoard.module.css.
+   Здесь остаются только классы, переиспользуемые и вне доски (списки, карточка задачи). */
 
 .boardCardDueOverdue {
   color: var(--danger);
@@ -366,35 +184,10 @@
   gap: 4px;
 }
 
-.boardCardAvatar {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.boardCardAvatarMuted {
-  background: var(--bg-muted);
-  color: var(--text-muted);
-}
-
 .personCard {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.personCardAvatar {
-  width: 36px;
-  height: 36px;
-  font-size: 13px;
 }
 
 .personCardBody {
@@ -482,19 +275,29 @@
   font-weight: 400;
 }
 
-.inlineEditTextarea:hover:not(:disabled) {
-  background: var(--bg-muted);
+/* Контент под переключателем вкладок/вида (Активные/Завершённые,
+   Доска/Таблица/Список/Календарь) — плавно проявляется при каждой смене
+   вместо резкой подмены DOM. */
+
+.viewContent {
+  animation: viewContentIn 0.18s ease;
 }
 
-.inlineEditTextarea:focus {
-  outline: none;
-  border-color: var(--accent);
-  background: var(--bg);
+@keyframes viewContentIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.inlineEditTextarea:disabled {
-  cursor: default;
-  opacity: 0.7;
+@media (prefers-reduced-motion: reduce) {
+  .viewContent {
+    animation: none;
+  }
 }
 
 /* Список (карточки истории/списка задач) */
@@ -631,4 +434,54 @@
 .restockToastClose:hover {
   color: var(--text);
   background: var(--bg-muted);
+}
+
+.taskFormNote {
+  resize: vertical;
+  min-height: 110px;
+  font-family: inherit;
+  background: var(--bg-muted);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.taskFormNote:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--bg-muted) 70%, var(--border));
+}
+
+.taskFormNote:focus {
+  outline: none;
+  background: var(--bg);
+  border-color: var(--accent);
+}
+
+.taskFormMetaRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 520px) {
+  .taskFormMetaRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.taskFormIconField {
+  position: relative;
+  display: flex;
+}
+
+.taskFormIconFieldIcon {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.taskFormIconFieldControl {
+  padding-left: 36px !important;
 }

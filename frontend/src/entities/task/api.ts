@@ -48,8 +48,13 @@ export function listActiveTasks() {
   return api.get<Task[]>('/tasks')
 }
 
-export function listCompletedTasks() {
-  return api.get<Task[]>('/tasks/completed')
+export async function listCompletedTasks(params: { limit?: number; offset?: number } = {}) {
+  const search = new URLSearchParams()
+  if (params.limit != null) search.set('limit', String(params.limit))
+  if (params.offset != null) search.set('offset', String(params.offset))
+  const qs = search.toString()
+  const { data, total } = await api.getWithTotal<Task[]>(`/tasks/completed${qs ? `?${qs}` : ''}`)
+  return { items: data, total }
 }
 
 export function getTask(id: number) {
