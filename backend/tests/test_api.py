@@ -1247,6 +1247,11 @@ async def test_sync_sales_offline_queue_via_api(client, owner_headers):
         json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "10"}]},
     )
 
+    response = await client.post(
+        "/api/counterparties/clients", headers=owner_headers, json={"name": "Клиент офлайн"}
+    )
+    client_id = response.json()["id"]
+
     batch = {
         "sales": [
             {
@@ -1261,21 +1266,41 @@ async def test_sync_sales_offline_queue_via_api(client, owner_headers):
                 "payment_method": "cash",
                 "items": [{"product_id": product_id, "quantity": "100", "price": "100"}],
             },
+            {
+                # продажа в долг — самый частый способ оплаты в регионе; должна
+                # применяться из офлайн-очереди наравне с обычной продажей
+                "client_op_id": "device-a-3",
+                "warehouse_id": 1,
+                "payment_method": "credit",
+                "items": [{"product_id": product_id, "quantity": "1", "price": "100"}],
+                "client_id": client_id,
+                "debt_due_date": str(date.today() + timedelta(days=7)),
+            },
         ]
     }
     response = await client.post("/api/sync/sales", headers=owner_headers, json=batch)
     assert response.status_code == 200, response.text
     result = response.json()
-    assert len(result["applied"]) == 1
+    assert len(result["applied"]) == 2
     assert len(result["errors"]) == 1
     assert result["errors"][0]["client_op_id"] == "device-a-2"
+    assert {s["client_op_id"] for s in result["applied"]} == {"device-a-1", "device-a-3"}
+
+    response = await client.get(f"/api/debts/client/{client_id}", headers=owner_headers)
+    summary = response.json()
+    assert len(summary["debts"]) == 1
+    assert summary["debts"][0]["balance"] == "100.00"
 
     # повторная отправка той же пачки (обрыв связи после ответа) не задваивает продажу
     response = await client.post("/api/sync/sales", headers=owner_headers, json=batch)
     assert response.status_code == 200
     result_retry = response.json()
-    assert len(result_retry["applied"]) == 1
-    assert result_retry["applied"][0]["id"] == result["applied"][0]["id"]
+    assert len(result_retry["applied"]) == 2
+    assert {s["id"] for s in result_retry["applied"]} == {s["id"] for s in result["applied"]}
+
+    # долг не задвоился повторной отправкой той же офлайн-пачки
+    response = await client.get(f"/api/debts/client/{client_id}", headers=owner_headers)
+    assert len(response.json()["debts"]) == 1
 
 
 async def test_connect_telegram_via_api(client, owner_headers, random_phone):
