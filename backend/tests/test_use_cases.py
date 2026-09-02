@@ -1838,6 +1838,64 @@ async def test_telegram_daily_summary(
     assert documents[0][0] == "12345"
 
 
+async def test_notify_low_stock(
+    make_uow, registered_shop, warehouse_id, create_product, monkeypatch
+):
+    from app.application.inventory.notify_low_stock import _run_async
+
+    tenant_id, _, owner = registered_shop
+    hot = await create_product(
+        tenant_id, name="Ходовой", purchase_price=Money.of("100"), retail_price=Money.of("200"),
+        min_stock=Decimal("5"),
+    )
+    cold = await create_product(
+        tenant_id, name="Незнакомец", purchase_price=Money.of("50"), retail_price=Money.of("100"),
+        min_stock=Decimal("5"),
+    )
+    for product, qty in ((hot, "5"), (cold, "1")):
+        await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+            owner,
+            ReceiveGoodsCommand(
+                warehouse_id=warehouse_id,
+                lines=[LineInput(product_id=product.id, quantity=Decimal(qty), cost=Decimal("10"))],
+            ),
+        )
+
+    await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=hot.id, quantity=Decimal("3"), price=Decimal("200"))],
+        ),
+    )
+
+    monkeypatch.setattr(
+        "app.application.inventory.notify_low_stock.SqlAlchemyUnitOfWork",
+        lambda tid: make_uow(tid) if tid is not None else make_uow(None),
+    )
+
+    sent = []
+
+    class FakeNotifier:
+        def send(self, chat_id: str, text: str) -> None:
+            sent.append((chat_id, text))
+
+    await _run_async(FakeNotifier())
+
+    async with make_uow(tenant_id) as uow:
+        notifications = await uow.notifications.list_for_user(owner.id)
+    texts = [n.text for n in notifications]
+    assert any("Ходовой" in t for t in texts)  # продавался и остаток <= min_stock
+    assert not any("Незнакомец" in t for t in texts)  # никогда не продавался
+
+    # повторный запуск в тот же день не плодит дубликат уведомления
+    await _run_async(FakeNotifier())
+    async with make_uow(tenant_id) as uow:
+        notifications_again = await uow.notifications.list_for_user(owner.id)
+    assert len(notifications_again) == len(notifications)
+
+
 async def test_create_sale_is_idempotent_by_client_op_id(
     make_uow, registered_shop, warehouse_id, create_product
 ):

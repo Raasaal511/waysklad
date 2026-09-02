@@ -12,6 +12,7 @@ from calendar import monthrange
 from datetime import datetime, timezone
 
 from app.application.debts.notify_due_debts import notify_due_debts
+from app.application.inventory.notify_low_stock import notify_low_stock
 from app.domain.analytics.period import SummaryPeriod
 from app.infrastructure.telegram import MSK_OFFSET, send_summaries_for
 
@@ -43,6 +44,7 @@ def main() -> None:
     sent_hours: set[tuple[str, str]] = set()  # (period, "YYYY-MM-DD-HH") — защита от повтора в тот же час
     while True:
         _run_safely("notify_due_debts", notify_due_debts)
+        _run_safely("notify_low_stock", notify_low_stock)
 
         now = datetime.now(timezone.utc)
         now_msk = now + MSK_OFFSET

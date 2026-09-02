@@ -8,6 +8,7 @@ class NotificationKind(StrEnum):
     TASK_DONE = "task_done"
     DEBT_DUE_SOON = "debt_due_soon"
     DEBT_OVERDUE = "debt_overdue"
+    LOW_STOCK = "low_stock"
 
 
 @dataclass
