@@ -62,7 +62,6 @@ export function StockPage() {
       {showWarehouseForm && (
         <Modal title="Новый склад" onClose={() => setShowWarehouseForm(false)}>
           <NewWarehouseForm
-            defaultName={warehouses.length === 0 ? 'Основной склад' : ''}
             onCreated={() => {
               setShowWarehouseForm(false)
               refreshCatalog(['warehouses']).catch(() => {})

@@ -1,5 +1,5 @@
 import { api } from '../../shared/api/client'
-import type { Role, User } from '../auth/api'
+import type { Role, TokenResponse, User } from '../auth/api'
 
 export function listEmployees() {
   return api.get<User[]>('/auth/employees')
@@ -53,5 +53,9 @@ export function updateShop(input: UpdateShopInput) {
 }
 
 export function changePassword(input: { current_password: string; new_password: string }) {
-  return api.patch<void>('/auth/me/password', input)
+  return api.patch<TokenResponse>('/auth/me/password', input)
+}
+
+export function logoutAll() {
+  return api.post<void>('/auth/me/logout-all')
 }

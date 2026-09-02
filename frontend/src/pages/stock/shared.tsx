@@ -8,7 +8,6 @@ import {
   type Warehouse,
 } from '../../entities/inventory/api'
 import { getByBarcode, type Category, type Product, type Unit } from '../../entities/product/api'
-import { listSuppliers, type Supplier } from '../../entities/counterparty/api'
 import type { User } from '../../entities/auth/api'
 import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
@@ -111,14 +110,8 @@ export function AssignedUsersField({
   )
 }
 
-export function NewWarehouseForm({
-  onCreated,
-  defaultName = '',
-}: {
-  onCreated: () => void
-  defaultName?: string
-}) {
-  const [name, setName] = useState(defaultName)
+export function NewWarehouseForm({ onCreated }: { onCreated: () => void }) {
+  const [name, setName] = useState('')
   const [address, setAddress] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -141,7 +134,13 @@ export function NewWarehouseForm({
     <form className={layoutStyles.form} onSubmit={handleSubmit}>
       <label className={layoutStyles.field}>
         Название склада
-        <input value={name} onChange={(e) => setName(e.target.value)} required />
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Например, Склад на Кадырова"
+          autoFocus
+          required
+        />
       </label>
       <label className={layoutStyles.field}>
         Адрес
@@ -216,13 +215,13 @@ export function MovementForm({
   const [scanError, setScanError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const { suppliers, ensureSuppliers } = useCatalog()
   const [withDebt, setWithDebt] = useState(false)
   const [supplierId, setSupplierId] = useState<number | null>(null)
   const [debtDueDate, setDebtDueDate] = useState('')
 
   useEffect(() => {
-    if (mode === 'receive') listSuppliers().then(setSuppliers).catch(() => {})
+    if (mode === 'receive') ensureSuppliers().catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
 
@@ -471,6 +470,7 @@ export function MovementForm({
                       <>
                         {formatQuantity(inLineQty)}
                         <IconButton
+                          variant="neutral"
                           className="product-tile-remove"
                           onClick={(e) => {
                             e.stopPropagation()
@@ -478,7 +478,7 @@ export function MovementForm({
                           }}
                           aria-label="Убрать из списка"
                         >
-                          <IconTrash size={10} stroke={1.8} />
+                          <IconTrash size={10} stroke={2} />
                         </IconButton>
                       </>
                     ) : (
