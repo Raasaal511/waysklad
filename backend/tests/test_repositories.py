@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -153,6 +154,72 @@ async def test_stock_reserve_and_release(make_uow, create_shop, create_product):
         assert released == Decimal("0")
         assert await uow.stock.get_reserved(product.id, warehouse_id) == Decimal("0")
         await uow.commit()
+
+
+async def test_stock_change_concurrent_first_write_no_duplicate_row(
+    make_uow, create_shop, create_product
+):
+    # первая операция над товаром/складом создаёт строку остатка — если два
+    # запроса делают это одновременно (например, две приёмки на разные склады
+    # сразу после заведения товара), второй INSERT бьётся об уникальный индекс;
+    # без savepoint-фикса это IntegrityError наружу вместо применения остатка
+    tenant_id, _, _ = await create_shop()
+
+    async with make_uow(tenant_id) as uow:
+        warehouse = await uow.warehouses.add(Warehouse(id=None, name="Основной"))
+        await uow.commit()
+        warehouse_id = warehouse.id
+
+    product = await create_product(tenant_id, name="Товар гонка")
+
+    async def change_in_own_transaction(delta: Decimal) -> Decimal:
+        async with make_uow(tenant_id) as uow:
+            quantity = await uow.stock.change(product.id, warehouse_id, delta)
+            await uow.commit()
+            return quantity
+
+    results = await asyncio.gather(
+        change_in_own_transaction(Decimal("5")),
+        change_in_own_transaction(Decimal("3")),
+    )
+    # порядок, в котором две конкурентные транзакции создают строку, не детерминирован —
+    # важно лишь то, что обе дельты применились ровно по разу (сумма = 8), без дубля строки
+    assert sorted(results) == [Decimal("3"), Decimal("8")] or sorted(results) == [Decimal("5"), Decimal("8")]
+
+    async with make_uow(tenant_id) as uow:
+        assert await uow.stock.get(product.id, warehouse_id) == Decimal("8")
+
+
+async def test_stock_change_concurrent_decrement_serializes_not_races(
+    make_uow, create_shop, create_product
+):
+    # два продавца одновременно продают последнюю единицу товара: SELECT FOR
+    # UPDATE должен сериализовать списания, а не допустить, чтобы оба прочитали
+    # один и тот же остаток и оба списали независимо (потерянное обновление)
+    tenant_id, _, _ = await create_shop()
+
+    async with make_uow(tenant_id) as uow:
+        warehouse = await uow.warehouses.add(Warehouse(id=None, name="Основной"))
+        await uow.commit()
+        warehouse_id = warehouse.id
+
+    product = await create_product(tenant_id, name="Товар последний")
+
+    async with make_uow(tenant_id) as uow:
+        await uow.stock.change(product.id, warehouse_id, Decimal("1"))
+        await uow.commit()
+
+    async def sell_one() -> Decimal:
+        async with make_uow(tenant_id) as uow:
+            quantity = await uow.stock.change(product.id, warehouse_id, Decimal("-1"))
+            await uow.commit()
+            return quantity
+
+    results = await asyncio.gather(sell_one(), sell_one())
+    assert sorted(results) == [Decimal("-1"), Decimal("0")]
+
+    async with make_uow(tenant_id) as uow:
+        assert await uow.stock.get(product.id, warehouse_id) == Decimal("-1")
 
 
 async def test_tenant_isolation(make_uow, create_shop, create_product):

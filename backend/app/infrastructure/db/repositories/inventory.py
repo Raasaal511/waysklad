@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 
 from app.domain.inventory.entities import StockDocument, StockItem
 from app.domain.inventory.repository import IStockDocumentRepository, IStockRepository
@@ -19,39 +20,46 @@ class SqlAlchemyStockRepository(SqlAlchemyRepository, IStockRepository):
     async def change(
         self, product_id: int, warehouse_id: int, delta: Decimal, variant_id: int | None = None
     ) -> Decimal:
-        item = await self._get_item(product_id, warehouse_id, variant_id, for_update=True)
-        if item is None:
-            item = StockItemModel(
-                tenant_id=self._tenant,
-                product_id=product_id,
-                variant_id=variant_id,
-                warehouse_id=warehouse_id,
-                quantity=delta,
-            )
-            self._session.add(item)
-        else:
-            item.quantity = item.quantity + delta
+        item = await self._get_or_create(product_id, warehouse_id, variant_id)
+        item.quantity = item.quantity + delta
         await self._session.flush()
         return item.quantity
 
     async def reserve(
         self, product_id: int, warehouse_id: int, delta: Decimal, variant_id: int | None = None
     ) -> Decimal:
-        item = await self._get_item(product_id, warehouse_id, variant_id, for_update=True)
-        if item is None:
-            item = StockItemModel(
-                tenant_id=self._tenant,
-                product_id=product_id,
-                variant_id=variant_id,
-                warehouse_id=warehouse_id,
-                quantity=Decimal("0"),
-                reserved=delta,
-            )
-            self._session.add(item)
-        else:
-            item.reserved = item.reserved + delta
+        item = await self._get_or_create(product_id, warehouse_id, variant_id)
+        item.reserved = item.reserved + delta
         await self._session.flush()
         return item.reserved
+
+    async def _get_or_create(
+        self, product_id: int, warehouse_id: int, variant_id: int | None
+    ) -> StockItemModel:
+        """Первая операция над товаром/складом создаёт строку остатка — если
+        это делают одновременно два запроса (например, две приёмки на разные
+        склады сразу после заведения товара), второй INSERT бьётся об уникальный
+        индекс. Savepoint даёт откатить только эту вставку, не всю транзакцию
+        use case, и перечитать уже созданную строку под блокировкой."""
+        item = await self._get_item(product_id, warehouse_id, variant_id, for_update=True)
+        if item is not None:
+            return item
+        try:
+            async with self._session.begin_nested():
+                item = StockItemModel(
+                    tenant_id=self._tenant,
+                    product_id=product_id,
+                    variant_id=variant_id,
+                    warehouse_id=warehouse_id,
+                    quantity=Decimal("0"),
+                )
+                self._session.add(item)
+                await self._session.flush()
+        except IntegrityError:
+            item = await self._get_item(product_id, warehouse_id, variant_id, for_update=True)
+            if item is None:
+                raise
+        return item
 
     async def get_reserved(
         self, product_id: int, warehouse_id: int, variant_id: int | None = None
