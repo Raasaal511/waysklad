@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from app.domain.identity.entities import User
 from app.domain.identity.permissions import Permission
+from app.infrastructure.rate_limit import limiter
 from app.infrastructure.security import create_access_token
 from app.presentation.auth.schemas import (
     ChangePasswordRequest,
@@ -21,6 +22,7 @@ from app.presentation.deps import (
     ConnectTelegramDep,
     CreateEmployeeDep,
     LoginDep,
+    LogoutAllDep,
     RegisterShopDep,
     UowDep,
     UpdateEmployeeDep,
@@ -32,20 +34,24 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _token_response(user: User, shop_slug: str | None = None) -> TokenResponse:
-    token = create_access_token(user.id, user.tenant_id, user.role.value)
+    token = create_access_token(user.id, user.tenant_id, user.role.value, user.token_version)
     return TokenResponse(
         access_token=token, user=UserResponse.from_entity(user), shop_slug=shop_slug
     )
 
 
 @router.post("/register", status_code=201)
-async def register_shop(body: RegisterRequest, use_case: RegisterShopDep) -> TokenResponse:
+@limiter.limit("10/hour")
+async def register_shop(
+    request: Request, body: RegisterRequest, use_case: RegisterShopDep
+) -> TokenResponse:
     result = await use_case.execute(body.to_command())
     return _token_response(result.owner, result.shop_slug)
 
 
 @router.post("/login")
-async def login(body: LoginRequest, use_case: LoginDep) -> TokenResponse:
+@limiter.limit("10/minute")
+async def login(request: Request, body: LoginRequest, use_case: LoginDep) -> TokenResponse:
     return _token_response(await use_case.execute(body.to_command()))
 
 
@@ -99,8 +105,16 @@ async def update_shop(
     return TenantResponse.from_entity(await use_case.execute(actor, body.to_command()))
 
 
-@router.patch("/me/password", status_code=204)
+@router.patch("/me/password")
 async def change_password(
     body: ChangePasswordRequest, actor: ActorDep, use_case: ChangePasswordDep
-) -> None:
-    await use_case.execute(actor, body.to_command())
+) -> TokenResponse:
+    # смена пароля инкрементирует token_version — без выдачи свежего токена
+    # пользователь сам разлогинил бы себя же текущим запросом
+    return _token_response(await use_case.execute(actor, body.to_command()))
+
+
+@router.post("/me/logout-all", status_code=204)
+async def logout_all(actor: ActorDep, use_case: LogoutAllDep) -> None:
+    """Разлогинить себя на всех устройствах — включая то, с которого вызван запрос."""
+    await use_case.execute(actor)

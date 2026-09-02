@@ -23,7 +23,7 @@ services:
     volumes:
       - ./backend:/app
     ports:
-      - "18000:8000"  # 8000 часто занят другими локальными сервисами
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -39,7 +39,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     ports:
-      - "5190:5173"
+      - "5173:5173"
     depends_on:
       - backend
 

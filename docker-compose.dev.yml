@@ -17,7 +17,9 @@ services:
     build: ./backend
     image: waysklad-backend-dev-deploy
     env_file: .env
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    # --proxy-headers/--forwarded-allow-ips — доверяем X-Forwarded-For от traefik,
+    # иначе rate_limit.py видит IP прокси для всех клиентов разом
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips=*
     volumes:
       - uploads_data_dev:/app/uploads
     restart: unless-stopped

@@ -1,5 +1,13 @@
+import os
 import random
 from typing import AsyncIterator, Callable
+
+# до импорта app.main — тесты логинятся многократно в одном сценарии,
+# и лимит /auth/login иначе рвёт их посреди прогона
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+# тестовое окружение намеренно не хранит секретов — стартовая проверка
+# SECRET_KEY (см. app/main.py) иначе не даст приложению импортироваться
+os.environ["DEBUG"] = "true"
 
 import pytest
 from httpx import ASGITransport, AsyncClient

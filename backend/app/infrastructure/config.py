@@ -7,6 +7,15 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24 * 30
     debug: bool = False
     telegram_bot_token: str = ""
+    # выключается в тестах (conftest.py) — иначе повторный логин в одном
+    # тестовом сценарии упирается в лимит /auth/login
+    rate_limit_enabled: bool = True
+    # None (по умолчанию) — in-memory storage: ок для одного процесса (локальная
+    # разработка). В проде backend поднят с несколькими uvicorn-воркерами
+    # (--workers), и без общего storage у каждого свой независимый счётчик —
+    # реальный лимит становится в N раз больше заявленного. Задаётся в .env как
+    # redis://redis:6379/0 (см. docker-compose.prod.yml).
+    rate_limit_storage_uri: str | None = None
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

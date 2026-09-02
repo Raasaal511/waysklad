@@ -14,16 +14,37 @@ services:
       timeout: 3s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build: ./backend
     image: waysklad-backend-prod
     env_file: .env
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    environment:
+      # 4 воркера без общего storage для rate limit считали бы независимо
+      # (реальный лимит стал бы в 4 раза мягче заявленного) — Redis даёт им
+      # один общий счётчик.
+      RATE_LIMIT_STORAGE_URI: redis://redis:6379/0
+    # --proxy-headers/--forwarded-allow-ips — доверяем X-Forwarded-For от nginx
+    # (см. frontend/nginx.conf), иначе rate_limit.py видит один и тот же IP
+    # (адрес nginx) для всех клиентов и лимитирует их одним общим счётчиком.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --proxy-headers --forwarded-allow-ips=*
     volumes:
       - uploads_data:/app/uploads
     restart: unless-stopped
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   frontend:
@@ -50,3 +71,4 @@ services:
 volumes:
   pgdata:
   uploads_data:
+  redis_data:
