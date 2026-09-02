@@ -1303,6 +1303,56 @@ async def test_sync_sales_offline_queue_via_api(client, owner_headers):
     assert len(response.json()["debts"]) == 1
 
 
+async def test_sync_sales_duplicate_client_op_id_in_same_batch_via_api(client, owner_headers):
+    # обрыв связи → клиент повторяет продажу в той же офлайн-пачке под тем же
+    # client_op_id — второе вхождение бьётся об UNIQUE(tenant_id, client_op_id),
+    # это не должно ронять обработку остальных продаж пачки необработанным 500
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Товар дубль", "purchase_price": "50", "retail_price": "100"},
+    )
+    product_id = response.json()["id"]
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "10"}]},
+    )
+
+    batch = {
+        "sales": [
+            {
+                "client_op_id": "device-b-1",
+                "warehouse_id": 1,
+                "payment_method": "cash",
+                "items": [{"product_id": product_id, "quantity": "1", "price": "100"}],
+            },
+            {
+                "client_op_id": "device-b-1",  # дубль первой продажи в этой же пачке
+                "warehouse_id": 1,
+                "payment_method": "cash",
+                "items": [{"product_id": product_id, "quantity": "1", "price": "100"}],
+            },
+            {
+                "client_op_id": "device-b-2",
+                "warehouse_id": 1,
+                "payment_method": "cash",
+                "items": [{"product_id": product_id, "quantity": "1", "price": "100"}],
+            },
+        ]
+    }
+    response = await client.post("/api/sync/sales", headers=owner_headers, json=batch)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    # обе попытки под дублирующим client_op_id резолвятся в одну и ту же продажу
+    # (без 500 на весь синк), третья независимая продажа применяется как обычно
+    assert len(result["errors"]) == 0
+    assert len(result["applied"]) == 3
+    applied_ids = {s["id"] for s in result["applied"] if s["client_op_id"] == "device-b-1"}
+    assert len(applied_ids) == 1
+    assert any(s["client_op_id"] == "device-b-2" for s in result["applied"])
+
+
 async def test_connect_telegram_via_api(client, owner_headers, random_phone):
     response = await client.post(
         "/api/auth/telegram", headers=owner_headers, json={"chat_id": "555444333"}
