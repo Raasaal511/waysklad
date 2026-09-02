@@ -24,11 +24,12 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode(), password_hash.encode())
 
 
-def create_access_token(user_id: int, tenant_id: int, role: str) -> str:
+def create_access_token(user_id: int, tenant_id: int, role: str, token_version: int = 0) -> str:
     payload = {
         "sub": str(user_id),
         "tenant_id": tenant_id,
         "role": role,
+        "tv": token_version,
         "exp": datetime.now(timezone.utc)
         + timedelta(minutes=settings.access_token_expire_minutes),
     }

@@ -25,8 +25,9 @@ class CurrentUser:
     role: Role
 
 
-def get_current_user(
+async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    factory: SessionFactoryDep,
 ) -> CurrentUser:
     if credentials is None:
         raise HTTPException(status_code=401, detail="Требуется авторизация")
@@ -34,9 +35,19 @@ def get_current_user(
         payload = decode_access_token(credentials.credentials)
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Недействительный токен")
+    user_id = int(payload["sub"])
+    tenant_id = payload["tenant_id"]
+    # token_version отсутствует в токенах, выданных до этой проверки — считаем их
+    # версией 0, чтобы не разлогинить всех разом при выкатке
+    token_version = payload.get("tv", 0)
+    uow = SqlAlchemyUnitOfWork(tenant_id, session_factory=factory)
+    async with uow:
+        current_version = await uow.users.get_token_version(user_id)
+    if current_version is None or current_version != token_version:
+        raise HTTPException(status_code=401, detail="Сессия завершена, войдите снова")
     return CurrentUser(
-        id=int(payload["sub"]),
-        tenant_id=payload["tenant_id"],
+        id=user_id,
+        tenant_id=tenant_id,
         role=Role(payload["role"]),
     )
 

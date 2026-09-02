@@ -22,6 +22,7 @@ from app.presentation.deps.uow import (  # noqa: F401
     get_uow,
 )
 from app.presentation.deps.use_cases import (  # noqa: F401
+    ApplyImportProductsDep,
     ApplyOfflineSalesDep,
     CancelOrderDep,
     ChangeOrderStatusDep,
@@ -55,8 +56,10 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     IssueOrderDep,
     IssueSupplierDebtDep,
     LoginDep,
+    LogoutAllDep,
     MarkAllNotificationsReadDep,
     MarkNotificationReadDep,
+    PreviewImportProductsDep,
     ReceiveGoodsDep,
     RegisterShopDep,
     RepayDebtDep,

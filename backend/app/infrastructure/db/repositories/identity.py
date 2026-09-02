@@ -102,6 +102,18 @@ class SqlAlchemyUserRepository(SqlAlchemyRepository, IUserRepository):
         ).scalar_one_or_none()
         return UserMapper.to_entity(model) if model else None
 
+    async def get_token_version(self, user_id: int) -> int | None:
+        row = (
+            await self._session.execute(
+                select(UserModel.token_version).where(
+                    UserModel.id == user_id,
+                    UserModel.tenant_id == self._tenant,
+                    UserModel.is_active.is_(True),
+                )
+            )
+        ).scalar_one_or_none()
+        return row
+
     async def list_by_tenant(self) -> list[User]:
         models = (
             await self._session.execute(
@@ -126,6 +138,7 @@ class SqlAlchemyUserRepository(SqlAlchemyRepository, IUserRepository):
         model.role = user.role
         model.is_active = user.is_active
         model.password_hash = user.password_hash
+        model.token_version = user.token_version
         await self._session.flush()
         return user
 

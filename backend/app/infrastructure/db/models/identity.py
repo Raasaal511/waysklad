@@ -1,5 +1,5 @@
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, SmallInteger, String
+from sqlalchemy import ForeignKey, Integer, SmallInteger, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domain.identity.entities import Role
@@ -41,6 +41,9 @@ class UserModel(Base, TenantMixin, TimestampMixin):
     password_hash: Mapped[str] = mapped_column(String(200))
     role: Mapped[Role] = mapped_column(RoleColumn, default=Role.SELLER)
     is_active: Mapped[bool] = mapped_column(default=True)
+    # Инкрементируется при смене пароля/принудительном разлогине — токены,
+    # выданные с прежним значением, перестают проходить проверку (см. get_current_user).
+    token_version: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class WarehouseAssignmentModel(Base):

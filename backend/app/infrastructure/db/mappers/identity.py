@@ -52,6 +52,7 @@ class UserMapper:
             password_hash=model.password_hash,
             is_active=model.is_active,
             tenant_id=model.tenant_id,
+            token_version=model.token_version,
         )
 
 

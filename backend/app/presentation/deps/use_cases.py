@@ -17,6 +17,7 @@ from app.application.auth.change_password import ChangePasswordUseCase
 from app.application.auth.connect_telegram import ConnectTelegramUseCase
 from app.application.auth.create_employee import CreateEmployeeUseCase
 from app.application.auth.login import LoginUseCase
+from app.application.auth.logout_all import LogoutAllUseCase
 from app.application.auth.register_shop import RegisterShopUseCase
 from app.application.auth.update_employee import UpdateEmployeeUseCase
 from app.application.auth.update_shop import UpdateShopUseCase
@@ -48,10 +49,12 @@ from app.application.orders.change_status import ChangeOrderStatusUseCase
 from app.application.orders.create_order import CreateOrderUseCase
 from app.application.orders.issue_order import IssueOrderUseCase
 from app.application.orders.update_order import UpdateOrderUseCase
+from app.application.products.apply_import import ApplyProductImportUseCase
 from app.application.products.create_category import CreateCategoryUseCase
 from app.application.products.create_product import CreateProductUseCase
 from app.application.products.create_unit import CreateUnitUseCase
 from app.application.products.import_excel import ImportProductsUseCase
+from app.application.products.import_preview import PreviewProductsUseCase
 from app.application.products.set_product_photo import SetProductPhotoUseCase
 from app.application.products.update_product import UpdateProductUseCase
 from app.application.sales.create_sale import CreateSaleUseCase
@@ -93,6 +96,9 @@ def get_change_password(uow: UowDep, hasher: HasherDep) -> ChangePasswordUseCase
     return ChangePasswordUseCase(uow, hasher)
 
 
+get_logout_all = _with_uow(LogoutAllUseCase)
+
+
 def get_set_product_photo(uow: UowDep, storage: FileStorageDep) -> SetProductPhotoUseCase:
     return SetProductPhotoUseCase(uow, storage)
 
@@ -102,6 +108,8 @@ get_update_product = _with_uow(UpdateProductUseCase)
 get_create_unit = _with_uow(CreateUnitUseCase)
 get_create_category = _with_uow(CreateCategoryUseCase)
 get_import_products = _with_uow(ImportProductsUseCase)
+get_preview_import_products = _with_uow(PreviewProductsUseCase)
+get_apply_import_products = _with_uow(ApplyProductImportUseCase)
 get_receive_goods = _with_uow(ReceiveGoodsUseCase)
 get_write_off = _with_uow(WriteOffUseCase)
 get_transfer = _with_uow(TransferUseCase)
@@ -162,6 +170,8 @@ UpdateProductDep = Annotated[UpdateProductUseCase, Depends(get_update_product)]
 CreateUnitDep = Annotated[CreateUnitUseCase, Depends(get_create_unit)]
 CreateCategoryDep = Annotated[CreateCategoryUseCase, Depends(get_create_category)]
 ImportProductsDep = Annotated[ImportProductsUseCase, Depends(get_import_products)]
+PreviewImportProductsDep = Annotated[PreviewProductsUseCase, Depends(get_preview_import_products)]
+ApplyImportProductsDep = Annotated[ApplyProductImportUseCase, Depends(get_apply_import_products)]
 SetProductPhotoDep = Annotated[SetProductPhotoUseCase, Depends(get_set_product_photo)]
 ReceiveGoodsDep = Annotated[ReceiveGoodsUseCase, Depends(get_receive_goods)]
 WriteOffDep = Annotated[WriteOffUseCase, Depends(get_write_off)]
@@ -209,6 +219,7 @@ ApplyOfflineSalesDep = Annotated[
 ConnectTelegramDep = Annotated[ConnectTelegramUseCase, Depends(get_connect_telegram)]
 UpdateShopDep = Annotated[UpdateShopUseCase, Depends(get_update_shop)]
 ChangePasswordDep = Annotated[ChangePasswordUseCase, Depends(get_change_password)]
+LogoutAllDep = Annotated[LogoutAllUseCase, Depends(get_logout_all)]
 CreateTaskDep = Annotated[CreateTaskUseCase, Depends(get_create_task)]
 ChangeTaskStatusDep = Annotated[ChangeTaskStatusUseCase, Depends(get_change_task_status)]
 UpdateTaskDep = Annotated[UpdateTaskUseCase, Depends(get_update_task)]
