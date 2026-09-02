@@ -48,6 +48,20 @@ class ReceiveGoodsUseCase:
                     line.product_id, cmd.warehouse_id, line.quantity.value, line.variant_id
                 )
 
+            # закупочная цена товара = цена последней приёмки (по строкам этого
+            # документа, в порядке их следования) — иначе маржа/прибыль в
+            # аналитике продолжает считаться по устаревшей цене, пока владелец
+            # не поправит её вручную в карточке товара
+            last_cost_by_product: dict[int, Money] = {}
+            for line in document.lines:
+                if line.cost is not None:
+                    last_cost_by_product[line.product_id] = line.cost
+            for product_id, cost in last_cost_by_product.items():
+                product = await uow.products.get(product_id)
+                if product.purchase_price != cost:
+                    product.purchase_price = cost
+                    await uow.products.save(product)
+
             if cmd.supplier_id is not None:
                 total = Money.zero()
                 for line in lines:

@@ -341,6 +341,50 @@ async def test_sale_receipt_via_api(client, owner_headers):
     assert response.content[:5] == b"%PDF-"
 
 
+async def test_inventory_receive_updates_purchase_price_via_api(client, owner_headers):
+    # закупочная цена товара = цена последней приёмки — иначе маржа в
+    # аналитике продолжает считаться по устаревшей цене
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Товар с меняющейся ценой", "purchase_price": "100", "retail_price": "200"},
+    )
+    product_id = response.json()["id"]
+
+    # приёмка без cost — цену не трогаем
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "5"}]},
+    )
+    response = await client.get(f"/api/products/{product_id}", headers=owner_headers)
+    assert response.json()["purchase_price"] == "100.00"
+
+    # приёмка с новой ценой — обновляет закупочную цену товара
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "5", "cost": "130"}]},
+    )
+    response = await client.get(f"/api/products/{product_id}", headers=owner_headers)
+    assert response.json()["purchase_price"] == "130.00"
+
+    # несколько строк одного товара в одной приёмке — побеждает последняя по порядку
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1,
+            "lines": [
+                {"product_id": product_id, "quantity": "1", "cost": "140"},
+                {"product_id": product_id, "quantity": "1", "cost": "150"},
+            ],
+        },
+    )
+    response = await client.get(f"/api/products/{product_id}", headers=owner_headers)
+    assert response.json()["purchase_price"] == "150.00"
+
+
 async def test_inventory_write_off_and_stocktake_endpoints(client, owner_headers):
     response = await client.post(
         "/api/products",
