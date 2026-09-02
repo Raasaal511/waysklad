@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 
 from app.domain.common.exceptions import NotFoundError
 from app.domain.common.quantity import Unit
@@ -64,6 +64,7 @@ class SqlAlchemySaleRepository(SqlAlchemyRepository, ISaleRepository):
         limit: int = 50,
         offset: int = 0,
         client_id: int | None = None,
+        product_id: int | None = None,
         warehouse_id: int | None = None,
         warehouse_ids: list[int] | None = None,
         payment_method: PaymentMethod | None = None,
@@ -74,6 +75,13 @@ class SqlAlchemySaleRepository(SqlAlchemyRepository, ISaleRepository):
         conditions = [SaleModel.tenant_id == self._tenant, SaleModel.deleted_at.is_(None)]
         if client_id is not None:
             conditions.append(SaleModel.client_id == client_id)
+        if product_id is not None:
+            conditions.append(
+                exists().where(
+                    SaleLineModel.sale_id == SaleModel.id,
+                    SaleLineModel.product_id == product_id,
+                )
+            )
         if warehouse_id is not None:
             conditions.append(SaleModel.warehouse_id == warehouse_id)
         if warehouse_ids is not None:

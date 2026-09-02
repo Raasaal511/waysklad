@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
 from app.domain.common.exceptions import AccessDeniedError
 from app.domain.identity.entities import Role
@@ -69,9 +69,12 @@ async def list_active_tasks(actor: ActorDep, uow: UowDep) -> list[TaskResponse]:
 
 
 @router.get("/completed", dependencies=[_view])
-async def list_completed_tasks(actor: ActorDep, uow: UowDep) -> list[TaskResponse]:
+async def list_completed_tasks(
+    response: Response, actor: ActorDep, uow: UowDep, limit: int = 50, offset: int = 0
+) -> list[TaskResponse]:
     async with uow:
-        tasks = await uow.tasks.list_completed(_scope(actor))
+        tasks, total = await uow.tasks.list_completed(_scope(actor), limit=limit, offset=offset)
+        response.headers["X-Total-Count"] = str(total)
         return [TaskResponse.from_entity(t) for t in tasks]
 
 

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Literal
 
@@ -221,6 +221,7 @@ class DebtsOverviewResponse(BaseModel):
     supplier_total_balance: Decimal
     supplier_debt_count: int
     upcoming_payments: list[UpcomingPaymentResponse]
+    has_scheduled_payments: bool
 
     @classmethod
     def from_active_debts(
@@ -228,7 +229,13 @@ class DebtsOverviewResponse(BaseModel):
     ) -> "DebtsOverviewResponse":
         client_debts = [d for d in debts if d.client_id is not None]
         supplier_debts = [d for d in debts if d.supplier_id is not None]
+        # Просроченные платежи всё ещё нужно показывать (иначе они пропадают из виду),
+        # а будущие — только на ближайший месяц, иначе виджет тонет в графике рассрочки
+        # на год-два вперёд. has_scheduled_payments не ограничен горизонтом — по нему
+        # кнопка "Выплаты" остаётся видимой, даже если следующий платёж дальше месяца.
+        horizon = date.today() + timedelta(days=30)
         upcoming: list[UpcomingPaymentResponse] = []
+        has_scheduled_payments = False
         for debt in debts:
             if not debt.schedule:
                 continue
@@ -238,6 +245,9 @@ class DebtsOverviewResponse(BaseModel):
             for installment in debt.schedule:
                 if paid_so_far >= installment.amount:
                     paid_so_far = paid_so_far - installment.amount
+                    continue
+                has_scheduled_payments = True
+                if installment.due_date > horizon:
                     continue
                 upcoming.append(
                     UpcomingPaymentResponse(
@@ -251,6 +261,7 @@ class DebtsOverviewResponse(BaseModel):
         return cls(
             client_total_balance=total_balance(client_debts).amount,
             client_debt_count=len(client_debts),
+            has_scheduled_payments=has_scheduled_payments,
             supplier_total_balance=total_balance(supplier_debts).amount,
             supplier_debt_count=len(supplier_debts),
             upcoming_payments=upcoming,
