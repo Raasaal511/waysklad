@@ -20,6 +20,7 @@ class TaskMapper:
             warehouse_id=task.warehouse_id,
             quantity=task.quantity.value if task.quantity is not None else None,
             completed_at=task.completed_at,
+            client_id=task.client_id,
         )
 
     @staticmethod
@@ -46,4 +47,5 @@ class TaskMapper:
             completed_at=model.completed_at,
             assigned_user_name=assigned_user_name,
             created_by_name=created_by_name,
+            client_id=model.client_id,
         )

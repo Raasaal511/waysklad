@@ -44,6 +44,8 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     EditSaleDep,
     ExtendDebtDep,
     GetCategoryProfitDep,
+    GetClientSummaryDep,
+    GetClientTimelineDep,
     GetDashboardDep,
     GetDeadStockDep,
     GetPeriodTotalsDep,

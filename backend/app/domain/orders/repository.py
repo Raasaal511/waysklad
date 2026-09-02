@@ -16,3 +16,7 @@ class IOrderRepository(Protocol):
     async def list_completed(self) -> list[Order]:
         """Завершённые заказы (issued/cancelled) — история, новые сначала."""
         ...
+
+    async def list_by_client(self, client_id: int) -> list[Order]:
+        """Все заказы (любого статуса) клиента — для ленты событий клиента."""
+        ...

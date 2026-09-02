@@ -87,5 +87,15 @@ class SqlAlchemyOrderRepository(SqlAlchemyRepository, IOrderRepository):
         ).scalars().all()
         return [OrderMapper.to_entity(m, await self._line_units(m)) for m in models]
 
+    async def list_by_client(self, client_id: int) -> list[Order]:
+        models = (
+            await self._session.execute(
+                select(OrderModel)
+                .where(OrderModel.tenant_id == self._tenant, OrderModel.client_id == client_id)
+                .order_by(OrderModel.created_at.desc())
+            )
+        ).scalars().all()
+        return [OrderMapper.to_entity(m, await self._line_units(m)) for m in models]
+
     async def _line_units(self, model: OrderModel):
         return await self._product_unit_by_id({line.product_id for line in model.lines})

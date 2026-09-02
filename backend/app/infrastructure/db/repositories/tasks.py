@@ -36,6 +36,7 @@ class SqlAlchemyTaskRepository(SqlAlchemyRepository, ITaskRepository):
         model.due_date = task.due_date
         model.note = task.note
         model.completed_at = task.completed_at
+        model.client_id = task.client_id
         await self._session.flush()
         return task
 
@@ -76,6 +77,13 @@ class SqlAlchemyTaskRepository(SqlAlchemyRepository, ITaskRepository):
         ).limit(limit).offset(offset)
         rows = (await self._session.execute(stmt)).all()
         return [await self._to_entity(*row) for row in rows], total
+
+    async def list_by_client(self, client_id: int) -> list[Task]:
+        stmt = self._select_with_names().where(
+            TaskModel.tenant_id == self._tenant, TaskModel.client_id == client_id
+        ).order_by(TaskModel.due_date.nulls_last(), TaskModel.id)
+        rows = (await self._session.execute(stmt)).all()
+        return [await self._to_entity(*row) for row in rows]
 
     def _select_with_names(self):
         return (

@@ -1,11 +1,14 @@
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
 from app.application.counterparties.create_client import CreateClientCommand
 from app.application.counterparties.create_supplier import CreateSupplierCommand
+from app.application.counterparties.get_client_summary import ClientSummary
 from app.application.counterparties.update_client import UpdateClientCommand
 from app.domain.counterparties.entities import Client, Supplier
+from app.domain.counterparties.timeline import ClientTimelineEvent, TimelineEventType
 
 
 class ClientCreateRequest(BaseModel):
@@ -64,6 +67,42 @@ class ClientResponse(BaseModel):
             city=client.city,
             debt_limit=client.debt_limit.amount if client.debt_limit else None,
             is_active=client.is_active,
+        )
+
+
+class ClientSummaryResponse(BaseModel):
+    client: ClientResponse
+    debt_balance: Decimal
+    active_orders_count: int
+    open_tasks_count: int
+
+    @classmethod
+    def from_summary(cls, summary: ClientSummary) -> "ClientSummaryResponse":
+        return cls(
+            client=ClientResponse.from_entity(summary.client),
+            debt_balance=summary.debt_balance.amount,
+            active_orders_count=summary.active_orders_count,
+            open_tasks_count=summary.open_tasks_count,
+        )
+
+
+class ClientTimelineEventResponse(BaseModel):
+    type: TimelineEventType
+    occurred_at: datetime
+    entity_id: int
+    title: str
+    amount: Decimal | None
+    status: str | None
+
+    @classmethod
+    def from_entity(cls, event: ClientTimelineEvent) -> "ClientTimelineEventResponse":
+        return cls(
+            type=event.type,
+            occurred_at=event.occurred_at,
+            entity_id=event.entity_id,
+            title=event.title,
+            amount=event.amount.amount if event.amount else None,
+            status=event.status,
         )
 
 

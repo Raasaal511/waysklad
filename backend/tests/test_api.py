@@ -791,6 +791,237 @@ async def test_task_full_lifecycle_via_api(client, owner_headers, random_phone):
     assert (await client.get("/api/notifications", headers=owner_headers)).json()["unread"] == 0
 
 
+async def test_task_client_link_via_api(client, owner_headers, random_phone):
+    # CRM: задача может быть привязана к клиенту — попадает в его ленту событий
+    response = await client.post(
+        "/api/counterparties/clients", headers=owner_headers, json={"name": "Ахмед"}
+    )
+    client_id = response.json()["id"]
+
+    response = await client.post(
+        "/api/tasks",
+        headers=owner_headers,
+        json={"title": "Перезвонить по заказу", "client_id": client_id},
+    )
+    assert response.status_code == 201, response.text
+    task = response.json()
+    assert task["client_id"] == client_id
+
+    # несуществующий клиент — понятная ошибка, а не молчаливое сохранение
+    response = await client.post(
+        "/api/tasks", headers=owner_headers, json={"title": "Без клиента", "client_id": 999999},
+    )
+    assert response.status_code == 404, response.text
+
+    # PATCH может как сменить привязку, так и явно снять её
+    response = await client.post(
+        "/api/counterparties/clients", headers=owner_headers, json={"name": "Марьям"}
+    )
+    other_client_id = response.json()["id"]
+
+    response = await client.patch(
+        f"/api/tasks/{task['id']}", headers=owner_headers, json={"client_id": other_client_id},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["client_id"] == other_client_id
+
+    response = await client.patch(
+        f"/api/tasks/{task['id']}", headers=owner_headers, json={"client_id": None},
+    )
+    assert response.status_code == 200
+    assert response.json()["client_id"] is None
+
+
+async def test_task_client_link_tenant_isolation_via_api(client, owner_headers, random_phone):
+    # клиент другого магазина не должен быть доступен для привязки задачи
+    other_owner_phone = random_phone()
+    await client.post(
+        "/api/auth/register",
+        json={
+            "shop_name": "Чужой магазин", "owner_name": "Другой", "phone": other_owner_phone,
+            "password": "secret123",
+        },
+    )
+    login = await client.post(
+        "/api/auth/login", json={"phone": other_owner_phone, "password": "secret123"}
+    )
+    other_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    response = await client.post(
+        "/api/counterparties/clients", headers=other_headers, json={"name": "Чужой клиент"}
+    )
+    foreign_client_id = response.json()["id"]
+
+    response = await client.post(
+        "/api/tasks",
+        headers=owner_headers,
+        json={"title": "Задача", "client_id": foreign_client_id},
+    )
+    assert response.status_code == 404, response.text
+
+
+async def test_client_timeline_via_api(client, owner_headers):
+    # CRM: единая лента событий клиента вместо поиска по Продажам/Заказам/Долгам/Задачам
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Товар для ленты", "purchase_price": "100", "retail_price": "200"},
+    )
+    product_id = response.json()["id"]
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "10"}]},
+    )
+
+    response = await client.post(
+        "/api/counterparties/clients", headers=owner_headers, json={"name": "Ахмед лента"}
+    )
+    client_id = response.json()["id"]
+
+    # пустая лента для нового клиента — не ошибка
+    response = await client.get(f"/api/counterparties/clients/{client_id}/timeline", headers=owner_headers)
+    assert response.status_code == 200
+    assert response.json() == []
+
+    # обычная продажа
+    response = await client.post(
+        "/api/sales",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1, "payment_method": "cash", "client_id": client_id,
+            "items": [{"product_id": product_id, "quantity": "1", "price": "200"}],
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    # продажа в долг + погашение
+    response = await client.post(
+        "/api/sales",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1, "payment_method": "credit", "client_id": client_id,
+            "items": [{"product_id": product_id, "quantity": "1", "price": "200"}],
+            "debt_due_date": str(date.today() + timedelta(days=7)),
+        },
+    )
+    assert response.status_code == 201, response.text
+    debts = (await client.get(f"/api/debts/client/{client_id}", headers=owner_headers)).json()["debts"]
+    debt_id = debts[0]["id"]
+    response = await client.post(
+        f"/api/debts/{debt_id}/repayments", headers=owner_headers, json={"amount": "50"},
+    )
+    assert response.status_code == 200, response.text
+
+    # заказ
+    response = await client.post(
+        "/api/orders",
+        headers=owner_headers,
+        json={
+            "client_id": client_id, "warehouse_id": 1,
+            "items": [{"product_id": product_id, "quantity": "1", "price": "200"}],
+            "due_date": date.today().isoformat(),
+        },
+    )
+    assert response.status_code == 201, response.text
+    order_id = response.json()["id"]
+
+    # задача, привязанная к клиенту
+    response = await client.post(
+        "/api/tasks", headers=owner_headers, json={"title": "Уточнить размер", "client_id": client_id},
+    )
+    assert response.status_code == 201, response.text
+    task_id = response.json()["id"]
+
+    response = await client.get(f"/api/counterparties/clients/{client_id}/timeline", headers=owner_headers)
+    assert response.status_code == 200
+    events = response.json()
+
+    assert any(e["type"] == "sale" for e in events)
+    assert sum(1 for e in events if e["type"] == "sale") == 2
+    assert any(e["type"] == "debt_issued" and e["entity_id"] == debt_id for e in events)
+    assert any(e["type"] == "debt_repaid" and e["entity_id"] == debt_id for e in events)
+    assert any(e["type"] == "order_created" and e["entity_id"] == order_id for e in events)
+    assert any(e["type"] == "task" and e["entity_id"] == task_id for e in events)
+
+    # новые события сверху (по убыванию даты) — свежесозданная задача первая
+    assert events[0]["type"] == "task"
+
+    # несуществующий клиент — 404, не пустая лента (не спутать «нет событий» с «нет доступа»)
+    response = await client.get("/api/counterparties/clients/999999/timeline", headers=owner_headers)
+    assert response.status_code == 404
+
+
+async def test_client_summary_via_api(client, owner_headers):
+    # CRM: карточка клиента как хаб — баланс долга и счётчики активных заказов/задач
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Товар для сводки", "purchase_price": "100", "retail_price": "200"},
+    )
+    product_id = response.json()["id"]
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "10"}]},
+    )
+
+    response = await client.post(
+        "/api/counterparties/clients", headers=owner_headers, json={"name": "Ахмед сводка"}
+    )
+    client_id = response.json()["id"]
+
+    response = await client.get(f"/api/counterparties/clients/{client_id}", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    summary = response.json()
+    assert summary["client"]["id"] == client_id
+    assert summary["debt_balance"] == "0.00"
+    assert summary["active_orders_count"] == 0
+    assert summary["open_tasks_count"] == 0
+
+    # продажа в долг — баланс растёт
+    await client.post(
+        "/api/sales",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1, "payment_method": "credit", "client_id": client_id,
+            "items": [{"product_id": product_id, "quantity": "1", "price": "200"}],
+            "debt_due_date": str(date.today() + timedelta(days=7)),
+        },
+    )
+
+    # активный заказ
+    await client.post(
+        "/api/orders",
+        headers=owner_headers,
+        json={
+            "client_id": client_id, "warehouse_id": 1,
+            "items": [{"product_id": product_id, "quantity": "1", "price": "200"}],
+            "due_date": date.today().isoformat(),
+        },
+    )
+
+    # одна задача останется открытой, вторую закроем — в счётчик попадает только открытая
+    response = await client.post(
+        "/api/tasks", headers=owner_headers, json={"title": "Закроем", "client_id": client_id},
+    )
+    task_to_close_id = response.json()["id"]
+    await client.post(
+        "/api/tasks", headers=owner_headers, json={"title": "Останется открытой", "client_id": client_id},
+    )
+    await client.patch(
+        f"/api/tasks/{task_to_close_id}/status", headers=owner_headers, json={"new_status": "done"},
+    )
+
+    response = await client.get(f"/api/counterparties/clients/{client_id}", headers=owner_headers)
+    summary = response.json()
+    assert summary["debt_balance"] == "200.00"
+    assert summary["active_orders_count"] == 1
+    assert summary["open_tasks_count"] == 1
+
+    response = await client.get("/api/counterparties/clients/999999", headers=owner_headers)
+    assert response.status_code == 404
+
+
 async def test_seller_sees_only_own_tasks_via_api(client, owner_headers, random_phone):
     phone = random_phone()
     response = await client.post(

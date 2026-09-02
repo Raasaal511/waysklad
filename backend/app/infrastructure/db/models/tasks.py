@@ -35,3 +35,5 @@ class TaskModel(Base, TenantMixin, TimestampMixin):
     warehouse_id: Mapped[int | None] = mapped_column(ForeignKey("warehouses.id"))
     quantity: Mapped[Decimal | None] = mapped_column(Numeric(14, 3))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # привязка к клиенту (CRM) — задача попадает в общую ленту событий клиента
+    client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), index=True)

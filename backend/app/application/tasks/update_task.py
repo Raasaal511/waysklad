@@ -20,6 +20,7 @@ class UpdateTaskCommand:
     assigned_user_id: int | None | Unset = UNSET
     due_date: date | None | Unset = UNSET
     note: str | Unset = UNSET
+    client_id: int | None | Unset = UNSET
 
 
 class UpdateTaskUseCase:
@@ -44,8 +45,14 @@ class UpdateTaskUseCase:
                 require(actor, Permission.USERS_MANAGE)  # чужие задачи назначает owner/manager
                 await uow.users.get(cmd.assigned_user_id)  # проверка существования
 
+            if cmd.client_id is not UNSET and cmd.client_id is not None:
+                await uow.clients.get(cmd.client_id)  # проверка существования + tenant
+
             task.update_fields(
-                assigned_user_id=cmd.assigned_user_id, due_date=cmd.due_date, note=cmd.note,
+                assigned_user_id=cmd.assigned_user_id, 
+                due_date=cmd.due_date, 
+                note=cmd.note,
+                client_id=cmd.client_id,
             )
             await uow.tasks.save(task)
 
@@ -56,6 +63,8 @@ class UpdateTaskUseCase:
                 details["due_date"] = str(cmd.due_date) if cmd.due_date else None
             if cmd.note is not UNSET:
                 details["note_changed"] = True
+            if cmd.client_id is not UNSET:
+                details["client_id"] = cmd.client_id
             await uow.audit.add(AuditEntry.record(actor, "task.update", task.id, **details))
 
             if reassigning and task.assigned_user_id is not None and task.assigned_user_id != actor.id:

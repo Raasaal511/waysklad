@@ -51,6 +51,7 @@ class Task:
     product_id: int | None = None
     warehouse_id: int | None = None
     quantity: Quantity | None = None
+    client_id: int | None = None  # привязка к клиенту (CRM) — попадает в его ленту событий
     number: int | None = None  # заполняется репозиторием при add()/чтении, не при создании
     created_at: datetime | None = None
     completed_at: datetime | None = None
@@ -79,6 +80,7 @@ class Task:
         assigned_user_id: int | None | Unset = UNSET,
         due_date: date | None | Unset = UNSET,
         note: str | Unset = UNSET,
+        client_id: int | None | Unset = UNSET,
     ) -> None:
         """Точечное обновление редактируемых инлайн полей — сентинел UNSET
         отличает «не трогать поле» от «сбросить в None» (due_date можно снять)."""
@@ -88,3 +90,5 @@ class Task:
             self.due_date = due_date
         if note is not UNSET:
             self.note = note
+        if client_id is not UNSET:
+            self.client_id = client_id

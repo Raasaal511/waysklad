@@ -18,6 +18,7 @@ class TaskCreateRequest(BaseModel):
     product_id: int | None = None
     warehouse_id: int | None = None
     quantity: Decimal | None = None
+    client_id: int | None = None
 
     def to_command(self) -> CreateTaskCommand:
         return CreateTaskCommand(
@@ -29,6 +30,7 @@ class TaskCreateRequest(BaseModel):
             product_id=self.product_id,
             warehouse_id=self.warehouse_id,
             quantity=self.quantity,
+            client_id=self.client_id,
         )
 
 
@@ -46,6 +48,7 @@ class TaskUpdateRequest(BaseModel):
     assigned_user_id: int | None = None
     due_date: date | None = None
     note: str | None = None
+    client_id: int | None = None
 
     def to_command(self, task_id: int) -> UpdateTaskCommand:
         fields = self.model_fields_set
@@ -54,6 +57,7 @@ class TaskUpdateRequest(BaseModel):
             assigned_user_id=self.assigned_user_id if "assigned_user_id" in fields else UNSET,
             due_date=self.due_date if "due_date" in fields else UNSET,
             note=self.note if "note" in fields else UNSET,
+            client_id=self.client_id if "client_id" in fields else UNSET,
         )
 
 
@@ -72,6 +76,7 @@ class TaskResponse(BaseModel):
     product_id: int | None
     warehouse_id: int | None
     quantity: Decimal | None
+    client_id: int | None
     created_at: datetime | None
     completed_at: datetime | None
 
@@ -92,6 +97,7 @@ class TaskResponse(BaseModel):
             product_id=task.product_id,
             warehouse_id=task.warehouse_id,
             quantity=task.quantity.value if task.quantity is not None else None,
+            client_id=task.client_id,
             created_at=task.created_at,
             completed_at=task.completed_at,
         )
