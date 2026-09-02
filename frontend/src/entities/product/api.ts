@@ -52,9 +52,64 @@ export interface ProductHistoryEntry {
   created_at: string
 }
 
-export interface ImportProductsResult {
+export type ImportMatchStatus = 'no_match' | 'match' | 'ambiguous_match'
+export type ImportAction = 'create' | 'update' | 'skip'
+
+export interface ExistingProductSnapshot {
+  id: number
+  name: string
+  sku: string
+  barcode: string | null
+  unit_code: string
+  purchase_price: string
+  retail_price: string
+  category_id: number | null
+  min_stock: string
+}
+
+export interface DuplicateCandidate {
+  matched_by: 'barcode' | 'sku' | 'name'
+  product: ExistingProductSnapshot
+}
+
+export interface PreviewRow {
+  row: number
+  name: string
+  sku: string
+  barcode: string | null
+  unit_code: string
+  category_id: number | null
+  purchase_price: string | null
+  retail_price: string | null
+  min_stock: string
+  parse_error: string | null
+  status: ImportMatchStatus
+  candidates: DuplicateCandidate[]
+}
+
+export interface PreviewProductsResult {
+  rows: PreviewRow[]
+}
+
+export interface ApplyImportRow {
+  client_row_id: string
+  action: ImportAction
+  name: string
+  sku: string
+  barcode: string | null
+  unit_code: string
+  purchase_price: string
+  retail_price: string
+  category_id: number | null
+  min_stock: string
+  existing_product_id: number | null
+}
+
+export interface ApplyImportResult {
   created: number
-  errors: { row: number; message: string }[]
+  updated: number
+  skipped: number
+  errors: { client_row_id: string; message: string }[]
 }
 
 interface ProductInput {
@@ -131,10 +186,14 @@ export function setProductPhoto(productId: number, file: File) {
   return api.postForm<Product>(`/products/${productId}/photo`, form)
 }
 
-export function importProducts(file: File) {
+export function previewImport(file: File) {
   const form = new FormData()
   form.append('file', file)
-  return api.postForm<ImportProductsResult>('/products/import', form)
+  return api.postForm<PreviewProductsResult>('/products/import/preview', form)
+}
+
+export function applyImport(rows: ApplyImportRow[]) {
+  return api.post<ApplyImportResult>('/products/import/apply', { rows })
 }
 
 export function getProductHistory(productId: number) {

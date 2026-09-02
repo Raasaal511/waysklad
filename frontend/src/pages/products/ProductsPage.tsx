@@ -3,6 +3,7 @@ import {
   Suspense,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type FormEvent,
@@ -16,7 +17,6 @@ import {
   createUnit,
   createCategory,
   setProductPhoto,
-  importProducts,
   exportProducts,
   type Product,
   type Unit,
@@ -28,6 +28,7 @@ import type { Warehouse } from '../../entities/inventory/api'
 import { useCatalog } from '../../app/CatalogContext'
 import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
+import { ImportProductsModal } from './ImportProductsModal'
 import {
   IconPlus,
   IconBarcode,
@@ -86,8 +87,8 @@ const BarcodeScanner = lazy(() =>
 )
 
 const PAGE_SIZE = 50
-const IMPORT_ERRORS_COLUMNS = '100px 1fr'
 const PRODUCT_FORM_ID = 'product-form'
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 
 type SortMode =
   | 'name'
@@ -286,9 +287,12 @@ export function ProductsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, inStockOnly, sortMode, stock, warehouseId])
 
+  // categories/units не инвалидируем здесь — создание новой категории/юнита уже
+  // само вызывает refreshCatalog через onCategoriesChanged/onUnitsChanged ниже,
+  // а обычное редактирование товара их не трогает.
   function refreshAfterChange() {
     loadProducts()
-    refreshCatalog(['products', 'stock', 'categories', 'units']).catch(() => {})
+    refreshCatalog(['products', 'stock']).catch(() => {})
   }
 
   const activeFilterCount =
@@ -549,86 +553,6 @@ export function ProductsPage() {
   )
 }
 
-function ImportProductsModal({
-  format,
-  onClose,
-  onDone,
-}: {
-  format: 'xlsx' | 'csv'
-  onClose: () => void
-  onDone: () => void
-}) {
-  const [file, setFile] = useState<File | null>(null)
-  const [result, setResult] = useState<{ created: number; errors: { row: number; message: string }[] } | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [importing, setImporting] = useState(false)
-
-  async function handleImport() {
-    if (!file) return
-    setError(null)
-    setImporting(true)
-    try {
-      const res = await importProducts(file)
-      setResult(res)
-      if (res.errors.length === 0) {
-        onDone()
-      }
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось импортировать товары')
-    } finally {
-      setImporting(false)
-    }
-  }
-
-  return (
-    <Modal title={`Импорт товаров из ${format === 'csv' ? 'CSV' : 'Excel'}`} onClose={onClose}>
-      <div className={layoutStyles.stack}>
-        <p className={layoutStyles.textMuted}>
-          Формат колонок: Название | Артикул | Штрихкод | Ед.изм. | Закупочная цена | Розничная
-          цена | Мин.остаток. Первая строка — заголовок, пропускается.
-        </p>
-        <input
-          type="file"
-          accept={format === 'csv' ? '.csv' : '.xlsx'}
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        />
-        {error && <p className={layoutStyles.error}>{error}</p>}
-        {result && (
-          <div className={layoutStyles.stack}>
-            <p>Создано товаров: {result.created}</p>
-            {result.errors.length > 0 && (
-              <div className={layoutStyles.dataTable}>
-                <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: IMPORT_ERRORS_COLUMNS }}>
-                  <span>Строка</span>
-                  <span>Ошибка</span>
-                </div>
-                <div className={layoutStyles.dataTableBody}>
-                  {result.errors.map((e, i) => (
-                    <div key={i} className={layoutStyles.dataRow} style={{ gridTemplateColumns: IMPORT_ERRORS_COLUMNS }}>
-                      <span>{e.row}</span>
-                      <span className={layoutStyles.textMuted}>{e.message}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        <div className={layoutStyles.row} style={{ gap: 8 }}>
-          <Button onClick={handleImport} disabled={!file || importing}>
-            {importing ? 'Импорт…' : 'Импортировать'}
-          </Button>
-          {result && (
-            <Button variant="secondary" onClick={onClose}>
-              Готово
-            </Button>
-          )}
-        </div>
-      </div>
-    </Modal>
-  )
-}
-
 function QuickNewCategoryForm({
   categories,
   open,
@@ -804,6 +728,9 @@ function ProductForm({
   const [showNewUnit, setShowNewUnit] = useState(false)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(product?.photo || null)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+  const [createdProduct, setCreatedProduct] = useState<Product | null>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
   const [variants, setVariants] = useState<VariantInput[]>(
     product?.variants.map((v) => ({ id: v.id, size: v.size, color: v.color, barcode: v.barcode })) ?? [],
   )
@@ -816,8 +743,21 @@ function ProductForm({
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null
+    if (file && !ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      setPhotoError('Неподдерживаемый формат файла. Загрузите изображение JPG, PNG, WEBP или GIF.')
+      e.target.value = ''
+      return
+    }
+    setPhotoError(null)
     setPhotoFile(file)
-    if (file) setPhotoPreview(URL.createObjectURL(file))
+    setPhotoPreview(file ? URL.createObjectURL(file) : product?.photo || null)
+  }
+
+  function handleRemovePhoto() {
+    setPhotoFile(null)
+    setPhotoError(null)
+    setPhotoPreview(product?.photo || null)
+    if (photoInputRef.current) photoInputRef.current.value = ''
   }
 
   function addVariant() {
@@ -852,12 +792,17 @@ function ProductForm({
       let saved: Product
       if (product) {
         saved = await updateProduct(product.id, { ...payload, photo: product.photo })
+      } else if (createdProduct) {
+        // Товар уже был создан на предыдущей попытке (упала только загрузка фото) —
+        // повторно создавать запись нельзя, иначе получится дубликат.
+        saved = await updateProduct(createdProduct.id, { ...payload, photo: createdProduct.photo })
       } else {
         saved = await createProduct({
           ...payload,
           initial_stock_warehouse_id: initialStockQuantity ? initialStockWarehouseId : null,
           initial_stock_quantity: initialStockQuantity || null,
         })
+        setCreatedProduct(saved)
       }
       if (photoFile) {
         saved = await setProductPhoto(saved.id, photoFile)
@@ -1065,9 +1010,23 @@ function ProductForm({
 
       <label className={layoutStyles.field}>
         Фото
-        <input type="file" accept="image/*" onChange={handlePhotoChange} />
+        <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoChange} />
       </label>
-      {photoPreview && <img src={photoPreview} alt="" className={styles.productFormPhotoPreview} />}
+      {photoError && <p className={layoutStyles.error}>{photoError}</p>}
+      {photoPreview && (
+        <div className={styles.productFormPhotoPreviewWrap}>
+          <img src={photoPreview} alt="" className={styles.productFormPhotoPreview} />
+          <IconButton
+            type="button"
+            variant="danger"
+            className={styles.productFormPhotoRemove}
+            onClick={handleRemovePhoto}
+            aria-label="Убрать фото"
+          >
+            <IconTrash size={14} stroke={1.8} />
+          </IconButton>
+        </div>
+      )}
 
       <div className={layoutStyles.field}>
         <div className={`${layoutStyles.row} ${layoutStyles.between}`}>

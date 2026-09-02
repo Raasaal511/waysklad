@@ -76,3 +76,12 @@ export function pluralizeSales(count: number): string {
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'продажи'
   return 'продаж'
 }
+
+/** Склонение "товар/товара/товаров" по числу. */
+export function pluralizeGoods(count: number): string {
+  const mod10 = count % 10
+  const mod100 = count % 100
+  if (mod10 === 1 && mod100 !== 11) return 'товару'
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'товарам'
+  return 'товарам'
+}
