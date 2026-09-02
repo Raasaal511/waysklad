@@ -7,6 +7,7 @@ from app.domain.common.exceptions import (
     DomainError,
     NotFoundError,
 )
+from app.infrastructure.admin_alerts import report_unhandled_error
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -29,4 +30,15 @@ def register_exception_handlers(app: FastAPI) -> None:
         # дублирующийся штрихкод) уже отлавливаются явной проверкой в use case
         return JSONResponse(
             status_code=409, content={"detail": "Нарушение уникальности данных — проверьте вводимые значения"}
+        )
+
+    @app.exception_handler(Exception)
+    async def unhandled_error(request: Request, exc: Exception) -> JSONResponse:
+        # последний барьер: баг в коде, обрыв БД и т.п. — то, что не предвидели
+        # явные обработчики выше. Раньше такие ошибки тихо превращались в 500
+        # без единого следа в логах — на проде о падении продажи/долга/синка
+        # никто не узнавал, пока не пожалуется пользователь.
+        report_unhandled_error(request.method, request.url.path, exc)
+        return JSONResponse(
+            status_code=500, content={"detail": "Внутренняя ошибка сервера"}
         )

@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24 * 30
     debug: bool = False
     telegram_bot_token: str = ""
+    # chat_id разработчика/оператора — куда шлются алерты о непредвиденных
+    # серверных ошибках (500 на sales/debts/sync). Не путать с
+    # Tenant.owner_telegram_chat_id — это про владельцев магазинов и сводки.
+    admin_alert_chat_id: str = ""
     # выключается в тестах (conftest.py) — иначе повторный логин в одном
     # тестовом сценарии упирается в лимит /auth/login
     rate_limit_enabled: bool = True

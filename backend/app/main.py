@@ -7,8 +7,11 @@ from starlette.staticfiles import StaticFiles
 from app import router as main_router
 from app.infrastructure.config import settings
 from app.infrastructure.files import UPLOAD_DIR
+from app.infrastructure.logging import configure_logging
 from app.infrastructure.rate_limit import limiter
 from app.presentation.errors import register_exception_handlers
+
+configure_logging()
 
 # Дефолтный SECRET_KEY в проде = любой может подделать JWT с любым tenant_id/ролью.
 # debug=True допускается только локально, где .env обычно не переопределяет секрет.
