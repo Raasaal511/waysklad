@@ -62,6 +62,18 @@ class SqlAlchemyClientRepository(SqlAlchemyRepository, IClientRepository):
         await self._session.flush()
         return client
 
+    async def get_by_phone(self, phone: str) -> Client | None:
+        if not phone:
+            return None
+        model = (
+            await self._session.execute(
+                select(ClientModel).where(
+                    ClientModel.tenant_id == self._tenant, ClientModel.phone == phone
+                )
+            )
+        ).scalar_one_or_none()
+        return ClientMapper.to_entity(model) if model else None
+
 
 class SqlAlchemySupplierRepository(SqlAlchemyRepository, ISupplierRepository):
     async def add(self, supplier: Supplier) -> Supplier:
