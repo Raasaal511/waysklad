@@ -7,6 +7,10 @@ from app.domain.common.phone import Phone
 from app.domain.storefront.entities import StorefrontRequest, StorefrontRequestLine
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 
+# защита от заспамливания списка заявок владельца — не более этого числа
+# ещё не обработанных заявок одновременно с одного телефона на один магазин
+_MAX_PENDING_REQUESTS_PER_PHONE = 5
+
 
 @dataclass(frozen=True)
 class StorefrontRequestItemInput:
@@ -40,6 +44,13 @@ class CreateStorefrontRequestUseCase:
         phone = Phone(cmd.customer_phone) if cmd.customer_phone.strip() else None
 
         async with SqlAlchemyUnitOfWork(tenant.id, session_factory=self._session_factory) as uow:
+            if phone is not None:
+                pending = await uow.storefront_requests.count_new_by_phone(str(phone))
+                if pending >= _MAX_PENDING_REQUESTS_PER_PHONE:
+                    raise DomainError(
+                        "У вас уже есть необработанные заявки — дождитесь ответа магазина"
+                    )
+
             for item in cmd.items:
                 product = await uow.products.get(item.product_id)
                 if not product.show_on_storefront:

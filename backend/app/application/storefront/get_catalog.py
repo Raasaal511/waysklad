@@ -1,8 +1,17 @@
 from dataclasses import dataclass
 
 from app.domain.catalog.entities import Category, Product
-from app.domain.common.exceptions import NotFoundError
+from app.domain.common.exceptions import DomainError, NotFoundError
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
+
+# покупателю доступна только эта часть сортировок ProductFilterFactory —
+# ни margin (закупочная маржа), ни stock (точный остаток) публично не отдаются
+_SORT_ALIASES = {
+    "name": "name",
+    "price_asc": "retail_price",
+    "price_desc": "-retail_price",
+    "created_desc": "-created_at",
+}
 
 
 @dataclass(frozen=True)
@@ -13,6 +22,13 @@ class GetStorefrontCatalogCommand:
     offset: int = 0
     category_id: int | None = None
     warehouse_id: int | None = None  # витрина одного склада — наличие считается только по нему
+    sort: str = "name"  # name, price_asc, price_desc, created_desc
+
+
+@dataclass(frozen=True)
+class StorefrontCategoryCount:
+    category: Category
+    product_count: int
 
 
 @dataclass(frozen=True)
@@ -20,7 +36,7 @@ class StorefrontCatalogResult:
     shop_name: str
     products: list[Product]
     in_stock_product_ids: set[int]  # факт наличия — точный остаток покупателю не показываем
-    categories: list[Category]
+    categories: list[StorefrontCategoryCount]
     total: int
 
 
@@ -51,26 +67,37 @@ class GetStorefrontCatalogUseCase:
                     # не даём перебором узнавать, какие warehouse_id вообще существуют
                     warehouse_id = None
 
+            order_by = _SORT_ALIASES.get(cmd.sort)
+            if order_by is None:
+                raise DomainError(f"Неизвестная сортировка: «{cmd.sort}»")
+
             raw_params: dict = {
                 "limit": cmd.limit,
                 "offset": cmd.offset,
                 "category_id": cmd.category_id,
                 "show_on_storefront": True,
+                "order_by": order_by,
             }
             if cmd.query.strip():
                 raw_params["search_text__ilike"] = cmd.query.strip()
             products, total = await uow.products.list_filtered(raw_params)
-            categories = await uow.categories.list()
+            all_categories = await uow.categories.list()
+            counts = await uow.products.count_storefront_by_category()
             stock_items = await uow.stock.list_all()
         in_stock_ids = {
             item.product_id
             for item in stock_items
             if item.quantity > 0 and (warehouse_id is None or item.warehouse_id == warehouse_id)
         }
+        categories_with_counts = [
+            StorefrontCategoryCount(category=c, product_count=counts[c.id])
+            for c in all_categories
+            if counts.get(c.id)
+        ]
         return StorefrontCatalogResult(
             shop_name=tenant.name,
             products=products,
             in_stock_product_ids=in_stock_ids,
-            categories=categories,
+            categories=categories_with_counts,
             total=total,
         )

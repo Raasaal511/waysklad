@@ -56,6 +56,8 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     GetRevenueTimelineDep,
     GetStockValueDep,
     GetStorefrontCatalogDep,
+    GetStorefrontProductDep,
+    GetStorefrontRequestStatusDep,
     GetTopProductsDep,
     ImportProductsDep,
     IssueDebtDep,

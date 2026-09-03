@@ -66,6 +66,8 @@ from app.application.sales.return_sale import ReturnSaleUseCase
 from app.application.storefront.accept_request import AcceptStorefrontRequestUseCase
 from app.application.storefront.create_request import CreateStorefrontRequestUseCase
 from app.application.storefront.get_catalog import GetStorefrontCatalogUseCase
+from app.application.storefront.get_product import GetStorefrontProductUseCase
+from app.application.storefront.get_request_status import GetStorefrontRequestStatusUseCase
 from app.application.storefront.list_messages import (
     ListStaffStorefrontMessagesUseCase,
     ListStorefrontMessagesUseCase,
@@ -169,6 +171,14 @@ get_mark_all_notifications_read = _with_uow(MarkAllNotificationsReadUseCase)
 
 def get_storefront_catalog(factory: SessionFactoryDep) -> GetStorefrontCatalogUseCase:
     return GetStorefrontCatalogUseCase(factory)
+
+
+def get_storefront_product(factory: SessionFactoryDep) -> GetStorefrontProductUseCase:
+    return GetStorefrontProductUseCase(factory)
+
+
+def get_storefront_request_status(factory: SessionFactoryDep) -> GetStorefrontRequestStatusUseCase:
+    return GetStorefrontRequestStatusUseCase(factory)
 
 
 def get_create_storefront_request(factory: SessionFactoryDep) -> CreateStorefrontRequestUseCase:
@@ -276,6 +286,12 @@ MarkAllNotificationsReadDep = Annotated[
 ]
 GetStorefrontCatalogDep = Annotated[
     GetStorefrontCatalogUseCase, Depends(get_storefront_catalog)
+]
+GetStorefrontProductDep = Annotated[
+    GetStorefrontProductUseCase, Depends(get_storefront_product)
+]
+GetStorefrontRequestStatusDep = Annotated[
+    GetStorefrontRequestStatusUseCase, Depends(get_storefront_request_status)
 ]
 CreateStorefrontRequestDep = Annotated[
     CreateStorefrontRequestUseCase, Depends(get_create_storefront_request)

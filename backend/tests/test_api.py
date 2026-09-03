@@ -2262,6 +2262,225 @@ async def test_storefront_chat_websocket_via_api(client, owner_headers):
         assert event["text"] == "Ответ владельца через WS"
 
 
+async def test_storefront_product_page_via_api(client, owner_headers):
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    visible = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={
+                "name": "Платье летнее",
+                "sku": "DR-001",
+                "purchase_price": "300",
+                "retail_price": "600",
+                "show_on_storefront": True,
+                "variants": [{"size": "M", "color": "Красный"}],
+            },
+        )
+    ).json()
+    hidden = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Скрытый товар", "purchase_price": "50", "retail_price": "100"},
+        )
+    ).json()
+
+    response = await client.get(f"/api/storefront/{slug}/products/{visible['id']}")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["product"]["id"] == visible["id"]
+    assert body["product"]["sku"] == "DR-001"
+    assert body["product"]["variants"][0]["size"] == "M"
+    assert "purchase_price" not in body["product"]  # закупочная цена не отдаётся
+
+    # скрытый товар — 404, даже если знаешь его id
+    response = await client.get(f"/api/storefront/{slug}/products/{hidden['id']}")
+    assert response.status_code == 404, response.text
+
+    # несуществующий товар — тоже 404
+    response = await client.get(f"/api/storefront/{slug}/products/999999")
+    assert response.status_code == 404, response.text
+
+    # витрина выключена — 404 даже на существующий видимый товар
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": False}
+    )
+    response = await client.get(f"/api/storefront/{slug}/products/{visible['id']}")
+    assert response.status_code == 404, response.text
+
+
+async def test_storefront_catalog_sort_and_category_counts_via_api(client, owner_headers):
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    category = (
+        await client.post("/api/products/categories", headers=owner_headers, json={"name": "Одежда"})
+    ).json()
+
+    cheap = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={
+                "name": "Дешёвый",
+                "purchase_price": "10",
+                "retail_price": "50",
+                "show_on_storefront": True,
+                "category_id": category["id"],
+            },
+        )
+    ).json()
+    pricey = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={
+                "name": "Дорогой",
+                "purchase_price": "100",
+                "retail_price": "500",
+                "show_on_storefront": True,
+                "category_id": category["id"],
+            },
+        )
+    ).json()
+    # товар без show_on_storefront не должен попадать в счётчик категории
+    await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={
+            "name": "Скрытый в той же категории",
+            "purchase_price": "1",
+            "retail_price": "2",
+            "category_id": category["id"],
+        },
+    )
+
+    response = await client.get(f"/api/storefront/{slug}", params={"sort": "price_asc"})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    ids = [p["id"] for p in body["products"] if p["id"] in (cheap["id"], pricey["id"])]
+    assert ids == [cheap["id"], pricey["id"]]
+
+    response = await client.get(f"/api/storefront/{slug}", params={"sort": "price_desc"})
+    assert response.status_code == 200, response.text
+    ids = [p["id"] for p in response.json()["products"] if p["id"] in (cheap["id"], pricey["id"])]
+    assert ids == [pricey["id"], cheap["id"]]
+
+    cat_response = next(c for c in body["categories"] if c["id"] == category["id"])
+    assert cat_response["product_count"] == 2  # скрытый товар не учтён
+
+    response = await client.get(f"/api/storefront/{slug}", params={"sort": "not_a_real_sort"})
+    assert response.status_code == 400, response.text
+
+
+async def test_storefront_request_status_via_api(client, owner_headers):
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Товар", "purchase_price": "50", "retail_price": "150", "show_on_storefront": True},
+        )
+    ).json()
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product["id"], "quantity": "5", "cost": "50"}]},
+    )
+    created = (
+        await client.post(
+            f"/api/storefront/{slug}/requests",
+            json={"customer_name": "Ахмед", "items": [{"product_id": product["id"], "quantity": "1"}]},
+        )
+    ).json()
+    token = created["access_token"]
+
+    response = await client.get("/api/storefront/requests/status", params={"token": token})
+    assert response.status_code == 200, response.text
+    assert response.json() == {"status": "new", "order": None}
+
+    due = (date.today() + timedelta(days=2)).isoformat()
+    await client.post(
+        f"/api/storefront/requests/{created['id']}/accept",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "due_date": due},
+    )
+
+    response = await client.get("/api/storefront/requests/status", params={"token": token})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "accepted"
+    assert body["order"]["due_date"] == due
+    assert body["order"]["total"] == "150.00"
+
+    response = await client.get("/api/storefront/requests/status", params={"token": "garbage"})
+    assert response.status_code == 404, response.text
+
+
+async def test_storefront_request_spam_protection_via_api(client, owner_headers):
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Товар", "purchase_price": "50", "retail_price": "100", "show_on_storefront": True},
+        )
+    ).json()
+
+    phone = "+79281234567"
+    for _ in range(5):
+        response = await client.post(
+            f"/api/storefront/{slug}/requests",
+            json={
+                "customer_name": "Спамер",
+                "customer_phone": phone,
+                "items": [{"product_id": product["id"], "quantity": "1"}],
+            },
+        )
+        assert response.status_code == 201, response.text
+
+    # шестая необработанная заявка с того же телефона — отклонена
+    response = await client.post(
+        f"/api/storefront/{slug}/requests",
+        json={
+            "customer_name": "Спамер",
+            "customer_phone": phone,
+            "items": [{"product_id": product["id"], "quantity": "1"}],
+        },
+    )
+    assert response.status_code == 400, response.text
+
+    # другой телефон — не ограничен предыдущими заявками
+    response = await client.post(
+        f"/api/storefront/{slug}/requests",
+        json={
+            "customer_name": "Другой человек",
+            "customer_phone": "+79281234568",
+            "items": [{"product_id": product["id"], "quantity": "1"}],
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    # без телефона — лимит не применяется вообще (нечем идентифицировать)
+    for _ in range(3):
+        response = await client.post(
+            f"/api/storefront/{slug}/requests",
+            json={"customer_name": "Аноним", "items": [{"product_id": product["id"], "quantity": "1"}]},
+        )
+        assert response.status_code == 201, response.text
+
+
 async def test_products_search_by_barcode_via_api(client, owner_headers):
     response = await client.post(
         "/api/products",

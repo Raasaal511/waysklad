@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.domain.common.exceptions import NotFoundError
 from app.domain.storefront.entities import (
@@ -70,6 +70,19 @@ class SqlAlchemyStorefrontRequestRepository(SqlAlchemyRepository, IStorefrontReq
             )
         ).scalars().all()
         return [StorefrontRequestMapper.to_entity(m) for m in models]
+
+    async def count_new_by_phone(self, phone: str) -> int:
+        return (
+            await self._session.execute(
+                select(func.count())
+                .select_from(StorefrontRequestModel)
+                .where(
+                    StorefrontRequestModel.tenant_id == self._tenant,
+                    StorefrontRequestModel.customer_phone == phone,
+                    StorefrontRequestModel.status == StorefrontRequestStatus.NEW,
+                )
+            )
+        ).scalar_one()
 
     async def _get_model(self, request_id: int) -> StorefrontRequestModel | None:
         return (

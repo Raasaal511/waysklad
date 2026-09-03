@@ -2,6 +2,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 
+from app.application.storefront.get_product import GetStorefrontProductCommand
+from app.application.storefront.get_request_status import GetStorefrontRequestStatusCommand
 from app.application.storefront.list_messages import ListStorefrontMessagesCommand
 from app.application.storefront.reject_request import RejectStorefrontRequestCommand
 from app.domain.identity.permissions import Permission
@@ -13,6 +15,8 @@ from app.presentation.deps import (
     ActorDep,
     CreateStorefrontRequestDep,
     GetStorefrontCatalogDep,
+    GetStorefrontProductDep,
+    GetStorefrontRequestStatusDep,
     ListStaffStorefrontMessagesDep,
     ListStorefrontMessagesDep,
     ListStorefrontRequestsDep,
@@ -31,8 +35,10 @@ from app.presentation.storefront.schemas import (
     StorefrontCatalogParams,
     StorefrontCatalogResponse,
     StorefrontMessageResponse,
+    StorefrontProductPageResponse,
     StorefrontRequestCreatedResponse,
     StorefrontRequestResponse,
+    StorefrontRequestStatusResponse,
 )
 
 router = APIRouter(prefix="/storefront", tags=["storefront"])
@@ -53,6 +59,17 @@ async def get_storefront_catalog(
     if result is None:
         raise HTTPException(status_code=404, detail="Витрина не найдена")
     return StorefrontCatalogResponse.from_result(result)
+
+
+@router.get("/{slug}/products/{product_id}")
+@limiter.limit("60/minute")
+async def get_storefront_product(
+    request: Request, slug: str, product_id: int, use_case: GetStorefrontProductDep
+) -> StorefrontProductPageResponse:
+    result = await use_case.execute(GetStorefrontProductCommand(slug=slug, product_id=product_id))
+    if result is None:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+    return StorefrontProductPageResponse.from_result(result)
 
 
 @router.post("/{slug}/requests", status_code=201)
@@ -77,8 +94,15 @@ async def list_new_storefront_requests(
     return [StorefrontRequestResponse.from_entity(r) for r in requests]
 
 
-# Чат заявки: покупатель (публично, по access_token). Регистрируется ДО
-# /requests/{request_id} ниже, иначе FastAPI сматчит "chat" как request_id.
+@router.get("/requests/status")
+@limiter.limit("60/minute")
+async def get_storefront_request_status(
+    request: Request, token: str, use_case: GetStorefrontRequestStatusDep
+) -> StorefrontRequestStatusResponse:
+    result = await use_case.execute(GetStorefrontRequestStatusCommand(access_token=token))
+    if result is None:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+    return StorefrontRequestStatusResponse.from_result(result)
 
 
 @router.get("/requests/chat")

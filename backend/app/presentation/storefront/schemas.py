@@ -8,12 +8,19 @@ from app.application.storefront.create_request import (
     CreateStorefrontRequestCommand,
     StorefrontRequestItemInput,
 )
-from app.application.storefront.get_catalog import GetStorefrontCatalogCommand, StorefrontCatalogResult
+from app.application.storefront.get_catalog import (
+    GetStorefrontCatalogCommand,
+    StorefrontCatalogResult,
+    StorefrontCategoryCount,
+)
+from app.application.storefront.get_product import StorefrontProductResult
+from app.application.storefront.get_request_status import StorefrontRequestStatusResult
 from app.application.storefront.send_message import (
     SendStaffStorefrontMessageCommand,
     SendStorefrontMessageCommand,
 )
-from app.domain.catalog.entities import Category, Product
+from app.domain.catalog.entities import Product
+from app.domain.orders.entities import Order
 from app.domain.storefront.entities import StorefrontMessage, StorefrontRequest
 
 
@@ -23,6 +30,7 @@ class StorefrontCatalogParams(BaseModel):
     offset: int = Field(0, ge=0)
     category_id: int | None = None
     warehouse_id: int | None = None  # витрина одного склада — см. ?warehouse=<id>
+    sort: str = "name"  # name, price_asc, price_desc, created_desc
 
     model_config = {"extra": "forbid"}
 
@@ -34,6 +42,7 @@ class StorefrontCatalogParams(BaseModel):
             offset=self.offset,
             category_id=self.category_id,
             warehouse_id=self.warehouse_id,
+            sort=self.sort,
         )
 
 
@@ -41,10 +50,16 @@ class StorefrontCategoryResponse(BaseModel):
     id: int
     name: str
     parent_id: int | None
+    product_count: int
 
     @classmethod
-    def from_entity(cls, category: Category) -> "StorefrontCategoryResponse":
-        return cls(id=category.id, name=category.name, parent_id=category.parent_id)
+    def from_count(cls, item: StorefrontCategoryCount) -> "StorefrontCategoryResponse":
+        return cls(
+            id=item.category.id,
+            name=item.category.name,
+            parent_id=item.category.parent_id,
+            product_count=item.product_count,
+        )
 
 
 class StorefrontProductResponse(BaseModel):
@@ -83,8 +98,46 @@ class StorefrontCatalogResponse(BaseModel):
                 StorefrontProductResponse.from_entity(p, p.id in result.in_stock_product_ids)
                 for p in result.products
             ],
-            categories=[StorefrontCategoryResponse.from_entity(c) for c in result.categories],
+            categories=[StorefrontCategoryResponse.from_count(c) for c in result.categories],
             total=result.total,
+        )
+
+
+class StorefrontProductVariantResponse(BaseModel):
+    id: int
+    size: str
+    color: str
+
+
+class StorefrontProductDetailResponse(StorefrontProductResponse):
+    """Карточка одного товара — то же самое, что в списке, плюс варианты
+    (размер/цвет) для полноты информации на отдельной странице/при шеринге."""
+
+    sku: str
+    variants: list[StorefrontProductVariantResponse]
+
+    @classmethod
+    def from_entity(cls, product: Product, in_stock: bool) -> "StorefrontProductDetailResponse":
+        base = StorefrontProductResponse.from_entity(product, in_stock)
+        return cls(
+            **base.model_dump(),
+            sku=product.sku,
+            variants=[
+                StorefrontProductVariantResponse(id=v.id, size=v.size, color=v.color)
+                for v in product.variants
+            ],
+        )
+
+
+class StorefrontProductPageResponse(BaseModel):
+    shop_name: str
+    product: StorefrontProductDetailResponse
+
+    @classmethod
+    def from_result(cls, result: StorefrontProductResult) -> "StorefrontProductPageResponse":
+        return cls(
+            shop_name=result.shop_name,
+            product=StorefrontProductDetailResponse.from_entity(result.product, result.in_stock),
         )
 
 
@@ -184,6 +237,38 @@ class SendStorefrontMessageRequest(BaseModel):
 
     def to_staff_command(self, request_id: int) -> SendStaffStorefrontMessageCommand:
         return SendStaffStorefrontMessageCommand(request_id=request_id, text=self.text)
+
+
+class StorefrontRequestOrderSummary(BaseModel):
+    """Детали заказа, в который превратилась заявка — только после accept."""
+
+    due_date: date
+    total: Decimal
+    prepayment: Decimal
+    to_pay: Decimal
+    status: str
+
+    @classmethod
+    def from_entity(cls, order: Order) -> "StorefrontRequestOrderSummary":
+        return cls(
+            due_date=order.due_date,
+            total=order.total.amount,
+            prepayment=order.prepayment.amount,
+            to_pay=order.to_pay.amount,
+            status=order.status.value,
+        )
+
+
+class StorefrontRequestStatusResponse(BaseModel):
+    status: str
+    order: StorefrontRequestOrderSummary | None
+
+    @classmethod
+    def from_result(cls, result: StorefrontRequestStatusResult) -> "StorefrontRequestStatusResponse":
+        return cls(
+            status=result.request.status.value,
+            order=StorefrontRequestOrderSummary.from_entity(result.order) if result.order else None,
+        )
 
 
 class StorefrontMessageResponse(BaseModel):

@@ -166,6 +166,20 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
         units = await self._units_map()
         return [ProductMapper.to_entity(m, units) for m in models], total
 
+    async def count_storefront_by_category(self) -> dict[int | None, int]:
+        rows = (
+            await self._session.execute(
+                select(ProductModel.category_id, func.count())
+                .where(
+                    ProductModel.tenant_id == self._tenant,
+                    ProductModel.is_active.is_(True),
+                    ProductModel.show_on_storefront.is_(True),
+                )
+                .group_by(ProductModel.category_id)
+            )
+        ).all()
+        return {category_id: count for category_id, count in rows}
+
     async def search_all(self, query: str = "") -> list[Product]:
         models = (
             await self._session.execute(
