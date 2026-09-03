@@ -11,6 +11,7 @@ from app.domain.catalog.repository import (
 )
 from app.domain.common.exceptions import NotFoundError
 from app.domain.common.quantity import Unit
+from app.infrastructure.db.filtering.product_filter import ProductFilterFactory
 from app.infrastructure.db.mappers.catalog import (
     CategoryMapper,
     ProductMapper,
@@ -132,15 +133,6 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
             raise NotFoundError(f"Товар {product_id} не найден")
         return ProductMapper.to_entity(model, await self._units_map())
 
-    _SORT_COLUMNS = {
-        "name": ProductModel.name,
-        "price_asc": ProductModel.retail_price,
-        "price_desc": ProductModel.retail_price.desc(),
-        "margin_desc": (ProductModel.retail_price - ProductModel.purchase_price).desc(),
-        "created_desc": ProductModel.created_at.desc(),
-        "created_asc": ProductModel.created_at,
-    }
-
     def _search_filter(self, query: str, category_id: int | None = None):
         pattern = f"%{query}%"
         conditions = [
@@ -156,26 +148,20 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
             conditions.append(ProductModel.category_id == category_id)
         return conditions
 
-    async def search(
-        self,
-        query: str,
-        limit: int = 50,
-        offset: int = 0,
-        category_id: int | None = None,
-        sort: str = "name",
+    async def list_filtered(
+        self, raw_params: dict, warehouse_id: int | None = None
     ) -> tuple[list[Product], int]:
-        conditions = self._search_filter(query, category_id)
-        total = (
-            await self._session.execute(
-                select(func.count()).select_from(ProductModel).where(*conditions)
-            )
-        ).scalar_one()
-        order = self._SORT_COLUMNS.get(sort, ProductModel.name)
-        models = (
-            await self._session.execute(
-                select(ProductModel).where(*conditions).order_by(order).limit(limit).offset(offset)
-            )
-        ).scalars().all()
+        fields = ProductFilterFactory.build_fields(warehouse_id)
+        base = select(ProductModel).where(
+            ProductModel.tenant_id == self._tenant, ProductModel.is_active.is_(True)
+        )
+        count_base = (
+            select(func.count())
+            .select_from(ProductModel)
+            .where(ProductModel.tenant_id == self._tenant, ProductModel.is_active.is_(True))
+        )
+        models = await ProductFilterFactory.fetch_list(self._session, raw_params, base, fields)
+        total = await ProductFilterFactory.fetch_count(self._session, raw_params, count_base, fields)
         units = await self._units_map()
         return [ProductMapper.to_entity(m, units) for m in models], total
 

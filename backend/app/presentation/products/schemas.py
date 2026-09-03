@@ -20,6 +20,43 @@ from app.application.products.update_product import (
 from app.domain.catalog.entities import Category, Product
 from app.domain.common.quantity import Unit
 
+_ORDER_BY_ALIASES = {
+    "price_asc": "retail_price",
+    "price_desc": "-retail_price",
+    "margin_desc": "-margin",
+    "created_desc": "-created_at",
+    "created_asc": "created_at",
+    "stock_desc": "-stock",
+}
+
+
+class ProductsFilterParams(BaseModel):
+    """Query-параметры списка товаров — форма запроса; преобразование в raw_params
+    для generic filter-системы см. to_raw_params()."""
+
+    query: str = ""
+    limit: int = Field(50, le=200)
+    offset: int = Field(0, ge=0)
+    category_id: int | None = None
+    sort: str = "name"
+    in_stock_only: bool = False
+    warehouse_id: int | None = None
+
+    model_config = {"extra": "forbid"}
+
+    def to_raw_params(self) -> dict:
+        raw: dict = {
+            "limit": self.limit,
+            "offset": self.offset,
+            "order_by": _ORDER_BY_ALIASES.get(self.sort, self.sort),
+            "category_id": self.category_id,
+        }
+        if self.query.strip():
+            raw["search_text__ilike"] = self.query.strip()
+        if self.in_stock_only:
+            raw["stock__gt"] = 0
+        return raw
+
 
 class VariantCreateRequest(BaseModel):
     size: str = ""

@@ -1829,6 +1829,80 @@ async def test_products_pagination_via_api(client, owner_headers):
     assert len(rows) - 1 >= 55  # минус строка заголовка
 
 
+async def test_products_generic_filter_via_api(client, owner_headers):
+    cheap = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Дешёвый товар", "sku": "SKU-CHEAP", "purchase_price": "10", "retail_price": "20"},
+        )
+    ).json()
+    pricey = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Дорогой товар", "sku": "SKU-PRICEY", "purchase_price": "500", "retail_price": "900"},
+        )
+    ).json()
+
+    # поиск по sku — попадает в объединённое search_text (name/sku/barcode)
+    response = await client.get("/api/products", headers=owner_headers, params={"query": "SKU-PRICEY"})
+    assert response.status_code == 200, response.text
+    ids = [p["id"] for p in response.json()]
+    assert ids == [pricey["id"]]
+
+    # сортировка по возрастанию розничной цены
+    response = await client.get(
+        "/api/products", headers=owner_headers, params={"sort": "price_asc", "limit": 200}
+    )
+    assert response.status_code == 200, response.text
+    products = response.json()
+    prices = [float(p["retail_price"]) for p in products if p["id"] in (cheap["id"], pricey["id"])]
+    assert prices == sorted(prices)
+    assert products[0]["id"] == cheap["id"]
+
+    # сортировка по убыванию маржи (retail - purchase) — дорогой товар с большей маржой первым
+    response = await client.get(
+        "/api/products", headers=owner_headers, params={"sort": "margin_desc", "limit": 200}
+    )
+    assert response.status_code == 200, response.text
+    products = response.json()
+    assert products[0]["id"] == pricey["id"]
+
+    # остаток: только у "дешёвого" делаем приёмку — in_stock_only отсекает "дорогой"
+    response = await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1,
+            "lines": [{"product_id": cheap["id"], "quantity": "5", "cost": "10"}],
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    response = await client.get(
+        "/api/products", headers=owner_headers, params={"in_stock_only": "true", "limit": 200}
+    )
+    assert response.status_code == 200, response.text
+    ids = [p["id"] for p in response.json()]
+    assert cheap["id"] in ids
+    assert pricey["id"] not in ids
+
+    # сортировка по остатку на конкретном складе (id=1 — создан при регистрации)
+    response = await client.get(
+        "/api/products",
+        headers=owner_headers,
+        params={"sort": "stock_desc", "warehouse_id": 1, "limit": 200},
+    )
+    assert response.status_code == 200, response.text
+    products = response.json()
+    assert products[0]["id"] == cheap["id"]
+
+    # неизвестное поле сортировки — понятная ошибка, не 500
+    response = await client.get("/api/products", headers=owner_headers, params={"sort": "not_a_field"})
+    assert response.status_code == 400, response.text
+
+
 async def test_products_search_by_barcode_via_api(client, owner_headers):
     response = await client.post(
         "/api/products",

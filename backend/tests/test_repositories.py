@@ -60,7 +60,7 @@ async def test_product_roundtrip_and_barcode_search(make_uow, create_shop):
         by_variant = await uow.products.get_by_barcode(Barcode("4600000000024"))
         assert by_variant is not None and by_variant.id == product_id
 
-        found, total = await uow.products.search("плать")
+        found, total = await uow.products.list_filtered({"search_text__ilike": "плать"})
         assert [p.id for p in found] == [product_id]
         assert total == 1
 
@@ -234,7 +234,7 @@ async def test_tenant_isolation(make_uow, create_shop, create_product):
     async with make_uow(tenant_b) as uow:
         with pytest.raises(NotFoundError):
             await uow.products.get(product.id)
-        found, total = await uow.products.search("Цемент")
+        found, total = await uow.products.list_filtered({"search_text__ilike": "Цемент"})
         assert found == [] and total == 0
 
 

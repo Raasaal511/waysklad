@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Response, UploadFile
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Response, UploadFile
 
 from app.application.products.import_excel import ImportProductsCommand
 from app.application.products.import_preview import PreviewProductsCommand
@@ -33,6 +35,7 @@ from app.presentation.products.schemas import (
     PreviewProductsResponse,
     ProductCreateRequest,
     ProductResponse,
+    ProductsFilterParams,
     ProductUpdateRequest,
     UnitCreateRequest,
     UnitResponse,
@@ -160,15 +163,11 @@ async def search_products(
     response: Response,
     uow: UowDep,
     show_purchase: ShowPurchaseDep,
-    query: str = "",
-    limit: int = 50,
-    offset: int = 0,
-    category_id: int | None = None,
-    sort: str = "name",
+    params: Annotated[ProductsFilterParams, Depends()],
 ) -> list[ProductResponse]:
     async with uow:
-        products, total = await uow.products.search(
-            query, limit=limit, offset=offset, category_id=category_id, sort=sort
+        products, total = await uow.products.list_filtered(
+            params.to_raw_params(), warehouse_id=params.warehouse_id
         )
         response.headers["X-Total-Count"] = str(total)
         return [ProductResponse.from_entity(p, show_purchase) for p in products]
