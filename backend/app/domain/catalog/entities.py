@@ -35,6 +35,7 @@ class Product:
     category_id: int | None = None
     photo: str = ""
     min_stock: Decimal = Decimal("0")  # порог «заканчивается»
+    show_on_storefront: bool = False  # видимость на публичной витрине — по умолчанию скрыт
     variants: list[ProductVariant] = field(default_factory=list)
 
     @property

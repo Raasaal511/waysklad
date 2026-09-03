@@ -9,6 +9,7 @@ class TenantMapper:
         return TenantModel(
             name=tenant.name,
             slug=tenant.slug,
+            storefront_enabled=tenant.storefront_enabled,
             owner_telegram_chat_id=tenant.owner_telegram_chat_id,
             summary_daily_enabled=tenant.summary_daily_enabled,
             summary_weekly_enabled=tenant.summary_weekly_enabled,
@@ -22,6 +23,7 @@ class TenantMapper:
             id=model.id,
             name=model.name,
             slug=model.slug,
+            storefront_enabled=model.storefront_enabled,
             owner_telegram_chat_id=model.owner_telegram_chat_id,
             summary_daily_enabled=model.summary_daily_enabled,
             summary_weekly_enabled=model.summary_weekly_enabled,

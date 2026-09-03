@@ -63,12 +63,14 @@ from app.application.sales.create_sale import CreateSaleUseCase
 from app.application.sales.delete_sale import DeleteSaleUseCase
 from app.application.sales.edit_sale import EditSaleUseCase
 from app.application.sales.return_sale import ReturnSaleUseCase
+from app.application.storefront.get_catalog import GetStorefrontCatalogUseCase
 from app.application.sync.apply_offline_ops import ApplyOfflineSalesUseCase
 from app.application.tasks.change_status import ChangeTaskStatusUseCase
 from app.application.tasks.update_task import UpdateTaskUseCase
 from app.application.tasks.create_task import CreateTaskUseCase
 from app.presentation.deps.notifier import NotifierDep
 from app.presentation.deps.security import FileStorageDep, HasherDep
+from app.presentation.deps.session import SessionFactoryDep
 from app.presentation.deps.uow import PublicUowDep, UowDep
 
 
@@ -153,6 +155,10 @@ get_mark_notification_read = _with_uow(MarkNotificationReadUseCase)
 get_mark_all_notifications_read = _with_uow(MarkAllNotificationsReadUseCase)
 
 
+def get_storefront_catalog(factory: SessionFactoryDep) -> GetStorefrontCatalogUseCase:
+    return GetStorefrontCatalogUseCase(factory)
+
+
 def get_create_task(uow: UowDep, notifier: NotifierDep) -> CreateTaskUseCase:
     return CreateTaskUseCase(uow, notifier)
 
@@ -234,5 +240,8 @@ MarkNotificationReadDep = Annotated[
 ]
 MarkAllNotificationsReadDep = Annotated[
     MarkAllNotificationsReadUseCase, Depends(get_mark_all_notifications_read)
+]
+GetStorefrontCatalogDep = Annotated[
+    GetStorefrontCatalogUseCase, Depends(get_storefront_catalog)
 ]
  

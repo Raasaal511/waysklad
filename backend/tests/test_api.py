@@ -1903,6 +1903,66 @@ async def test_products_generic_filter_via_api(client, owner_headers):
     assert response.status_code == 400, response.text
 
 
+async def test_storefront_catalog_via_api(client, owner_headers):
+    slug = "magazin-berkat"  # slugify("Магазин Беркат") — детерминирован, см. owner_headers
+
+    # магазин только что зарегистрирован — витрина выключена по умолчанию
+    response = await client.get(f"/api/storefront/{slug}")
+    assert response.status_code == 404, response.text
+
+    hidden = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Скрытый товар", "purchase_price": "50", "retail_price": "100"},
+        )
+    ).json()
+    visible = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={
+                "name": "Видимый товар",
+                "purchase_price": "50",
+                "retail_price": "150",
+                "show_on_storefront": True,
+            },
+        )
+    ).json()
+    assert visible["show_on_storefront"] is True
+    assert hidden["show_on_storefront"] is False  # дефолт — скрыт, пока владелец явно не включит
+
+    # витрина ещё выключена целиком — даже видимый товар недоступен публично
+    response = await client.get(f"/api/storefront/{slug}")
+    assert response.status_code == 404, response.text
+
+    response = await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["storefront_enabled"] is True
+
+    # без авторизации — публичный доступ
+    response = await client.get(f"/api/storefront/{slug}")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    ids = [p["id"] for p in body["products"]]
+    assert visible["id"] in ids
+    assert hidden["id"] not in ids  # флаг товара скрывает его даже при включённой витрине
+
+    product = body["products"][0]
+    assert "purchase_price" not in product  # закупочная цена никогда не отдаётся публично
+    assert "margin" not in product
+    assert set(product.keys()) == {"id", "name", "retail_price", "photo", "category_id", "in_stock"}
+
+    response = await client.get(f"/api/storefront/{slug}", params={"query": "Скрытый"})
+    assert response.status_code == 200, response.text
+    assert response.json()["products"] == []  # запрос не обходит show_on_storefront
+
+    response = await client.get("/api/storefront/no-such-shop")
+    assert response.status_code == 404, response.text
+
+
 async def test_products_search_by_barcode_via_api(client, owner_headers):
     response = await client.post(
         "/api/products",

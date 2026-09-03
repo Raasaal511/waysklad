@@ -53,6 +53,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     GetRestockRecommendationsDep,
     GetRevenueTimelineDep,
     GetStockValueDep,
+    GetStorefrontCatalogDep,
     GetTopProductsDep,
     ImportProductsDep,
     IssueDebtDep,

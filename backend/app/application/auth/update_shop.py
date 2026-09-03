@@ -14,6 +14,7 @@ class UpdateShopCommand:
     summary_weekly_enabled: bool | None = None
     summary_monthly_enabled: bool | None = None
     summary_daily_hour_msk: int | None = None
+    storefront_enabled: bool | None = None
 
 
 class UpdateShopUseCase:
@@ -40,6 +41,8 @@ class UpdateShopUseCase:
                 tenant.summary_monthly_enabled = cmd.summary_monthly_enabled
             if cmd.summary_daily_hour_msk is not None:
                 tenant.summary_daily_hour_msk = cmd.summary_daily_hour_msk
+            if cmd.storefront_enabled is not None:
+                tenant.storefront_enabled = cmd.storefront_enabled
             tenant = await uow.tenants.save(tenant)
             await uow.audit.add(AuditEntry.record(actor, "shop.update", tenant.id))
             await uow.commit()

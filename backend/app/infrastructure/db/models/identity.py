@@ -17,6 +17,7 @@ class TenantModel(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     slug: Mapped[str | None] = mapped_column(String(120), unique=True, index=True)
+    storefront_enabled: Mapped[bool] = mapped_column(default=False)
     owner_telegram_chat_id: Mapped[str | None] = mapped_column(String(32))  # для сводок бота
     summary_daily_enabled: Mapped[bool] = mapped_column(default=True)
     summary_weekly_enabled: Mapped[bool] = mapped_column(default=False)

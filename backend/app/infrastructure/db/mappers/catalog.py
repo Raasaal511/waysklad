@@ -68,6 +68,7 @@ class ProductMapper:
             retail_price=product.retail_price.amount,
             min_stock=product.min_stock,
             photo=product.photo,
+            show_on_storefront=product.show_on_storefront,
             variants=[ProductVariantMapper.to_orm(v, tenant_id) for v in product.variants],
         )
 
@@ -85,5 +86,6 @@ class ProductMapper:
             category_id=model.category_id,
             photo=model.photo,
             min_stock=model.min_stock,
+            show_on_storefront=model.show_on_storefront,
             variants=[ProductVariantMapper.to_entity(v) for v in model.variants],
         )

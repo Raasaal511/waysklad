@@ -30,6 +30,7 @@ class UpdateProductCommand:
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
     photo: str = ""
+    show_on_storefront: bool = False
     variants: list[UpdateVariantInput] = field(default_factory=list)
 
 
@@ -65,6 +66,7 @@ class UpdateProductUseCase:
                 category_id=cmd.category_id,
                 min_stock=cmd.min_stock,
                 photo=cmd.photo,
+                show_on_storefront=cmd.show_on_storefront,
                 variants=[
                     ProductVariant(
                         id=v.id,

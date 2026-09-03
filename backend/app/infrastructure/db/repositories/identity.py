@@ -55,6 +55,7 @@ class SqlAlchemyTenantRepository(SqlAlchemyRepository, ITenantRepository):
         if model is None:
             raise NotFoundError(f"Магазин {tenant.id} не найден")
         model.name = tenant.name
+        model.storefront_enabled = tenant.storefront_enabled
         model.owner_telegram_chat_id = tenant.owner_telegram_chat_id
         model.summary_daily_enabled = tenant.summary_daily_enabled
         model.summary_weekly_enabled = tenant.summary_weekly_enabled

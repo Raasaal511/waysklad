@@ -93,6 +93,8 @@ class ConnectTelegramRequest(BaseModel):
 class TenantResponse(BaseModel):
     id: int
     name: str
+    slug: str | None
+    storefront_enabled: bool
     owner_telegram_chat_id: str | None
     summary_daily_enabled: bool
     summary_weekly_enabled: bool
@@ -103,6 +105,8 @@ class TenantResponse(BaseModel):
     def from_entity(cls, tenant: Tenant) -> "TenantResponse":
         return cls(
             id=tenant.id, name=tenant.name,
+            slug=tenant.slug,
+            storefront_enabled=tenant.storefront_enabled,
             owner_telegram_chat_id=tenant.owner_telegram_chat_id,
             summary_daily_enabled=tenant.summary_daily_enabled,
             summary_weekly_enabled=tenant.summary_weekly_enabled,
@@ -117,6 +121,7 @@ class UpdateShopRequest(BaseModel):
     summary_weekly_enabled: bool | None = None
     summary_monthly_enabled: bool | None = None
     summary_daily_hour_msk: int | None = Field(default=None, ge=0, le=23)
+    storefront_enabled: bool | None = None
 
     def to_command(self) -> UpdateShopCommand:
         return UpdateShopCommand(
@@ -125,6 +130,7 @@ class UpdateShopRequest(BaseModel):
             summary_weekly_enabled=self.summary_weekly_enabled,
             summary_monthly_enabled=self.summary_monthly_enabled,
             summary_daily_hour_msk=self.summary_daily_hour_msk,
+            storefront_enabled=self.storefront_enabled,
         )
 
 

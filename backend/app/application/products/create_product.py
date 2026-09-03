@@ -30,6 +30,7 @@ class CreateProductCommand:
     barcode: str | None = None
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
+    show_on_storefront: bool = False
     variants: list[VariantInput] = field(default_factory=list)
     initial_stock_warehouse_id: int | None = None
     initial_stock_quantity: Decimal | None = None
@@ -76,6 +77,7 @@ class CreateProductUseCase:
                 barcode=Barcode(cmd.barcode) if cmd.barcode else None,
                 category_id=cmd.category_id,
                 min_stock=cmd.min_stock,
+                show_on_storefront=cmd.show_on_storefront,
                 variants=[
                     ProductVariant(
                         id=None,

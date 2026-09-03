@@ -80,6 +80,7 @@ class ProductCreateRequest(BaseModel):
     barcode: str | None = None
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
+    show_on_storefront: bool = False
     variants: list[VariantCreateRequest] = []
     initial_stock_warehouse_id: int | None = None
     initial_stock_quantity: Decimal | None = None
@@ -94,6 +95,7 @@ class ProductCreateRequest(BaseModel):
             barcode=self.barcode,
             category_id=self.category_id,
             min_stock=self.min_stock,
+            show_on_storefront=self.show_on_storefront,
             variants=[
                 VariantInput(size=v.size, color=v.color, barcode=v.barcode)
                 for v in self.variants
@@ -113,6 +115,7 @@ class ProductUpdateRequest(BaseModel):
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
     photo: str = ""
+    show_on_storefront: bool = False
     variants: list[VariantUpdateRequest] = []
 
     def to_command(self, product_id: int) -> UpdateProductCommand:
@@ -127,6 +130,7 @@ class ProductUpdateRequest(BaseModel):
             category_id=self.category_id,
             min_stock=self.min_stock,
             photo=self.photo,
+            show_on_storefront=self.show_on_storefront,
             variants=[
                 UpdateVariantInput(id=v.id, size=v.size, color=v.color, barcode=v.barcode)
                 for v in self.variants
@@ -346,6 +350,7 @@ class ProductResponse(BaseModel):
     category_id: int | None
     min_stock: Decimal
     photo: str
+    show_on_storefront: bool
     variants: list[VariantResponse]
 
     @classmethod
@@ -362,6 +367,7 @@ class ProductResponse(BaseModel):
             category_id=product.category_id,
             min_stock=product.min_stock,
             photo=product.photo,
+            show_on_storefront=product.show_on_storefront,
             variants=[
                 VariantResponse(
                     id=v.id,

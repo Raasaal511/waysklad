@@ -2,7 +2,13 @@ from sqlalchemy import func, select
 from sqlalchemy.sql.functions import concat
 
 from app.domain.filtering.operators import Operator
-from app.infrastructure.db.filtering.field_spec import DATE_OPS, FieldSpec, NUMERIC_OPS, TEXT_OPS
+from app.infrastructure.db.filtering.field_spec import (
+    BOOL_OPS,
+    DATE_OPS,
+    FieldSpec,
+    NUMERIC_OPS,
+    TEXT_OPS,
+)
 from app.infrastructure.db.filtering.filter_factory import BaseQueryFilterFactory
 from app.infrastructure.db.models.catalog import ProductModel
 from app.infrastructure.db.models.inventory import StockItemModel
@@ -47,4 +53,5 @@ class ProductFilterFactory(BaseQueryFilterFactory[ProductModel]):
             "margin": FieldSpec(ProductModel.retail_price - ProductModel.purchase_price, NUMERIC_OPS),
             "created_at": FieldSpec(ProductModel.created_at, DATE_OPS),
             "stock": FieldSpec(_stock_expr(warehouse_id), NUMERIC_OPS),
+            "show_on_storefront": FieldSpec(ProductModel.show_on_storefront, BOOL_OPS),
         }
