@@ -24,6 +24,7 @@ class OrderSource(StrEnum):
     INSTAGRAM = "instagram"
     CALL = "call"
     IN_PERSON = "in_person"
+    STOREFRONT = "storefront"  # заявка с публичной витрины
 
 
 _ALLOWED: dict[OrderStatus, set[OrderStatus]] = {

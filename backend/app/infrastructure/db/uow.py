@@ -28,6 +28,7 @@ from app.infrastructure.db.repositories.sales import (
     SqlAlchemySaleRepository,
     SqlAlchemySaleReturnRepository,
 )
+from app.infrastructure.db.repositories.storefront import SqlAlchemyStorefrontRequestRepository
 from app.infrastructure.db.repositories.tasks import SqlAlchemyTaskRepository
 from app.infrastructure.db.session import SessionLocal
 
@@ -59,6 +60,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.sale_returns = SqlAlchemySaleReturnRepository(self)
         self.debts = SqlAlchemyDebtRepository(self)
         self.orders = SqlAlchemyOrderRepository(self)
+        self.storefront_requests = SqlAlchemyStorefrontRequestRepository(self)
         self.tasks = SqlAlchemyTaskRepository(self)
         self.notifications = SqlAlchemyNotificationRepository(self)
         self.audit = SqlAlchemyAuditRepository(self)

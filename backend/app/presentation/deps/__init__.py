@@ -23,6 +23,7 @@ from app.presentation.deps.uow import (  # noqa: F401
     get_uow,
 )
 from app.presentation.deps.use_cases import (  # noqa: F401
+    AcceptStorefrontRequestDep,
     ApplyImportProductsDep,
     ApplyOfflineSalesDep,
     CancelOrderDep,
@@ -37,6 +38,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     CreateOrderDep,
     CreateProductDep,
     CreateSaleDep,
+    CreateStorefrontRequestDep,
     CreateSupplierDep,
     CreateTaskDep,
     CreateUnitDep,
@@ -59,6 +61,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     IssueDebtDep,
     IssueOrderDep,
     IssueSupplierDebtDep,
+    ListStorefrontRequestsDep,
     LoginDep,
     LogoutAllDep,
     MarkAllNotificationsReadDep,
@@ -66,6 +69,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     PreviewImportProductsDep,
     ReceiveGoodsDep,
     RegisterShopDep,
+    RejectStorefrontRequestDep,
     RepayDebtDep,
     ReturnSaleDep,
     SetProductPhotoDep,

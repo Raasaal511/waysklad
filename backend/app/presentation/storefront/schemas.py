@@ -1,9 +1,16 @@
+from datetime import date
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
+from app.application.storefront.accept_request import AcceptStorefrontRequestCommand
+from app.application.storefront.create_request import (
+    CreateStorefrontRequestCommand,
+    StorefrontRequestItemInput,
+)
 from app.application.storefront.get_catalog import GetStorefrontCatalogCommand, StorefrontCatalogResult
 from app.domain.catalog.entities import Category, Product
+from app.domain.storefront.entities import StorefrontRequest
 
 
 class StorefrontCatalogParams(BaseModel):
@@ -74,4 +81,78 @@ class StorefrontCatalogResponse(BaseModel):
             ],
             categories=[StorefrontCategoryResponse.from_entity(c) for c in result.categories],
             total=result.total,
+        )
+
+
+class StorefrontRequestItemRequest(BaseModel):
+    product_id: int
+    quantity: Decimal = Field(gt=0)
+    variant_id: int | None = None
+
+
+class CreateStorefrontRequestRequest(BaseModel):
+    customer_name: str = Field(min_length=1, max_length=200)
+    items: list[StorefrontRequestItemRequest] = Field(min_length=1)
+    customer_phone: str = ""
+    note: str = Field("", max_length=1000)
+
+    model_config = {"extra": "forbid"}
+
+    def to_command(self, slug: str) -> CreateStorefrontRequestCommand:
+        return CreateStorefrontRequestCommand(
+            slug=slug,
+            customer_name=self.customer_name,
+            items=[
+                StorefrontRequestItemInput(
+                    product_id=i.product_id, quantity=i.quantity, variant_id=i.variant_id
+                )
+                for i in self.items
+            ],
+            customer_phone=self.customer_phone,
+            note=self.note,
+        )
+
+
+class StorefrontRequestLineResponse(BaseModel):
+    product_id: int
+    quantity: Decimal
+    variant_id: int | None
+
+
+class StorefrontRequestResponse(BaseModel):
+    id: int
+    customer_name: str
+    customer_phone: str
+    note: str
+    status: str
+    lines: list[StorefrontRequestLineResponse]
+
+    @classmethod
+    def from_entity(cls, request: StorefrontRequest) -> "StorefrontRequestResponse":
+        return cls(
+            id=request.id,
+            customer_name=request.customer_name,
+            customer_phone=request.customer_phone,
+            note=request.note,
+            status=request.status.value,
+            lines=[
+                StorefrontRequestLineResponse(
+                    product_id=line.product_id, quantity=line.quantity, variant_id=line.variant_id
+                )
+                for line in request.lines
+            ],
+        )
+
+
+class AcceptStorefrontRequestRequest(BaseModel):
+    warehouse_id: int
+    due_date: date
+    prepayment: Decimal = Decimal("0")
+
+    def to_command(self, request_id: int) -> AcceptStorefrontRequestCommand:
+        return AcceptStorefrontRequestCommand(
+            request_id=request_id,
+            warehouse_id=self.warehouse_id,
+            due_date=self.due_date,
+            prepayment=self.prepayment,
         )

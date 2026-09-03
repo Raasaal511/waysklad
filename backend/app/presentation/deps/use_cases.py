@@ -63,7 +63,11 @@ from app.application.sales.create_sale import CreateSaleUseCase
 from app.application.sales.delete_sale import DeleteSaleUseCase
 from app.application.sales.edit_sale import EditSaleUseCase
 from app.application.sales.return_sale import ReturnSaleUseCase
+from app.application.storefront.accept_request import AcceptStorefrontRequestUseCase
+from app.application.storefront.create_request import CreateStorefrontRequestUseCase
 from app.application.storefront.get_catalog import GetStorefrontCatalogUseCase
+from app.application.storefront.list_requests import ListStorefrontRequestsUseCase
+from app.application.storefront.reject_request import RejectStorefrontRequestUseCase
 from app.application.sync.apply_offline_ops import ApplyOfflineSalesUseCase
 from app.application.tasks.change_status import ChangeTaskStatusUseCase
 from app.application.tasks.update_task import UpdateTaskUseCase
@@ -159,6 +163,15 @@ def get_storefront_catalog(factory: SessionFactoryDep) -> GetStorefrontCatalogUs
     return GetStorefrontCatalogUseCase(factory)
 
 
+def get_create_storefront_request(factory: SessionFactoryDep) -> CreateStorefrontRequestUseCase:
+    return CreateStorefrontRequestUseCase(factory)
+
+
+get_list_storefront_requests = _with_uow(ListStorefrontRequestsUseCase)
+get_accept_storefront_request = _with_uow(AcceptStorefrontRequestUseCase)
+get_reject_storefront_request = _with_uow(RejectStorefrontRequestUseCase)
+
+
 def get_create_task(uow: UowDep, notifier: NotifierDep) -> CreateTaskUseCase:
     return CreateTaskUseCase(uow, notifier)
 
@@ -243,5 +256,17 @@ MarkAllNotificationsReadDep = Annotated[
 ]
 GetStorefrontCatalogDep = Annotated[
     GetStorefrontCatalogUseCase, Depends(get_storefront_catalog)
+]
+CreateStorefrontRequestDep = Annotated[
+    CreateStorefrontRequestUseCase, Depends(get_create_storefront_request)
+]
+ListStorefrontRequestsDep = Annotated[
+    ListStorefrontRequestsUseCase, Depends(get_list_storefront_requests)
+]
+AcceptStorefrontRequestDep = Annotated[
+    AcceptStorefrontRequestUseCase, Depends(get_accept_storefront_request)
+]
+RejectStorefrontRequestDep = Annotated[
+    RejectStorefrontRequestUseCase, Depends(get_reject_storefront_request)
 ]
  

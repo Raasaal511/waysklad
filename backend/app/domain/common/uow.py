@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from app.domain.notifications.repository import INotificationRepository
     from app.domain.orders.repository import IOrderRepository
     from app.domain.sales.repository import ISaleRepository, ISaleReturnRepository
+    from app.domain.storefront.repository import IStorefrontRequestRepository
     from app.domain.tasks.repository import ITaskRepository
 
 
@@ -49,6 +50,7 @@ class IUnitOfWork(ABC):
     sale_returns: ISaleReturnRepository
     debts: IDebtRepository
     orders: IOrderRepository
+    storefront_requests: IStorefrontRequestRepository
     tasks: ITaskRepository
     notifications: INotificationRepository
     audit: IAuditRepository

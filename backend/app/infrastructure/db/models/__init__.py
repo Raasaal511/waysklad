@@ -9,5 +9,6 @@ from app.infrastructure.db.models import (  # noqa: F401
     notifications,
     orders,
     sales,
+    storefront,
     tasks,
 )

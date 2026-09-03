@@ -2013,6 +2013,152 @@ async def test_storefront_catalog_filtered_by_warehouse_via_api(client, owner_he
     assert next(p for p in response.json()["products"] if p["id"] == product["id"])["in_stock"] is True
 
 
+async def test_storefront_request_full_flow_via_api(client, owner_headers):
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={
+                "name": "Товар для заявки",
+                "purchase_price": "50",
+                "retail_price": "120",
+                "show_on_storefront": True,
+            },
+        )
+    ).json()
+    response = await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product["id"], "quantity": "10", "cost": "50"}]},
+    )
+    assert response.status_code == 201, response.text
+
+    # публичная заявка — без авторизации
+    response = await client.post(
+        f"/api/storefront/{slug}/requests",
+        json={
+            "customer_name": "Ахмед",
+            "customer_phone": "+79280001122",
+            "note": "Хочу два, если есть скидка — напишите",
+            "items": [{"product_id": product["id"], "quantity": "2"}],
+        },
+    )
+    assert response.status_code == 201, response.text
+    request = response.json()
+    assert request["status"] == "new"
+    assert request["customer_name"] == "Ахмед"
+
+    # владелец видит заявку в списке новых
+    response = await client.get("/api/storefront/requests/new", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    ids = [r["id"] for r in response.json()]
+    assert request["id"] in ids
+
+    # без авторизации список заявок недоступен
+    response = await client.get("/api/storefront/requests/new")
+    assert response.status_code in (401, 403), response.text
+
+    due = (date.today() + timedelta(days=3)).isoformat()
+    response = await client.post(
+        f"/api/storefront/requests/{request['id']}/accept",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "due_date": due},
+    )
+    assert response.status_code == 200, response.text
+    order = response.json()
+    assert order["source"] == "storefront"
+    assert order["due_date"] == due
+    assert order["lines"][0]["product_id"] == product["id"]
+    assert order["lines"][0]["price"] == "120.00"  # цена взята из актуального retail_price
+
+    # клиент создан по имени+телефону из заявки
+    response = await client.get("/api/counterparties/clients", headers=owner_headers, params={"query": "Ахмед"})
+    assert response.status_code == 200, response.text
+    clients = response.json()
+    assert any(c["phone"] == "+79280001122" for c in clients)
+
+    # повторно принять ту же заявку нельзя
+    response = await client.post(
+        f"/api/storefront/requests/{request['id']}/accept",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "due_date": due},
+    )
+    assert response.status_code == 400, response.text
+
+    # повторная заявка с тем же телефоном не плодит второго клиента
+    response = await client.post(
+        f"/api/storefront/{slug}/requests",
+        json={
+            "customer_name": "Ахмед",
+            "customer_phone": "+79280001122",
+            "items": [{"product_id": product["id"], "quantity": "1"}],
+        },
+    )
+    assert response.status_code == 201, response.text
+    second_request_id = response.json()["id"]
+    response = await client.post(
+        f"/api/storefront/requests/{second_request_id}/accept",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "due_date": due},
+    )
+    assert response.status_code == 200, response.text
+    second_order = response.json()
+    assert second_order["client_id"] == order["client_id"]  # тот же клиент, не дубль
+
+    response = await client.get("/api/counterparties/clients", headers=owner_headers, params={"query": "Ахмед"})
+    assert sum(1 for c in response.json() if c["phone"] == "+79280001122") == 1
+
+
+async def test_storefront_request_reject_via_api(client, owner_headers):
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Товар", "purchase_price": "50", "retail_price": "100", "show_on_storefront": True},
+        )
+    ).json()
+    request = (
+        await client.post(
+            f"/api/storefront/{slug}/requests",
+            json={"customer_name": "Тест", "items": [{"product_id": product["id"], "quantity": "1"}]},
+        )
+    ).json()
+
+    response = await client.post(
+        f"/api/storefront/requests/{request['id']}/reject", headers=owner_headers
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "rejected"
+
+    # повторно отклонить/принять нельзя
+    response = await client.post(
+        f"/api/storefront/requests/{request['id']}/reject", headers=owner_headers
+    )
+    assert response.status_code == 400, response.text
+
+    # заявка на скрытый товар отклоняется на уровне создания
+    hidden = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Скрытый", "purchase_price": "10", "retail_price": "20"},
+        )
+    ).json()
+    response = await client.post(
+        f"/api/storefront/{slug}/requests",
+        json={"customer_name": "Тест", "items": [{"product_id": hidden["id"], "quantity": "1"}]},
+    )
+    assert response.status_code == 400, response.text
+
+
 async def test_products_search_by_barcode_via_api(client, owner_headers):
     response = await client.post(
         "/api/products",
