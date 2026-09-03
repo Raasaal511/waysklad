@@ -1963,6 +1963,56 @@ async def test_storefront_catalog_via_api(client, owner_headers):
     assert response.status_code == 404, response.text
 
 
+async def test_storefront_catalog_filtered_by_warehouse_via_api(client, owner_headers):
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    second_warehouse = (
+        await client.post("/api/inventory/warehouses", headers=owner_headers, json={"name": "Филиал"})
+    ).json()
+
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={
+                "name": "Товар только на складе 1",
+                "purchase_price": "50",
+                "retail_price": "100",
+                "show_on_storefront": True,
+            },
+        )
+    ).json()
+    response = await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product["id"], "quantity": "5", "cost": "50"}]},
+    )
+    assert response.status_code == 201, response.text
+
+    # без warehouse_id — «в наличии» суммарно по всем складам
+    response = await client.get(f"/api/storefront/{slug}")
+    assert response.status_code == 200, response.text
+    assert next(p for p in response.json()["products"] if p["id"] == product["id"])["in_stock"] is True
+
+    # склад 1 — товар есть
+    response = await client.get(f"/api/storefront/{slug}", params={"warehouse_id": 1})
+    assert response.status_code == 200, response.text
+    assert next(p for p in response.json()["products"] if p["id"] == product["id"])["in_stock"] is True
+
+    # склад «Филиал» — товар виден (флаг товара это не меняет), но остатка там нет
+    response = await client.get(f"/api/storefront/{slug}", params={"warehouse_id": second_warehouse["id"]})
+    assert response.status_code == 200, response.text
+    listed = next(p for p in response.json()["products"] if p["id"] == product["id"])
+    assert listed["in_stock"] is False
+
+    # несуществующий склад — фильтр тихо игнорируется, не 404/400
+    response = await client.get(f"/api/storefront/{slug}", params={"warehouse_id": 999999})
+    assert response.status_code == 200, response.text
+    assert next(p for p in response.json()["products"] if p["id"] == product["id"])["in_stock"] is True
+
+
 async def test_products_search_by_barcode_via_api(client, owner_headers):
     response = await client.post(
         "/api/products",
