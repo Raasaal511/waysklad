@@ -4,7 +4,7 @@ from app.domain.common.notifier import INotifier
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.entities import Role
 from app.domain.notifications.entities import Notification, NotificationKind
-from app.infrastructure.ws_broadcast import broadcaster
+from app.infrastructure.ws_broadcast import broadcaster, user_channel
 
 
 async def notify_user(
@@ -24,7 +24,7 @@ async def notify_user(
     )
     try:
         await broadcaster.publish(
-            user_id,
+            user_channel(user_id),
             {
                 "id": saved.id,
                 "kind": kind.value,

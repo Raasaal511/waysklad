@@ -1,5 +1,5 @@
-"""Push-доставка событий в открытые WebSocket-соединения (уведомления в реальном
-времени вместо периодического опроса GET /api/notifications).
+"""Push-доставка событий в открытые WebSocket-соединения — уведомления в реальном
+времени вместо периодического опроса GET /api/notifications, и чат заявок с витрины.
 
 Без NOTIFICATIONS_REDIS_URL — форвардинг в памяти процесса: подходит для dev
 (один uvicorn-процесс, --reload без --workers). С NOTIFICATIONS_REDIS_URL —
@@ -7,6 +7,10 @@
 открытое соединение клиента живёт только в одном воркере, и без общей шины
 уведомление, созданное HTTP-запросом в другом воркере, никогда не дойдёт до
 открытого сокета.
+
+Каналы — произвольные строки ("user:<id>" для личных уведомлений,
+"storefront_request:<id>" для чата заявки) — один Broadcaster/Redis pub/sub
+обслуживает оба сценария.
 """
 
 import asyncio
@@ -19,10 +23,15 @@ from app.infrastructure.config import settings
 from app.infrastructure.logging import get_logger
 
 _logger = get_logger("app.ws")
+_PUBSUB_PREFIX = "ws_channel:"
 
 
-def _channel(user_id: int) -> str:
-    return f"notifications:user:{user_id}"
+def user_channel(user_id: int) -> str:
+    return f"user:{user_id}"
+
+
+def storefront_request_channel(request_id: int) -> str:
+    return f"storefront_request:{request_id}"
 
 
 class ConnectionRegistry:
@@ -30,28 +39,28 @@ class ConnectionRegistry:
     доставка в конкретный сокет всегда идёт через локальный реестр этого воркера."""
 
     def __init__(self) -> None:
-        self._by_user: dict[int, set[WebSocket]] = defaultdict(set)
+        self._by_channel: dict[str, set[WebSocket]] = defaultdict(set)
 
-    def add(self, user_id: int, ws: WebSocket) -> None:
-        self._by_user[user_id].add(ws)
+    def add(self, channel: str, ws: WebSocket) -> None:
+        self._by_channel[channel].add(ws)
 
-    def remove(self, user_id: int, ws: WebSocket) -> None:
-        self._by_user[user_id].discard(ws)
-        if not self._by_user[user_id]:
-            del self._by_user[user_id]
+    def remove(self, channel: str, ws: WebSocket) -> None:
+        self._by_channel[channel].discard(ws)
+        if not self._by_channel[channel]:
+            del self._by_channel[channel]
 
-    async def send_local(self, user_id: int, payload: dict) -> None:
-        sockets = list(self._by_user.get(user_id, ()))
+    async def send_local(self, channel: str, payload: dict) -> None:
+        sockets = list(self._by_channel.get(channel, ()))
         for ws in sockets:
             try:
                 await ws.send_json(payload)
             except Exception:
-                _logger.exception("Не удалось отправить событие в WebSocket user_id=%s", user_id)
+                _logger.exception("Не удалось отправить событие в WebSocket channel=%s", channel)
 
 
 class Broadcaster:
-    """Единая точка публикации события пользователю — скрывает, идёт ли оно
-    через Redis pub/sub или напрямую в памяти процесса."""
+    """Единая точка публикации события в канал — скрывает, идёт ли оно через
+    Redis pub/sub или напрямую в памяти процесса."""
 
     def __init__(self) -> None:
         self.registry = ConnectionRegistry()
@@ -66,7 +75,7 @@ class Broadcaster:
 
         self._redis = redis.from_url(settings.notifications_redis_url)
         self._pubsub = self._redis.pubsub()
-        await self._pubsub.psubscribe("notifications:user:*")
+        await self._pubsub.psubscribe(f"{_PUBSUB_PREFIX}*")
         self._listen_task = asyncio.create_task(self._listen())
 
     async def stop(self) -> None:
@@ -83,23 +92,23 @@ class Broadcaster:
             if message["type"] != "pmessage":
                 continue
             try:
-                channel: str = message["channel"].decode()
-                user_id = int(channel.rsplit(":", 1)[1])
+                raw_channel: str = message["channel"].decode()
+                channel = raw_channel.removeprefix(_PUBSUB_PREFIX)
                 payload = json.loads(message["data"])
             except Exception:
-                _logger.exception("Некорректное сообщение в notifications pub/sub")
+                _logger.exception("Некорректное сообщение в ws pub/sub")
                 continue
-            await self.registry.send_local(user_id, payload)
+            await self.registry.send_local(channel, payload)
 
-    async def publish(self, user_id: int, payload: dict) -> None:
+    async def publish(self, channel: str, payload: dict) -> None:
         if self._redis is not None:
             try:
-                await self._redis.publish(_channel(user_id), json.dumps(payload))
+                await self._redis.publish(f"{_PUBSUB_PREFIX}{channel}", json.dumps(payload))
                 return
             except Exception:
                 _logger.exception("Redis publish не удался — событие потеряно для других воркеров")
         # без Redis (dev) или как fallback — доставляем хотя бы локально в этом процессе
-        await self.registry.send_local(user_id, payload)
+        await self.registry.send_local(channel, payload)
 
 
 broadcaster = Broadcaster()

@@ -13,7 +13,7 @@ from app.presentation.notifications.schemas import (
     NotificationListResponse,
     NotificationResponse,
 )
-from app.infrastructure.ws_broadcast import broadcaster
+from app.infrastructure.ws_broadcast import broadcaster, user_channel
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -24,8 +24,9 @@ async def notifications_ws(websocket: WebSocket, token: str, factory: SessionFac
     может выставить заголовок Authorization при открытии сокета — токен
     передаётся query-параметром (?token=...)."""
     user = await get_current_user_ws(token, factory)
+    channel = user_channel(user.id)
     await websocket.accept()
-    broadcaster.registry.add(user.id, websocket)
+    broadcaster.registry.add(channel, websocket)
     try:
         while True:
             # клиент ничего не обязан присылать — просто держим соединение
@@ -34,7 +35,7 @@ async def notifications_ws(websocket: WebSocket, token: str, factory: SessionFac
     except WebSocketDisconnect:
         pass
     finally:
-        broadcaster.registry.remove(user.id, websocket)
+        broadcaster.registry.remove(channel, websocket)
 
 
 @router.get("")

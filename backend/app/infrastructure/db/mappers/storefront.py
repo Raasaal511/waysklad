@@ -1,5 +1,10 @@
-from app.domain.storefront.entities import StorefrontRequest, StorefrontRequestLine
+from app.domain.storefront.entities import (
+    StorefrontMessage,
+    StorefrontRequest,
+    StorefrontRequestLine,
+)
 from app.infrastructure.db.models.storefront import (
+    StorefrontMessageModel,
     StorefrontRequestLineModel,
     StorefrontRequestModel,
 )
@@ -15,6 +20,7 @@ class StorefrontRequestMapper:
             note=request.note,
             status=request.status,
             order_id=request.order_id,
+            access_token=request.access_token,
             lines=[
                 StorefrontRequestLineModel(
                     tenant_id=tenant_id,
@@ -35,6 +41,7 @@ class StorefrontRequestMapper:
             note=model.note,
             status=model.status,
             order_id=model.order_id,
+            access_token=model.access_token,
             created_at=model.created_at,
             lines=[
                 StorefrontRequestLine(
@@ -44,4 +51,25 @@ class StorefrontRequestMapper:
                 )
                 for line in model.lines
             ],
+        )
+
+
+class StorefrontMessageMapper:
+    @staticmethod
+    def to_orm(message: StorefrontMessage, tenant_id: int) -> StorefrontMessageModel:
+        return StorefrontMessageModel(
+            tenant_id=tenant_id,
+            request_id=message.request_id,
+            author=message.author,
+            text=message.text,
+        )
+
+    @staticmethod
+    def to_entity(model: StorefrontMessageModel) -> StorefrontMessage:
+        return StorefrontMessage(
+            id=model.id,
+            request_id=model.request_id,
+            author=model.author,
+            text=model.text,
+            created_at=model.created_at,
         )

@@ -34,7 +34,15 @@ class StorefrontRequest:
     note: str = ""
     status: StorefrontRequestStatus = StorefrontRequestStatus.NEW
     order_id: int | None = None  # заполняется при принятии
+    # непредсказуемый токен для доступа покупателя к чату своей заявки без
+    # аккаунта — выдаётся один раз в ответе на создание, дальше хранится
+    # на стороне покупателя (localStorage); заполняется репозиторием при add()
+    access_token: str = ""
     created_at: datetime | None = None
+    # заполняется только get_by_token() — единственный способ анонимного
+    # покупателя узнать tenant своей заявки, чтобы открыть tenant-scoped UoW;
+    # аналог User.tenant_id (тот же паттерн: контекст, знающий о tenant извне)
+    tenant_id: int | None = None
 
     def validate(self) -> None:
         if not self.customer_name.strip():
@@ -52,3 +60,24 @@ class StorefrontRequest:
         if self.status != StorefrontRequestStatus.NEW:
             raise DomainError("Заявка уже обработана")
         self.status = StorefrontRequestStatus.REJECTED
+
+
+class MessageAuthor(StrEnum):
+    CUSTOMER = "customer"
+    STAFF = "staff"
+
+
+@dataclass
+class StorefrontMessage:
+    """Сообщение в чате заявки — живёт вместе с StorefrontRequest, не
+    отдельная самостоятельная сущность (переживает и принятие заявки)."""
+
+    id: int | None
+    request_id: int
+    author: MessageAuthor
+    text: str
+    created_at: datetime | None = None
+
+    def validate(self) -> None:
+        if not self.text.strip():
+            raise DomainError("Пустое сообщение")

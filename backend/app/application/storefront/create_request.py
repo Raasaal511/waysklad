@@ -1,3 +1,4 @@
+import secrets
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -49,6 +50,7 @@ class CreateStorefrontRequestUseCase:
                 customer_name=cmd.customer_name.strip(),
                 customer_phone=str(phone) if phone else "",
                 note=cmd.note.strip(),
+                access_token=secrets.token_urlsafe(32),
                 lines=[
                     StorefrontRequestLine(
                         product_id=item.product_id,

@@ -9,8 +9,12 @@ from app.application.storefront.create_request import (
     StorefrontRequestItemInput,
 )
 from app.application.storefront.get_catalog import GetStorefrontCatalogCommand, StorefrontCatalogResult
+from app.application.storefront.send_message import (
+    SendStaffStorefrontMessageCommand,
+    SendStorefrontMessageCommand,
+)
 from app.domain.catalog.entities import Category, Product
-from app.domain.storefront.entities import StorefrontRequest
+from app.domain.storefront.entities import StorefrontMessage, StorefrontRequest
 
 
 class StorefrontCatalogParams(BaseModel):
@@ -120,6 +124,8 @@ class StorefrontRequestLineResponse(BaseModel):
 
 
 class StorefrontRequestResponse(BaseModel):
+    """Owner-side — без access_token, сотрудник не должен видеть токен покупателя."""
+
     id: int
     customer_name: str
     customer_phone: str
@@ -144,6 +150,18 @@ class StorefrontRequestResponse(BaseModel):
         )
 
 
+class StorefrontRequestCreatedResponse(StorefrontRequestResponse):
+    """Только ответ на создание заявки — единственный момент, когда покупатель
+    узнаёт свой access_token (дальше хранит его сам, сервер не показывает повторно)."""
+
+    access_token: str
+
+    @classmethod
+    def from_entity(cls, request: StorefrontRequest) -> "StorefrontRequestCreatedResponse":
+        base = StorefrontRequestResponse.from_entity(request)
+        return cls(**base.model_dump(), access_token=request.access_token)
+
+
 class AcceptStorefrontRequestRequest(BaseModel):
     warehouse_id: int
     due_date: date
@@ -155,4 +173,32 @@ class AcceptStorefrontRequestRequest(BaseModel):
             warehouse_id=self.warehouse_id,
             due_date=self.due_date,
             prepayment=self.prepayment,
+        )
+
+
+class SendStorefrontMessageRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+    def to_command(self, access_token: str) -> SendStorefrontMessageCommand:
+        return SendStorefrontMessageCommand(access_token=access_token, text=self.text)
+
+    def to_staff_command(self, request_id: int) -> SendStaffStorefrontMessageCommand:
+        return SendStaffStorefrontMessageCommand(request_id=request_id, text=self.text)
+
+
+class StorefrontMessageResponse(BaseModel):
+    id: int
+    request_id: int
+    author: str
+    text: str
+    created_at: str | None
+
+    @classmethod
+    def from_entity(cls, message: StorefrontMessage) -> "StorefrontMessageResponse":
+        return cls(
+            id=message.id,
+            request_id=message.request_id,
+            author=message.author.value,
+            text=message.text,
+            created_at=message.created_at.isoformat() if message.created_at else None,
         )

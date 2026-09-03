@@ -1,10 +1,20 @@
 from sqlalchemy import select
 
 from app.domain.common.exceptions import NotFoundError
-from app.domain.storefront.entities import StorefrontRequest, StorefrontRequestStatus
-from app.domain.storefront.repository import IStorefrontRequestRepository
-from app.infrastructure.db.mappers.storefront import StorefrontRequestMapper
-from app.infrastructure.db.models.storefront import StorefrontRequestModel
+from app.domain.storefront.entities import (
+    StorefrontMessage,
+    StorefrontRequest,
+    StorefrontRequestStatus,
+)
+from app.domain.storefront.repository import (
+    IStorefrontMessageRepository,
+    IStorefrontRequestRepository,
+)
+from app.infrastructure.db.mappers.storefront import (
+    StorefrontMessageMapper,
+    StorefrontRequestMapper,
+)
+from app.infrastructure.db.models.storefront import StorefrontMessageModel, StorefrontRequestModel
 from app.infrastructure.db.repositories.base import SqlAlchemyRepository
 
 
@@ -31,6 +41,23 @@ class SqlAlchemyStorefrontRequestRepository(SqlAlchemyRepository, IStorefrontReq
             raise NotFoundError(f"Заявка {request_id} не найдена")
         return StorefrontRequestMapper.to_entity(model)
 
+    async def get_by_token(self, access_token: str) -> StorefrontRequest | None:
+        # без tenant-фильтра: вызывается анонимным покупателем ДО того, как
+        # известен tenant — токен сам по себе доказательство владения заявкой,
+        # как и Tenant.slug при резолве магазина
+        model = (
+            await self._session.execute(
+                select(StorefrontRequestModel).where(
+                    StorefrontRequestModel.access_token == access_token
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            return None
+        entity = StorefrontRequestMapper.to_entity(model)
+        entity.tenant_id = model.tenant_id
+        return entity
+
     async def list_new(self) -> list[StorefrontRequest]:
         models = (
             await self._session.execute(
@@ -53,3 +80,26 @@ class SqlAlchemyStorefrontRequestRepository(SqlAlchemyRepository, IStorefrontReq
                 )
             )
         ).scalar_one_or_none()
+
+
+class SqlAlchemyStorefrontMessageRepository(SqlAlchemyRepository, IStorefrontMessageRepository):
+    async def add(self, message: StorefrontMessage) -> StorefrontMessage:
+        model = StorefrontMessageMapper.to_orm(message, self._tenant)
+        self._session.add(model)
+        await self._session.flush()
+        message.id = model.id
+        message.created_at = model.created_at
+        return message
+
+    async def list_by_request(self, request_id: int) -> list[StorefrontMessage]:
+        models = (
+            await self._session.execute(
+                select(StorefrontMessageModel)
+                .where(
+                    StorefrontMessageModel.tenant_id == self._tenant,
+                    StorefrontMessageModel.request_id == request_id,
+                )
+                .order_by(StorefrontMessageModel.created_at)
+            )
+        ).scalars().all()
+        return [StorefrontMessageMapper.to_entity(m) for m in models]

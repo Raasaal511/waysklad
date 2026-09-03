@@ -66,8 +66,16 @@ from app.application.sales.return_sale import ReturnSaleUseCase
 from app.application.storefront.accept_request import AcceptStorefrontRequestUseCase
 from app.application.storefront.create_request import CreateStorefrontRequestUseCase
 from app.application.storefront.get_catalog import GetStorefrontCatalogUseCase
+from app.application.storefront.list_messages import (
+    ListStaffStorefrontMessagesUseCase,
+    ListStorefrontMessagesUseCase,
+)
 from app.application.storefront.list_requests import ListStorefrontRequestsUseCase
 from app.application.storefront.reject_request import RejectStorefrontRequestUseCase
+from app.application.storefront.send_message import (
+    SendStaffStorefrontMessageUseCase,
+    SendStorefrontMessageUseCase,
+)
 from app.application.sync.apply_offline_ops import ApplyOfflineSalesUseCase
 from app.application.tasks.change_status import ChangeTaskStatusUseCase
 from app.application.tasks.update_task import UpdateTaskUseCase
@@ -170,6 +178,18 @@ def get_create_storefront_request(factory: SessionFactoryDep) -> CreateStorefron
 get_list_storefront_requests = _with_uow(ListStorefrontRequestsUseCase)
 get_accept_storefront_request = _with_uow(AcceptStorefrontRequestUseCase)
 get_reject_storefront_request = _with_uow(RejectStorefrontRequestUseCase)
+get_list_staff_storefront_messages = _with_uow(ListStaffStorefrontMessagesUseCase)
+get_send_staff_storefront_message = _with_uow(SendStaffStorefrontMessageUseCase)
+
+
+def get_list_storefront_messages(factory: SessionFactoryDep) -> ListStorefrontMessagesUseCase:
+    return ListStorefrontMessagesUseCase(factory)
+
+
+def get_send_storefront_message(
+    factory: SessionFactoryDep, notifier: NotifierDep
+) -> SendStorefrontMessageUseCase:
+    return SendStorefrontMessageUseCase(factory, notifier)
 
 
 def get_create_task(uow: UowDep, notifier: NotifierDep) -> CreateTaskUseCase:
@@ -268,5 +288,17 @@ AcceptStorefrontRequestDep = Annotated[
 ]
 RejectStorefrontRequestDep = Annotated[
     RejectStorefrontRequestUseCase, Depends(get_reject_storefront_request)
+]
+ListStorefrontMessagesDep = Annotated[
+    ListStorefrontMessagesUseCase, Depends(get_list_storefront_messages)
+]
+SendStorefrontMessageDep = Annotated[
+    SendStorefrontMessageUseCase, Depends(get_send_storefront_message)
+]
+ListStaffStorefrontMessagesDep = Annotated[
+    ListStaffStorefrontMessagesUseCase, Depends(get_list_staff_storefront_messages)
+]
+SendStaffStorefrontMessageDep = Annotated[
+    SendStaffStorefrontMessageUseCase, Depends(get_send_staff_storefront_message)
 ]
  

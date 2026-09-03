@@ -2159,6 +2159,109 @@ async def test_storefront_request_reject_via_api(client, owner_headers):
     assert response.status_code == 400, response.text
 
 
+async def test_storefront_chat_rest_via_api(client, owner_headers):
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Товар", "purchase_price": "50", "retail_price": "100", "show_on_storefront": True},
+        )
+    ).json()
+    created = (
+        await client.post(
+            f"/api/storefront/{slug}/requests",
+            json={"customer_name": "Ахмед", "items": [{"product_id": product["id"], "quantity": "1"}]},
+        )
+    ).json()
+    assert "access_token" in created and created["access_token"]
+    token = created["access_token"]
+
+    # owner-side ответ (список заявок) не содержит токен
+    response = await client.get("/api/storefront/requests/new", headers=owner_headers)
+    assert "access_token" not in response.json()[0]
+
+    # покупатель пишет по своему токену
+    response = await client.post(
+        "/api/storefront/requests/chat", params={"token": token}, json={"text": "Уточните размер, пожалуйста"}
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["author"] == "customer"
+
+    # неверный токен — заявка не найдена
+    response = await client.post(
+        "/api/storefront/requests/chat", params={"token": "garbage"}, json={"text": "тест"}
+    )
+    assert response.status_code == 404, response.text
+
+    # сотрудник читает и отвечает
+    response = await client.get(
+        f"/api/storefront/requests/{created['id']}/chat", headers=owner_headers
+    )
+    assert response.status_code == 200, response.text
+    assert len(response.json()) == 1
+    assert response.json()[0]["text"] == "Уточните размер, пожалуйста"
+
+    response = await client.post(
+        f"/api/storefront/requests/{created['id']}/chat",
+        headers=owner_headers,
+        json={"text": "Размер M подойдёт?"},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["author"] == "staff"
+
+    # покупатель по токену видит оба сообщения
+    response = await client.get("/api/storefront/requests/chat", params={"token": token})
+    assert response.status_code == 200, response.text
+    texts = [m["text"] for m in response.json()]
+    assert texts == ["Уточните размер, пожалуйста", "Размер M подойдёт?"]
+
+    # без авторизации staff-эндпоинт недоступен
+    response = await client.get(f"/api/storefront/requests/{created['id']}/chat")
+    assert response.status_code in (401, 403), response.text
+
+
+async def test_storefront_chat_websocket_via_api(client, owner_headers):
+    from starlette.testclient import TestClient
+
+    from app.main import app as fastapi_app
+
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Товар", "purchase_price": "50", "retail_price": "100", "show_on_storefront": True},
+        )
+    ).json()
+    created = (
+        await client.post(
+            f"/api/storefront/{slug}/requests",
+            json={"customer_name": "Ахмед", "items": [{"product_id": product["id"], "quantity": "1"}]},
+        )
+    ).json()
+    token = created["access_token"]
+
+    sync_client = TestClient(fastapi_app)
+    with sync_client.websocket_connect(f"/api/storefront/requests/chat/ws?token={token}") as ws:
+        response = await client.post(
+            f"/api/storefront/requests/{created['id']}/chat",
+            headers=owner_headers,
+            json={"text": "Ответ владельца через WS"},
+        )
+        assert response.status_code == 201, response.text
+
+        event = ws.receive_json()
+        assert event["author"] == "staff"
+        assert event["text"] == "Ответ владельца через WS"
+
+
 async def test_products_search_by_barcode_via_api(client, owner_headers):
     response = await client.post(
         "/api/products",
