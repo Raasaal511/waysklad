@@ -17,6 +17,7 @@ from app.domain.debts.entities import Debt, DebtStatus, total_balance
 
 class IssueDebtRequest(BaseModel):
     client_id: int
+    warehouse_id: int
     amount: Decimal
     due_date: date | None = None
     note: str = ""
@@ -24,6 +25,7 @@ class IssueDebtRequest(BaseModel):
     def to_command(self) -> IssueDebtCommand:
         return IssueDebtCommand(
             client_id=self.client_id,
+            warehouse_id=self.warehouse_id,
             amount=self.amount,
             due_date=self.due_date,
             note=self.note,
@@ -32,6 +34,7 @@ class IssueDebtRequest(BaseModel):
 
 class IssueSupplierDebtRequest(BaseModel):
     supplier_id: int
+    warehouse_id: int
     amount: Decimal
     due_date: date | None = None
     note: str = ""
@@ -39,6 +42,7 @@ class IssueSupplierDebtRequest(BaseModel):
     def to_command(self) -> IssueSupplierDebtCommand:
         return IssueSupplierDebtCommand(
             supplier_id=self.supplier_id,
+            warehouse_id=self.warehouse_id,
             amount=self.amount,
             due_date=self.due_date,
             note=self.note,
@@ -60,7 +64,7 @@ class DebtsFilterParams(BaseModel):
     """Query-параметры списка долгов — форма запроса; преобразование в raw_params
     для generic filter-системы см. to_raw_params()."""
 
-    limit: int = Field(50, le=200)
+    limit: int = Field(50, le=50)
     offset: int = Field(0, ge=0)
     order_by: str | None = None
     direction: Literal["client", "supplier"] | None = None
@@ -135,6 +139,7 @@ class ExtensionResponse(BaseModel):
 
 class DebtResponse(BaseModel):
     id: int
+    warehouse_id: int
     client_id: int | None
     supplier_id: int | None
     amount: Decimal
@@ -155,6 +160,7 @@ class DebtResponse(BaseModel):
     def from_entity(cls, debt: Debt) -> "DebtResponse":
         return cls(
             id=debt.id,
+            warehouse_id=debt.warehouse_id,
             client_id=debt.client_id,
             supplier_id=debt.supplier_id,
             amount=debt.amount.amount,

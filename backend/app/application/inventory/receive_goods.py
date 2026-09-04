@@ -71,6 +71,7 @@ class ReceiveGoodsUseCase:
                     supplier = await uow.suppliers.get(cmd.supplier_id)
                     debt = Debt(
                         id=None,
+                        warehouse_id=cmd.warehouse_id,
                         supplier_id=supplier.id,
                         amount=total,
                         issued_at=date.today(),

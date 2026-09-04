@@ -98,6 +98,7 @@ class IssueOrderUseCase:
             if sale.payment_method is PaymentMethod.CREDIT:
                 debt = Debt(
                     id=None,
+                    warehouse_id=order.warehouse_id,
                     client_id=sale.client_id,
                     amount=sale.total,
                     issued_at=date.today(),

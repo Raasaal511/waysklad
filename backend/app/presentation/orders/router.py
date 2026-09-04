@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.domain.identity.permissions import Permission
+from app.domain.identity.permissions import Permission, require_warehouse
 from app.presentation.audit.schemas import AuditEntryResponse
 from app.presentation.deps import (
     ActorDep,
@@ -62,25 +62,34 @@ async def issue_order(
 
 
 @router.get("", dependencies=[_view])
-async def list_active_orders(uow: UowDep) -> list[OrderResponse]:
+async def list_active_orders(actor: ActorDep, uow: UowDep) -> list[OrderResponse]:
     async with uow:
-        return [OrderResponse.from_entity(o) for o in await uow.orders.list_active()]
+        warehouse_ids = actor.warehouse_ids if actor.is_warehouse_scoped else None
+        orders = await uow.orders.list_active(warehouse_ids)
+        return [OrderResponse.from_entity(o) for o in orders]
 
 
 @router.get("/completed", dependencies=[_view])
-async def list_completed_orders(uow: UowDep) -> list[OrderResponse]:
+async def list_completed_orders(actor: ActorDep, uow: UowDep) -> list[OrderResponse]:
     async with uow:
-        return [OrderResponse.from_entity(o) for o in await uow.orders.list_completed()]
+        warehouse_ids = actor.warehouse_ids if actor.is_warehouse_scoped else None
+        orders = await uow.orders.list_completed(warehouse_ids)
+        return [OrderResponse.from_entity(o) for o in orders]
 
 
 @router.get("/{order_id}", dependencies=[_view])
-async def get_order(order_id: int, uow: UowDep) -> OrderResponse:
+async def get_order(order_id: int, actor: ActorDep, uow: UowDep) -> OrderResponse:
     async with uow:
-        return OrderResponse.from_entity(await uow.orders.get(order_id))
+        order = await uow.orders.get(order_id)
+        require_warehouse(actor, order.warehouse_id)
+        return OrderResponse.from_entity(order)
 
 
 @router.get("/{order_id}/history", dependencies=[_view])
-async def get_order_history(order_id: int, uow: UowDep) -> list[AuditEntryResponse]:
+async def get_order_history(
+    order_id: int, actor: ActorDep, uow: UowDep
+) -> list[AuditEntryResponse]:
     async with uow:
+        require_warehouse(actor, (await uow.orders.get(order_id)).warehouse_id)
         entries = await uow.audit.list_by_entity("order", order_id)
         return [AuditEntryResponse.from_entity(e) for e in entries]

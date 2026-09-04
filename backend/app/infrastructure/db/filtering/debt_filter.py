@@ -80,6 +80,7 @@ class DebtFilterFactory(BaseQueryFilterFactory[DebtModel]):
         return {
             "client_id": FieldSpec(DebtModel.client_id, NUMERIC_OPS | {Operator.IS_NULL}),
             "supplier_id": FieldSpec(DebtModel.supplier_id, NUMERIC_OPS | {Operator.IS_NULL}),
+            "warehouse_id": FieldSpec(DebtModel.warehouse_id, NUMERIC_OPS),
             "status": FieldSpec(status_expr, frozenset({Operator.EQ, Operator.IN})),
             "balance": FieldSpec(balance_expr, NUMERIC_OPS),
             "due_date": FieldSpec(DebtModel.due_date, DATE_OPS),

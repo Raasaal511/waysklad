@@ -68,7 +68,13 @@ async def test_supplier_debt_and_due_debts_via_api(client, owner_headers):
     response = await client.post(
         "/api/debts/suppliers",
         headers=owner_headers,
-        json={"supplier_id": supplier_id, "amount": "50000", "due_date": today, "note": "цемент"},
+        json={
+            "supplier_id": supplier_id,
+            "warehouse_id": 1,
+            "amount": "50000",
+            "due_date": today,
+            "note": "цемент",
+        },
     )
     assert response.status_code == 201, response.text
     debt = response.json()
@@ -88,6 +94,52 @@ async def test_supplier_debt_and_due_debts_via_api(client, owner_headers):
     tomorrow = (date.today() + timedelta(days=1)).isoformat()
     response = await client.get(f"/api/debts/due?on={tomorrow}", headers=owner_headers)
     assert debt["id"] not in [d["id"] for d in response.json()]
+
+
+async def test_debts_client_summary_as_of_via_api(client, owner_headers):
+    response = await client.post(
+        "/api/counterparties/clients", headers=owner_headers, json={"name": "Ахмед"},
+    )
+    client_id = response.json()["id"]
+
+    response = await client.post(
+        "/api/debts",
+        headers=owner_headers,
+        json={"client_id": client_id, "warehouse_id": 1, "amount": "1000"},
+    )
+    assert response.status_code == 201, response.text
+    debt_id = response.json()["id"]
+
+    before = (date.today() - timedelta(days=1)).isoformat()
+    today = date.today().isoformat()
+    after = (date.today() + timedelta(days=1)).isoformat()
+
+    response = await client.post(
+        f"/api/debts/{debt_id}/repayments",
+        headers=owner_headers,
+        json={"amount": "300", "paid_on": before},
+    )
+    assert response.status_code == 200, response.text
+
+    response = await client.post(
+        f"/api/debts/{debt_id}/repayments",
+        headers=owner_headers,
+        json={"amount": "200", "paid_on": after},
+    )
+    assert response.status_code == 200, response.text
+
+    # снимок на «сегодня» видит только первое погашение (before), не второе (after)
+    response = await client.get(f"/api/debts/client/{client_id}?on={today}", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    summary = response.json()
+    assert summary["total_balance"] == "700.00"
+    assert len(summary["debts"][0]["repayments"]) == 1
+
+    # без ?on= — текущий момент, видны оба погашения
+    response = await client.get(f"/api/debts/client/{client_id}", headers=owner_headers)
+    summary = response.json()
+    assert summary["total_balance"] == "500.00"
+    assert len(summary["debts"][0]["repayments"]) == 2
 
 
 async def test_full_trading_flow(client, owner_headers):
@@ -599,6 +651,7 @@ async def test_order_full_lifecycle_via_api(client, owner_headers):
     order = response.json()
     assert order["to_pay"] == "2000.00"
     assert order["source"] == "whatsapp"
+    assert order["number"] is not None
     order_id = order["id"]
 
     # остаток зарезервирован под заказ — обычная продажа не пройдёт
@@ -1853,7 +1906,7 @@ async def test_products_generic_filter_via_api(client, owner_headers):
 
     # сортировка по возрастанию розничной цены
     response = await client.get(
-        "/api/products", headers=owner_headers, params={"sort": "price_asc", "limit": 200}
+        "/api/products", headers=owner_headers, params={"sort": "price_asc", "limit": 50}
     )
     assert response.status_code == 200, response.text
     products = response.json()
@@ -1863,7 +1916,7 @@ async def test_products_generic_filter_via_api(client, owner_headers):
 
     # сортировка по убыванию маржи (retail - purchase) — дорогой товар с большей маржой первым
     response = await client.get(
-        "/api/products", headers=owner_headers, params={"sort": "margin_desc", "limit": 200}
+        "/api/products", headers=owner_headers, params={"sort": "margin_desc", "limit": 50}
     )
     assert response.status_code == 200, response.text
     products = response.json()
@@ -1881,7 +1934,7 @@ async def test_products_generic_filter_via_api(client, owner_headers):
     assert response.status_code == 201, response.text
 
     response = await client.get(
-        "/api/products", headers=owner_headers, params={"in_stock_only": "true", "limit": 200}
+        "/api/products", headers=owner_headers, params={"in_stock_only": "true", "limit": 50}
     )
     assert response.status_code == 200, response.text
     ids = [p["id"] for p in response.json()]
@@ -1892,7 +1945,7 @@ async def test_products_generic_filter_via_api(client, owner_headers):
     response = await client.get(
         "/api/products",
         headers=owner_headers,
-        params={"sort": "stock_desc", "warehouse_id": 1, "limit": 200},
+        params={"sort": "stock_desc", "warehouse_id": 1, "limit": 50},
     )
     assert response.status_code == 200, response.text
     products = response.json()
@@ -2671,3 +2724,156 @@ async def test_seller_sees_only_own_warehouse_documents(client, owner_headers, r
     documents = response.json()
     assert len(documents) == 1
     assert documents[0]["warehouse_id"] == warehouse2_id
+
+
+async def test_get_inventory_document_via_api(client, owner_headers, random_phone):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Товар документа", "unit_code": "pcs", "purchase_price": "1", "retail_price": "2"},
+    )
+    product_id = response.json()["id"]
+
+    response = await client.post(
+        "/api/inventory/warehouses", headers=owner_headers, json={"name": "Второй склад"}
+    )
+    warehouse2_id = response.json()["id"]
+
+    response = await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": warehouse2_id, "lines": [{"product_id": product_id, "quantity": "5"}]},
+    )
+    assert response.status_code == 201, response.text
+    document_id = response.json()["id"]
+
+    response = await client.get(f"/api/inventory/documents/{document_id}", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    document = response.json()
+    assert document["warehouse_id"] == warehouse2_id
+    assert document["lines"][0]["product_id"] == product_id
+
+    response = await client.get("/api/inventory/documents/999999", headers=owner_headers)
+    assert response.status_code == 404
+
+    phone = random_phone()
+    response = await client.post(
+        "/api/auth/employees",
+        headers=owner_headers,
+        json={
+            "name": "Продавец",
+            "phone": phone,
+            "password": "secret123",
+            "role": "seller",
+            "warehouse_ids": [1],
+        },
+    )
+    assert response.status_code == 201, response.text
+    response = await client.post("/api/auth/login", json={"phone": phone, "password": "secret123"})
+    seller_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+    response = await client.get(f"/api/inventory/documents/{document_id}", headers=seller_headers)
+    assert response.status_code == 403
+
+
+async def test_seller_sees_only_own_warehouse_orders(client, owner_headers, random_phone):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Товар заказа", "unit_code": "pcs", "purchase_price": "1", "retail_price": "2"},
+    )
+    product_id = response.json()["id"]
+
+    response = await client.post(
+        "/api/inventory/warehouses", headers=owner_headers, json={"name": "Второй склад"}
+    )
+    warehouse2_id = response.json()["id"]
+
+    for wh_id in (1, warehouse2_id):
+        await client.post(
+            "/api/inventory/receive",
+            headers=owner_headers,
+            json={"warehouse_id": wh_id, "lines": [{"product_id": product_id, "quantity": "5"}]},
+        )
+
+    response = await client.post(
+        "/api/counterparties/clients", headers=owner_headers, json={"name": "Клиент"},
+    )
+    client_id = response.json()["id"]
+
+    for wh_id in (1, warehouse2_id):
+        response = await client.post(
+            "/api/orders",
+            headers=owner_headers,
+            json={
+                "client_id": client_id,
+                "warehouse_id": wh_id,
+                "items": [{"product_id": product_id, "quantity": "1", "price": "2"}],
+                "due_date": date.today().isoformat(),
+            },
+        )
+        assert response.status_code == 201, response.text
+
+    phone = random_phone()
+    response = await client.post(
+        "/api/auth/employees",
+        headers=owner_headers,
+        json={
+            "name": "Продавец",
+            "phone": phone,
+            "password": "secret123",
+            "role": "seller",
+            "warehouse_ids": [warehouse2_id],
+        },
+    )
+    assert response.status_code == 201, response.text
+    response = await client.post("/api/auth/login", json={"phone": phone, "password": "secret123"})
+    seller_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+    response = await client.get("/api/orders", headers=seller_headers)
+    assert response.status_code == 200, response.text
+    orders = response.json()
+    assert len(orders) == 1
+    assert orders[0]["warehouse_id"] == warehouse2_id
+
+
+async def test_seller_sees_only_own_warehouse_debts(client, owner_headers, random_phone):
+    response = await client.post(
+        "/api/inventory/warehouses", headers=owner_headers, json={"name": "Второй склад"}
+    )
+    warehouse2_id = response.json()["id"]
+
+    response = await client.post(
+        "/api/counterparties/clients", headers=owner_headers, json={"name": "Клиент долга"},
+    )
+    client_id = response.json()["id"]
+
+    for wh_id in (1, warehouse2_id):
+        response = await client.post(
+            "/api/debts",
+            headers=owner_headers,
+            json={"client_id": client_id, "warehouse_id": wh_id, "amount": "500"},
+        )
+        assert response.status_code == 201, response.text
+
+    phone = random_phone()
+    response = await client.post(
+        "/api/auth/employees",
+        headers=owner_headers,
+        json={
+            "name": "Продавец",
+            "phone": phone,
+            "password": "secret123",
+            "role": "seller",
+            "warehouse_ids": [warehouse2_id],
+        },
+    )
+    assert response.status_code == 201, response.text
+    response = await client.post("/api/auth/login", json={"phone": phone, "password": "secret123"})
+    seller_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+    response = await client.get("/api/debts", headers=seller_headers)
+    assert response.status_code == 200, response.text
+    debts = response.json()
+    assert len(debts) == 1
+    assert debts[0]["warehouse_id"] == warehouse2_id

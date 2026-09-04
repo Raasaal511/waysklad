@@ -302,9 +302,11 @@ async def test_debt_with_installments(make_uow, create_shop):
     tenant_id, _, _ = await create_shop()
 
     async with make_uow(tenant_id) as uow:
+        warehouse = await uow.warehouses.add(Warehouse(id=None, name="Основной"))
         client = await uow.clients.add(Client(id=None, name="Ахмед", phone=Phone("+79280000001")))
         debt = Debt(
             id=None,
+            warehouse_id=warehouse.id,
             client_id=client.id,
             amount=Money.of("3500"),
             issued_at=date.today(),
@@ -332,9 +334,13 @@ async def test_debt_save_appends_repayment_and_replaces_schedule(make_uow, creat
     tenant_id, _, _ = await create_shop()
 
     async with make_uow(tenant_id) as uow:
+        warehouse = await uow.warehouses.add(Warehouse(id=None, name="Основной"))
         client = await uow.clients.add(Client(id=None, name="Тамара", phone=Phone("+79280009988")))
         debt = await uow.debts.add(
-            Debt(id=None, client_id=client.id, amount=Money.of("1000"), issued_at=date.today())
+            Debt(
+                id=None, warehouse_id=warehouse.id, client_id=client.id,
+                amount=Money.of("1000"), issued_at=date.today(),
+            )
         )
         await uow.commit()
         debt_id = debt.id
@@ -445,25 +451,31 @@ async def test_debts_list_filtered_status_query_and_pagination(make_uow, create_
     tenant_id, _, _ = await create_shop()
 
     async with make_uow(tenant_id) as uow:
+        warehouse = await uow.warehouses.add(Warehouse(id=None, name="Основной"))
         ahmed = await uow.clients.add(Client(id=None, name="Ахмед", phone=Phone("+79280005511")))
         milana = await uow.clients.add(Client(id=None, name="Милана", phone=Phone("+79280005522")))
         # просроченный долг Ахмеда — остаток есть, срок в прошлом
         overdue_debt = await uow.debts.add(
             Debt(
-                id=None, client_id=ahmed.id, amount=Money.of("1000"), issued_at=date.today(),
+                id=None, warehouse_id=warehouse.id, client_id=ahmed.id,
+                amount=Money.of("1000"), issued_at=date.today(),
                 due_date=date.today() - timedelta(days=5),
             )
         )
         # активный долг Миланы — остаток есть, срок далеко
         await uow.debts.add(
             Debt(
-                id=None, client_id=milana.id, amount=Money.of("2000"), issued_at=date.today(),
+                id=None, warehouse_id=warehouse.id, client_id=milana.id,
+                amount=Money.of("2000"), issued_at=date.today(),
                 due_date=date.today() + timedelta(days=60),
             )
         )
         # закрытый долг Ахмеда — погашен полностью
         closed_debt = await uow.debts.add(
-            Debt(id=None, client_id=ahmed.id, amount=Money.of("500"), issued_at=date.today())
+            Debt(
+                id=None, warehouse_id=warehouse.id, client_id=ahmed.id,
+                amount=Money.of("500"), issued_at=date.today(),
+            )
         )
         await uow.commit()
         closed_debt.repay(Money.of("500"), on=date.today())
@@ -510,8 +522,14 @@ async def test_debts_list_filtered_tenant_isolation(make_uow, create_shop):
     tenant_b, _, _ = await create_shop()
 
     async with make_uow(tenant_a) as uow:
+        warehouse = await uow.warehouses.add(Warehouse(id=None, name="Основной"))
         client = await uow.clients.add(Client(id=None, name="Ахмед", phone=Phone("+79280006611")))
-        await uow.debts.add(Debt(id=None, client_id=client.id, amount=Money.of("1000"), issued_at=date.today()))
+        await uow.debts.add(
+            Debt(
+                id=None, warehouse_id=warehouse.id, client_id=client.id,
+                amount=Money.of("1000"), issued_at=date.today(),
+            )
+        )
         await uow.commit()
 
     async with make_uow(tenant_b) as uow:

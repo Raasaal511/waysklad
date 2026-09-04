@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Response
 
+from app.domain.common.exceptions import AccessDeniedError
 from app.infrastructure.inventory_export import (
     render_documents_csv,
     render_documents_pdf,
@@ -159,6 +160,19 @@ async def export_documents_pdf(actor: ActorDep, uow: UowDep) -> Response:
         media_type="application/pdf",
         headers={"Content-Disposition": 'attachment; filename="ostatki.pdf"'},
     )
+
+
+@router.get("/documents/{document_id}")
+async def get_document(
+    document_id: int, actor: ActorDep, uow: UowDep
+) -> DocumentHistoryResponse:
+    async with uow:
+        document = await uow.stock_documents.get(document_id)
+        if actor.is_warehouse_scoped:
+            document_warehouses = {document.warehouse_id, document.to_warehouse_id}
+            if document_warehouses.isdisjoint(actor.warehouse_ids):
+                raise AccessDeniedError("Этот склад вам не назначен")
+        return DocumentHistoryResponse.from_entity(document)
 
 
 @router.post("/receive", status_code=201)

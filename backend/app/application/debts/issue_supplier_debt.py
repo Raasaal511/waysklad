@@ -7,12 +7,13 @@ from app.domain.common.exceptions import DomainError
 from app.domain.common.money import Money
 from app.domain.common.uow import IUnitOfWork
 from app.domain.debts.entities import Debt
-from app.domain.identity.permissions import Actor, Permission, require
+from app.domain.identity.permissions import Actor, Permission, require, require_warehouse
 
 
 @dataclass(frozen=True)
 class IssueSupplierDebtCommand:
     supplier_id: int
+    warehouse_id: int
     amount: Decimal
     due_date: date | None = None  # «обещали заплатить до…»
     note: str = ""
@@ -26,6 +27,7 @@ class IssueSupplierDebtUseCase:
 
     async def execute(self, actor: Actor, cmd: IssueSupplierDebtCommand) -> Debt:
         require(actor, Permission.DEBTS_MANAGE)
+        require_warehouse(actor, cmd.warehouse_id)
         amount = Money.of(cmd.amount)
         if not amount > Money.zero():
             raise DomainError("Сумма долга должна быть больше нуля")
@@ -34,6 +36,7 @@ class IssueSupplierDebtUseCase:
             supplier = await uow.suppliers.get(cmd.supplier_id)
             debt = Debt(
                 id=None,
+                warehouse_id=cmd.warehouse_id,
                 supplier_id=supplier.id,
                 amount=amount,
                 issued_at=date.today(),

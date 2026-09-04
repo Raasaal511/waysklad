@@ -1095,28 +1095,31 @@ async def test_stocktake_detects_and_corrects_discrepancy(
 
 
 def test_debt_requires_exactly_one_counterparty():
-    both = Debt(id=None, amount=Money.of("100"), issued_at=date.today(), client_id=1, supplier_id=2)
+    both = Debt(
+        id=None, warehouse_id=1, amount=Money.of("100"), issued_at=date.today(),
+        client_id=1, supplier_id=2,
+    )
     with pytest.raises(DomainError):
         both.validate()
 
-    neither = Debt(id=None, amount=Money.of("100"), issued_at=date.today())
+    neither = Debt(id=None, warehouse_id=1, amount=Money.of("100"), issued_at=date.today())
     with pytest.raises(DomainError):
         neither.validate()
 
-    Debt(id=None, amount=Money.of("100"), issued_at=date.today(), client_id=1).validate()
-    Debt(id=None, amount=Money.of("100"), issued_at=date.today(), supplier_id=1).validate()
+    Debt(id=None, warehouse_id=1, amount=Money.of("100"), issued_at=date.today(), client_id=1).validate()
+    Debt(id=None, warehouse_id=1, amount=Money.of("100"), issued_at=date.today(), supplier_id=1).validate()
 
 
 def test_total_balance_sums_debts():
     debts = [
-        Debt(id=1, amount=Money.of("500"), issued_at=date.today(), client_id=1),
-        Debt(id=2, amount=Money.of("300"), issued_at=date.today(), client_id=1),
+        Debt(id=1, warehouse_id=1, amount=Money.of("500"), issued_at=date.today(), client_id=1),
+        Debt(id=2, warehouse_id=1, amount=Money.of("300"), issued_at=date.today(), client_id=1),
     ]
     assert total_balance(debts) == Money.of("800")
     assert total_balance([]) == Money.zero()
 
 
-async def test_issue_supplier_debt_and_list_by_supplier(make_uow, registered_shop):
+async def test_issue_supplier_debt_and_list_by_supplier(make_uow, registered_shop, warehouse_id):
     tenant_id, _, owner = registered_shop
     supplier = await CreateSupplierUseCase(make_uow(tenant_id)).execute(
         owner, CreateSupplierCommand(name="ООО СтройПоставка")
@@ -1124,7 +1127,10 @@ async def test_issue_supplier_debt_and_list_by_supplier(make_uow, registered_sho
 
     debt = await IssueSupplierDebtUseCase(make_uow(tenant_id)).execute(
         owner,
-        IssueSupplierDebtCommand(supplier_id=supplier.id, amount=Decimal("50000"), note="партия цемента"),
+        IssueSupplierDebtCommand(
+            supplier_id=supplier.id, warehouse_id=warehouse_id,
+            amount=Decimal("50000"), note="партия цемента",
+        ),
     )
     assert debt.supplier_id == supplier.id
     assert debt.client_id is None
@@ -1137,7 +1143,7 @@ async def test_issue_supplier_debt_and_list_by_supplier(make_uow, registered_sho
 
 
 async def test_storekeeper_cannot_issue_supplier_debt(
-    make_uow, hasher, registered_shop, random_phone
+    make_uow, hasher, registered_shop, random_phone, warehouse_id
 ):
     tenant_id, _, owner = registered_shop
     supplier = await CreateSupplierUseCase(make_uow(tenant_id)).execute(
@@ -1149,11 +1155,11 @@ async def test_storekeeper_cannot_issue_supplier_debt(
     with pytest.raises(AccessDeniedError):
         await IssueSupplierDebtUseCase(make_uow(tenant_id)).execute(
             Actor(id=storekeeper.id, role=storekeeper.role),
-            IssueSupplierDebtCommand(supplier_id=supplier.id, amount=Decimal("1000")),
+            IssueSupplierDebtCommand(supplier_id=supplier.id, warehouse_id=warehouse_id, amount=Decimal("1000")),
         )
 
 
-async def test_issue_debt_respects_debt_limit_without_sale(make_uow, registered_shop):
+async def test_issue_debt_respects_debt_limit_without_sale(make_uow, registered_shop, warehouse_id):
     tenant_id, _, owner = registered_shop
     client = await CreateClientUseCase(make_uow(tenant_id)).execute(
         owner, CreateClientCommand(name="Ибрагим", debt_limit=Decimal("2000"))
@@ -1161,23 +1167,26 @@ async def test_issue_debt_respects_debt_limit_without_sale(make_uow, registered_
 
     debt = await IssueDebtUseCase(make_uow(tenant_id)).execute(
         owner,
-        IssueDebtCommand(client_id=client.id, amount=Decimal("1500"), note="стройматериалы в долг"),
+        IssueDebtCommand(
+            client_id=client.id, warehouse_id=warehouse_id,
+            amount=Decimal("1500"), note="стройматериалы в долг",
+        ),
     )
     assert debt.balance == Money.of("1500")
 
     with pytest.raises(DomainError):
         await IssueDebtUseCase(make_uow(tenant_id)).execute(
-            owner, IssueDebtCommand(client_id=client.id, amount=Decimal("1000"))
+            owner, IssueDebtCommand(client_id=client.id, warehouse_id=warehouse_id, amount=Decimal("1000"))
         )
 
 
-async def test_create_installment_schedule_must_match_balance(make_uow, registered_shop):
+async def test_create_installment_schedule_must_match_balance(make_uow, registered_shop, warehouse_id):
     tenant_id, _, owner = registered_shop
     client = await CreateClientUseCase(make_uow(tenant_id)).execute(
         owner, CreateClientCommand(name="Заур")
     )
     debt = await IssueDebtUseCase(make_uow(tenant_id)).execute(
-        owner, IssueDebtCommand(client_id=client.id, amount=Decimal("3000"))
+        owner, IssueDebtCommand(client_id=client.id, warehouse_id=warehouse_id, amount=Decimal("3000"))
     )
 
     with pytest.raises(DomainError):
@@ -1204,7 +1213,7 @@ async def test_create_installment_schedule_must_match_balance(make_uow, register
     assert len(updated.schedule) == 2
 
 
-async def test_extend_debt_records_history_and_changes_due_date(make_uow, registered_shop):
+async def test_extend_debt_records_history_and_changes_due_date(make_uow, registered_shop, warehouse_id):
     tenant_id, _, owner = registered_shop
     client = await CreateClientUseCase(make_uow(tenant_id)).execute(
         owner, CreateClientCommand(name="Тимур")
@@ -1212,7 +1221,7 @@ async def test_extend_debt_records_history_and_changes_due_date(make_uow, regist
     original_due = date.today() + timedelta(days=3)
     debt = await IssueDebtUseCase(make_uow(tenant_id)).execute(
         owner,
-        IssueDebtCommand(client_id=client.id, amount=Decimal("1000"), due_date=original_due),
+        IssueDebtCommand(client_id=client.id, warehouse_id=warehouse_id, amount=Decimal("1000"), due_date=original_due),
     )
 
     new_due = date.today() + timedelta(days=10)
@@ -1227,13 +1236,13 @@ async def test_extend_debt_records_history_and_changes_due_date(make_uow, regist
     assert updated.extensions[0].author_id == owner.id
 
 
-async def test_extend_debt_fails_when_already_closed(make_uow, registered_shop):
+async def test_extend_debt_fails_when_already_closed(make_uow, registered_shop, warehouse_id):
     tenant_id, _, owner = registered_shop
     client = await CreateClientUseCase(make_uow(tenant_id)).execute(
         owner, CreateClientCommand(name="Рустам")
     )
     debt = await IssueDebtUseCase(make_uow(tenant_id)).execute(
-        owner, IssueDebtCommand(client_id=client.id, amount=Decimal("500")),
+        owner, IssueDebtCommand(client_id=client.id, warehouse_id=warehouse_id, amount=Decimal("500")),
     )
     await RepayDebtUseCase(make_uow(tenant_id)).execute(
         owner, RepayDebtCommand(debt_id=debt.id, amount=Decimal("500")),
@@ -1246,13 +1255,13 @@ async def test_extend_debt_fails_when_already_closed(make_uow, registered_shop):
         )
 
 
-async def test_repay_debt_records_note_and_author(make_uow, registered_shop):
+async def test_repay_debt_records_note_and_author(make_uow, registered_shop, warehouse_id):
     tenant_id, _, owner = registered_shop
     client = await CreateClientUseCase(make_uow(tenant_id)).execute(
         owner, CreateClientCommand(name="Иса")
     )
     debt = await IssueDebtUseCase(make_uow(tenant_id)).execute(
-        owner, IssueDebtCommand(client_id=client.id, amount=Decimal("800")),
+        owner, IssueDebtCommand(client_id=client.id, warehouse_id=warehouse_id, amount=Decimal("800")),
     )
 
     updated = await RepayDebtUseCase(make_uow(tenant_id)).execute(
@@ -1264,7 +1273,7 @@ async def test_repay_debt_records_note_and_author(make_uow, registered_shop):
     assert updated.balance == Money.of("500")
 
 
-async def test_debt_status_transitions(make_uow, registered_shop):
+async def test_debt_status_transitions(make_uow, registered_shop, warehouse_id):
     tenant_id, _, owner = registered_shop
     client = await CreateClientUseCase(make_uow(tenant_id)).execute(
         owner, CreateClientCommand(name="Магомед")
@@ -1272,25 +1281,37 @@ async def test_debt_status_transitions(make_uow, registered_shop):
 
     active = await IssueDebtUseCase(make_uow(tenant_id)).execute(
         owner,
-        IssueDebtCommand(client_id=client.id, amount=Decimal("100"), due_date=date.today() + timedelta(days=30)),
+        IssueDebtCommand(
+            client_id=client.id, warehouse_id=warehouse_id,
+            amount=Decimal("100"), due_date=date.today() + timedelta(days=30),
+        ),
     )
     assert active.status() == DebtStatus.ACTIVE
 
     due_soon = await IssueDebtUseCase(make_uow(tenant_id)).execute(
         owner,
-        IssueDebtCommand(client_id=client.id, amount=Decimal("100"), due_date=date.today() + timedelta(days=2)),
+        IssueDebtCommand(
+            client_id=client.id, warehouse_id=warehouse_id,
+            amount=Decimal("100"), due_date=date.today() + timedelta(days=2),
+        ),
     )
     assert due_soon.status() == DebtStatus.DUE_SOON
 
     overdue = await IssueDebtUseCase(make_uow(tenant_id)).execute(
         owner,
-        IssueDebtCommand(client_id=client.id, amount=Decimal("100"), due_date=date.today() - timedelta(days=1)),
+        IssueDebtCommand(
+            client_id=client.id, warehouse_id=warehouse_id,
+            amount=Decimal("100"), due_date=date.today() - timedelta(days=1),
+        ),
     )
     assert overdue.status() == DebtStatus.OVERDUE
 
     partially_paid = await IssueDebtUseCase(make_uow(tenant_id)).execute(
         owner,
-        IssueDebtCommand(client_id=client.id, amount=Decimal("100"), due_date=date.today() + timedelta(days=30)),
+        IssueDebtCommand(
+            client_id=client.id, warehouse_id=warehouse_id,
+            amount=Decimal("100"), due_date=date.today() + timedelta(days=30),
+        ),
     )
     partially_paid = await RepayDebtUseCase(make_uow(tenant_id)).execute(
         owner, RepayDebtCommand(debt_id=partially_paid.id, amount=Decimal("40")),
@@ -1298,7 +1319,7 @@ async def test_debt_status_transitions(make_uow, registered_shop):
     assert partially_paid.status() == DebtStatus.PARTIALLY_PAID
 
     closed = await IssueDebtUseCase(make_uow(tenant_id)).execute(
-        owner, IssueDebtCommand(client_id=client.id, amount=Decimal("100")),
+        owner, IssueDebtCommand(client_id=client.id, warehouse_id=warehouse_id, amount=Decimal("100")),
     )
     closed = await RepayDebtUseCase(make_uow(tenant_id)).execute(
         owner, RepayDebtCommand(debt_id=closed.id, amount=Decimal("100")),

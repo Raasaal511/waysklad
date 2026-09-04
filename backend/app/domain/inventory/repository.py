@@ -43,3 +43,7 @@ class IStockDocumentRepository(Protocol):
         ограничения по складу (owner/analyst); иначе — только документы, где склад
         документа (источник или получатель при перемещении) входит в список."""
         ...
+
+    async def get(self, document_id: int) -> StockDocument:
+        """Один документ по id. NotFoundError, если не найден в текущем tenant."""
+        ...

@@ -3,6 +3,7 @@ from decimal import Decimal
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 
+from app.domain.common.exceptions import NotFoundError
 from app.domain.inventory.entities import StockDocument, StockItem
 from app.domain.inventory.repository import IStockDocumentRepository, IStockRepository
 from app.infrastructure.db.mappers.inventory import StockDocumentMapper
@@ -129,3 +130,18 @@ class SqlAlchemyStockDocumentRepository(SqlAlchemyRepository, IStockDocumentRepo
         product_ids = {line.product_id for m in models for line in m.lines}
         units_by_product = await self._product_unit_by_id(product_ids)
         return [StockDocumentMapper.to_entity(m, units_by_product) for m in models]
+
+    async def get(self, document_id: int) -> StockDocument:
+        model = (
+            await self._session.execute(
+                select(StockDocumentModel).where(
+                    StockDocumentModel.tenant_id == self._tenant,
+                    StockDocumentModel.id == document_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            raise NotFoundError(f"Документ {document_id} не найден")
+        product_ids = {line.product_id for line in model.lines}
+        units_by_product = await self._product_unit_by_id(product_ids)
+        return StockDocumentMapper.to_entity(model, units_by_product)
