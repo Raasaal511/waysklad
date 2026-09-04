@@ -26,7 +26,7 @@ from app.domain.storefront.entities import StorefrontMessage, StorefrontRequest
 
 class StorefrontCatalogParams(BaseModel):
     query: str = ""
-    limit: int = Field(50, le=200)
+    limit: int = Field(50, le=50)
     offset: int = Field(0, ge=0)
     category_id: int | None = None
     warehouse_id: int | None = None  # витрина одного склада — см. ?warehouse=<id>

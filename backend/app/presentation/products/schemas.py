@@ -35,7 +35,7 @@ class ProductsFilterParams(BaseModel):
     для generic filter-системы см. to_raw_params()."""
 
     query: str = ""
-    limit: int = Field(50, le=200)
+    limit: int = Field(50, le=50)
     offset: int = Field(0, ge=0)
     category_id: int | None = None
     sort: str = "name"
