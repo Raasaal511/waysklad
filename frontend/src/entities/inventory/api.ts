@@ -123,3 +123,20 @@ export function transferStock(input: {
 }) {
   return api.post<StockDocument>('/inventory/transfer', input)
 }
+
+export interface StocktakeDiscrepancy {
+  product_id: number
+  variant_id: number | null
+  expected: string
+  actual: string
+  delta: string
+}
+
+export interface StocktakeResult {
+  document: StockDocument
+  discrepancies: StocktakeDiscrepancy[]
+}
+
+export function stocktake(input: { warehouse_id: number; lines: StockLine[]; note?: string }) {
+  return api.post<StocktakeResult>('/inventory/stocktake', input)
+}

@@ -1,6 +1,7 @@
-.iconAccent {
+.storefrontLink {
   color: var(--accent);
-  flex-shrink: 0;
+  word-break: break-all;
+  font-size: 14px;
 }
 
 .shopNameField {

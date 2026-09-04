@@ -1233,11 +1233,9 @@ function NewSaleForm({
       refreshCatalog(['stock']).catch(() => {})
       onDone(sale)
     } catch (err) {
-      // Сеть недоступна (offline или fetch упал по TypeError, не по HTTP-ответу) —
-      // и продажа не в долг (офлайн-синк на бэкенде долги не поддерживает, см. sync/schemas.py) —
-      // сохраняем в очередь вместо показа ошибки. Бизнес-ошибки (ApiError) остаются ошибками.
+      // Сеть недоступна — сохраняем в очередь (включая продажи в долг с debt_due_date).
       const isNetworkFailure = !(err instanceof ApiError) && (!navigator.onLine || err instanceof TypeError)
-      if (isNetworkFailure && payment !== 'credit') {
+      if (isNetworkFailure && (payment !== 'credit' || (clientId && debtDueDate))) {
         await queueSale({
           warehouse_id: warehouseId,
           payment_method: payment,
@@ -1245,6 +1243,7 @@ function NewSaleForm({
           discount: discountAmount.toFixed(2),
           client_id: clientId,
           cash_received: cashReceivedValue,
+          debt_due_date: payment === 'credit' ? debtDueDate : null,
         })
         clearDraft()
         setOfflineQueued({ itemsCount: items.length, total: total.toFixed(2) })

@@ -26,6 +26,7 @@ export interface Product {
   category_id: number | null
   min_stock: string
   photo: string
+  show_on_storefront: boolean
   variants: Variant[]
 }
 
@@ -121,6 +122,7 @@ interface ProductInput {
   barcode?: string | null
   category_id?: number | null
   min_stock?: string
+  show_on_storefront?: boolean
   variants?: VariantInput[]
   initial_stock_warehouse_id?: number | null
   initial_stock_quantity?: string | null
@@ -139,7 +141,9 @@ export interface ListProductsParams {
   limit?: number
   offset?: number
   categoryId?: number | null
-  sort?: 'name' | 'price_asc' | 'price_desc' | 'margin_desc' | 'created_desc' | 'created_asc'
+  sort?: 'name' | 'price_asc' | 'price_desc' | 'margin_desc' | 'created_desc' | 'created_asc' | 'stock_desc'
+  inStockOnly?: boolean
+  warehouseId?: number | null
 }
 
 export async function listProducts(params: ListProductsParams = {}) {
@@ -149,6 +153,8 @@ export async function listProducts(params: ListProductsParams = {}) {
   if (params.offset != null) search.set('offset', String(params.offset))
   if (params.categoryId != null) search.set('category_id', String(params.categoryId))
   if (params.sort) search.set('sort', params.sort)
+  if (params.inStockOnly) search.set('in_stock_only', 'true')
+  if (params.warehouseId != null) search.set('warehouse_id', String(params.warehouseId))
   const qs = search.toString()
   const { data, total } = await api.getWithTotal<Product[]>(`/products${qs ? `?${qs}` : ''}`)
   return { items: data, total }

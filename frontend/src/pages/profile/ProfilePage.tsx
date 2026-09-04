@@ -132,6 +132,33 @@ function PersonalizationTab() {
           {error && <span className={layoutStyles.textDanger}>{error}</span>}
         </div>
       </div>
+
+      <StorefrontSettings shop={shop} />
+    </div>
+  )
+}
+
+function StorefrontSettings({ shop }: { shop: Tenant }) {
+  const storeUrl = shop.slug ? `${window.location.origin}/store/${shop.slug}` : null
+
+  return (
+    <div className={[layoutStyles.stack, layoutStyles.card, layoutStyles.cardFull].join(' ')}>
+      <div>
+        <h3>Публичная витрина</h3>
+        <p className={layoutStyles.textMuted}>
+          Включение, товары и заявки — в отдельном разделе меню.
+        </p>
+      </div>
+      <div className={layoutStyles.row} style={{ gap: 8, flexWrap: 'wrap' }}>
+        <Link to="/storefront">
+          <Button>Открыть раздел «Витрина»</Button>
+        </Link>
+        {shop.storefront_enabled && storeUrl && (
+          <a href={storeUrl} target="_blank" rel="noreferrer" className={styles.storefrontLink}>
+            {storeUrl}
+          </a>
+        )}
+      </div>
     </div>
   )
 }

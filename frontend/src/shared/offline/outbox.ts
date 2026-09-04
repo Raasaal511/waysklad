@@ -19,6 +19,7 @@ export interface QueuedSale {
   discount: string
   client_id: number | null
   cash_received: string | null
+  debt_due_date: string | null
   queued_at: string
 }
 

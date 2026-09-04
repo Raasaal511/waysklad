@@ -10,6 +10,7 @@ import {
   IconUsers,
   IconChartBar,
   IconUserCog,
+  IconBuildingStore,
   IconChevronLeft,
   IconChevronRight,
   type Icon as TablerIcon,
@@ -38,6 +39,10 @@ const NAV_ITEMS: NavItem[] = [
   {
     to: '/orders', label: 'Заказы', icon: IconClipboardList,
     roles: ['owner', 'manager', 'seller', 'analyst'],
+  },
+  {
+    to: '/storefront', label: 'Витрина', icon: IconBuildingStore,
+    roles: ['owner', 'manager', 'seller'],
   },
   { to: '/tasks', label: 'Задачи', icon: IconChecklist },
   {

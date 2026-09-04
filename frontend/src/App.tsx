@@ -14,6 +14,12 @@ import { StockPage } from './pages/stock/StockPage'
 import { WarehouseDetailPage } from './pages/stock/WarehouseDetailPage'
 import { MovementHistoryPage } from './pages/stock/MovementHistoryPage'
 import { OrdersPage } from './pages/orders/OrdersPage'
+import { StorefrontRequestsPage } from './pages/storefront/StorefrontRequestsPage'
+import { StorefrontManagePage } from './pages/storefront/StorefrontManagePage'
+import { StorefrontCatalogPage } from './pages/storefront/StorefrontCatalogPage'
+import { StorefrontProductPage } from './pages/storefront/StorefrontProductPage'
+import { StorefrontCartPage } from './pages/storefront/StorefrontCartPage'
+import { StorefrontRequestPage } from './pages/storefront/StorefrontRequestPage'
 import { TasksPage } from './pages/tasks/TasksPage'
 import { DebtsPage } from './pages/debts/DebtsPage'
 import { DebtDetailPage } from './pages/debts/DebtDetailPage'
@@ -30,6 +36,10 @@ export function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/store/:slug" element={<StorefrontCatalogPage />} />
+            <Route path="/store/:slug/products/:productId" element={<StorefrontProductPage />} />
+            <Route path="/store/:slug/cart" element={<StorefrontCartPage />} />
+            <Route path="/store/:slug/request" element={<StorefrontRequestPage />} />
             <Route
               element={
                 <RequireAuth>
@@ -50,6 +60,8 @@ export function App() {
               <Route path="/stock/history" element={<MovementHistoryPage />} />
               <Route path="/stock/:id" element={<WarehouseDetailPage />} />
               <Route path="/orders" element={<OrdersPage />} />
+              <Route path="/orders/storefront-requests" element={<StorefrontRequestsPage />} />
+              <Route path="/storefront" element={<StorefrontManagePage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/debts" element={<DebtsPage />} />
               <Route path="/debts/:id" element={<DebtDetailPage />} />

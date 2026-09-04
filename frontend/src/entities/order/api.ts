@@ -2,7 +2,7 @@ import { api } from '../../shared/api/client'
 import type { PaymentMethod, Sale } from '../sale/api'
 
 export type OrderStatus = 'new' | 'in_progress' | 'ready' | 'issued' | 'cancelled'
-export type OrderSource = 'whatsapp' | 'instagram' | 'call' | 'in_person'
+export type OrderSource = 'whatsapp' | 'instagram' | 'call' | 'in_person' | 'storefront'
 
 export interface OrderLine {
   product_id: number
