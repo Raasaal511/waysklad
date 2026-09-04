@@ -154,10 +154,24 @@ export async function listProducts(params: ListProductsParams = {}) {
   return { items: data, total }
 }
 
-/** Весь каталог целиком (без пагинации) — для форм выбора товара: продажа, заказ, приёмка. */
+const ALL_PRODUCTS_PAGE_SIZE = 50
+
+/** Весь каталог целиком (постранично, лимит на бэкенде — 50) — для форм выбора товара: продажа, заказ, приёмка. */
 export async function listAllProducts(query = '', categoryId?: number | null) {
-  const { items } = await listProducts({ query, limit: 1000, categoryId })
-  return items
+  const all: Product[] = []
+  let offset = 0
+  while (true) {
+    const { items, total } = await listProducts({
+      query,
+      categoryId,
+      limit: ALL_PRODUCTS_PAGE_SIZE,
+      offset,
+    })
+    all.push(...items)
+    offset += items.length
+    if (items.length < ALL_PRODUCTS_PAGE_SIZE || offset >= total) break
+  }
+  return all
 }
 
 export function createProduct(input: ProductInput) {
