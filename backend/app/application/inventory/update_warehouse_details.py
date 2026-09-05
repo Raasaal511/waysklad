@@ -11,6 +11,7 @@ class UpdateWarehouseDetailsCommand:
     warehouse_id: int
     name: str
     address: str = ""
+    show_on_storefront: bool = False
 
 
 class UpdateWarehouseDetailsUseCase:
@@ -24,7 +25,7 @@ class UpdateWarehouseDetailsUseCase:
 
         async with self._uow as uow:
             warehouse = await uow.warehouses.update_details(
-                cmd.warehouse_id, cmd.name, cmd.address
+                cmd.warehouse_id, cmd.name, cmd.address, cmd.show_on_storefront
             )
             await uow.audit.add(
                 AuditEntry.record(

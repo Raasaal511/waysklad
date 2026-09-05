@@ -14,11 +14,14 @@ from app.infrastructure.db.models.catalog import ProductModel
 from app.infrastructure.db.models.inventory import StockItemModel
 
 
-def _stock_expr(warehouse_id: int | None):
-    """Суммарный остаток товара — по конкретному складу либо по всем сразу."""
+def _stock_expr(warehouse_id: int | None = None, warehouse_ids: list[int] | None = None):
+    """Суммарный остаток товара — по конкретному складу, по списку складов
+    (например, только видимые на витрине) либо по всем сразу."""
     conditions = [StockItemModel.product_id == ProductModel.id]
     if warehouse_id is not None:
         conditions.append(StockItemModel.warehouse_id == warehouse_id)
+    elif warehouse_ids is not None:
+        conditions.append(StockItemModel.warehouse_id.in_(warehouse_ids))
     return (
         select(func.coalesce(func.sum(StockItemModel.quantity), 0))
         .where(*conditions)
@@ -41,7 +44,9 @@ class ProductFilterFactory(BaseQueryFilterFactory[ProductModel]):
     allowed_order_fields = {"name", "retail_price", "margin", "created_at", "stock"}
 
     @classmethod
-    def build_fields(cls, warehouse_id: int | None = None) -> dict[str, FieldSpec]:
+    def build_fields(
+        cls, warehouse_id: int | None = None, warehouse_ids: list[int] | None = None
+    ) -> dict[str, FieldSpec]:
         return {
             "name": FieldSpec(ProductModel.name, TEXT_OPS),
             "sku": FieldSpec(ProductModel.sku, TEXT_OPS),
@@ -52,6 +57,6 @@ class ProductFilterFactory(BaseQueryFilterFactory[ProductModel]):
             "purchase_price": FieldSpec(ProductModel.purchase_price, NUMERIC_OPS),
             "margin": FieldSpec(ProductModel.retail_price - ProductModel.purchase_price, NUMERIC_OPS),
             "created_at": FieldSpec(ProductModel.created_at, DATE_OPS),
-            "stock": FieldSpec(_stock_expr(warehouse_id), NUMERIC_OPS),
+            "stock": FieldSpec(_stock_expr(warehouse_id, warehouse_ids), NUMERIC_OPS),
             "show_on_storefront": FieldSpec(ProductModel.show_on_storefront, BOOL_OPS),
         }

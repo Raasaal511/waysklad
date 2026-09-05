@@ -31,6 +31,7 @@ class WarehouseModel(Base, TenantMixin, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     address: Mapped[str] = mapped_column(String(300), default="")
+    show_on_storefront: Mapped[bool] = mapped_column(default=False)
 
 
 class UserModel(Base, TenantMixin, TimestampMixin):

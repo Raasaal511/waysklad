@@ -150,9 +150,30 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
         return conditions
 
     async def list_filtered(
-        self, raw_params: dict, warehouse_id: int | None = None
+        self,
+        raw_params: dict,
+        warehouse_id: int | None = None,
+        warehouse_ids: list[int] | None = None,
+        variant_size: str | None = None,
+        variant_color: str | None = None,
     ) -> tuple[list[Product], int]:
-        fields = ProductFilterFactory.build_fields(warehouse_id)
+        fields = ProductFilterFactory.build_fields(warehouse_id, warehouse_ids)
+        variant_conditions = []
+        if variant_size is not None:
+            variant_conditions.append(ProductVariantModel.size == variant_size)
+        if variant_color is not None:
+            variant_conditions.append(ProductVariantModel.color == variant_color)
+        # фильтр по варианту — не через generic-DSL (EQ/IN там не выражают
+        # «есть хотя бы один вариант с size/color == X»), явный EXISTS точечно
+        # для этого публичного кейса витрины
+        variant_exists = (
+            select(1)
+            .where(ProductVariantModel.product_id == ProductModel.id, *variant_conditions)
+            .exists()
+            if variant_conditions
+            else None
+        )
+
         base = select(ProductModel).where(
             ProductModel.tenant_id == self._tenant, ProductModel.is_active.is_(True)
         )
@@ -161,6 +182,10 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
             .select_from(ProductModel)
             .where(ProductModel.tenant_id == self._tenant, ProductModel.is_active.is_(True))
         )
+        if variant_exists is not None:
+            base = base.where(variant_exists)
+            count_base = count_base.where(variant_exists)
+
         models = await ProductFilterFactory.fetch_list(self._session, raw_params, base, fields)
         total = await ProductFilterFactory.fetch_count(self._session, raw_params, count_base, fields)
         units = await self._units_map()
@@ -179,6 +204,33 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
             )
         ).all()
         return {category_id: count for category_id, count in rows}
+
+    async def list_storefront_variant_options(self) -> tuple[list[str], list[str]]:
+        base_filters = (
+            ProductModel.tenant_id == self._tenant,
+            ProductModel.is_active.is_(True),
+            ProductModel.show_on_storefront.is_(True),
+            ProductVariantModel.product_id == ProductModel.id,
+        )
+        sizes = (
+            await self._session.execute(
+                select(ProductVariantModel.size)
+                .join(ProductModel)
+                .where(*base_filters, ProductVariantModel.size != "")
+                .distinct()
+                .order_by(ProductVariantModel.size)
+            )
+        ).scalars().all()
+        colors = (
+            await self._session.execute(
+                select(ProductVariantModel.color)
+                .join(ProductModel)
+                .where(*base_filters, ProductVariantModel.color != "")
+                .distinct()
+                .order_by(ProductVariantModel.color)
+            )
+        ).scalars().all()
+        return list(sizes), list(colors)
 
     async def search_all(self, query: str = "") -> list[Product]:
         models = (

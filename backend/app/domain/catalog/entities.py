@@ -36,6 +36,10 @@ class Product:
     photo: str = ""
     min_stock: Decimal = Decimal("0")  # порог «заканчивается»
     show_on_storefront: bool = False  # видимость на публичной витрине — по умолчанию скрыт
+    # ограничения заявки с витрины — действуют только там, не в обычной продаже/заказе;
+    # None у обоих значит «без ограничения» (текущее поведение)
+    storefront_min_qty: Decimal | None = None
+    storefront_step_qty: Decimal | None = None
     variants: list[ProductVariant] = field(default_factory=list)
 
     @property

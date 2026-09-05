@@ -31,6 +31,11 @@ class StorefrontCatalogParams(BaseModel):
     category_id: int | None = None
     warehouse_id: int | None = None  # витрина одного склада — см. ?warehouse=<id>
     sort: str = "name"  # name, price_asc, price_desc, created_desc
+    min_price: Decimal | None = Field(None, ge=0)
+    max_price: Decimal | None = Field(None, ge=0)
+    in_stock_only: bool = False
+    variant_size: str | None = None
+    variant_color: str | None = None
 
     model_config = {"extra": "forbid"}
 
@@ -43,6 +48,11 @@ class StorefrontCatalogParams(BaseModel):
             category_id=self.category_id,
             warehouse_id=self.warehouse_id,
             sort=self.sort,
+            min_price=self.min_price,
+            max_price=self.max_price,
+            in_stock_only=self.in_stock_only,
+            variant_size=self.variant_size,
+            variant_color=self.variant_color,
         )
 
 
@@ -71,6 +81,8 @@ class StorefrontProductResponse(BaseModel):
     photo: str
     category_id: int | None
     in_stock: bool
+    min_order_qty: Decimal | None
+    order_step_qty: Decimal | None
 
     @classmethod
     def from_entity(cls, product: Product, in_stock: bool) -> "StorefrontProductResponse":
@@ -81,13 +93,24 @@ class StorefrontProductResponse(BaseModel):
             photo=product.photo,
             category_id=product.category_id,
             in_stock=in_stock,
+            min_order_qty=product.storefront_min_qty,
+            order_step_qty=product.storefront_step_qty,
         )
+
+
+class StorefrontWarehouseResponse(BaseModel):
+    id: int
+    name: str
+    address: str
 
 
 class StorefrontCatalogResponse(BaseModel):
     shop_name: str
     products: list[StorefrontProductResponse]
     categories: list[StorefrontCategoryResponse]
+    warehouses: list[StorefrontWarehouseResponse]
+    available_sizes: list[str]
+    available_colors: list[str]
     total: int
 
     @classmethod
@@ -99,6 +122,12 @@ class StorefrontCatalogResponse(BaseModel):
                 for p in result.products
             ],
             categories=[StorefrontCategoryResponse.from_count(c) for c in result.categories],
+            warehouses=[
+                StorefrontWarehouseResponse(id=w.id, name=w.name, address=w.address)
+                for w in result.warehouses
+            ],
+            available_sizes=result.available_sizes,
+            available_colors=result.available_colors,
             total=result.total,
         )
 

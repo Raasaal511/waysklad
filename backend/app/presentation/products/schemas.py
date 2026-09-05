@@ -81,6 +81,8 @@ class ProductCreateRequest(BaseModel):
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
     show_on_storefront: bool = False
+    storefront_min_qty: Decimal | None = None
+    storefront_step_qty: Decimal | None = None
     variants: list[VariantCreateRequest] = []
     initial_stock_warehouse_id: int | None = None
     initial_stock_quantity: Decimal | None = None
@@ -96,6 +98,8 @@ class ProductCreateRequest(BaseModel):
             category_id=self.category_id,
             min_stock=self.min_stock,
             show_on_storefront=self.show_on_storefront,
+            storefront_min_qty=self.storefront_min_qty,
+            storefront_step_qty=self.storefront_step_qty,
             variants=[
                 VariantInput(size=v.size, color=v.color, barcode=v.barcode)
                 for v in self.variants
@@ -116,6 +120,8 @@ class ProductUpdateRequest(BaseModel):
     min_stock: Decimal = Decimal("0")
     photo: str = ""
     show_on_storefront: bool = False
+    storefront_min_qty: Decimal | None = None
+    storefront_step_qty: Decimal | None = None
     variants: list[VariantUpdateRequest] = []
 
     def to_command(self, product_id: int) -> UpdateProductCommand:
@@ -131,6 +137,8 @@ class ProductUpdateRequest(BaseModel):
             min_stock=self.min_stock,
             photo=self.photo,
             show_on_storefront=self.show_on_storefront,
+            storefront_min_qty=self.storefront_min_qty,
+            storefront_step_qty=self.storefront_step_qty,
             variants=[
                 UpdateVariantInput(id=v.id, size=v.size, color=v.color, barcode=v.barcode)
                 for v in self.variants
@@ -351,6 +359,8 @@ class ProductResponse(BaseModel):
     min_stock: Decimal
     photo: str
     show_on_storefront: bool
+    storefront_min_qty: Decimal | None
+    storefront_step_qty: Decimal | None
     variants: list[VariantResponse]
 
     @classmethod
@@ -368,6 +378,8 @@ class ProductResponse(BaseModel):
             min_stock=product.min_stock,
             photo=product.photo,
             show_on_storefront=product.show_on_storefront,
+            storefront_min_qty=product.storefront_min_qty,
+            storefront_step_qty=product.storefront_step_qty,
             variants=[
                 VariantResponse(
                     id=v.id,

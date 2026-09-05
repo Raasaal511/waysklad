@@ -154,7 +154,9 @@ class SqlAlchemyWarehouseRepository(SqlAlchemyRepository, IWarehouseRepository):
             await self.set_assignments(model.id, warehouse.assigned_user_ids)
         return warehouse
 
-    async def update_details(self, warehouse_id: int, name: str, address: str) -> Warehouse:
+    async def update_details(
+        self, warehouse_id: int, name: str, address: str, show_on_storefront: bool = False
+    ) -> Warehouse:
         model = (
             await self._session.execute(
                 select(WarehouseModel).where(
@@ -166,6 +168,7 @@ class SqlAlchemyWarehouseRepository(SqlAlchemyRepository, IWarehouseRepository):
             raise NotFoundError(f"Склад {warehouse_id} не найден")
         model.name = name
         model.address = address
+        model.show_on_storefront = show_on_storefront
         await self._session.flush()
         return await self.get(warehouse_id)
 

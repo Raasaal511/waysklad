@@ -62,7 +62,10 @@ class WarehouseMapper:
     @staticmethod
     def to_orm(warehouse: Warehouse, tenant_id: int) -> WarehouseModel:
         return WarehouseModel(
-            tenant_id=tenant_id, name=warehouse.name, address=warehouse.address
+            tenant_id=tenant_id,
+            name=warehouse.name,
+            address=warehouse.address,
+            show_on_storefront=warehouse.show_on_storefront,
         )
 
     @staticmethod
@@ -72,4 +75,5 @@ class WarehouseMapper:
             name=model.name,
             address=model.address,
             assigned_user_ids=assigned_user_ids or [],
+            show_on_storefront=model.show_on_storefront,
         )

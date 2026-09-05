@@ -45,6 +45,8 @@ class ProductModel(Base, TenantMixin, TimestampMixin):
     photo: Mapped[str] = mapped_column(String(500), default="")
     is_active: Mapped[bool] = mapped_column(default=True)
     show_on_storefront: Mapped[bool] = mapped_column(default=False)
+    storefront_min_qty: Mapped[Decimal | None] = mapped_column(Numeric(14, 3))
+    storefront_step_qty: Mapped[Decimal | None] = mapped_column(Numeric(14, 3))
 
     variants: Mapped[list["ProductVariantModel"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"

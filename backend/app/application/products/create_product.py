@@ -31,6 +31,8 @@ class CreateProductCommand:
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
     show_on_storefront: bool = False
+    storefront_min_qty: Decimal | None = None
+    storefront_step_qty: Decimal | None = None
     variants: list[VariantInput] = field(default_factory=list)
     initial_stock_warehouse_id: int | None = None
     initial_stock_quantity: Decimal | None = None
@@ -67,6 +69,10 @@ class CreateProductUseCase:
                 if existing is not None:
                     raise DomainError(f"Штрихкод «{value}» уже используется товаром «{existing.name}»")
 
+            for qty in (cmd.storefront_min_qty, cmd.storefront_step_qty):
+                if qty is not None and qty <= 0:
+                    raise DomainError("Мин. количество и шаг заказа на витрине должны быть больше нуля")
+
             product = Product(
                 id=None,
                 name=cmd.name,
@@ -78,6 +84,8 @@ class CreateProductUseCase:
                 category_id=cmd.category_id,
                 min_stock=cmd.min_stock,
                 show_on_storefront=cmd.show_on_storefront,
+                storefront_min_qty=cmd.storefront_min_qty,
+                storefront_step_qty=cmd.storefront_step_qty,
                 variants=[
                     ProductVariant(
                         id=None,

@@ -41,6 +41,7 @@ class Warehouse:
     # данные (продажи, остатки, аналитика) для них фильтруются по этому списку;
     # owner имеет доступ ко всем складам магазина вне зависимости от списка
     assigned_user_ids: list[int] = field(default_factory=list)
+    show_on_storefront: bool = False  # видимость на публичной витрине — по умолчанию скрыт
 
 
 @dataclass
