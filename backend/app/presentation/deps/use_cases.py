@@ -45,6 +45,11 @@ from app.application.debts.list_debts import ListDebtsUseCase
 from app.application.debts.list_due_debts import ListDueDebtsUseCase
 from app.application.debts.repay_debt import RepayDebtUseCase
 from app.application.inventory.create_warehouse import CreateWarehouseUseCase
+from app.application.inventory.get_document import GetDocumentUseCase
+from app.application.inventory.get_document_export_data import GetDocumentExportDataUseCase
+from app.application.inventory.list_documents import ListDocumentsUseCase
+from app.application.inventory.list_stock import ListStockUseCase
+from app.application.inventory.list_warehouses import ListWarehousesUseCase
 from app.application.inventory.receive_goods import ReceiveGoodsUseCase
 from app.application.inventory.set_warehouse_assignments import (
     SetWarehouseAssignmentsUseCase,
@@ -55,6 +60,7 @@ from app.application.inventory.update_warehouse_details import (
     UpdateWarehouseDetailsUseCase,
 )
 from app.application.inventory.write_off import WriteOffUseCase
+from app.application.notifications.list_notifications import ListNotificationsUseCase
 from app.application.notifications.mark_read import (
     MarkAllNotificationsReadUseCase,
     MarkNotificationReadUseCase,
@@ -96,6 +102,7 @@ from app.application.storefront.accept_request import AcceptStorefrontRequestUse
 from app.application.storefront.create_request import CreateStorefrontRequestUseCase
 from app.application.storefront.get_catalog import GetStorefrontCatalogUseCase
 from app.application.storefront.get_product import GetStorefrontProductUseCase
+from app.application.storefront.get_request import GetStorefrontRequestUseCase
 from app.application.storefront.get_request_status import GetStorefrontRequestStatusUseCase
 from app.application.storefront.list_messages import (
     ListStaffStorefrontMessagesUseCase,
@@ -109,6 +116,9 @@ from app.application.storefront.send_message import (
 )
 from app.application.sync.apply_offline_ops import ApplyOfflineSalesUseCase
 from app.application.tasks.change_status import ChangeTaskStatusUseCase
+from app.application.tasks.get_task import GetTaskUseCase
+from app.application.tasks.get_task_history import GetTaskHistoryUseCase
+from app.application.tasks.list_tasks import ListActiveTasksUseCase, ListCompletedTasksUseCase
 from app.application.tasks.update_task import UpdateTaskUseCase
 from app.application.tasks.create_task import CreateTaskUseCase
 from app.presentation.deps.notifier import NotifierDep
@@ -173,6 +183,11 @@ get_stocktake = _with_uow(StocktakeUseCase)
 get_create_warehouse = _with_uow(CreateWarehouseUseCase)
 get_set_warehouse_assignments = _with_uow(SetWarehouseAssignmentsUseCase)
 get_update_warehouse_details = _with_uow(UpdateWarehouseDetailsUseCase)
+get_list_warehouses = _with_uow(ListWarehousesUseCase)
+get_list_stock = _with_uow(ListStockUseCase)
+get_list_documents = _with_uow(ListDocumentsUseCase)
+get_document = _with_uow(GetDocumentUseCase)
+get_document_export_data = _with_uow(GetDocumentExportDataUseCase)
 get_create_sale = _with_uow(CreateSaleUseCase)
 get_return_sale = _with_uow(ReturnSaleUseCase)
 get_edit_sale = _with_uow(EditSaleUseCase)
@@ -224,6 +239,7 @@ get_connect_telegram = _with_uow(ConnectTelegramUseCase)
 get_update_shop = _with_uow(UpdateShopUseCase)
 get_mark_notification_read = _with_uow(MarkNotificationReadUseCase)
 get_mark_all_notifications_read = _with_uow(MarkAllNotificationsReadUseCase)
+get_list_notifications = _with_uow(ListNotificationsUseCase)
 
 
 def get_storefront_catalog(factory: SessionFactoryDep) -> GetStorefrontCatalogUseCase:
@@ -243,6 +259,7 @@ def get_create_storefront_request(factory: SessionFactoryDep) -> CreateStorefron
 
 
 get_list_storefront_requests = _with_uow(ListStorefrontRequestsUseCase)
+get_storefront_request = _with_uow(GetStorefrontRequestUseCase)
 get_accept_storefront_request = _with_uow(AcceptStorefrontRequestUseCase)
 get_reject_storefront_request = _with_uow(RejectStorefrontRequestUseCase)
 get_list_staff_storefront_messages = _with_uow(ListStaffStorefrontMessagesUseCase)
@@ -269,6 +286,12 @@ def get_change_task_status(uow: UowDep, notifier: NotifierDep) -> ChangeTaskStat
 
 def get_update_task(uow: UowDep, notifier: NotifierDep) -> UpdateTaskUseCase:
     return UpdateTaskUseCase(uow, notifier)
+
+
+get_list_active_tasks = _with_uow(ListActiveTasksUseCase)
+get_list_completed_tasks = _with_uow(ListCompletedTasksUseCase)
+get_task = _with_uow(GetTaskUseCase)
+get_task_history = _with_uow(GetTaskHistoryUseCase)
 
 # готовые зависимости для сигнатур роутов
 RegisterShopDep = Annotated[RegisterShopUseCase, Depends(get_register_shop)]
@@ -304,6 +327,13 @@ SetWarehouseAssignmentsDep = Annotated[
 ]
 UpdateWarehouseDetailsDep = Annotated[
     UpdateWarehouseDetailsUseCase, Depends(get_update_warehouse_details)
+]
+ListWarehousesDep = Annotated[ListWarehousesUseCase, Depends(get_list_warehouses)]
+ListStockDep = Annotated[ListStockUseCase, Depends(get_list_stock)]
+ListDocumentsDep = Annotated[ListDocumentsUseCase, Depends(get_list_documents)]
+GetDocumentDep = Annotated[GetDocumentUseCase, Depends(get_document)]
+GetDocumentExportDataDep = Annotated[
+    GetDocumentExportDataUseCase, Depends(get_document_export_data)
 ]
 CreateSaleDep = Annotated[CreateSaleUseCase, Depends(get_create_sale)]
 ReturnSaleDep = Annotated[ReturnSaleUseCase, Depends(get_return_sale)]
@@ -365,12 +395,17 @@ LogoutAllDep = Annotated[LogoutAllUseCase, Depends(get_logout_all)]
 CreateTaskDep = Annotated[CreateTaskUseCase, Depends(get_create_task)]
 ChangeTaskStatusDep = Annotated[ChangeTaskStatusUseCase, Depends(get_change_task_status)]
 UpdateTaskDep = Annotated[UpdateTaskUseCase, Depends(get_update_task)]
+ListActiveTasksDep = Annotated[ListActiveTasksUseCase, Depends(get_list_active_tasks)]
+ListCompletedTasksDep = Annotated[ListCompletedTasksUseCase, Depends(get_list_completed_tasks)]
+GetTaskDep = Annotated[GetTaskUseCase, Depends(get_task)]
+GetTaskHistoryDep = Annotated[GetTaskHistoryUseCase, Depends(get_task_history)]
 MarkNotificationReadDep = Annotated[
     MarkNotificationReadUseCase, Depends(get_mark_notification_read)
 ]
 MarkAllNotificationsReadDep = Annotated[
     MarkAllNotificationsReadUseCase, Depends(get_mark_all_notifications_read)
 ]
+ListNotificationsDep = Annotated[ListNotificationsUseCase, Depends(get_list_notifications)]
 GetStorefrontCatalogDep = Annotated[
     GetStorefrontCatalogUseCase, Depends(get_storefront_catalog)
 ]
@@ -385,6 +420,9 @@ CreateStorefrontRequestDep = Annotated[
 ]
 ListStorefrontRequestsDep = Annotated[
     ListStorefrontRequestsUseCase, Depends(get_list_storefront_requests)
+]
+GetStorefrontRequestDep = Annotated[
+    GetStorefrontRequestUseCase, Depends(get_storefront_request)
 ]
 AcceptStorefrontRequestDep = Annotated[
     AcceptStorefrontRequestUseCase, Depends(get_accept_storefront_request)

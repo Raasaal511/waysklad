@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Response
 
-from app.domain.common.exceptions import AccessDeniedError
 from app.infrastructure.inventory_export import (
     render_documents_csv,
     render_documents_pdf,
@@ -12,12 +11,16 @@ from app.application.analytics.restock_recommendations import (
 from app.presentation.deps import (
     ActorDep,
     CreateWarehouseDep,
+    GetDocumentDep,
+    GetDocumentExportDataDep,
     GetRestockRecommendationsDep,
+    ListDocumentsDep,
+    ListStockDep,
+    ListWarehousesDep,
     ReceiveGoodsDep,
     SetWarehouseAssignmentsDep,
     StocktakeDep,
     TransferDep,
-    UowDep,
     UpdateWarehouseDetailsDep,
     WriteOffDep,
 )
@@ -38,24 +41,6 @@ from app.presentation.inventory.schemas import (
 )
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
-
-
-async def _load_document_export_data(actor: ActorDep, uow: UowDep):
-    async with uow:
-        warehouse_ids = actor.warehouse_ids if actor.is_warehouse_scoped else None
-        documents = await uow.stock_documents.list_all(warehouse_ids)
-        warehouses = await uow.warehouses.list()
-        products = await uow.products.search_all()
-        users = await uow.users.list_by_tenant()
-        tenant = await uow.tenants.get(uow.tenant_id)
-        return (
-            documents,
-            {w.id: w.name for w in warehouses},
-            {p.id: p.name for p in products},
-            {p.id: p.unit.fractional for p in products},
-            {u.id: u.name for u in users},
-            tenant.name,
-        )
 
 
 @router.post("/warehouses", status_code=201)
@@ -90,13 +75,9 @@ async def set_warehouse_assignments(
 
 
 @router.get("/warehouses")
-async def list_warehouses(actor: ActorDep, uow: UowDep) -> list[WarehouseResponse]:
-    async with uow:
-        if actor.is_warehouse_scoped:
-            warehouses = await uow.warehouses.list_for_user(actor.id)
-        else:
-            warehouses = await uow.warehouses.list()
-        return [WarehouseResponse.from_entity(w) for w in warehouses]
+async def list_warehouses(actor: ActorDep, use_case: ListWarehousesDep) -> list[WarehouseResponse]:
+    warehouses = await use_case.execute(actor)
+    return [WarehouseResponse.from_entity(w) for w in warehouses]
 
 
 @router.get("/restock-recommendations")
@@ -108,31 +89,23 @@ async def get_restock_recommendations(
 
 
 @router.get("/stock")
-async def list_stock(actor: ActorDep, uow: UowDep) -> list[StockItemResponse]:
-    async with uow:
-        items = await uow.stock.list_all()
-        if not actor.is_warehouse_scoped:
-            return [StockItemResponse.from_entity(item) for item in items]
-        allowed_ids = set(actor.warehouse_ids)
-        return [
-            StockItemResponse.from_entity(item)
-            for item in items
-            if item.warehouse_id in allowed_ids
-        ]
+async def list_stock(actor: ActorDep, use_case: ListStockDep) -> list[StockItemResponse]:
+    items = await use_case.execute(actor)
+    return [StockItemResponse.from_entity(item) for item in items]
 
 
 @router.get("/documents")
-async def list_documents(actor: ActorDep, uow: UowDep) -> list[DocumentHistoryResponse]:
-    async with uow:
-        warehouse_ids = actor.warehouse_ids if actor.is_warehouse_scoped else None
-        documents = await uow.stock_documents.list_all(warehouse_ids)
-        return [DocumentHistoryResponse.from_entity(d) for d in documents]
+async def list_documents(actor: ActorDep, use_case: ListDocumentsDep) -> list[DocumentHistoryResponse]:
+    documents = await use_case.execute(actor)
+    return [DocumentHistoryResponse.from_entity(d) for d in documents]
 
 
 @router.get("/documents/export.xlsx")
-async def export_documents_xlsx(actor: ActorDep, uow: UowDep) -> Response:
-    documents, warehouses, products, fractional, users, _ = await _load_document_export_data(actor, uow)
-    content = render_documents_xlsx(documents, warehouses, products, fractional, users)
+async def export_documents_xlsx(actor: ActorDep, use_case: GetDocumentExportDataDep) -> Response:
+    data = await use_case.execute(actor)
+    content = render_documents_xlsx(
+        data.documents, data.warehouse_names, data.product_names, data.product_fractional, data.user_names
+    )
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -141,9 +114,11 @@ async def export_documents_xlsx(actor: ActorDep, uow: UowDep) -> Response:
 
 
 @router.get("/documents/export.csv")
-async def export_documents_csv(actor: ActorDep, uow: UowDep) -> Response:
-    documents, warehouses, products, fractional, users, _ = await _load_document_export_data(actor, uow)
-    content = render_documents_csv(documents, warehouses, products, fractional, users)
+async def export_documents_csv(actor: ActorDep, use_case: GetDocumentExportDataDep) -> Response:
+    data = await use_case.execute(actor)
+    content = render_documents_csv(
+        data.documents, data.warehouse_names, data.product_names, data.product_fractional, data.user_names
+    )
     return Response(
         content=content,
         media_type="text/csv",
@@ -152,9 +127,16 @@ async def export_documents_csv(actor: ActorDep, uow: UowDep) -> Response:
 
 
 @router.get("/documents/export.pdf")
-async def export_documents_pdf(actor: ActorDep, uow: UowDep) -> Response:
-    documents, warehouses, products, fractional, users, shop_name = await _load_document_export_data(actor, uow)
-    content = render_documents_pdf(shop_name, documents, warehouses, products, fractional, users)
+async def export_documents_pdf(actor: ActorDep, use_case: GetDocumentExportDataDep) -> Response:
+    data = await use_case.execute(actor)
+    content = render_documents_pdf(
+        data.shop_name,
+        data.documents,
+        data.warehouse_names,
+        data.product_names,
+        data.product_fractional,
+        data.user_names,
+    )
     return Response(
         content=content,
         media_type="application/pdf",
@@ -164,15 +146,9 @@ async def export_documents_pdf(actor: ActorDep, uow: UowDep) -> Response:
 
 @router.get("/documents/{document_id}")
 async def get_document(
-    document_id: int, actor: ActorDep, uow: UowDep
+    document_id: int, actor: ActorDep, use_case: GetDocumentDep
 ) -> DocumentHistoryResponse:
-    async with uow:
-        document = await uow.stock_documents.get(document_id)
-        if actor.is_warehouse_scoped:
-            document_warehouses = {document.warehouse_id, document.to_warehouse_id}
-            if document_warehouses.isdisjoint(actor.warehouse_ids):
-                raise AccessDeniedError("Этот склад вам не назначен")
-        return DocumentHistoryResponse.from_entity(document)
+    return DocumentHistoryResponse.from_entity(await use_case.execute(actor, document_id))
 
 
 @router.post("/receive", status_code=201)
