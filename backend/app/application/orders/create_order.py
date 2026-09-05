@@ -74,6 +74,7 @@ class CreateOrderUseCase:
             )
             new_order.validate()
             order = await uow.orders.add(new_order)
+            await uow.clients.link_to_warehouse(order.client_id, order.warehouse_id)
             await uow.audit.add(
                 AuditEntry.record(
                     actor, "order.create", order.id,

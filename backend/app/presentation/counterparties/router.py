@@ -33,10 +33,13 @@ async def create_client(
 
 @router.get("/clients")
 async def search_clients(
-    uow: UowDep, query: str = "", include_inactive: bool = False
+    uow: UowDep, actor: ActorDep, query: str = "", include_inactive: bool = False
 ) -> list[ClientResponse]:
     async with uow:
-        clients = await uow.clients.search(query, include_inactive=include_inactive)
+        warehouse_ids = actor.warehouse_ids if actor.is_warehouse_scoped else None
+        clients = await uow.clients.search(
+            query, include_inactive=include_inactive, warehouse_ids=warehouse_ids
+        )
         return [ClientResponse.from_entity(c) for c in clients]
 
 
@@ -72,6 +75,8 @@ async def create_supplier(
 
 
 @router.get("/suppliers")
-async def list_suppliers(uow: UowDep) -> list[SupplierResponse]:
+async def list_suppliers(uow: UowDep, actor: ActorDep) -> list[SupplierResponse]:
     async with uow:
-        return [SupplierResponse.from_entity(s) for s in await uow.suppliers.list()]
+        warehouse_ids = actor.warehouse_ids if actor.is_warehouse_scoped else None
+        suppliers = await uow.suppliers.list(warehouse_ids=warehouse_ids)
+        return [SupplierResponse.from_entity(s) for s in suppliers]

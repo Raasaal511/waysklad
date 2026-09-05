@@ -103,6 +103,8 @@ class CreateSaleUseCase:
                 await self._check_debt_limit(uow, sale)
 
             await uow.sales.add(sale)
+            if sale.client_id is not None:
+                await uow.clients.link_to_warehouse(sale.client_id, sale.warehouse_id)
 
             if sale.payment_method is PaymentMethod.CREDIT:
                 debt = Debt(

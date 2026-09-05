@@ -45,6 +45,7 @@ class IssueSupplierDebtUseCase:
             )
             debt.validate()
             debt = await uow.debts.add(debt)
+            await uow.suppliers.link_to_warehouse(supplier.id, cmd.warehouse_id)
             await uow.audit.add(
                 AuditEntry.record(
                     actor, "debt.issue_supplier", debt.id,

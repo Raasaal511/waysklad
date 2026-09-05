@@ -616,6 +616,134 @@ async def test_storekeeper_limited_to_assigned_warehouse_via_api(
     assert response.json() == []
 
 
+async def test_counterparties_scoped_by_warehouse_via_api(client, owner_headers, random_phone):
+    # клиент/поставщик привязаны к складу транзитивно — через продажу/приёмку
+    # на этом складе (warehouse_client_links/warehouse_supplier_links); продавец,
+    # привязанный только к своему складу, не должен видеть чужих контрагентов
+    warehouses = (await client.get("/api/inventory/warehouses", headers=owner_headers)).json()
+    main_warehouse_id = warehouses[0]["id"]
+
+    response = await client.post(
+        "/api/inventory/warehouses", headers=owner_headers, json={"name": "Склад Б"}
+    )
+    assert response.status_code == 201, response.text
+    second_warehouse_id = response.json()["id"]
+
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Товар для контрагентов", "purchase_price": "50", "retail_price": "100"},
+    )
+    product_id = response.json()["id"]
+    for warehouse_id in (main_warehouse_id, second_warehouse_id):
+        await client.post(
+            "/api/inventory/receive",
+            headers=owner_headers,
+            json={"warehouse_id": warehouse_id, "lines": [{"product_id": product_id, "quantity": "10"}]},
+        )
+
+    client_main = (
+        await client.post(
+            "/api/counterparties/clients", headers=owner_headers, json={"name": "Клиент склада А"}
+        )
+    ).json()
+    client_second = (
+        await client.post(
+            "/api/counterparties/clients", headers=owner_headers, json={"name": "Клиент склада Б"}
+        )
+    ).json()
+    supplier_main = (
+        await client.post(
+            "/api/counterparties/suppliers", headers=owner_headers, json={"name": "Поставщик склада А"}
+        )
+    ).json()
+    supplier_second = (
+        await client.post(
+            "/api/counterparties/suppliers", headers=owner_headers, json={"name": "Поставщик склада Б"}
+        )
+    ).json()
+
+    # засвечиваем каждого контрагента на своём складе продажей/приёмкой
+    response = await client.post(
+        "/api/sales",
+        headers=owner_headers,
+        json={
+            "warehouse_id": main_warehouse_id,
+            "payment_method": "cash",
+            "items": [{"product_id": product_id, "quantity": "1", "price": "100"}],
+            "client_id": client_main["id"],
+        },
+    )
+    assert response.status_code == 201, response.text
+    response = await client.post(
+        "/api/sales",
+        headers=owner_headers,
+        json={
+            "warehouse_id": second_warehouse_id,
+            "payment_method": "cash",
+            "items": [{"product_id": product_id, "quantity": "1", "price": "100"}],
+            "client_id": client_second["id"],
+        },
+    )
+    assert response.status_code == 201, response.text
+    response = await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={
+            "warehouse_id": main_warehouse_id,
+            "lines": [{"product_id": product_id, "quantity": "1", "cost": "50"}],
+            "supplier_id": supplier_main["id"],
+            "debt_due_date": str(date.today() + timedelta(days=7)),
+        },
+    )
+    assert response.status_code == 201, response.text
+    response = await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={
+            "warehouse_id": second_warehouse_id,
+            "lines": [{"product_id": product_id, "quantity": "1", "cost": "50"}],
+            "supplier_id": supplier_second["id"],
+            "debt_due_date": str(date.today() + timedelta(days=7)),
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    # владелец видит всех
+    response = await client.get("/api/counterparties/clients", headers=owner_headers)
+    names = {c["name"] for c in response.json()}
+    assert {"Клиент склада А", "Клиент склада Б"} <= names
+    response = await client.get("/api/counterparties/suppliers", headers=owner_headers)
+    names = {s["name"] for s in response.json()}
+    assert {"Поставщик склада А", "Поставщик склада Б"} <= names
+
+    # продавец, назначенный только на склад А, видит только своих контрагентов
+    seller_phone = random_phone()
+    response = await client.post(
+        "/api/auth/employees",
+        headers=owner_headers,
+        json={
+            "name": "Продавец А", "phone": seller_phone, "password": "secret123",
+            "role": "seller", "warehouse_ids": [main_warehouse_id],
+        },
+    )
+    assert response.status_code == 201, response.text
+    login = await client.post(
+        "/api/auth/login", json={"phone": seller_phone, "password": "secret123"}
+    )
+    seller_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    response = await client.get("/api/counterparties/clients", headers=seller_headers)
+    names = {c["name"] for c in response.json()}
+    assert "Клиент склада А" in names
+    assert "Клиент склада Б" not in names
+
+    response = await client.get("/api/counterparties/suppliers", headers=seller_headers)
+    names = {s["name"] for s in response.json()}
+    assert "Поставщик склада А" in names
+    assert "Поставщик склада Б" not in names
+
+
 async def test_order_full_lifecycle_via_api(client, owner_headers):
     response = await client.post(
         "/api/products",
@@ -1724,6 +1852,122 @@ async def test_sync_sales_duplicate_client_op_id_in_same_batch_via_api(client, o
     applied_ids = {s["id"] for s in result["applied"] if s["client_op_id"] == "device-b-1"}
     assert len(applied_ids) == 1
     assert any(s["client_op_id"] == "device-b-2" for s in result["applied"])
+
+
+async def test_sync_returns_receipts_writeoffs_via_api(client, owner_headers):
+    # один и тот же офлайн-синк принимает все четыре типа операций сразу —
+    # проверяем успешное применение и идемпотентность повторной отправки пачки
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Товар для синка", "purchase_price": "50", "retail_price": "100"},
+    )
+    product_id = response.json()["id"]
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "20"}]},
+    )
+    response = await client.post(
+        "/api/sales",
+        headers=owner_headers,
+        json={
+            "warehouse_id": 1,
+            "payment_method": "cash",
+            "items": [{"product_id": product_id, "quantity": "5", "price": "100"}],
+        },
+    )
+    sale = response.json()
+    sale_line_id = sale["lines"][0]["id"]
+
+    batch = {
+        "returns": [
+            {
+                "client_op_id": "return-1",
+                "sale_id": sale["id"],
+                "items": [{"sale_line_id": sale_line_id, "quantity": "1"}],
+                "note": "не подошло",
+            }
+        ],
+        "receipts": [
+            {
+                "client_op_id": "receipt-1",
+                "warehouse_id": 1,
+                "lines": [{"product_id": product_id, "quantity": "10", "cost": "50"}],
+            }
+        ],
+        "writeoffs": [
+            {
+                "client_op_id": "writeoff-1",
+                "warehouse_id": 1,
+                "lines": [{"product_id": product_id, "quantity": "2"}],
+                "note": "бой",
+            }
+        ],
+    }
+    response = await client.post("/api/sync/sales", headers=owner_headers, json=batch)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert len(result["errors"]) == 0
+    assert len(result["applied_returns"]) == 1
+    assert result["applied_returns"][0]["client_op_id"] == "return-1"
+    assert len(result["applied_receipts"]) == 1
+    assert result["applied_receipts"][0]["client_op_id"] == "receipt-1"
+    assert len(result["applied_writeoffs"]) == 1
+    assert result["applied_writeoffs"][0]["client_op_id"] == "writeoff-1"
+
+    # остаток: 20 - 5 (продажа) + 1 (возврат) + 10 (приёмка) - 2 (списание) = 24
+    response = await client.get("/api/inventory/stock", headers=owner_headers)
+    item = next(i for i in response.json() if i["product_id"] == product_id)
+    assert item["quantity"] == "24.000"
+
+    # повторная отправка той же пачки не задваивает ни одну из операций
+    response = await client.post("/api/sync/sales", headers=owner_headers, json=batch)
+    assert response.status_code == 200, response.text
+    retry = response.json()
+    assert len(retry["errors"]) == 0
+    assert retry["applied_returns"][0]["id"] == result["applied_returns"][0]["id"]
+    assert retry["applied_receipts"][0]["id"] == result["applied_receipts"][0]["id"]
+    assert retry["applied_writeoffs"][0]["id"] == result["applied_writeoffs"][0]["id"]
+
+    response = await client.get("/api/inventory/stock", headers=owner_headers)
+    item = next(i for i in response.json() if i["product_id"] == product_id)
+    assert item["quantity"] == "24.000"
+
+
+async def test_sync_error_has_typed_code_via_api(client, owner_headers):
+    # code = имя класса исключения — фронт различает причину отказа без
+    # парсинга текста сообщения
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Товар с кодом ошибки", "purchase_price": "50", "retail_price": "100"},
+    )
+    product_id = response.json()["id"]
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "1"}]},
+    )
+
+    batch = {
+        "sales": [
+            {
+                "client_op_id": "op-insufficient-stock",
+                "warehouse_id": 1,
+                "payment_method": "cash",
+                "items": [{"product_id": product_id, "quantity": "1000", "price": "100"}],
+            }
+        ]
+    }
+    response = await client.post("/api/sync/sales", headers=owner_headers, json=batch)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert len(result["errors"]) == 1
+    error = result["errors"][0]
+    assert error["op_type"] == "sale"
+    assert error["code"] == "InsufficientStockError"
+    assert error["client_op_id"] == "op-insufficient-stock"
 
 
 async def test_connect_telegram_via_api(client, owner_headers, random_phone):

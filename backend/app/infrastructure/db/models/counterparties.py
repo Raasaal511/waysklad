@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Index, Numeric, String, Text, text
+from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.infrastructure.db.models.base import Base, TenantMixin, TimestampMixin
@@ -36,3 +36,34 @@ class SupplierModel(Base, TenantMixin, TimestampMixin):
     name: Mapped[str] = mapped_column(String(200), index=True)
     contact: Mapped[str] = mapped_column(String(200), default="")
     note: Mapped[str] = mapped_column(Text, default="")
+
+
+class WarehouseClientLinkModel(Base):
+    """На каком складе засветился клиент (продажа/заказ/долг) — для видимости
+    клиента warehouse-scoped сотрудникам (manager/seller/storekeeper). Чисто
+    индексная связка, не бизнес-правило — тенант проверяется транзитивно через
+    warehouse_id/client_id, как и в WarehouseAssignmentModel."""
+
+    __tablename__ = "warehouse_client_links"
+    __table_args__ = (UniqueConstraint("warehouse_id", "client_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    warehouse_id: Mapped[int] = mapped_column(
+        ForeignKey("warehouses.id", ondelete="CASCADE"), index=True
+    )
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), index=True)
+
+
+class WarehouseSupplierLinkModel(Base):
+    """Аналог WarehouseClientLinkModel для поставщиков (приёмка/долг поставщику)."""
+
+    __tablename__ = "warehouse_supplier_links"
+    __table_args__ = (UniqueConstraint("warehouse_id", "supplier_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    warehouse_id: Mapped[int] = mapped_column(
+        ForeignKey("warehouses.id", ondelete="CASCADE"), index=True
+    )
+    supplier_id: Mapped[int] = mapped_column(
+        ForeignKey("suppliers.id", ondelete="CASCADE"), index=True
+    )
