@@ -16,6 +16,7 @@ from app.presentation.deps import (
     CreateStorefrontRequestDep,
     GetStorefrontCatalogDep,
     GetStorefrontProductDep,
+    GetStorefrontRequestDep,
     GetStorefrontRequestStatusDep,
     ListStaffStorefrontMessagesDep,
     ListStorefrontMessagesDep,
@@ -24,7 +25,6 @@ from app.presentation.deps import (
     SendStaffStorefrontMessageDep,
     SendStorefrontMessageDep,
     SessionFactoryDep,
-    UowDep,
 )
 from app.presentation.deps.auth import require_permission
 from app.presentation.orders.schemas import OrderResponse
@@ -146,9 +146,10 @@ async def storefront_chat_ws(websocket: WebSocket, token: str, factory: SessionF
 
 
 @router.get("/requests/{request_id}", dependencies=[_view])
-async def get_storefront_request(request_id: int, uow: UowDep) -> StorefrontRequestResponse:
-    async with uow:
-        return StorefrontRequestResponse.from_entity(await uow.storefront_requests.get(request_id))
+async def get_storefront_request(
+    request_id: int, use_case: GetStorefrontRequestDep
+) -> StorefrontRequestResponse:
+    return StorefrontRequestResponse.from_entity(await use_case.execute(request_id))
 
 
 @router.post("/requests/{request_id}/accept", dependencies=[_manage])
