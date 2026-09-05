@@ -5,12 +5,13 @@ import {
   listNotifications,
   markNotificationRead,
   markAllNotificationsRead,
+  notificationsWsUrl,
   type Notification,
 } from '../entities/notification/api'
 import layoutStyles from '../shared/ui/Layout.module.css'
 import styles from './NotificationBell.module.css'
 
-const POLL_INTERVAL_MS = 30_000
+const POLL_INTERVAL_MS = 60_000
 
 function formatTime(value: string | null) {
   if (!value) return ''
@@ -20,6 +21,10 @@ function formatTime(value: string | null) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function getAccessToken(): string | null {
+  return localStorage.getItem('access_token') ?? sessionStorage.getItem('access_token')
 }
 
 export function NotificationBell({ align = 'right' }: { align?: 'left' | 'right' }) {
@@ -32,7 +37,8 @@ export function NotificationBell({ align = 'right' }: { align?: 'left' | 'right'
 
   useEffect(() => {
     let cancelled = false
-    function tick() {
+
+    function refresh() {
       if (document.visibilityState !== 'visible') return
       listNotifications()
         .then((r) => {
@@ -42,11 +48,48 @@ export function NotificationBell({ align = 'right' }: { align?: 'left' | 'right'
         })
         .catch(() => {})
     }
-    tick()
-    const id = window.setInterval(tick, POLL_INTERVAL_MS)
+
+    refresh()
+    const pollId = window.setInterval(refresh, POLL_INTERVAL_MS)
+
+    let ws: WebSocket | null = null
+    let retryTimer: number | undefined
+    let closed = false
+
+    function connectWs() {
+      const token = getAccessToken()
+      if (!token || closed) return
+      ws = new WebSocket(notificationsWsUrl(token))
+      ws.onmessage = (ev) => {
+        try {
+          const n = JSON.parse(ev.data as string) as Notification
+          setItems((prev) => (prev.some((x) => x.id === n.id) ? prev : [{ ...n, is_read: false }, ...prev]))
+          setUnread((prev) => prev + 1)
+        } catch {
+          // ignore malformed
+        }
+      }
+      ws.onclose = () => {
+        if (!closed) {
+          refresh()
+          retryTimer = window.setTimeout(connectWs, 4000)
+        }
+      }
+    }
+    connectWs()
+
+    function onVisible() {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
     return () => {
       cancelled = true
-      window.clearInterval(id)
+      closed = true
+      window.clearInterval(pollId)
+      if (retryTimer) window.clearTimeout(retryTimer)
+      document.removeEventListener('visibilitychange', onVisible)
+      ws?.close()
     }
   }, [])
 

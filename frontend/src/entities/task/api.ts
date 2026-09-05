@@ -18,6 +18,7 @@ export interface Task {
   product_id: number | null
   warehouse_id: number | null
   quantity: string | null
+  client_id: number | null
   created_at: string | null
   completed_at: string | null
 }
@@ -42,6 +43,7 @@ export interface TaskCreateInput {
   product_id?: number | null
   warehouse_id?: number | null
   quantity?: string | null
+  client_id?: number | null
 }
 
 export function listActiveTasks() {
@@ -73,6 +75,7 @@ export interface TaskUpdateInput {
   assigned_user_id?: number | null
   due_date?: string | null
   note?: string
+  client_id?: number | null
 }
 
 export function updateTask(id: number, input: TaskUpdateInput) {

@@ -14,6 +14,7 @@ import { createTask, changeTaskStatus, listActiveTasks } from '../../entities/ta
 import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
 import { useCatalog } from '../../app/CatalogContext'
+import { useShop } from '../../app/ShopContext'
 import { Modal } from '../../shared/ui/Modal'
 import {
   IconChevronLeft,
@@ -27,6 +28,7 @@ import {
   IconClipboardCheck,
   IconTruck,
   IconSearch,
+  IconShare,
 } from '@tabler/icons-react'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Button } from '../../shared/ui/Button'
@@ -66,6 +68,7 @@ export function WarehouseDetailPage() {
   const { id } = useParams<{ id: string }>()
   const warehouseId = Number(id)
   const { user } = useAuth()
+  const { shop } = useShop()
   const canManageWarehouses = user?.role === 'owner' || user?.role === 'manager'
 
   const {
@@ -298,6 +301,21 @@ export function WarehouseDetailPage() {
           {warehouse?.address && <span className="text-muted">{warehouse.address}</span>}
         </div>
         <div className="row" style={{ gap: 8 }}>
+          {shop?.storefront_enabled && shop.slug && (
+            <IconButton
+              variant="muted"
+              size="lg"
+              tooltip="Поделиться витриной склада"
+              aria-label="Поделиться витриной склада"
+              onClick={() => {
+                const url = `${window.location.origin}/store/${shop.slug}?warehouse_id=${warehouseId}`
+                navigator.clipboard?.writeText(url).catch(() => {})
+                window.open(url, '_blank', 'noopener,noreferrer')
+              }}
+            >
+              <IconShare size={20} stroke={1.8} />
+            </IconButton>
+          )}
           {(Object.keys(MODE_LABELS) as MovementMode[]).map((m) => {
             const Icon = MODE_ICONS[m]
             return (

@@ -49,6 +49,7 @@ import {
   IconBrandInstagram,
   IconBrandWhatsapp,
   IconMapPin,
+  IconBuildingStore,
   IconLayoutKanban,
   IconTable,
   IconList,
@@ -91,6 +92,7 @@ const ORDER_SOURCE_LABELS: Record<OrderSource, string> = {
   instagram: 'Instagram',
   call: 'Звонок',
   in_person: 'Очно',
+  storefront: 'Витрина',
 }
 
 const ORDER_SOURCE_ICONS: Record<OrderSource, TablerIcon> = {
@@ -98,6 +100,7 @@ const ORDER_SOURCE_ICONS: Record<OrderSource, TablerIcon> = {
   instagram: IconBrandInstagram,
   call: IconPhone,
   in_person: IconMapPin,
+  storefront: IconBuildingStore,
 }
 
 const PAYMENT_LABELS: Record<PaymentMethod, string> = {
@@ -333,11 +336,18 @@ export function OrdersPage() {
     <div className={layoutStyles.stack}>
       <div className={layoutStyles.sectionTitle}>
         <h2>Заказы</h2>
-        {canManage && (
-          <Button onClick={() => setShowForm(true)}>
-            <IconPlus size={16} stroke={1.8} /> Заказ
-          </Button>
-        )}
+        <div className={layoutStyles.row} style={{ gap: 8 }}>
+          <Link to="/storefront?tab=requests">
+            <Button variant="secondary">
+              <IconBuildingStore size={16} stroke={1.8} /> Заявки с витрины
+            </Button>
+          </Link>
+          {canManage && (
+            <Button onClick={() => setShowForm(true)}>
+              <IconPlus size={16} stroke={1.8} /> Заказ
+            </Button>
+          )}
+        </div>
       </div>
 
       {showOnboarding && (
@@ -1427,7 +1437,9 @@ function NewOrderForm({
           <Select
             value={source}
             onChange={(v) => setSource(v as OrderSource)}
-            options={Object.entries(ORDER_SOURCE_LABELS).map(([value, label]) => ({ value, label }))}
+            options={Object.entries(ORDER_SOURCE_LABELS)
+              .filter(([value]) => value !== 'storefront')
+              .map(([value, label]) => ({ value, label }))}
           />
         </label>
       </div>

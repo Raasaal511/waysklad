@@ -25,6 +25,8 @@ export function updateEmployee(
 export interface Tenant {
   id: number
   name: string
+  slug: string | null
+  storefront_enabled: boolean
   owner_telegram_chat_id: string | null
   summary_daily_enabled: boolean
   summary_weekly_enabled: boolean
@@ -42,6 +44,7 @@ export function getShop() {
 
 export interface UpdateShopInput {
   name: string
+  storefront_enabled?: boolean
   summary_daily_enabled?: boolean
   summary_weekly_enabled?: boolean
   summary_monthly_enabled?: boolean

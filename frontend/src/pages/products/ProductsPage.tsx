@@ -2,7 +2,6 @@ import {
   lazy,
   Suspense,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -208,11 +207,7 @@ export function ProductsPage() {
     return () => clearTimeout(timer)
   }, [query])
 
-  // Категория и сортировка (кроме "по остатку") считаются на сервере — работают по всему
-  // каталогу, а не только по уже подгруженной странице; наличие/остаток остаются
-  // клиентскими, т.к. требуют знания складских остатков, которых нет в таблице товаров.
-  const serverSort = sortMode === 'stock_desc' ? 'name' : sortMode
-
+  // Фильтры по наличию и сортировка по остатку считаются на сервере — по всему каталогу.
   async function loadProducts() {
     setLoading(true)
     setError(null)
@@ -222,7 +217,9 @@ export function ProductsPage() {
         limit: PAGE_SIZE,
         offset: 0,
         categoryId: categoryId === 'all' ? null : categoryId,
-        sort: serverSort,
+        sort: sortMode,
+        inStockOnly,
+        warehouseId: warehouseId === 'all' ? null : warehouseId,
       })
       setProducts(items)
       setTotal(t)
@@ -241,7 +238,9 @@ export function ProductsPage() {
         limit: PAGE_SIZE,
         offset: products.length,
         categoryId: categoryId === 'all' ? null : categoryId,
-        sort: serverSort,
+        sort: sortMode,
+        inStockOnly,
+        warehouseId: warehouseId === 'all' ? null : warehouseId,
       })
       setProducts((prev) => [...prev, ...items])
       setTotal(t)
@@ -255,7 +254,7 @@ export function ProductsPage() {
   useEffect(() => {
     loadProducts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQuery, categoryId, serverSort])
+  }, [debouncedQuery, categoryId, sortMode, inStockOnly, warehouseId])
 
   useEffect(() => {
     ensureCategories().catch(() => {})
@@ -275,17 +274,7 @@ export function ProductsPage() {
       .filter((s) => s.product_id === productId && (warehouseId === 'all' || s.warehouse_id === warehouseId))
       .reduce((sum, s) => sum + Number(s.reserved), 0)
 
-  const filtered = useMemo(() => {
-    let list = products
-    if (inStockOnly) {
-      list = list.filter((p) => stockFor(p.id) > 0)
-    }
-    if (sortMode === 'stock_desc') {
-      list = [...list].sort((a, b) => stockFor(b.id) - stockFor(a.id))
-    }
-    return list
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, inStockOnly, sortMode, stock, warehouseId])
+  const filtered = products
 
   // categories/units не инвалидируем здесь — создание новой категории/юнита уже
   // само вызывает refreshCatalog через onCategoriesChanged/onUnitsChanged ниже,
@@ -738,6 +727,7 @@ function ProductForm({
     warehouses[0]?.id ?? null,
   )
   const [initialStockQuantity, setInitialStockQuantity] = useState('')
+  const [showOnStorefront, setShowOnStorefront] = useState(product?.show_on_storefront ?? false)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -787,6 +777,7 @@ function ProductForm({
         retail_price: retailPrice || '0',
         min_stock: minStock || '0',
         category_id: categoryId,
+        show_on_storefront: showOnStorefront,
         variants,
       }
       let saved: Product
@@ -1007,6 +998,15 @@ function ProductForm({
       )}
 
       <h4 className={styles.formSectionTitle}>Дополнительно</h4>
+
+      <label className={styles.saleCheckbox}>
+        <input
+          type="checkbox"
+          checked={showOnStorefront}
+          onChange={(e) => setShowOnStorefront(e.target.checked)}
+        />
+        Показывать на публичной витрине
+      </label>
 
       <label className={layoutStyles.field}>
         Фото
