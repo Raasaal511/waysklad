@@ -16,6 +16,8 @@ from app.application.analytics.top_products import (
 from app.application.auth.change_password import ChangePasswordUseCase
 from app.application.auth.connect_telegram import ConnectTelegramUseCase
 from app.application.auth.create_employee import CreateEmployeeUseCase
+from app.application.auth.get_shop import GetShopUseCase
+from app.application.auth.list_employees import ListEmployeesUseCase
 from app.application.auth.login import LoginUseCase
 from app.application.auth.logout_all import LogoutAllUseCase
 from app.application.auth.register_shop import RegisterShopUseCase
@@ -25,6 +27,8 @@ from app.application.counterparties.create_client import CreateClientUseCase
 from app.application.counterparties.create_supplier import CreateSupplierUseCase
 from app.application.counterparties.get_client_summary import GetClientSummaryUseCase
 from app.application.counterparties.get_client_timeline import GetClientTimelineUseCase
+from app.application.counterparties.list_suppliers import ListSuppliersUseCase
+from app.application.counterparties.search_clients import SearchClientsUseCase
 from app.application.counterparties.update_client import UpdateClientUseCase
 from app.application.debts.create_installment import CreateInstallmentUseCase
 from app.application.debts.extend_debt import ExtendDebtUseCase
@@ -67,8 +71,15 @@ from app.application.products.apply_import import ApplyProductImportUseCase
 from app.application.products.create_category import CreateCategoryUseCase
 from app.application.products.create_product import CreateProductUseCase
 from app.application.products.create_unit import CreateUnitUseCase
+from app.application.products.get_export_data import GetProductsExportDataUseCase
+from app.application.products.get_product import GetProductUseCase
+from app.application.products.get_product_by_barcode import GetProductByBarcodeUseCase
+from app.application.products.get_product_history import GetProductHistoryUseCase
 from app.application.products.import_excel import ImportProductsUseCase
 from app.application.products.import_preview import PreviewProductsUseCase
+from app.application.products.list_categories import ListCategoriesUseCase
+from app.application.products.list_units import ListUnitsUseCase
+from app.application.products.search_products import SearchProductsUseCase
 from app.application.products.set_product_photo import SetProductPhotoUseCase
 from app.application.products.update_product import UpdateProductUseCase
 from app.application.sales.create_sale import CreateSaleUseCase
@@ -126,6 +137,8 @@ def get_create_employee(uow: UowDep, hasher: HasherDep) -> CreateEmployeeUseCase
 
 
 get_update_employee = _with_uow(UpdateEmployeeUseCase)
+get_list_employees = _with_uow(ListEmployeesUseCase)
+get_shop = _with_uow(GetShopUseCase)
 
 
 def get_change_password(uow: UowDep, hasher: HasherDep) -> ChangePasswordUseCase:
@@ -146,6 +159,13 @@ get_create_category = _with_uow(CreateCategoryUseCase)
 get_import_products = _with_uow(ImportProductsUseCase)
 get_preview_import_products = _with_uow(PreviewProductsUseCase)
 get_apply_import_products = _with_uow(ApplyProductImportUseCase)
+get_list_units = _with_uow(ListUnitsUseCase)
+get_list_categories = _with_uow(ListCategoriesUseCase)
+get_search_products = _with_uow(SearchProductsUseCase)
+get_product_by_barcode = _with_uow(GetProductByBarcodeUseCase)
+get_product = _with_uow(GetProductUseCase)
+get_product_history = _with_uow(GetProductHistoryUseCase)
+get_products_export_data = _with_uow(GetProductsExportDataUseCase)
 get_receive_goods = _with_uow(ReceiveGoodsUseCase)
 get_write_off = _with_uow(WriteOffUseCase)
 get_transfer = _with_uow(TransferUseCase)
@@ -189,6 +209,8 @@ get_update_client = _with_uow(UpdateClientUseCase)
 get_client_timeline = _with_uow(GetClientTimelineUseCase)
 get_client_summary = _with_uow(GetClientSummaryUseCase)
 get_create_supplier = _with_uow(CreateSupplierUseCase)
+get_search_clients = _with_uow(SearchClientsUseCase)
+get_list_suppliers = _with_uow(ListSuppliersUseCase)
 get_dashboard = _with_uow(GetDashboardUseCase)
 get_period_totals = _with_uow(GetPeriodTotalsUseCase)
 get_revenue_timeline = _with_uow(GetRevenueTimelineUseCase)
@@ -253,6 +275,8 @@ RegisterShopDep = Annotated[RegisterShopUseCase, Depends(get_register_shop)]
 LoginDep = Annotated[LoginUseCase, Depends(get_login)]
 CreateEmployeeDep = Annotated[CreateEmployeeUseCase, Depends(get_create_employee)]
 UpdateEmployeeDep = Annotated[UpdateEmployeeUseCase, Depends(get_update_employee)]
+ListEmployeesDep = Annotated[ListEmployeesUseCase, Depends(get_list_employees)]
+GetShopDep = Annotated[GetShopUseCase, Depends(get_shop)]
 CreateProductDep = Annotated[CreateProductUseCase, Depends(get_create_product)]
 UpdateProductDep = Annotated[UpdateProductUseCase, Depends(get_update_product)]
 CreateUnitDep = Annotated[CreateUnitUseCase, Depends(get_create_unit)]
@@ -260,6 +284,15 @@ CreateCategoryDep = Annotated[CreateCategoryUseCase, Depends(get_create_category
 ImportProductsDep = Annotated[ImportProductsUseCase, Depends(get_import_products)]
 PreviewImportProductsDep = Annotated[PreviewProductsUseCase, Depends(get_preview_import_products)]
 ApplyImportProductsDep = Annotated[ApplyProductImportUseCase, Depends(get_apply_import_products)]
+ListUnitsDep = Annotated[ListUnitsUseCase, Depends(get_list_units)]
+ListCategoriesDep = Annotated[ListCategoriesUseCase, Depends(get_list_categories)]
+SearchProductsDep = Annotated[SearchProductsUseCase, Depends(get_search_products)]
+GetProductByBarcodeDep = Annotated[GetProductByBarcodeUseCase, Depends(get_product_by_barcode)]
+GetProductDep = Annotated[GetProductUseCase, Depends(get_product)]
+GetProductHistoryDep = Annotated[GetProductHistoryUseCase, Depends(get_product_history)]
+GetProductsExportDataDep = Annotated[
+    GetProductsExportDataUseCase, Depends(get_products_export_data)
+]
 SetProductPhotoDep = Annotated[SetProductPhotoUseCase, Depends(get_set_product_photo)]
 ReceiveGoodsDep = Annotated[ReceiveGoodsUseCase, Depends(get_receive_goods)]
 WriteOffDep = Annotated[WriteOffUseCase, Depends(get_write_off)]
@@ -310,6 +343,8 @@ UpdateClientDep = Annotated[UpdateClientUseCase, Depends(get_update_client)]
 GetClientTimelineDep = Annotated[GetClientTimelineUseCase, Depends(get_client_timeline)]
 GetClientSummaryDep = Annotated[GetClientSummaryUseCase, Depends(get_client_summary)]
 CreateSupplierDep = Annotated[CreateSupplierUseCase, Depends(get_create_supplier)]
+SearchClientsDep = Annotated[SearchClientsUseCase, Depends(get_search_clients)]
+ListSuppliersDep = Annotated[ListSuppliersUseCase, Depends(get_list_suppliers)]
 GetDashboardDep = Annotated[GetDashboardUseCase, Depends(get_dashboard)]
 GetPeriodTotalsDep = Annotated[GetPeriodTotalsUseCase, Depends(get_period_totals)]
 GetRevenueTimelineDep = Annotated[GetRevenueTimelineUseCase, Depends(get_revenue_timeline)]
