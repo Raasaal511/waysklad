@@ -62,6 +62,12 @@ from app.application.products.update_product import UpdateProductUseCase
 from app.application.sales.create_sale import CreateSaleUseCase
 from app.application.sales.delete_sale import DeleteSaleUseCase
 from app.application.sales.edit_sale import EditSaleUseCase
+from app.application.sales.get_receipt_data import GetReceiptDataUseCase
+from app.application.sales.get_sale import GetSaleUseCase
+from app.application.sales.get_sale_history import GetSaleHistoryUseCase
+from app.application.sales.get_sales_summary import GetSalesSummaryUseCase
+from app.application.sales.list_sale_returns import ListSaleReturnsUseCase
+from app.application.sales.list_sales import ListSalesUseCase
 from app.application.sales.return_sale import ReturnSaleUseCase
 from app.application.storefront.accept_request import AcceptStorefrontRequestUseCase
 from app.application.storefront.create_request import CreateStorefrontRequestUseCase
@@ -139,6 +145,12 @@ get_create_sale = _with_uow(CreateSaleUseCase)
 get_return_sale = _with_uow(ReturnSaleUseCase)
 get_edit_sale = _with_uow(EditSaleUseCase)
 get_delete_sale = _with_uow(DeleteSaleUseCase)
+get_list_sales = _with_uow(ListSalesUseCase)
+get_sales_summary = _with_uow(GetSalesSummaryUseCase)
+get_sale = _with_uow(GetSaleUseCase)
+get_sale_history = _with_uow(GetSaleHistoryUseCase)
+get_sale_returns = _with_uow(ListSaleReturnsUseCase)
+get_receipt_data = _with_uow(GetReceiptDataUseCase)
 get_issue_debt = _with_uow(IssueDebtUseCase)
 get_issue_supplier_debt = _with_uow(IssueSupplierDebtUseCase)
 get_repay_debt = _with_uow(RepayDebtUseCase)
@@ -241,6 +253,12 @@ CreateSaleDep = Annotated[CreateSaleUseCase, Depends(get_create_sale)]
 ReturnSaleDep = Annotated[ReturnSaleUseCase, Depends(get_return_sale)]
 EditSaleDep = Annotated[EditSaleUseCase, Depends(get_edit_sale)]
 DeleteSaleDep = Annotated[DeleteSaleUseCase, Depends(get_delete_sale)]
+ListSalesDep = Annotated[ListSalesUseCase, Depends(get_list_sales)]
+GetSalesSummaryDep = Annotated[GetSalesSummaryUseCase, Depends(get_sales_summary)]
+GetSaleDep = Annotated[GetSaleUseCase, Depends(get_sale)]
+GetSaleHistoryDep = Annotated[GetSaleHistoryUseCase, Depends(get_sale_history)]
+ListSaleReturnsDep = Annotated[ListSaleReturnsUseCase, Depends(get_sale_returns)]
+GetReceiptDataDep = Annotated[GetReceiptDataUseCase, Depends(get_receipt_data)]
 IssueDebtDep = Annotated[IssueDebtUseCase, Depends(get_issue_debt)]
 IssueSupplierDebtDep = Annotated[
     IssueSupplierDebtUseCase, Depends(get_issue_supplier_debt)
