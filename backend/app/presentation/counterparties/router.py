@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.application.counterparties.get_client_summary import GetClientSummaryCommand
 from app.application.counterparties.get_client_timeline import GetClientTimelineCommand
+from app.application.counterparties.search_clients import SearchClientsCommand
 from app.presentation.counterparties.schemas import (
     ClientCreateRequest,
     ClientResponse,
@@ -17,7 +18,8 @@ from app.presentation.deps import (
     CreateSupplierDep,
     GetClientSummaryDep,
     GetClientTimelineDep,
-    UowDep,
+    ListSuppliersDep,
+    SearchClientsDep,
     UpdateClientDep,
 )
 
@@ -33,14 +35,12 @@ async def create_client(
 
 @router.get("/clients")
 async def search_clients(
-    uow: UowDep, actor: ActorDep, query: str = "", include_inactive: bool = False
+    actor: ActorDep, use_case: SearchClientsDep, query: str = "", include_inactive: bool = False
 ) -> list[ClientResponse]:
-    async with uow:
-        warehouse_ids = actor.warehouse_ids if actor.is_warehouse_scoped else None
-        clients = await uow.clients.search(
-            query, include_inactive=include_inactive, warehouse_ids=warehouse_ids
-        )
-        return [ClientResponse.from_entity(c) for c in clients]
+    clients = await use_case.execute(
+        actor, SearchClientsCommand(query=query, include_inactive=include_inactive)
+    )
+    return [ClientResponse.from_entity(c) for c in clients]
 
 
 @router.patch("/clients/{client_id}")
@@ -75,8 +75,6 @@ async def create_supplier(
 
 
 @router.get("/suppliers")
-async def list_suppliers(uow: UowDep, actor: ActorDep) -> list[SupplierResponse]:
-    async with uow:
-        warehouse_ids = actor.warehouse_ids if actor.is_warehouse_scoped else None
-        suppliers = await uow.suppliers.list(warehouse_ids=warehouse_ids)
-        return [SupplierResponse.from_entity(s) for s in suppliers]
+async def list_suppliers(actor: ActorDep, use_case: ListSuppliersDep) -> list[SupplierResponse]:
+    suppliers = await use_case.execute(actor)
+    return [SupplierResponse.from_entity(s) for s in suppliers]
