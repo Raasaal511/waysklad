@@ -21,10 +21,11 @@ from app.presentation.deps import (
     ChangePasswordDep,
     ConnectTelegramDep,
     CreateEmployeeDep,
+    GetShopDep,
+    ListEmployeesDep,
     LoginDep,
     LogoutAllDep,
     RegisterShopDep,
-    UowDep,
     UpdateEmployeeDep,
     UpdateShopDep,
 )
@@ -63,18 +64,9 @@ async def create_employee(
 
 
 @router.get("/employees", dependencies=[require_permission(Permission.USERS_MANAGE)])
-async def list_employees(uow: UowDep) -> list[UserResponse]:
-    async with uow:
-        employees = await uow.users.list_by_tenant()
-        warehouses = await uow.warehouses.list()
-        by_user: dict[int, list[int]] = {}
-        for warehouse in warehouses:
-            for user_id in warehouse.assigned_user_ids:
-                by_user.setdefault(user_id, []).append(warehouse.id)
-        return [
-            UserResponse.from_entity(u, warehouse_ids=by_user.get(u.id, []))
-            for u in employees
-        ]
+async def list_employees(use_case: ListEmployeesDep) -> list[UserResponse]:
+    items = await use_case.execute()
+    return [UserResponse.from_entity(item.user, warehouse_ids=item.warehouse_ids) for item in items]
 
 
 @router.patch("/employees/{employee_id}", dependencies=[require_permission(Permission.USERS_MANAGE)])
@@ -93,9 +85,8 @@ async def connect_telegram(
 
 
 @router.get("/shop")
-async def get_shop(uow: UowDep) -> TenantResponse:
-    async with uow:
-        return TenantResponse.from_entity(await uow.tenants.get(uow.tenant_id))
+async def get_shop(use_case: GetShopDep) -> TenantResponse:
+    return TenantResponse.from_entity(await use_case.execute())
 
 
 @router.patch("/shop")
