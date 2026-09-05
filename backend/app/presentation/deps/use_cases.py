@@ -28,8 +28,17 @@ from app.application.counterparties.get_client_timeline import GetClientTimeline
 from app.application.counterparties.update_client import UpdateClientUseCase
 from app.application.debts.create_installment import CreateInstallmentUseCase
 from app.application.debts.extend_debt import ExtendDebtUseCase
+from app.application.debts.get_debt import GetDebtUseCase
+from app.application.debts.get_debt_history import GetDebtHistoryUseCase
+from app.application.debts.get_debts_overview import GetDebtsOverviewUseCase
 from app.application.debts.issue_debt import IssueDebtUseCase
 from app.application.debts.issue_supplier_debt import IssueSupplierDebtUseCase
+from app.application.debts.list_counterparty_debts import (
+    ListClientDebtsUseCase,
+    ListSupplierDebtsUseCase,
+)
+from app.application.debts.list_debts import ListDebtsUseCase
+from app.application.debts.list_due_debts import ListDueDebtsUseCase
 from app.application.debts.repay_debt import RepayDebtUseCase
 from app.application.inventory.create_warehouse import CreateWarehouseUseCase
 from app.application.inventory.receive_goods import ReceiveGoodsUseCase
@@ -159,6 +168,13 @@ get_issue_supplier_debt = _with_uow(IssueSupplierDebtUseCase)
 get_repay_debt = _with_uow(RepayDebtUseCase)
 get_create_installment = _with_uow(CreateInstallmentUseCase)
 get_extend_debt = _with_uow(ExtendDebtUseCase)
+get_list_debts = _with_uow(ListDebtsUseCase)
+get_debts_overview = _with_uow(GetDebtsOverviewUseCase)
+get_list_due_debts = _with_uow(ListDueDebtsUseCase)
+get_list_client_debts = _with_uow(ListClientDebtsUseCase)
+get_list_supplier_debts = _with_uow(ListSupplierDebtsUseCase)
+get_debt = _with_uow(GetDebtUseCase)
+get_debt_history = _with_uow(GetDebtHistoryUseCase)
 get_create_order = _with_uow(CreateOrderUseCase)
 get_update_order = _with_uow(UpdateOrderUseCase)
 get_change_order_status = _with_uow(ChangeOrderStatusUseCase)
@@ -273,6 +289,13 @@ IssueSupplierDebtDep = Annotated[
 RepayDebtDep = Annotated[RepayDebtUseCase, Depends(get_repay_debt)]
 CreateInstallmentDep = Annotated[CreateInstallmentUseCase, Depends(get_create_installment)]
 ExtendDebtDep = Annotated[ExtendDebtUseCase, Depends(get_extend_debt)]
+ListDebtsDep = Annotated[ListDebtsUseCase, Depends(get_list_debts)]
+GetDebtsOverviewDep = Annotated[GetDebtsOverviewUseCase, Depends(get_debts_overview)]
+ListDueDebtsDep = Annotated[ListDueDebtsUseCase, Depends(get_list_due_debts)]
+ListClientDebtsDep = Annotated[ListClientDebtsUseCase, Depends(get_list_client_debts)]
+ListSupplierDebtsDep = Annotated[ListSupplierDebtsUseCase, Depends(get_list_supplier_debts)]
+GetDebtDep = Annotated[GetDebtUseCase, Depends(get_debt)]
+GetDebtHistoryDep = Annotated[GetDebtHistoryUseCase, Depends(get_debt_history)]
 CreateOrderDep = Annotated[CreateOrderUseCase, Depends(get_create_order)]
 UpdateOrderDep = Annotated[UpdateOrderUseCase, Depends(get_update_order)]
 ChangeOrderStatusDep = Annotated[ChangeOrderStatusUseCase, Depends(get_change_order_status)]
