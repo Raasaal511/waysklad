@@ -23,6 +23,7 @@ class ReturnSaleCommand:
     sale_id: int
     items: list[ReturnItemInput]
     note: str = ""
+    client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,11 @@ class ReturnSaleUseCase:
         require(actor, Permission.SALES_RETURN)
 
         async with self._uow as uow:
+            if cmd.client_op_id is not None:
+                existing = await uow.sale_returns.get_by_client_op_id(cmd.client_op_id)
+                if existing is not None:
+                    return ReturnSaleResult(sale_return=existing, refund=Money.zero())
+
             sale = await uow.sales.get(cmd.sale_id)
             require_warehouse(actor, sale.warehouse_id)
             lines_by_id = {line.id: line for line in sale.lines}
@@ -67,7 +73,8 @@ class ReturnSaleUseCase:
                 refund = refund + sale_line.price * item.quantity
 
             sale_return = SaleReturn(
-                id=None, sale_id=sale.id, author_id=actor.id, lines=return_lines, note=cmd.note
+                id=None, sale_id=sale.id, author_id=actor.id, lines=return_lines, note=cmd.note,
+                client_op_id=cmd.client_op_id,
             )
             sale_return.validate()
 

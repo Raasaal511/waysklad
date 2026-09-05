@@ -17,6 +17,7 @@ class WriteOffCommand:
     warehouse_id: int
     lines: list[LineInput]
     note: str = ""  # причина: порча, усушка, бой…
+    client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
 
 
 class WriteOffUseCase:
@@ -27,6 +28,11 @@ class WriteOffUseCase:
         require(actor, Permission.STOCK_WRITE_OFF)
 
         async with self._uow as uow:
+            if cmd.client_op_id is not None:
+                existing = await uow.stock_documents.get_by_client_op_id(cmd.client_op_id)
+                if existing is not None:
+                    return existing
+
             await require_warehouse_access(uow, actor, cmd.warehouse_id)
             document = StockDocument(
                 id=None,
@@ -35,6 +41,7 @@ class WriteOffUseCase:
                 author_id=actor.id,
                 lines=await build_lines(uow, cmd.lines),
                 note=cmd.note,
+                client_op_id=cmd.client_op_id,
             )
             document.post()
             await uow.stock_documents.add(document)

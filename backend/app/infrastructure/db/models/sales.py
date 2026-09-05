@@ -53,11 +53,16 @@ class SaleLineModel(Base, TenantMixin):
 
 class SaleReturnModel(Base, TenantMixin, TimestampMixin):
     __tablename__ = "sale_returns"
+    __table_args__ = (
+        # идемпотентность офлайн-очереди: повторная отправка не создаст дубль
+        UniqueConstraint("tenant_id", "client_op_id"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     sale_id: Mapped[int] = mapped_column(ForeignKey("sales.id"))
     author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     note: Mapped[str] = mapped_column(Text, default="")
+    client_op_id: Mapped[str | None] = mapped_column(String(64))
 
     lines: Mapped[list["SaleReturnLineModel"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"

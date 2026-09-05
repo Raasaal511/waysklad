@@ -110,6 +110,21 @@ class SqlAlchemyStockDocumentRepository(SqlAlchemyRepository, IStockDocumentRepo
         document.id = model.id
         return document
 
+    async def get_by_client_op_id(self, client_op_id: str) -> StockDocument | None:
+        model = (
+            await self._session.execute(
+                select(StockDocumentModel).where(
+                    StockDocumentModel.tenant_id == self._tenant,
+                    StockDocumentModel.client_op_id == client_op_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            return None
+        product_ids = {line.product_id for line in model.lines}
+        units_by_product = await self._product_unit_by_id(product_ids)
+        return StockDocumentMapper.to_entity(model, units_by_product)
+
     async def list_all(self, warehouse_ids: list[int] | None = None) -> list[StockDocument]:
         conditions = [StockDocumentModel.tenant_id == self._tenant]
         if warehouse_ids is not None:

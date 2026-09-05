@@ -18,6 +18,7 @@ class ReceiveGoodsCommand:
     note: str = ""
     supplier_id: int | None = None  # если указан — приёмка считается долгом поставщику
     debt_due_date: date | None = None  # «долг до», обязателен при supplier_id
+    client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
 
 
 class ReceiveGoodsUseCase:
@@ -30,6 +31,11 @@ class ReceiveGoodsUseCase:
             raise DomainError("Для приёмки в долг нужно указать срок «Долг до»")
 
         async with self._uow as uow:
+            if cmd.client_op_id is not None:
+                existing = await uow.stock_documents.get_by_client_op_id(cmd.client_op_id)
+                if existing is not None:
+                    return existing
+
             await require_warehouse_access(uow, actor, cmd.warehouse_id)
             lines = await build_lines(uow, cmd.lines)
             document = StockDocument(
@@ -40,9 +46,12 @@ class ReceiveGoodsUseCase:
                 lines=lines,
                 supplier_id=cmd.supplier_id,
                 note=cmd.note,
+                client_op_id=cmd.client_op_id,
             )
             document.post()
             await uow.stock_documents.add(document)
+            if cmd.supplier_id is not None:
+                await uow.suppliers.link_to_warehouse(cmd.supplier_id, cmd.warehouse_id)
             for line in document.lines:
                 await uow.stock.change(
                     line.product_id, cmd.warehouse_id, line.quantity.value, line.variant_id

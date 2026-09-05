@@ -75,6 +75,7 @@ class SaleReturnMapper:
             sale_id=sale_return.sale_id,
             author_id=sale_return.author_id,
             note=sale_return.note,
+            client_op_id=sale_return.client_op_id,
             lines=[
                 SaleReturnLineModel(
                     tenant_id=tenant_id,
@@ -93,6 +94,7 @@ class SaleReturnMapper:
             author_id=model.author_id,
             note=model.note,
             created_at=model.created_at,
+            client_op_id=model.client_op_id,
             lines=[
                 SaleReturnLine(
                     id=line.id,

@@ -87,6 +87,7 @@ class SaleReturn:
     lines: list[SaleReturnLine] = field(default_factory=list)
     note: str = ""
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
 
     def validate(self) -> None:
         if not self.lines:

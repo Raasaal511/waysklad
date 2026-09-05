@@ -1,7 +1,17 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Index, Numeric, Text, UniqueConstraint, text
+from sqlalchemy import (
+    DateTime,
+    Enum as SAEnum,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.inventory.entities import StockDocType
@@ -42,7 +52,12 @@ class StockItemModel(Base, TenantMixin):
 
 class StockDocumentModel(Base, TenantMixin, TimestampMixin):
     __tablename__ = "stock_documents"
-    __table_args__ = (UniqueConstraint("tenant_id", "number"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "number"),
+        # идемпотентность офлайн-очереди (приёмка/списание); документы других типов
+        # (перемещение/инвентаризация) в sync не участвуют — client_op_id у них NULL
+        UniqueConstraint("tenant_id", "client_op_id"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     number: Mapped[int]  # сквозной номер в пределах магазина
@@ -54,6 +69,7 @@ class StockDocumentModel(Base, TenantMixin, TimestampMixin):
     note: Mapped[str] = mapped_column(Text, default="")
     posted: Mapped[bool] = mapped_column(default=False)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    client_op_id: Mapped[str | None] = mapped_column(String(64))
 
     lines: Mapped[list["StockDocumentLineModel"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"

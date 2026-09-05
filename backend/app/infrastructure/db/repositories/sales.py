@@ -178,6 +178,21 @@ class SqlAlchemySaleReturnRepository(SqlAlchemyRepository, ISaleReturnRepository
         units = await self._units_by_sale_line(sale_line_ids)
         return [SaleReturnMapper.to_entity(m, units) for m in models]
 
+    async def get_by_client_op_id(self, client_op_id: str) -> SaleReturn | None:
+        model = (
+            await self._session.execute(
+                select(SaleReturnModel).where(
+                    SaleReturnModel.tenant_id == self._tenant,
+                    SaleReturnModel.client_op_id == client_op_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            return None
+        sale_line_ids = {line.sale_line_id for line in model.lines}
+        units = await self._units_by_sale_line(sale_line_ids)
+        return SaleReturnMapper.to_entity(model, units)
+
     async def _units_by_sale_line(self, sale_line_ids: set[int]):
         if not sale_line_ids:
             return {}
