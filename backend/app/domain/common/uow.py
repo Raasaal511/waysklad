@@ -19,6 +19,7 @@ if TYPE_CHECKING:
         IWarehouseRepository,
     )
     from app.domain.inventory.repository import IStockDocumentRepository, IStockRepository
+    from app.domain.marketplace.repository import IMarketplaceProductRepository
     from app.domain.notifications.repository import INotificationRepository
     from app.domain.orders.repository import IOrderRepository
     from app.domain.sales.repository import ISaleRepository, ISaleReturnRepository
@@ -59,6 +60,7 @@ class IUnitOfWork(ABC):
     notifications: INotificationRepository
     audit: IAuditRepository
     analytics: IAnalyticsRepository
+    marketplace_products: IMarketplaceProductRepository
 
     async def __aenter__(self) -> IUnitOfWork:
         return self

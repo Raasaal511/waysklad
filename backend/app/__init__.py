@@ -5,6 +5,7 @@ from app.presentation.auth.router import router as auth_router
 from app.presentation.counterparties.router import router as counterparties_router
 from app.presentation.debts.router import router as debts_router
 from app.presentation.inventory.router import router as inventory_router
+from app.presentation.marketplace.router import router as marketplace_router
 from app.presentation.notifications.router import router as notifications_router
 from app.presentation.orders.router import router as orders_router
 from app.presentation.products.router import router as products_router
@@ -27,3 +28,4 @@ router.include_router(notifications_router)
 router.include_router(analytics_router)
 router.include_router(sync_router)
 router.include_router(storefront_router)
+router.include_router(marketplace_router)

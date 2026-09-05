@@ -92,6 +92,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     ListDocumentsDep,
     ListDueDebtsDep,
     ListEmployeesDep,
+    ListMarketplaceProductsDep,
     ListNotificationsDep,
     ListSaleReturnsDep,
     ListSalesDep,

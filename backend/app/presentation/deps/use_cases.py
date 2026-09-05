@@ -60,6 +60,7 @@ from app.application.inventory.update_warehouse_details import (
     UpdateWarehouseDetailsUseCase,
 )
 from app.application.inventory.write_off import WriteOffUseCase
+from app.application.marketplace.list_products import ListMarketplaceProductsUseCase
 from app.application.notifications.list_notifications import ListNotificationsUseCase
 from app.application.notifications.mark_read import (
     MarkAllNotificationsReadUseCase,
@@ -246,6 +247,10 @@ def get_storefront_catalog(factory: SessionFactoryDep) -> GetStorefrontCatalogUs
     return GetStorefrontCatalogUseCase(factory)
 
 
+def get_list_marketplace_products(factory: SessionFactoryDep) -> ListMarketplaceProductsUseCase:
+    return ListMarketplaceProductsUseCase(factory)
+
+
 def get_storefront_product(factory: SessionFactoryDep) -> GetStorefrontProductUseCase:
     return GetStorefrontProductUseCase(factory)
 
@@ -408,6 +413,9 @@ MarkAllNotificationsReadDep = Annotated[
 ListNotificationsDep = Annotated[ListNotificationsUseCase, Depends(get_list_notifications)]
 GetStorefrontCatalogDep = Annotated[
     GetStorefrontCatalogUseCase, Depends(get_storefront_catalog)
+]
+ListMarketplaceProductsDep = Annotated[
+    ListMarketplaceProductsUseCase, Depends(get_list_marketplace_products)
 ]
 GetStorefrontProductDep = Annotated[
     GetStorefrontProductUseCase, Depends(get_storefront_product)
