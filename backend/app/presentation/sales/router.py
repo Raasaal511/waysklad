@@ -23,7 +23,6 @@ from app.presentation.deps import (
     ListSaleReturnsDep,
     ListSalesDep,
     ReturnSaleDep,
-    UowDep,
 )
 from app.presentation.deps.auth import require_permission
 from app.presentation.sales.schemas import (
@@ -109,11 +108,14 @@ async def get_sale(sale_id: int, actor: ActorDep, use_case: GetSaleDep) -> SaleR
 
 @router.patch("/{sale_id}", dependencies=[require_permission(Permission.SALES_EDIT)])
 async def edit_sale(
-    sale_id: int, body: SaleEditRequest, actor: ActorDep, use_case: EditSaleDep, uow: UowDep
+    sale_id: int,
+    body: SaleEditRequest,
+    actor: ActorDep,
+    use_case: EditSaleDep,
+    get_sale_use_case: GetSaleDep,
 ) -> SaleResponse:
     await use_case.execute(actor, body.to_command(sale_id))
-    async with uow:
-        return SaleResponse.from_entity(await uow.sales.get(sale_id))
+    return SaleResponse.from_entity(await get_sale_use_case.execute(actor, sale_id))
 
 
 @router.delete(
