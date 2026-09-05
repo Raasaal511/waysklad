@@ -2,10 +2,10 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.presentation.deps import (
     ActorDep,
+    ListNotificationsDep,
     MarkAllNotificationsReadDep,
     MarkNotificationReadDep,
     SessionFactoryDep,
-    UowDep,
 )
 from app.presentation.deps.auth import get_current_user_ws
 from app.presentation.notifications.schemas import (
@@ -39,13 +39,11 @@ async def notifications_ws(websocket: WebSocket, token: str, factory: SessionFac
 
 
 @router.get("")
-async def list_notifications(actor: ActorDep, uow: UowDep) -> NotificationListResponse:
-    async with uow:
-        items = await uow.notifications.list_for_user(actor.id)
-        unread = await uow.notifications.unread_count(actor.id)
-        return NotificationListResponse(
-            items=[NotificationResponse.from_entity(n) for n in items], unread=unread
-        )
+async def list_notifications(actor: ActorDep, use_case: ListNotificationsDep) -> NotificationListResponse:
+    result = await use_case.execute(actor)
+    return NotificationListResponse(
+        items=[NotificationResponse.from_entity(n) for n in result.items], unread=result.unread
+    )
 
 
 @router.post("/{notification_id}/read")
