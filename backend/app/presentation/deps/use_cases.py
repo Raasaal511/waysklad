@@ -49,7 +49,10 @@ from app.application.notifications.mark_read import (
 from app.application.orders.cancel_order import CancelOrderUseCase
 from app.application.orders.change_status import ChangeOrderStatusUseCase
 from app.application.orders.create_order import CreateOrderUseCase
+from app.application.orders.get_order import GetOrderUseCase
+from app.application.orders.get_order_history import GetOrderHistoryUseCase
 from app.application.orders.issue_order import IssueOrderUseCase
+from app.application.orders.list_orders import ListActiveOrdersUseCase, ListCompletedOrdersUseCase
 from app.application.orders.update_order import UpdateOrderUseCase
 from app.application.products.apply_import import ApplyProductImportUseCase
 from app.application.products.create_category import CreateCategoryUseCase
@@ -161,6 +164,10 @@ get_update_order = _with_uow(UpdateOrderUseCase)
 get_change_order_status = _with_uow(ChangeOrderStatusUseCase)
 get_cancel_order = _with_uow(CancelOrderUseCase)
 get_issue_order = _with_uow(IssueOrderUseCase)
+get_list_active_orders = _with_uow(ListActiveOrdersUseCase)
+get_list_completed_orders = _with_uow(ListCompletedOrdersUseCase)
+get_order = _with_uow(GetOrderUseCase)
+get_order_history = _with_uow(GetOrderHistoryUseCase)
 get_create_client = _with_uow(CreateClientUseCase)
 get_update_client = _with_uow(UpdateClientUseCase)
 get_client_timeline = _with_uow(GetClientTimelineUseCase)
@@ -271,6 +278,10 @@ UpdateOrderDep = Annotated[UpdateOrderUseCase, Depends(get_update_order)]
 ChangeOrderStatusDep = Annotated[ChangeOrderStatusUseCase, Depends(get_change_order_status)]
 CancelOrderDep = Annotated[CancelOrderUseCase, Depends(get_cancel_order)]
 IssueOrderDep = Annotated[IssueOrderUseCase, Depends(get_issue_order)]
+ListActiveOrdersDep = Annotated[ListActiveOrdersUseCase, Depends(get_list_active_orders)]
+ListCompletedOrdersDep = Annotated[ListCompletedOrdersUseCase, Depends(get_list_completed_orders)]
+GetOrderDep = Annotated[GetOrderUseCase, Depends(get_order)]
+GetOrderHistoryDep = Annotated[GetOrderHistoryUseCase, Depends(get_order_history)]
 CreateClientDep = Annotated[CreateClientUseCase, Depends(get_create_client)]
 UpdateClientDep = Annotated[UpdateClientUseCase, Depends(get_update_client)]
 GetClientTimelineDep = Annotated[GetClientTimelineUseCase, Depends(get_client_timeline)]
