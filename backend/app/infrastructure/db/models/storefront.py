@@ -24,6 +24,7 @@ class StorefrontRequestModel(Base, TenantMixin, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     customer_name: Mapped[str] = mapped_column(String(200))
     customer_phone: Mapped[str] = mapped_column(String(20), default="")
+    customer_telegram_chat_id: Mapped[str | None] = mapped_column(String(32))
     note: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[StorefrontRequestStatus] = mapped_column(
         StorefrontRequestStatusColumn, default=StorefrontRequestStatus.NEW

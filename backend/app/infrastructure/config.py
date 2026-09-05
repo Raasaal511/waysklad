@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     # (другой HTTP-запрос), никогда не дойдёт до открытого сокета. Задаётся в
     # .env как redis://redis:6379/1 (тот же Redis, что и rate limit, другая БД).
     notifications_redis_url: str | None = None
+    # Базовый публичный адрес backend (например https://waysklad.ru) — нужен
+    # боту витрины, чтобы отправить абсолютный URL фото товара (Product.photo
+    # хранится как относительный /uploads/... путь, Telegram sendPhoto по URL
+    # требует абсолютный адрес). Пустая строка (дефолт, пока нет прод-домена) —
+    # бот показывает карточку товара без фото, а не падает.
+    public_base_url: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

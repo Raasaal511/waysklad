@@ -31,6 +31,10 @@ class StorefrontRequest:
     customer_name: str
     lines: list[StorefrontRequestLine] = field(default_factory=list)
     customer_phone: str = ""
+    # заполнено, только если заявка создана из Telegram-бота витрины — задел
+    # на будущее (push покупателю ответа владельца в чат), не используется
+    # веб-витриной (там доступ по access_token)
+    customer_telegram_chat_id: str = ""
     note: str = ""
     status: StorefrontRequestStatus = StorefrontRequestStatus.NEW
     order_id: int | None = None  # заполняется при принятии

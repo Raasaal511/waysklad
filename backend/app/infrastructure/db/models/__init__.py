@@ -11,4 +11,5 @@ from app.infrastructure.db.models import (  # noqa: F401
     sales,
     storefront,
     tasks,
+    telegram_bot,
 )

@@ -43,5 +43,17 @@ services:
     depends_on:
       - backend
 
+  storefront_bot:
+    build: ./backend
+    image: waysklad-backend-dev
+    env_file: .env
+    command: python -m app.infrastructure.telegram_bot.bot
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pgdata:

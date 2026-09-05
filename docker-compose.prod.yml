@@ -72,6 +72,15 @@ services:
       db:
         condition: service_healthy
 
+  storefront_bot:
+    image: waysklad-backend-prod
+    env_file: .env
+    command: python -m app.infrastructure.telegram_bot.bot
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:
   uploads_data:
