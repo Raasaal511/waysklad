@@ -259,8 +259,10 @@ def get_storefront_request_status(factory: SessionFactoryDep) -> GetStorefrontRe
     return GetStorefrontRequestStatusUseCase(factory)
 
 
-def get_create_storefront_request(factory: SessionFactoryDep) -> CreateStorefrontRequestUseCase:
-    return CreateStorefrontRequestUseCase(factory)
+def get_create_storefront_request(
+    factory: SessionFactoryDep, notifier: NotifierDep
+) -> CreateStorefrontRequestUseCase:
+    return CreateStorefrontRequestUseCase(factory, notifier)
 
 
 get_list_storefront_requests = _with_uow(ListStorefrontRequestsUseCase)

@@ -10,6 +10,7 @@ class NotificationKind(StrEnum):
     DEBT_OVERDUE = "debt_overdue"
     LOW_STOCK = "low_stock"
     STOREFRONT_MESSAGE = "storefront_message"
+    STOREFRONT_REQUEST_NEW = "storefront_request_new"
 
 
 @dataclass

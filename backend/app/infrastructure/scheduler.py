@@ -13,6 +13,9 @@ from datetime import datetime, timezone
 
 from app.application.debts.notify_due_debts import notify_due_debts
 from app.application.inventory.notify_low_stock import notify_low_stock
+from app.application.storefront.release_expired_reservations import (
+    release_expired_storefront_reservations,
+)
 from app.domain.analytics.period import SummaryPeriod
 from app.infrastructure.telegram import MSK_OFFSET, send_summaries_for
 
@@ -50,6 +53,10 @@ def main() -> None:
         now_msk = now + MSK_OFFSET
         hour_key = now.strftime("%Y-%m-%d-%H")
         sent_hours = {k for k in sent_hours if k[1] == hour_key}  # забыть прошлые часы
+
+        if ("storefront_reservations", hour_key) not in sent_hours:
+            _run_safely("release_expired_storefront_reservations", release_expired_storefront_reservations)
+            sent_hours.add(("storefront_reservations", hour_key))
 
         if (SummaryPeriod.DAY, hour_key) not in sent_hours:
             _run_safely("send_summaries[day]", lambda: send_summaries_for(SummaryPeriod.DAY, now))

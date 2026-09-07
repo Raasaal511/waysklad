@@ -35,6 +35,7 @@ class ClientUpdateRequest(BaseModel):
     city: str = ""
     debt_limit: Decimal | None = None
     is_active: bool = True
+    force: bool = False  # подтвердить деактивацию клиента с непогашенным долгом
 
     def to_command(self, client_id: int) -> UpdateClientCommand:
         return UpdateClientCommand(
@@ -45,6 +46,7 @@ class ClientUpdateRequest(BaseModel):
             city=self.city,
             debt_limit=self.debt_limit,
             is_active=self.is_active,
+            force=self.force,
         )
 
 

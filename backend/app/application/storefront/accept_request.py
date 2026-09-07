@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
+from app.application.storefront.reservation import release_request_reservation
 from app.domain.audit.entities import AuditEntry
 from app.domain.common.exceptions import DomainError, InsufficientStockError
 from app.domain.common.money import Money
@@ -37,6 +38,12 @@ class AcceptStorefrontRequestUseCase:
             request = await uow.storefront_requests.get(cmd.request_id)
             if request.status != StorefrontRequestStatus.NEW:
                 raise DomainError("Заявка уже обработана")
+
+            if not request.reservation_released:
+                # мягкий резерв под заявку (CreateStorefrontRequestUseCase) мог
+                # осесть на любом видимом складе — снимаем его весь, чтобы ниже
+                # переставить резерв уже конкретно на выбранный владельцем склад
+                await release_request_reservation(uow, request)
 
             client = None
             phone = Phone(request.customer_phone) if request.customer_phone else None

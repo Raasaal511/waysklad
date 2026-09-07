@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from app.application.storefront.reservation import release_request_reservation
 from app.domain.audit.entities import AuditEntry
 from app.domain.common.exceptions import DomainError
 from app.domain.common.uow import IUnitOfWork
@@ -23,6 +24,8 @@ class RejectStorefrontRequestUseCase:
             request = await uow.storefront_requests.get(cmd.request_id)
             if request.status != StorefrontRequestStatus.NEW:
                 raise DomainError("Заявка уже обработана")
+            if not request.reservation_released:
+                await release_request_reservation(uow, request)
             request.reject()
             await uow.storefront_requests.save(request)
             await uow.audit.add(

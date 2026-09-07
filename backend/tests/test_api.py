@@ -142,6 +142,45 @@ async def test_debts_client_summary_as_of_via_api(client, owner_headers):
     assert len(summary["debts"][0]["repayments"]) == 2
 
 
+async def test_due_debt_whatsapp_reminder_link_via_api(client, owner_headers):
+    today = date.today().isoformat()
+
+    response = await client.post(
+        "/api/counterparties/clients",
+        headers=owner_headers,
+        json={"name": "С телефоном", "phone": "+79281112233"},
+    )
+    with_phone_id = response.json()["id"]
+    response = await client.post(
+        "/api/debts",
+        headers=owner_headers,
+        json={"client_id": with_phone_id, "warehouse_id": 1, "amount": "1000", "due_date": today},
+    )
+    assert response.status_code == 201, response.text
+
+    response = await client.post(
+        "/api/counterparties/clients", headers=owner_headers, json={"name": "Без телефона"},
+    )
+    without_phone_id = response.json()["id"]
+    response = await client.post(
+        "/api/debts",
+        headers=owner_headers,
+        json={"client_id": without_phone_id, "warehouse_id": 1, "amount": "500", "due_date": today},
+    )
+    assert response.status_code == 201, response.text
+
+    response = await client.get("/api/debts/due", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    by_client = {d["client_id"]: d for d in response.json()}
+
+    with_phone_link = by_client[with_phone_id]["whatsapp_reminder_link"]
+    assert with_phone_link is not None
+    assert with_phone_link.startswith("https://wa.me/79281112233?text=")
+    assert "1000" in with_phone_link
+
+    assert by_client[without_phone_id]["whatsapp_reminder_link"] is None
+
+
 async def test_full_trading_flow(client, owner_headers):
     response = await client.post(
         "/api/products",
@@ -2598,6 +2637,155 @@ async def test_storefront_request_reject_via_api(client, owner_headers):
         json={"customer_name": "Тест", "items": [{"product_id": hidden["id"], "quantity": "1"}]},
     )
     assert response.status_code == 400, response.text
+
+
+async def test_storefront_request_reserves_stock_via_api(client, owner_headers):
+    """Заявка сразу резервирует остаток — следующая заявка на весь оставшийся
+    остаток должна увидеть недостаточность и пометить это флагом, а не тихо
+    принять невозможный заказ."""
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    await client.put(
+        "/api/inventory/warehouses/1",
+        headers=owner_headers,
+        json={"name": "Основной склад", "show_on_storefront": True},
+    )
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Резервируемый товар", "purchase_price": "50", "retail_price": "100", "show_on_storefront": True},
+        )
+    ).json()
+    response = await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product["id"], "quantity": "5", "cost": "50"}]},
+    )
+    assert response.status_code == 201, response.text
+
+    # первая заявка на весь остаток — резерв полностью покрыт
+    first = (
+        await client.post(
+            f"/api/storefront/{slug}/requests",
+            json={"customer_name": "Первый", "items": [{"product_id": product["id"], "quantity": "5"}]},
+        )
+    ).json()
+    assert first["insufficient_stock_at_request"] is False
+
+    # вторая заявка на тот же товар — остатка уже нет (весь зарезервирован первой)
+    second = (
+        await client.post(
+            f"/api/storefront/{slug}/requests",
+            json={"customer_name": "Второй", "items": [{"product_id": product["id"], "quantity": "1"}]},
+        )
+    ).json()
+    assert second["insufficient_stock_at_request"] is True
+
+    # владелец увидел уведомление о новой заявке
+    response = await client.get("/api/notifications", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    kinds = [n["kind"] for n in response.json()["items"]]
+    assert kinds.count("storefront_request_new") == 2
+
+
+async def test_storefront_request_accept_does_not_double_reserve_via_api(client, owner_headers):
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    await client.put(
+        "/api/inventory/warehouses/1",
+        headers=owner_headers,
+        json={"name": "Основной склад", "show_on_storefront": True},
+    )
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Товар", "purchase_price": "50", "retail_price": "100", "show_on_storefront": True},
+        )
+    ).json()
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product["id"], "quantity": "3", "cost": "50"}]},
+    )
+
+    request = (
+        await client.post(
+            f"/api/storefront/{slug}/requests",
+            json={"customer_name": "Клиент", "items": [{"product_id": product["id"], "quantity": "3"}]},
+        )
+    ).json()
+    assert request["insufficient_stock_at_request"] is False
+
+    due = (date.today() + timedelta(days=3)).isoformat()
+    response = await client.post(
+        f"/api/storefront/requests/{request['id']}/accept",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "due_date": due},
+    )
+    assert response.status_code == 200, response.text
+
+    # если бы резерв на создании и на принятии складывались — новая заявка на
+    # тот же остаток увидела бы "недостаточно" уже при 1 штуке (3 занято create + 3 accept > 3 факт)
+    third = (
+        await client.post(
+            f"/api/storefront/{slug}/requests",
+            json={"customer_name": "Третий", "items": [{"product_id": product["id"], "quantity": "1"}]},
+        )
+    ).json()
+    # остаток физически весь ушёл в принятый заказ — новая заявка честно не резервирует
+    assert third["insufficient_stock_at_request"] is True
+
+
+async def test_storefront_request_reject_releases_reservation_via_api(client, owner_headers):
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    await client.put(
+        "/api/inventory/warehouses/1",
+        headers=owner_headers,
+        json={"name": "Основной склад", "show_on_storefront": True},
+    )
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Товар", "purchase_price": "50", "retail_price": "100", "show_on_storefront": True},
+        )
+    ).json()
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product["id"], "quantity": "2", "cost": "50"}]},
+    )
+
+    request = (
+        await client.post(
+            f"/api/storefront/{slug}/requests",
+            json={"customer_name": "Клиент", "items": [{"product_id": product["id"], "quantity": "2"}]},
+        )
+    ).json()
+    assert request["insufficient_stock_at_request"] is False
+
+    response = await client.post(
+        f"/api/storefront/requests/{request['id']}/reject", headers=owner_headers
+    )
+    assert response.status_code == 200, response.text
+
+    # резерв снят отклонением — новая заявка на тот же остаток снова видит его целиком
+    after_reject = (
+        await client.post(
+            f"/api/storefront/{slug}/requests",
+            json={"customer_name": "Второй", "items": [{"product_id": product["id"], "quantity": "2"}]},
+        )
+    ).json()
+    assert after_reject["insufficient_stock_at_request"] is False
 
 
 async def test_storefront_chat_rest_via_api(client, owner_headers):

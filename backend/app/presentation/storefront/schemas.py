@@ -214,6 +214,7 @@ class StorefrontRequestResponse(BaseModel):
     note: str
     status: str
     lines: list[StorefrontRequestLineResponse]
+    insufficient_stock_at_request: bool
 
     @classmethod
     def from_entity(cls, request: StorefrontRequest) -> "StorefrontRequestResponse":
@@ -229,6 +230,7 @@ class StorefrontRequestResponse(BaseModel):
                 )
                 for line in request.lines
             ],
+            insufficient_stock_at_request=request.insufficient_stock_at_request,
         )
 
 

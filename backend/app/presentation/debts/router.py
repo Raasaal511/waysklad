@@ -12,6 +12,7 @@ from app.presentation.debts.schemas import (
     DebtsFilterParams,
     DebtsOverviewResponse,
     DebtsSummaryResponse,
+    DueDebtResponse,
     ExtendDebtRequest,
     IssueDebtRequest,
     IssueSupplierDebtRequest,
@@ -91,9 +92,9 @@ async def get_debts_overview(actor: ActorDep, use_case: GetDebtsOverviewDep) -> 
 @router.get("/due", dependencies=[_view])
 async def list_due_debts(
     actor: ActorDep, use_case: ListDueDebtsDep, on: date | None = None
-) -> list[DebtResponse]:
-    debts = await use_case.execute(actor, on)
-    return [DebtResponse.from_entity(d) for d in debts]
+) -> list[DueDebtResponse]:
+    items = await use_case.execute(actor, on)
+    return [DueDebtResponse.from_item(item) for item in items]
 
 
 @router.get("/client/{client_id}", dependencies=[_view])

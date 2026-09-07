@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import func, select
 
 from app.domain.common.exceptions import NotFoundError
@@ -32,6 +34,8 @@ class SqlAlchemyStorefrontRequestRepository(SqlAlchemyRepository, IStorefrontReq
             raise NotFoundError(f"Заявка {request.id} не найдена")
         model.status = request.status
         model.order_id = request.order_id
+        model.insufficient_stock_at_request = request.insufficient_stock_at_request
+        model.reservation_released = request.reservation_released
         await self._session.flush()
         return request
 
@@ -67,6 +71,19 @@ class SqlAlchemyStorefrontRequestRepository(SqlAlchemyRepository, IStorefrontReq
                     StorefrontRequestModel.status == StorefrontRequestStatus.NEW,
                 )
                 .order_by(StorefrontRequestModel.created_at)
+            )
+        ).scalars().all()
+        return [StorefrontRequestMapper.to_entity(m) for m in models]
+
+    async def list_stale_reserved(self, older_than: datetime) -> list[StorefrontRequest]:
+        models = (
+            await self._session.execute(
+                select(StorefrontRequestModel).where(
+                    StorefrontRequestModel.tenant_id == self._tenant,
+                    StorefrontRequestModel.status == StorefrontRequestStatus.NEW,
+                    StorefrontRequestModel.reservation_released.is_(False),
+                    StorefrontRequestModel.created_at < older_than,
+                )
             )
         ).scalars().all()
         return [StorefrontRequestMapper.to_entity(m) for m in models]

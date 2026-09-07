@@ -11,6 +11,7 @@ from app.application.debts.create_installment import (
 from app.application.debts.extend_debt import ExtendDebtCommand
 from app.application.debts.issue_debt import IssueDebtCommand
 from app.application.debts.issue_supplier_debt import IssueSupplierDebtCommand
+from app.application.debts.list_due_debts import DueDebtItem
 from app.application.debts.repay_debt import RepayDebtCommand
 from app.domain.debts.entities import Debt, DebtStatus, total_balance
 
@@ -194,6 +195,17 @@ class DebtResponse(BaseModel):
                 for e in debt.extensions
             ],
         )
+
+
+class DueDebtResponse(DebtResponse):
+    """Просроченный/срочный долг с готовой ссылкой для WhatsApp-напоминания клиенту."""
+
+    whatsapp_reminder_link: str | None
+
+    @classmethod
+    def from_item(cls, item: DueDebtItem) -> "DueDebtResponse":
+        base = DebtResponse.from_entity(item.debt)
+        return cls(**base.model_dump(), whatsapp_reminder_link=item.whatsapp_reminder_link)
 
 
 class DebtsSummaryResponse(BaseModel):

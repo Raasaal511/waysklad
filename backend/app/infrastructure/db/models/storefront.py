@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum as SAEnum, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.storefront.entities import MessageAuthor, StorefrontRequestStatus
@@ -33,6 +33,8 @@ class StorefrontRequestModel(Base, TenantMixin, TimestampMixin):
     # уникален глобально (не в пределах tenant) — сам по себе служит доказательством
     # владения заявкой, не должен быть угадываем/пересекаться между магазинами
     access_token: Mapped[str] = mapped_column(String(43), unique=True, index=True)
+    insufficient_stock_at_request: Mapped[bool] = mapped_column(Boolean, default=False)
+    reservation_released: Mapped[bool] = mapped_column(Boolean, default=False)
 
     lines: Mapped[list["StorefrontRequestLineModel"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"

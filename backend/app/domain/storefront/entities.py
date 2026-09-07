@@ -47,6 +47,14 @@ class StorefrontRequest:
     # покупателя узнать tenant своей заявки, чтобы открыть tenant-scoped UoW;
     # аналог User.tenant_id (тот же паттерн: контекст, знающий о tenant извне)
     tenant_id: int | None = None
+    # true, если на момент создания заявки остатка не хватило хотя бы на одну
+    # позицию — резерв всё равно ставится (может подвезти), но фронт должен
+    # предупредить покупателя, что товара может не быть
+    insufficient_stock_at_request: bool = False
+    # резерв под заявку снят (принятием/отклонением/авто-освобождением через 72ч)
+    # — раздельно от status, чтобы владелец видел историю NEW-заявок с уже
+    # снятым резервом, а не терял их из истории переводом в rejected
+    reservation_released: bool = False
 
     def validate(self) -> None:
         if not self.customer_name.strip():
@@ -59,11 +67,13 @@ class StorefrontRequest:
             raise DomainError("Заявка уже обработана")
         self.status = StorefrontRequestStatus.ACCEPTED
         self.order_id = order_id
+        self.reservation_released = True  # резерв конвертирован в списание/резерв заказа
 
     def reject(self) -> None:
         if self.status != StorefrontRequestStatus.NEW:
             raise DomainError("Заявка уже обработана")
         self.status = StorefrontRequestStatus.REJECTED
+        self.reservation_released = True
 
 
 class MessageAuthor(StrEnum):

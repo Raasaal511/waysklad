@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Protocol
 
 from app.domain.storefront.entities import StorefrontMessage, StorefrontRequest
@@ -12,6 +13,11 @@ class IStorefrontRequestRepository(Protocol):
     async def count_new_by_phone(self, phone: str) -> int:
         """Сколько ещё не обработанных (status=new) заявок с этим телефоном
         уже есть у этого магазина — защита от заспамливания списка заявок."""
+        ...
+
+    async def list_stale_reserved(self, older_than: datetime) -> list[StorefrontRequest]:
+        """NEW-заявки старше older_than с ещё не снятым резервом — кандидаты
+        на авто-освобождение резерва (см. release_expired_storefront_reservations)."""
         ...
 
 

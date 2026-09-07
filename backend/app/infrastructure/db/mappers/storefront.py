@@ -22,6 +22,8 @@ class StorefrontRequestMapper:
             status=request.status,
             order_id=request.order_id,
             access_token=request.access_token,
+            insufficient_stock_at_request=request.insufficient_stock_at_request,
+            reservation_released=request.reservation_released,
             lines=[
                 StorefrontRequestLineModel(
                     tenant_id=tenant_id,
@@ -45,6 +47,8 @@ class StorefrontRequestMapper:
             order_id=model.order_id,
             access_token=model.access_token,
             created_at=model.created_at,
+            insufficient_stock_at_request=model.insufficient_stock_at_request,
+            reservation_released=model.reservation_released,
             lines=[
                 StorefrontRequestLine(
                     product_id=line.product_id,

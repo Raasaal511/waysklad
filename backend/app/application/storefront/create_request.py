@@ -2,9 +2,13 @@ import secrets
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from app.application.storefront.reservation import reserve_request_stock
+from app.application.tasks.notify import notify_user
 from app.domain.catalog.entities import Product
 from app.domain.common.exceptions import DomainError
 from app.domain.common.phone import Phone
+from app.domain.identity.entities import Role
+from app.domain.notifications.entities import NotificationKind
 from app.domain.storefront.entities import StorefrontRequest, StorefrontRequestLine
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 
@@ -44,11 +48,15 @@ class CreateStorefrontRequestCommand:
 
 
 class CreateStorefrontRequestUseCase:
-    """Публичная (без авторизации) заявка с витрины — лёгкая, без резерва остатка
-    и без даты готовности. Становится Order только когда владелец её примет."""
+    """Публичная (без авторизации) заявка с витрины — без даты готовности и
+    привязки к конкретному складу (склад выбирает владелец при принятии), но
+    сразу мягко резервирует остаток на видимых складах, чтобы товар не ушёл
+    другому покупателю, пока заявка ждёт ответа. Резерв снимается принятием/
+    отклонением или авто-освобождением через 72ч (см. app/infrastructure/scheduler.py)."""
 
-    def __init__(self, session_factory):
+    def __init__(self, session_factory, notifier=None):
         self._session_factory = session_factory
+        self._notifier = notifier
 
     async def execute(self, cmd: CreateStorefrontRequestCommand) -> StorefrontRequest | None:
         async with SqlAlchemyUnitOfWork(None, session_factory=self._session_factory) as public_uow:
@@ -103,6 +111,35 @@ class CreateStorefrontRequestUseCase:
                 ],
             )
             request.validate()
+
+            visible_warehouse_ids = {
+                w.id for w in await uow.warehouses.list() if w.show_on_storefront
+            }
+            request.insufficient_stock_at_request = not await reserve_request_stock(
+                uow, request.lines, visible_warehouse_ids
+            )
+
             await uow.storefront_requests.add(request)
+
+            recipients = [
+                u for u in await uow.users.list_by_tenant() if u.role in (Role.OWNER, Role.MANAGER)
+            ]
+            total_amount = sum(
+                (products_by_id[line.product_id].retail_price.amount * line.quantity for line in request.lines),
+                Decimal("0"),
+            )
+            for user in recipients:
+                await notify_user(
+                    uow, self._notifier,
+                    user_id=user.id,
+                    kind=NotificationKind.STOREFRONT_REQUEST_NEW,
+                    text=(
+                        f"Новая заявка с витрины: {request.customer_name}, "
+                        f"{len(request.lines)} товаров на сумму {total_amount} ₽"
+                    ),
+                    link="/orders/storefront-requests",
+                    entity_id=request.id,
+                )
+
             await uow.commit()
             return request
