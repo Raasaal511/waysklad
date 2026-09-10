@@ -28,6 +28,19 @@
   white-space: nowrap;
 }
 
+.salePageActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0 4px;
+  border-top: 1px solid var(--border);
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+  z-index: 2;
+}
+
 .salePaymentBadgeAll {
   background: transparent;
   border: 1px solid var(--border);

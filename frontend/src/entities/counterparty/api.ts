@@ -44,6 +44,7 @@ export function updateClient(
     city?: string
     debt_limit?: string | null
     is_active: boolean
+    force?: boolean
   },
 ) {
   return api.patch<Client>(`/counterparties/clients/${clientId}`, input)

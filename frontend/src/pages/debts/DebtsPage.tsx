@@ -1,24 +1,15 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   listActiveDebts,
   listClosedDebts,
   getDebtsOverview,
-  issueDebt,
-  issueSupplierDebt,
-  createInstallment,
-  repayDebt,
+  listDueDebts,
   type Debt,
   type DebtsOverview,
 } from '../../entities/debt/api'
-import { searchClients, type Client, type Supplier } from '../../entities/counterparty/api'
+import { searchClients, type Client } from '../../entities/counterparty/api'
 import { useCatalog } from '../../app/CatalogContext'
-import {
-  type InstallmentPeriod,
-  INSTALLMENT_PERIOD_OPTIONS,
-  buildInstallmentSchedule,
-  estimatePartsCount,
-} from '../../entities/debt/installmentSchedule'
 import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
 import {
@@ -31,12 +22,10 @@ import {
   IconCalendarRepeat,
   IconSearch,
   IconClockHour4,
+  IconBrandWhatsapp,
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
-import { Select } from '../../shared/ui/Select'
-import { DateInput } from '../../shared/ui/DateInput'
-import { QuickNewClientForm } from '../../shared/ui/QuickNewClientForm'
-import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
+import { formatMoney } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
 import { daysOverdue, pluralDays } from '../../entities/debt/dueDate'
 import layoutStyles from '../../shared/ui/Layout.module.css'
@@ -77,44 +66,6 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString('ru-RU')
 }
 
-const DUE_DATE_PRESETS: { label: string; days: number }[] = [
-  { label: 'Неделя', days: 7 },
-  { label: '2 мес.', days: 60 },
-  { label: '3 мес.', days: 90 },
-  { label: '4 мес.', days: 120 },
-  { label: 'Полгода', days: 182 },
-  { label: 'Год', days: 365 },
-]
-
-function addDays(days: number) {
-  const d = new Date()
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
-}
-
-function DueDatePresets({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <div className={styles['debt-due-date-presets']}>
-      {DUE_DATE_PRESETS.map((p) => {
-        const presetValue = addDays(p.days)
-        return (
-          <button
-            key={p.label}
-            type="button"
-            className={[
-              styles['debt-due-date-preset'],
-              value === presetValue && styles['debt-due-date-preset-active'],
-            ].filter(Boolean).join(' ')}
-            onClick={() => onChange(presetValue)}
-          >
-            {p.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 const PAGE_SIZE = 50
 
 const DEBTS_VIEW_KEY = 'debts_view'
@@ -143,9 +94,9 @@ export function DebtsPage() {
   const { suppliers, ensureSuppliers } = useCatalog()
   const [clients, setClients] = useState<Client[]>([])
   const [overview, setOverview] = useState<DebtsOverview | null>(null)
+  const [whatsappByDebtId, setWhatsappByDebtId] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showForm, setShowForm] = useState(false)
   const [showUpcoming, setShowUpcoming] = useState(false)
   // Вкладки/фильтр просмотра — предпочтение устройства, переживает обновление страницы.
   const [view, setView] = useState<'active' | 'closed'>(
@@ -178,6 +129,15 @@ export function DebtsPage() {
 
   function refreshOverview() {
     getDebtsOverview().then(setOverview).catch(() => {})
+    listDueDebts()
+      .then((due) => {
+        const map: Record<number, string> = {}
+        for (const d of due) {
+          if (d.whatsapp_reminder_link) map[d.id] = d.whatsapp_reminder_link
+        }
+        setWhatsappByDebtId(map)
+      })
+      .catch(() => {})
   }
 
   // Первая загрузка страницы — полноэкранный "Загрузка…", заодно тянет
@@ -315,25 +275,11 @@ export function DebtsPage() {
               {upcoming.length > 0 && <span className={layoutStyles.countBadge}>{upcoming.length}</span>}
             </Button>
           )}
-          <Button onClick={() => setShowForm(true)}>
+          <Button onClick={() => navigate('/debts/new')}>
             <IconPlus size={16} stroke={1.8} /> Выдать долг
           </Button>
         </div>
       </div>
-
-      {showForm && (
-        <Modal title="Выдать долг" onClose={() => setShowForm(false)}>
-          <IssueDebtForm
-            clients={clients}
-            onClientCreated={(client) => setClients((prev) => [...prev, client])}
-            suppliers={suppliers}
-            onDone={() => {
-              setShowForm(false)
-              load()
-            }}
-          />
-        </Modal>
-      )}
 
       {error && <p className={layoutStyles.error}>{error}</p>}
 
@@ -473,6 +419,7 @@ export function DebtsPage() {
                   debt={d}
                   name={counterpartyName(d)}
                   onOpen={() => navigate(`/debts/${d.id}`)}
+                  whatsappLink={whatsappByDebtId[d.id]}
                   index={i}
                 />
               ))}
@@ -518,14 +465,17 @@ function DebtRow({
   debt,
   name,
   onOpen,
+  whatsappLink,
   index = 0,
 }: {
   debt: Debt
   name: string
   onOpen: () => void
+  whatsappLink?: string
   index?: number
 }) {
   const Icon = debt.client_id != null ? IconUser : IconTruck
+  const overdue = debt.due_date != null && !debt.is_closed && daysOverdue(debt.due_date) > 0
 
   return (
     <div
@@ -555,8 +505,8 @@ function DebtRow({
         <div className={styles['debt-row-meta']}>
           <span>Остаток из {formatMoney(debt.amount)} ₽</span>
           {debt.due_date && !debt.is_closed && (
-            <span className={daysOverdue(debt.due_date) > 0 ? layoutStyles.textDanger : undefined}>
-              {daysOverdue(debt.due_date) > 0
+            <span className={overdue ? layoutStyles.textDanger : undefined}>
+              {overdue
                 ? `Просрочен на ${daysOverdue(debt.due_date)} ${pluralDays(daysOverdue(debt.due_date))}`
                 : `Срок до ${formatDate(debt.due_date)}`}
             </span>
@@ -568,250 +518,20 @@ function DebtRow({
           )}
         </div>
       </div>
+      {overdue && whatsappLink && (
+        <a
+          href={whatsappLink}
+          target="_blank"
+          rel="noreferrer"
+          className={styles['debt-whatsapp']}
+          title="Напомнить в WhatsApp"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <IconBrandWhatsapp size={18} stroke={1.8} />
+          <span className={styles['debt-whatsapp-label']}>Напомнить</span>
+        </a>
+      )}
       <IconChevronRight size={18} stroke={1.8} className={styles['debt-row-chevron']} />
     </div>
-  )
-}
-
-function IssueDebtForm({
-  clients,
-  onClientCreated,
-  suppliers,
-  onDone,
-}: {
-  clients: Client[]
-  onClientCreated: (client: Client) => void
-  suppliers: Supplier[]
-  onDone: () => void
-}) {
-  const [kind, setKind] = useState<'client' | 'supplier'>('client')
-  const [clientId, setClientId] = useState<number | null>(clients[0]?.id ?? null)
-  const [showNewClientForm, setShowNewClientForm] = useState(false)
-  const [supplierId, setSupplierId] = useState<number | null>(suppliers[0]?.id ?? null)
-  const [amount, setAmount] = useState('')
-  const [dueDate, setDueDate] = useState('')
-  const [note, setNote] = useState('')
-  const [withInstallment, setWithInstallment] = useState(false)
-  const [downPayment, setDownPayment] = useState('')
-  const [partsInput, setPartsInput] = useState('3')
-  const [partsTouched, setPartsTouched] = useState(false)
-  const parts = Math.min(Math.max(Number(partsInput) || 0, 1), 60)
-  const [period, setPeriod] = useState<InstallmentPeriod>('month')
-  const [firstPaymentDate, setFirstPaymentDate] = useState(new Date().toISOString().slice(0, 10))
-
-  // Пока пользователь не поправил «Платежей» руками, число платежей само
-  // подстраивается под срок долга и периодичность — например, год с разбивкой
-  // раз в месяц сразу даёт 12 платежей, а не дефолтные 3.
-  useEffect(() => {
-    if (!withInstallment || partsTouched || !dueDate || !firstPaymentDate) return
-    setPartsInput(String(estimatePartsCount(firstPaymentDate, dueDate, period)))
-  }, [withInstallment, partsTouched, dueDate, firstPaymentDate, period])
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-
-  const downPaymentNum = Number(downPayment || '0')
-  const downPaymentInvalid = downPaymentNum < 0 || (amount !== '' && downPaymentNum >= Number(amount))
-  const remainingAfterDownPayment = Math.max(Number(amount || '0') - downPaymentNum, 0).toFixed(2)
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    if (!dueDate) {
-      setError('Укажите срок «Долг до»')
-      return
-    }
-    if (withInstallment && !firstPaymentDate) {
-      setError('Укажите дату первого платежа рассрочки')
-      return
-    }
-    if (withInstallment && downPaymentInvalid) {
-      setError('Первый взнос должен быть меньше суммы долга')
-      return
-    }
-    if (withInstallment && parts < 2) {
-      setError('Платежей должно быть не меньше двух')
-      return
-    }
-    setError(null)
-    setSaving(true)
-    try {
-      const debt =
-        kind === 'client'
-          ? clientId && (await issueDebt({ client_id: clientId, amount, due_date: dueDate, note }))
-          : supplierId && (await issueSupplierDebt({ supplier_id: supplierId, amount, due_date: dueDate, note }))
-      if (!debt) return
-      if (withInstallment) {
-        if (downPaymentNum > 0) {
-          await repayDebt(debt.id, { amount: downPayment, paid_on: firstPaymentDate, note: 'Первый взнос' })
-        }
-        await createInstallment(
-          debt.id,
-          buildInstallmentSchedule(remainingAfterDownPayment, parts, firstPaymentDate, period),
-        )
-      }
-      onDone()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось выдать долг')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <form className={layoutStyles.form} onSubmit={handleSubmit}>
-      <div className={layoutStyles.row}>
-        <Button variant={kind === 'client' ? 'primary' : 'secondary'} onClick={() => setKind('client')}>
-          Клиенту (нам должны)
-        </Button>
-        <Button variant={kind === 'supplier' ? 'primary' : 'secondary'} onClick={() => setKind('supplier')}>
-          Поставщику (мы должны)
-        </Button>
-      </div>
-
-      {kind === 'client' ? (
-        <label className={layoutStyles.field}>
-          Клиент
-          <div className="sale-client-row">
-            <Select
-              className="sale-client-select"
-              value={clientId != null ? String(clientId) : ''}
-              onChange={(v) => setClientId(Number(v))}
-              options={clients.map((c) => ({ value: String(c.id), label: c.name }))}
-            />
-            <QuickNewClientForm
-              open={showNewClientForm}
-              onOpenChange={setShowNewClientForm}
-              trigger={
-                <Button type="button" variant="secondary" onClick={() => setShowNewClientForm(true)}>
-                  <IconPlus size={16} stroke={1.8} /> Клиент
-                </Button>
-              }
-              onCreated={(client) => {
-                onClientCreated(client)
-                setClientId(client.id)
-                setShowNewClientForm(false)
-              }}
-            />
-          </div>
-        </label>
-      ) : (
-        <label className={layoutStyles.field}>
-          Поставщик
-          <Select
-            value={supplierId != null ? String(supplierId) : ''}
-            onChange={(v) => setSupplierId(Number(v))}
-            options={suppliers.map((s) => ({ value: String(s.id), label: s.name }))}
-          />
-        </label>
-      )}
-
-      <label className={layoutStyles.field}>
-        Сумма
-        <input
-          type="text"
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => {
-            const normalized = normalizeDecimalInput(e.target.value)
-            if (normalized !== null) setAmount(normalized)
-          }}
-          required
-        />
-      </label>
-      <label className={layoutStyles.field}>
-        Долг до
-        <DateInput
-          value={dueDate}
-          min={new Date().toISOString().slice(0, 10)}
-          onChange={setDueDate}
-          required
-        />
-      </label>
-      <DueDatePresets value={dueDate} onChange={setDueDate} />
-      <label className={layoutStyles.field}>
-        Заметка
-        <input value={note} onChange={(e) => setNote(e.target.value)} />
-      </label>
-
-      <label className="sale-checkbox">
-        <input
-          type="checkbox"
-          checked={withInstallment}
-          onChange={(e) => {
-            setWithInstallment(e.target.checked)
-            if (!e.target.checked) setPartsTouched(false)
-          }}
-        />
-        С рассрочкой
-      </label>
-
-      {withInstallment && (
-        <div className={layoutStyles.stack} style={{ gap: 14 }}>
-          <label className={layoutStyles.field}>
-            Первый взнос (необязательно)
-            <input
-              type="text"
-              inputMode="decimal"
-              placeholder="0"
-              value={downPayment}
-              onChange={(e) => {
-                const normalized = normalizeDecimalInput(e.target.value)
-                if (normalized !== null) setDownPayment(normalized)
-              }}
-            />
-          </label>
-          {downPaymentNum > 0 && (
-            <p className={downPaymentInvalid ? layoutStyles.error : layoutStyles.textMuted}>
-              {downPaymentInvalid
-                ? 'Первый взнос должен быть меньше суммы долга'
-                : `В рассрочку пойдёт ${formatMoney(remainingAfterDownPayment)} ₽`}
-            </p>
-          )}
-          <div className={layoutStyles.row}>
-            <label className={layoutStyles.field} style={{ flex: 1 }}>
-              Платежей
-              <input
-                type="number"
-                min={2}
-                max={60}
-                value={partsInput}
-                onChange={(e) => {
-                  setPartsInput(e.target.value.replace(/^0+(?=\d)/, ''))
-                  setPartsTouched(true)
-                }}
-                onBlur={() => setPartsInput(String(parts))}
-              />
-            </label>
-            <label className={layoutStyles.field} style={{ flex: 1 }}>
-              Периодичность
-              <Select
-                value={period}
-                onChange={(v) => setPeriod(v as InstallmentPeriod)}
-                options={INSTALLMENT_PERIOD_OPTIONS}
-              />
-            </label>
-          </div>
-          <label className={layoutStyles.field}>
-            {downPaymentNum > 0 ? 'Дата первого взноса и старт графика' : 'Первый платёж'}
-            <DateInput
-              value={firstPaymentDate}
-              min={new Date().toISOString().slice(0, 10)}
-              onChange={setFirstPaymentDate}
-            />
-          </label>
-        </div>
-      )}
-
-      {error && <p className={layoutStyles.error}>{error}</p>}
-      <Button
-        type="submit"
-        disabled={
-          saving ||
-          (kind === 'client' ? !clientId : !supplierId) ||
-          (withInstallment && downPaymentInvalid)
-        }
-      >
-        {saving ? 'Сохранение…' : 'Выдать долг'}
-      </Button>
-    </form>
   )
 }

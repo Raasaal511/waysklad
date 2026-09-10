@@ -1,0 +1,46 @@
+.hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 18px;
+  padding: 18px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  align-items: start;
+}
+
+.heroIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: calc(var(--radius) - 4px);
+  background: var(--bg-muted);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.kindChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+@media (max-width: 720px) {
+  .hero {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .heroIcon {
+    width: 48px;
+    height: 48px;
+  }
+}

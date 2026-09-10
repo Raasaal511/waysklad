@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   setWarehouseAssignments,
   updateWarehouseDetails,
@@ -10,7 +10,7 @@ import {
   type RestockRecommendation,
 } from '../../entities/inventory/api'
 import type { Product } from '../../entities/product/api'
-import { createTask, changeTaskStatus, listActiveTasks } from '../../entities/task/api'
+import { createTask, listActiveTasks } from '../../entities/task/api'
 import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
 import { useCatalog } from '../../app/CatalogContext'
@@ -24,32 +24,33 @@ import {
   IconPlus,
   IconCheck,
   IconX,
-  IconArrowBarToDown,
   IconClipboardCheck,
   IconTruck,
   IconSearch,
   IconShare,
+  IconPackage,
+  IconAlertTriangle,
+  IconMapPin,
+  IconUsers,
+  IconArrowBarToDown,
 } from '@tabler/icons-react'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
-import { ProductDetailCard } from '../../shared/ui/ProductDetailCard'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
 import { formatQuantity, isLowStock, isOutOfStock, normalizeDecimalInput } from '../../shared/lib/format'
-import { loadReceiveDraft, clearReceiveDraft } from './receiveDraft'
 import { loadRestockCart, saveRestockCart } from './restockCart'
 import {
   AssignedUsersField,
   MODE_LABELS,
   MODE_ICONS,
-  MovementForm,
   useWarehouseManagerCandidates,
   type MovementMode,
-  type MovementLine,
 } from './shared'
 import layoutStyles from '../../shared/ui/Layout.module.css'
+import detail from '../products/ProductDetailPage.module.css'
 import styles from './WarehouseDetailPage.module.css'
 
 const STOCK_COLUMNS = '2fr 1fr 1fr 1fr'
@@ -67,6 +68,7 @@ function pulseTasksNav() {
 export function WarehouseDetailPage() {
   const { id } = useParams<{ id: string }>()
   const warehouseId = Number(id)
+  const navigate = useNavigate()
   const { user } = useAuth()
   const { shop } = useShop()
   const canManageWarehouses = user?.role === 'owner' || user?.role === 'manager'
@@ -90,7 +92,6 @@ export function WarehouseDetailPage() {
   const [recommendations, setRecommendations] = useState<RestockRecommendation[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState<MovementMode | null>(null)
   const [restockCartIds, setRestockCartIds] = useState<number[]>(() => loadRestockCart(warehouseId).ids)
   const [restockCartQuantities, setRestockCartQuantities] = useState<Record<number, string>>(
     () => loadRestockCart(warehouseId).quantities,
@@ -98,9 +99,6 @@ export function WarehouseDetailPage() {
   const [restockNotice, setRestockNotice] = useState<string | null>(null)
   const [restockedProductIds, setRestockedProductIds] = useState<Set<number>>(new Set())
   const [showEdit, setShowEdit] = useState(false)
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-  const [movementDrafts, setMovementDrafts] = useState<Partial<Record<MovementMode, MovementLine[]>>>({})
-  const [pendingTaskId, setPendingTaskId] = useState<number | null>(null)
   const [stockQuery, setStockQuery] = useState('')
   const [stockCategoryId, setStockCategoryId] = useState<number | 'all'>('all')
   const [showAllProducts, setShowAllProducts] = useState(false)
@@ -116,7 +114,7 @@ export function WarehouseDetailPage() {
     currentIdRef.current = requestedId
     if (!silent) setLoading(true)
     try {
-      const [, , p, , , , rec, activeTasks] = await Promise.all([
+      const [, , , , , , rec, activeTasks] = await Promise.all([
         ensureStock(),
         ensureWarehouses(),
         ensureProducts(),
@@ -137,22 +135,16 @@ export function WarehouseDetailPage() {
       )
 
       if (searchParams.get('open') === 'receive') {
-        const draft = loadReceiveDraft()
-        if (draft && draft.warehouseId === warehouseId) {
-          const seeded: MovementLine[] = draft.lines.flatMap((l) => {
-            const product = p.find((x) => x.id === l.productId)
-            return product ? [{ product, quantity: l.quantity || '1', cost: product.purchase_price ?? '' }] : []
-          })
-          setMovementDrafts((prev) => ({ ...prev, receive: seeded }))
-          setPendingTaskId(draft.fromTaskId ?? null)
-          setMode('receive')
-        }
-        clearReceiveDraft()
-        setSearchParams((prev) => {
-          const next = new URLSearchParams(prev)
-          next.delete('open')
-          return next
-        })
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('open')
+            return next
+          },
+          { replace: true },
+        )
+        navigate(`/stock/${warehouseId}/movement/receive`, { replace: true })
+        return
       }
     } catch (err) {
       if (currentIdRef.current === requestedId) {
@@ -225,9 +217,15 @@ export function WarehouseDetailPage() {
     })
     .sort((a, b) => Number(b.quantity) - Number(a.quantity) || productName(a.product_id).localeCompare(productName(b.product_id)))
 
-  function openMode(m: MovementMode) {
-    setMode(m)
-  }
+  const stockPositionsCount = warehouseStock.length
+  const lowStockCount = warehouseStock.filter((item) => {
+    const product = productById(item.product_id)
+    return product != null && isLowStock(item.quantity, product.min_stock)
+  }).length
+  const assigneesSummary =
+    warehouse == null || warehouse.assigned_user_ids.length === 0
+      ? 'Только владелец/управляющий'
+      : warehouse.assigned_user_ids.map(employeeName).join(', ')
 
   async function createRestockTasks() {
     const items = restockCartIds
@@ -268,108 +266,140 @@ export function WarehouseDetailPage() {
 
   if (!loading && !warehouse) {
     return (
-      <div className="stack">
+      <div className={layoutStyles.stack}>
         <Link to="/stock" className={layoutStyles.backLink}>
           <IconChevronLeft size={16} stroke={1.8} /> Все склады
         </Link>
-        <p className="error">Склад не найден</p>
+        <p className={layoutStyles.error}>Склад не найден</p>
       </div>
     )
   }
 
   return (
-    <div className="stack">
+    <div className={layoutStyles.stack}>
       <Link to="/stock" className={layoutStyles.backLink}>
         <IconChevronLeft size={16} stroke={1.8} /> Все склады
       </Link>
 
-      <div className="section-title">
-        <div className="stack" style={{ gap: 2 }}>
-          <div className="row" style={{ gap: 6 }}>
-            <h2>{warehouse?.name}</h2>
-            {canManageWarehouses && warehouse && (
-              <IconButton
-                variant="muted"
-                tooltip="Изменить склад"
-                aria-label="Изменить склад"
-                onClick={() => setShowEdit(true)}
-              >
-                <IconPencil size={16} stroke={1.8} />
-              </IconButton>
-            )}
-          </div>
-          {warehouse?.address && <span className="text-muted">{warehouse.address}</span>}
-        </div>
-        <div className="row" style={{ gap: 8 }}>
-          {shop?.storefront_enabled && shop.slug && (
-            <IconButton
-              variant="muted"
-              size="lg"
-              tooltip="Поделиться витриной склада"
-              aria-label="Поделиться витриной склада"
-              onClick={() => {
-                const url = `${window.location.origin}/store/${shop.slug}?warehouse_id=${warehouseId}`
-                navigator.clipboard?.writeText(url).catch(() => {})
-                window.open(url, '_blank', 'noopener,noreferrer')
-              }}
-            >
-              <IconShare size={20} stroke={1.8} />
-            </IconButton>
-          )}
-          {(Object.keys(MODE_LABELS) as MovementMode[]).map((m) => {
-            const Icon = MODE_ICONS[m]
-            return (
-              <IconButton key={m} variant="accent" size="lg" tooltip={MODE_LABELS[m]} onClick={() => openMode(m)}>
-                <Icon size={22} stroke={1.8} />
-              </IconButton>
-            )
-          })}
-        </div>
-      </div>
+      {warehouse && (
+        <>
+          <section
+            className={`${styles.hero} ${detail.reveal}`}
+            style={{ '--reveal-delay': '0ms' } as CSSProperties}
+          >
+            <div className={styles.heroIcon}>
+              <IconPackage size={28} stroke={1.6} />
+            </div>
+            <div className={detail.heroBody}>
+              <div className={detail.heroTop}>
+                <div className={detail.heroHeading}>
+                  <h2 className={detail.heroTitle}>{warehouse.name}</h2>
+                  <div className={detail.heroTags}>
+                    {warehouse.show_on_storefront && (
+                      <span className={detail.storefrontChip}>На витрине</span>
+                    )}
+                  </div>
+                </div>
+                <div className={styles.heroActions}>
+                  {shop?.storefront_enabled && shop.slug && (
+                    <IconButton
+                      variant="muted"
+                      size="lg"
+                      tooltip="Поделиться витриной склада"
+                      aria-label="Поделиться витриной склада"
+                      onClick={() => {
+                        const url = `${window.location.origin}/store/${shop.slug}?warehouse_id=${warehouseId}`
+                        navigator.clipboard?.writeText(url).catch(() => {})
+                        window.open(url, '_blank', 'noopener,noreferrer')
+                      }}
+                    >
+                      <IconShare size={20} stroke={1.8} />
+                    </IconButton>
+                  )}
+                  {canManageWarehouses && (
+                    <IconButton
+                      variant="muted"
+                      size="lg"
+                      tooltip="Изменить склад"
+                      aria-label="Изменить склад"
+                      onClick={() => setShowEdit(true)}
+                    >
+                      <IconPencil size={20} stroke={1.8} />
+                    </IconButton>
+                  )}
+                  {(Object.keys(MODE_LABELS) as MovementMode[]).map((m) => {
+                    const Icon = MODE_ICONS[m]
+                    return (
+                      <IconButton
+                        key={m}
+                        variant="accent"
+                        size="lg"
+                        tooltip={MODE_LABELS[m]}
+                        onClick={() => navigate(`/stock/${warehouseId}/movement/${m}`)}
+                      >
+                        <Icon size={22} stroke={1.8} />
+                      </IconButton>
+                    )
+                  })}
+                </div>
+              </div>
+              <div className={detail.heroMeta}>
+                {warehouse.address && (
+                  <span>
+                    <IconMapPin size={15} stroke={1.8} />
+                    {warehouse.address}
+                  </span>
+                )}
+                <span>
+                  <IconUsers size={15} stroke={1.8} />
+                  {assigneesSummary}
+                </span>
+              </div>
+            </div>
+          </section>
 
-      <div className="card card-full stack">
-        <span className="field-label">Ответственные</span>
-        {warehouse && warehouse.assigned_user_ids.length === 0 ? (
-          <p className="text-muted">Никто не назначен — доступ есть только у владельца/управляющего</p>
-        ) : (
-          <div className="row wrap">
-            {warehouse?.assigned_user_ids.map((uid) => (
-              <span key={uid} className="badge accent">
-                {employeeName(uid)}
+          <section
+            className={`${detail.metrics} ${detail.reveal}`}
+            style={{ '--reveal-delay': '60ms' } as CSSProperties}
+          >
+            <div className={detail.metric}>
+              <span className={detail.metricIcon}>
+                <IconPackage size={18} stroke={1.8} />
               </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {mode && warehouse && (
-        <Modal
-          title={`${MODE_LABELS[mode]} · ${warehouse.name}`}
-          onClose={() => setMode(null)}
-          size="full"
-        >
-          <MovementForm
-            mode={mode}
-            products={products}
-            warehouses={warehouses}
-            units={units}
-            categories={categories}
-            stock={allStock}
-            fixedWarehouseId={warehouse.id}
-            lines={movementDrafts[mode]}
-            onLinesChange={(next) => setMovementDrafts((prev) => ({ ...prev, [mode]: next }))}
-            onDone={() => {
-              if (mode === 'receive' && pendingTaskId != null) {
-                changeTaskStatus(pendingTaskId, 'done').catch(() => {})
-                setPendingTaskId(null)
-              }
-              setMode(null)
-              setMovementDrafts((prev) => ({ ...prev, [mode]: undefined }))
-              refreshCatalog(['stock']).catch(() => {})
-              load(true)
-            }}
-          />
-        </Modal>
+              <div className={detail.metricBody}>
+                <strong>{stockPositionsCount}</strong>
+                <span>Позиций на складе</span>
+              </div>
+            </div>
+            <div className={detail.metric}>
+              <span className={`${detail.metricIcon} ${lowStockCount > 0 ? detail.metricIconWarn : ''}`}>
+                <IconAlertTriangle size={18} stroke={1.8} />
+              </span>
+              <div className={detail.metricBody}>
+                <strong>{lowStockCount}</strong>
+                <span>Мало на складе</span>
+              </div>
+            </div>
+            <div className={detail.metric}>
+              <span className={`${detail.metricIcon} ${recommendations.length > 0 ? detail.metricIconWarn : ''}`}>
+                <IconTrendingUp size={18} stroke={1.8} />
+              </span>
+              <div className={detail.metricBody}>
+                <strong>{recommendations.length}</strong>
+                <span>К дозаказу</span>
+              </div>
+            </div>
+            <div className={detail.metric}>
+              <span className={detail.metricIcon}>
+                <IconUsers size={18} stroke={1.8} />
+              </span>
+              <div className={detail.metricBody}>
+                <strong>{warehouse.assigned_user_ids.length || '—'}</strong>
+                <span>Ответственных</span>
+              </div>
+            </div>
+          </section>
+        </>
       )}
 
       {showEdit && warehouse && (
@@ -384,13 +414,13 @@ export function WarehouseDetailPage() {
         </Modal>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className={layoutStyles.error}>{error}</p>}
 
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : !allStock.some((item) => item.warehouse_id === warehouseId) && !showAllProducts ? (
-        <div className="stack" style={{ gap: 8 }}>
-          <p className="text-muted">На этом складе остатков пока нет</p>
+        <div className={`${layoutStyles.stack} ${detail.reveal}`} style={{ gap: 8, '--reveal-delay': '110ms' } as CSSProperties}>
+          <p className={layoutStyles.textMuted}>На этом складе остатков пока нет</p>
           {products.length > 0 && (
             <button type="button" className="disclosure-link" onClick={() => setShowAllProducts(true)}>
               Показать все товары компании, чтобы принять сюда
@@ -398,8 +428,8 @@ export function WarehouseDetailPage() {
           )}
         </div>
       ) : (
-        <div className="stack">
-          <h3>Товары на складе</h3>
+        <div className={`${layoutStyles.stack} ${detail.reveal}`} style={{ '--reveal-delay': '110ms' } as CSSProperties}>
+          <h3 className={detail.sectionTitle}>Товары на складе</h3>
           <div className="sale-search-panel">
             <div className="sale-search-row">
               <IconSearch size={16} stroke={1.8} className="sale-search-icon" />
@@ -468,7 +498,7 @@ export function WarehouseDetailPage() {
                           '--row-delay': `${Math.min(i, 12) * 25}ms`,
                         } as CSSProperties
                       }
-                      onClick={() => product && setSelectedProduct(product)}
+                      onClick={() => product && navigate(`/products/${product.id}`)}
                     >
                       <span className="data-row-name">{productName(item.product_id)}</span>
                       <span className="text-muted">{product?.sku || '—'}</span>
@@ -597,17 +627,6 @@ export function WarehouseDetailPage() {
         }}
         onSubmit={createRestockTasks}
       />
-
-      {selectedProduct && (
-        <ProductDetailCard
-          product={selectedProduct}
-          categories={categories}
-          units={units}
-          warehouses={warehouses}
-          stock={allStock}
-          onClose={() => setSelectedProduct(null)}
-        />
-      )}
     </div>
   )
 }
@@ -820,6 +839,7 @@ function WarehouseEditForm({
 }) {
   const [name, setName] = useState(warehouse.name)
   const [address, setAddress] = useState(warehouse.address)
+  const [showOnStorefront, setShowOnStorefront] = useState(warehouse.show_on_storefront ?? false)
   const [selectedIds, setSelectedIds] = useState<number[]>(warehouse.assigned_user_ids)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -830,7 +850,11 @@ function WarehouseEditForm({
     setError(null)
     setSaving(true)
     try {
-      await updateWarehouseDetails(warehouse.id, { name, address })
+      await updateWarehouseDetails(warehouse.id, {
+        name,
+        address,
+        show_on_storefront: showOnStorefront,
+      })
       await setWarehouseAssignments(warehouse.id, selectedIds)
       onDone()
     } catch (err) {
@@ -850,6 +874,18 @@ function WarehouseEditForm({
         Адрес
         <input value={address} onChange={(e) => setAddress(e.target.value)} />
       </label>
+      <label className="sale-checkbox">
+        <input
+          type="checkbox"
+          checked={showOnStorefront}
+          onChange={(e) => setShowOnStorefront(e.target.checked)}
+        />
+        Показывать на витрине
+      </label>
+      <p className="text-muted" style={{ margin: '-6px 0 0', fontSize: 13, lineHeight: 1.4 }}>
+        Учитывается в наличии для покупателей. Если ни один склад не отмечен — на витрине везде
+        «нет в наличии».
+      </p>
       <label className="field">
         Ответственные
         <AssignedUsersField candidates={candidates} selectedIds={selectedIds} onChange={setSelectedIds} />

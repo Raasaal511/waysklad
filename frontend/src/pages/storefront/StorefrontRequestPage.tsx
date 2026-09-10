@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { IconChevronLeft, IconSend } from '@tabler/icons-react'
 import {
   getStorefrontRequestStatus,
@@ -32,6 +32,9 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 
 export function StorefrontRequestPage() {
   const { slug = '' } = useParams<{ slug: string }>()
+  const location = useLocation()
+  const insufficientFromSubmit =
+    (location.state as { insufficientStock?: boolean } | null)?.insufficientStock === true
   const token = loadRequestToken(slug)
   const [status, setStatus] = useState<StorefrontRequestStatusResponse | null>(null)
   const [messages, setMessages] = useState<StorefrontMessage[]>([])
@@ -39,6 +42,7 @@ export function StorefrontRequestPage() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showStockWarning] = useState(insufficientFromSubmit)
   const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -163,6 +167,12 @@ export function StorefrontRequestPage() {
                   </div>
                 )}
               </div>
+            )}
+
+            {showStockWarning && (
+              <p className={styles.stockWarning}>
+                Возможно, часть товара уже разобрали — мы уточним наличие и свяжемся с вами.
+              </p>
             )}
 
             <div className={styles.chat}>

@@ -273,7 +273,7 @@ export function DebtCard({
 
       <span className={styles['debt-item-source']}>
         {debt.sale_id != null ? (
-          <Link to={`/?openSale=${debt.sale_id}`} className={styles['debt-item-source-link']}>
+          <Link to={`/sales/${debt.sale_id}`} className={styles['debt-item-source-link']}>
             <IconReceipt size={13} stroke={1.8} /> Из продажи №{debt.sale_id}
           </Link>
         ) : debt.receipt_document_id != null ? (

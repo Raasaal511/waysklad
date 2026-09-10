@@ -161,6 +161,10 @@ function SettingsTab({ canEdit }: { canEdit: boolean }) {
               <Button>Выбрать товары →</Button>
             </Link>
           </div>
+          <p className={layoutStyles.textMuted} style={{ margin: 0, fontSize: 13 }}>
+            Чтобы наличие считалось верно, в настройках склада включите «Показывать на витрине».
+            Иначе покупатель увидит товары, но без наличия.
+          </p>
         </section>
       )}
 

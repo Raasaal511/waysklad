@@ -343,6 +343,60 @@
   opacity: 0.5;
 }
 
+.selectMenuSearch {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
+  padding: 4px 4px 8px;
+  margin: -4px -4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.selectMenuSearchInput {
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.selectMenuSearchInput:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+  border-color: var(--accent);
+}
+
+.selectMenuList {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 0;
+}
+
+.selectMenuCreate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.selectMenuEmpty {
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.selectMenuError {
+  margin: 4px 6px 2px;
+  font-size: 13px;
+  color: var(--danger);
+}
+
 /* Table (обычный <table>) */
 
 .tableWrap {

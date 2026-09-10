@@ -7,9 +7,12 @@ import {
   IconHeart,
   IconHeartFilled,
   IconPlus,
+  IconX,
+  IconBuildingStore,
 } from '@tabler/icons-react'
 import {
   getStorefrontCatalog,
+  initialOrderQty,
   loadRequestToken,
   type StorefrontCatalog,
   type StorefrontProduct,
@@ -18,6 +21,7 @@ import {
 import { ApiError } from '../../shared/api/client'
 import { formatMoney } from '../../shared/lib/format'
 import { Select } from '../../shared/ui/Select'
+import { Button } from '../../shared/ui/Button'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { addToCart, loadCart, cartCount, type StorefrontCartItem } from './cart'
 import styles from './Storefront.module.css'
@@ -54,9 +58,16 @@ export function StorefrontCatalogPage() {
   const categoryId = searchParams.get('category_id')
     ? Number(searchParams.get('category_id'))
     : null
+  const minPrice = searchParams.get('min_price') ?? ''
+  const maxPrice = searchParams.get('max_price') ?? ''
+  const inStockOnly = searchParams.get('in_stock_only') === 'true'
+  const variantSize = searchParams.get('variant_size') ?? ''
+  const variantColor = searchParams.get('variant_color') ?? ''
 
   const [query, setQuery] = useState(searchParams.get('q') ?? '')
   const [debouncedQuery, setDebouncedQuery] = useState(query)
+  const [minPriceDraft, setMinPriceDraft] = useState(minPrice)
+  const [maxPriceDraft, setMaxPriceDraft] = useState(maxPrice)
   const [catalog, setCatalog] = useState<StorefrontCatalog | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -81,6 +92,11 @@ export function StorefrontCatalogPage() {
           sort,
           categoryId,
           warehouseId,
+          minPrice: minPrice || undefined,
+          maxPrice: maxPrice || undefined,
+          inStockOnly: inStockOnly || undefined,
+          variantSize: variantSize || undefined,
+          variantColor: variantColor || undefined,
           limit: 50,
         })
         if (!cancelled) setCatalog(data)
@@ -103,7 +119,23 @@ export function StorefrontCatalogPage() {
     return () => {
       cancelled = true
     }
-  }, [slug, debouncedQuery, sort, categoryId, warehouseId])
+  }, [
+    slug,
+    debouncedQuery,
+    sort,
+    categoryId,
+    warehouseId,
+    minPrice,
+    maxPrice,
+    inStockOnly,
+    variantSize,
+    variantColor,
+  ])
+
+  useEffect(() => {
+    setMinPriceDraft(minPrice)
+    setMaxPriceDraft(maxPrice)
+  }, [minPrice, maxPrice])
 
   useEffect(() => {
     function onStorage() {
@@ -149,10 +181,38 @@ export function StorefrontCatalogPage() {
       name: product.name,
       retail_price: product.retail_price,
       photo: product.photo,
-      quantity: '1',
+      quantity: String(initialOrderQty(product.min_order_qty, product.order_step_qty)),
       variant_id: null,
     })
     setCart(loadCart(slug))
+  }
+
+  const activeFilters: { key: string; label: string; clear: Record<string, string | null> }[] = []
+  if (minPrice) activeFilters.push({ key: 'min', label: `от ${minPrice} ₽`, clear: { min_price: null } })
+  if (maxPrice) activeFilters.push({ key: 'max', label: `до ${maxPrice} ₽`, clear: { max_price: null } })
+  if (inStockOnly) activeFilters.push({ key: 'stock', label: 'В наличии', clear: { in_stock_only: null } })
+  if (variantSize) activeFilters.push({ key: 'size', label: `Размер ${variantSize}`, clear: { variant_size: null } })
+  if (variantColor) activeFilters.push({ key: 'color', label: variantColor, clear: { variant_color: null } })
+  if (warehouseId != null) {
+    const wh = catalog?.warehouses.find((w) => w.id === warehouseId)
+    activeFilters.push({
+      key: 'wh',
+      label: wh?.name ?? `Точка #${warehouseId}`,
+      clear: { warehouse_id: null },
+    })
+  }
+
+  function clearAllFilters() {
+    setMinPriceDraft('')
+    setMaxPriceDraft('')
+    patchParams({
+      min_price: null,
+      max_price: null,
+      in_stock_only: null,
+      variant_size: null,
+      variant_color: null,
+      warehouse_id: null,
+    })
   }
 
   if (error && !catalog) {
@@ -176,6 +236,10 @@ export function StorefrontCatalogPage() {
             <h1 className={styles.shopName}>{catalog?.shop_name ?? '…'}</h1>
           </div>
           <div className={styles.headerActions}>
+            <Link to="/marketplace" className={styles.marketplaceLink}>
+              <IconBuildingStore size={16} stroke={1.8} />
+              Все магазины
+            </Link>
             {requestToken && (
               <Link to={`/store/${slug}/request`} className={styles.headerLink}>
                 Моя заявка
@@ -209,6 +273,88 @@ export function StorefrontCatalogPage() {
             options={SORT_OPTIONS}
           />
         </div>
+
+        <div className={styles.filters}>
+          <label className={styles.filterField}>
+            Цена от
+            <input
+              type="text"
+              inputMode="decimal"
+              value={minPriceDraft}
+              onChange={(e) => setMinPriceDraft(e.target.value)}
+              onBlur={() => patchParams({ min_price: minPriceDraft.trim() || null })}
+              placeholder="0"
+            />
+          </label>
+          <label className={styles.filterField}>
+            до
+            <input
+              type="text"
+              inputMode="decimal"
+              value={maxPriceDraft}
+              onChange={(e) => setMaxPriceDraft(e.target.value)}
+              onBlur={() => patchParams({ max_price: maxPriceDraft.trim() || null })}
+              placeholder="∞"
+            />
+          </label>
+          <label className={styles.filterCheck}>
+            <input
+              type="checkbox"
+              checked={inStockOnly}
+              onChange={(e) => patchParams({ in_stock_only: e.target.checked ? 'true' : null })}
+            />
+            Только в наличии
+          </label>
+          {(catalog?.available_sizes.length ?? 0) > 0 && (
+            <Select
+              value={variantSize}
+              onChange={(v) => patchParams({ variant_size: v || null })}
+              options={[
+                { value: '', label: 'Размер' },
+                ...(catalog?.available_sizes.map((s) => ({ value: s, label: s })) ?? []),
+              ]}
+            />
+          )}
+          {(catalog?.available_colors.length ?? 0) > 0 && (
+            <Select
+              value={variantColor}
+              onChange={(v) => patchParams({ variant_color: v || null })}
+              options={[
+                { value: '', label: 'Цвет' },
+                ...(catalog?.available_colors.map((c) => ({ value: c, label: c })) ?? []),
+              ]}
+            />
+          )}
+          {(catalog?.warehouses.length ?? 0) > 1 && (
+            <Select
+              value={warehouseId != null ? String(warehouseId) : ''}
+              onChange={(v) => patchParams({ warehouse_id: v || null })}
+              options={[
+                { value: '', label: 'Все точки' },
+                ...(catalog?.warehouses.map((w) => ({ value: String(w.id), label: w.name })) ?? []),
+              ]}
+            />
+          )}
+        </div>
+
+        {activeFilters.length > 0 && (
+          <div className={styles.filterChips}>
+            {activeFilters.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                className={styles.filterChip}
+                onClick={() => patchParams(f.clear)}
+              >
+                {f.label}
+                <IconX size={12} stroke={2} />
+              </button>
+            ))}
+            <button type="button" className={styles.filterChipClear} onClick={clearAllFilters}>
+              Сбросить
+            </button>
+          </div>
+        )}
 
         {((catalog?.categories.length ?? 0) > 0 || favorites.length > 0) && (
           <div className={styles.categories}>
@@ -247,12 +393,37 @@ export function StorefrontCatalogPage() {
       </header>
 
       <main className={styles.main}>
+        {catalog && !loading && (
+          <div className={styles.resultMeta}>
+            <span>
+              {showFavoritesOnly
+                ? `Избранное · ${products.length}`
+                : (
+                  <>
+                    Найдено <strong>{catalog.total}</strong>
+                    {products.length < catalog.total ? ` · показано ${products.length}` : ''}
+                  </>
+                )}
+            </span>
+          </div>
+        )}
         {loading && !catalog ? (
           <p className={styles.muted}>Загрузка…</p>
         ) : products.length === 0 ? (
           <div className={styles.emptyState}>
             <IconPackage size={36} stroke={1.5} />
-            <p>Пока нет товаров</p>
+            <p>{activeFilters.length > 0 || debouncedQuery ? 'Ничего не найдено' : 'Пока нет товаров'}</p>
+            {(activeFilters.length > 0 || debouncedQuery) && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setQuery('')
+                  clearAllFilters()
+                }}
+              >
+                Сбросить поиск и фильтры
+              </Button>
+            )}
           </div>
         ) : (
           <div className={styles.grid}>

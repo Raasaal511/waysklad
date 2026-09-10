@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { Link } from 'react-router-dom'
-import { listDocuments, exportDocuments, type DocumentHistoryEntry, type ExportFormat } from '../../entities/inventory/api'
+import { Link, useSearchParams } from 'react-router-dom'
+import { listDocuments, getDocument, exportDocuments, type DocumentHistoryEntry, type ExportFormat } from '../../entities/inventory/api'
 import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
 import { useCatalog } from '../../app/CatalogContext'
@@ -83,6 +83,7 @@ function documentTotal(doc: DocumentHistoryEntry): number | null {
 export function MovementHistoryPage() {
   const { user } = useAuth()
   const canSeeEmployees = user?.role === 'owner' || user?.role === 'manager'
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const { warehouses, products, units, employees, ensureWarehouses, ensureProducts, ensureUnits, ensureEmployees } =
     useCatalog()
@@ -117,6 +118,31 @@ export function MovementHistoryPage() {
 
   useEffect(() => {
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ?open=id — точечная загрузка документа (из уведомления/ссылки)
+  useEffect(() => {
+    const openId = searchParams.get('open')
+    if (!openId) return
+    const id = Number(openId)
+    if (!Number.isFinite(id)) return
+    getDocument(id)
+      .then((doc) => {
+        setDocuments((prev) => (prev.some((d) => d.id === doc.id) ? prev : [doc, ...prev]))
+        setExpandedId(doc.id)
+      })
+      .catch(() => {})
+      .finally(() => {
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('open')
+            return next
+          },
+          { replace: true },
+        )
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

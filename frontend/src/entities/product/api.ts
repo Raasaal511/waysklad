@@ -27,6 +27,8 @@ export interface Product {
   min_stock: string
   photo: string
   show_on_storefront: boolean
+  storefront_min_qty: string | null
+  storefront_step_qty: string | null
   variants: Variant[]
 }
 
@@ -123,6 +125,8 @@ interface ProductInput {
   category_id?: number | null
   min_stock?: string
   show_on_storefront?: boolean
+  storefront_min_qty?: string | null
+  storefront_step_qty?: string | null
   variants?: VariantInput[]
   initial_stock_warehouse_id?: number | null
   initial_stock_quantity?: string | null
@@ -182,6 +186,10 @@ export async function listAllProducts(query = '', categoryId?: number | null) {
 
 export function createProduct(input: ProductInput) {
   return api.post<Product>('/products', input)
+}
+
+export function getProduct(id: number) {
+  return api.get<Product>(`/products/${id}`)
 }
 
 export function listUnits() {

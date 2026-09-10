@@ -12,6 +12,8 @@ export interface StorefrontProduct {
   photo: string
   category_id: number | null
   in_stock: boolean
+  min_order_qty: string | null
+  order_step_qty: string | null
 }
 
 export interface StorefrontProductDetail extends StorefrontProduct {
@@ -26,10 +28,19 @@ export interface StorefrontCategory {
   product_count: number
 }
 
+export interface StorefrontWarehouse {
+  id: number
+  name: string
+  address: string
+}
+
 export interface StorefrontCatalog {
   shop_name: string
   products: StorefrontProduct[]
   categories: StorefrontCategory[]
+  warehouses: StorefrontWarehouse[]
+  available_sizes: string[]
+  available_colors: string[]
   total: number
 }
 
@@ -51,6 +62,7 @@ export interface StorefrontRequest {
   note: string
   status: StorefrontRequestStatus
   lines: StorefrontRequestLine[]
+  insufficient_stock_at_request: boolean
 }
 
 export interface StorefrontRequestCreated extends StorefrontRequest {
@@ -85,6 +97,11 @@ export interface CatalogParams {
   categoryId?: number | null
   warehouseId?: number | null
   sort?: StorefrontSort
+  minPrice?: string
+  maxPrice?: string
+  inStockOnly?: boolean
+  variantSize?: string
+  variantColor?: string
 }
 
 function catalogQuery(params: CatalogParams) {
@@ -95,6 +112,11 @@ function catalogQuery(params: CatalogParams) {
   if (params.categoryId != null) search.set('category_id', String(params.categoryId))
   if (params.warehouseId != null) search.set('warehouse_id', String(params.warehouseId))
   if (params.sort) search.set('sort', params.sort)
+  if (params.minPrice) search.set('min_price', params.minPrice)
+  if (params.maxPrice) search.set('max_price', params.maxPrice)
+  if (params.inStockOnly) search.set('in_stock_only', 'true')
+  if (params.variantSize) search.set('variant_size', params.variantSize)
+  if (params.variantColor) search.set('variant_color', params.variantColor)
   const qs = search.toString()
   return qs ? `?${qs}` : ''
 }
@@ -185,4 +207,25 @@ export function storefrontChatWsUrl(token: string): string {
   }
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${proto}//${window.location.host}${apiBase}/storefront/requests/chat/ws?token=${encodeURIComponent(token)}`
+}
+
+/** Минимальное стартовое количество с учётом min/step. */
+export function initialOrderQty(min: string | null | undefined, step: string | null | undefined): number {
+  const minN = min != null && min !== '' ? Number(min) : 1
+  const stepN = step != null && step !== '' ? Number(step) : 1
+  const base = Number.isFinite(minN) && minN > 0 ? minN : 1
+  const s = Number.isFinite(stepN) && stepN > 0 ? stepN : 1
+  return base
+}
+
+export function bumpOrderQty(
+  current: number,
+  deltaSteps: number,
+  min: string | null | undefined,
+  step: string | null | undefined,
+): number {
+  const minN = min != null && min !== '' && Number(min) > 0 ? Number(min) : 1
+  const stepN = step != null && step !== '' && Number(step) > 0 ? Number(step) : 1
+  const next = current + deltaSteps * stepN
+  return Math.max(minN, Math.min(9999, next))
 }
