@@ -148,7 +148,7 @@ export function ProductDetailPage() {
         <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : (
         <>
-          <section className={`${styles.hero} ${styles.reveal}`} style={{ '--reveal-delay': '0ms' } as CSSProperties}>
+          <section className={`${styles.hero} ${styles.heroWithMedia} ${styles.reveal}`} style={{ '--reveal-delay': '0ms' } as CSSProperties}>
             {product.photo ? (
               <img src={product.photo} alt="" className={styles.heroPhoto} />
             ) : (
@@ -182,7 +182,10 @@ export function ProductDetailPage() {
                   </IconButton>
                 )}
               </div>
-              <div className={styles.heroPrice}>{formatMoney(product.retail_price)} ₽</div>
+              <div className={styles.heroPrice}>
+                {formatMoney(product.retail_price)}
+                <span className={styles.heroPriceCurrency}>₽</span>
+              </div>
               <div className={styles.heroMeta}>
                 <span>
                   <IconBarcode size={15} stroke={1.8} />
@@ -206,7 +209,8 @@ export function ProductDetailPage() {
               </span>
               <div className={styles.metricBody}>
                 <strong>
-                  {formatQuantity(String(totalStock))} {unitName(product.unit_code)}
+                  {formatQuantity(String(totalStock))}{' '}
+                  <span className={styles.metricCurrency}>{unitName(product.unit_code)}</span>
                   {low && <StockWarningIcon />}
                 </strong>
                 <span>
@@ -225,7 +229,10 @@ export function ProductDetailPage() {
                   <IconCoin size={18} stroke={1.8} />
                 </span>
                 <div className={styles.metricBody}>
-                  <strong>{formatMoney(product.purchase_price)} ₽</strong>
+                  <strong>
+                    {formatMoney(product.purchase_price)}
+                    <span className={styles.metricCurrency}> ₽</span>
+                  </strong>
                   <span>Закупка</span>
                 </div>
               </div>
@@ -236,7 +243,10 @@ export function ProductDetailPage() {
                   <IconPercentage size={18} stroke={1.8} />
                 </span>
                 <div className={styles.metricBody}>
-                  <strong>{formatMoney(product.margin)} ₽</strong>
+                  <strong>
+                    {formatMoney(product.margin)}
+                    <span className={styles.metricCurrency}> ₽</span>
+                  </strong>
                   <span>Маржа</span>
                 </div>
               </div>
@@ -247,7 +257,8 @@ export function ProductDetailPage() {
               </span>
               <div className={styles.metricBody}>
                 <strong>
-                  {formatQuantity(product.min_stock)} {unitName(product.unit_code)}
+                  {formatQuantity(product.min_stock)}{' '}
+                  <span className={styles.metricCurrency}>{unitName(product.unit_code)}</span>
                 </strong>
                 <span>Мин. остаток</span>
               </div>

@@ -346,8 +346,13 @@ export function DebtsPage() {
             <span className={styles['debt-tab-label']}>
               <IconArrowDownLeft size={14} stroke={2} /> Нам должны клиенты
             </span>
-            <strong>{formatMoney(String(totalOwedToUs))} ₽</strong>
-            {clientDebtCount > 0 && <span className={layoutStyles.countBadge}>{clientDebtCount}</span>}
+            <div className={styles['debt-tab-meta']}>
+              <span className={styles['debt-tab-amount']}>
+                {formatMoney(String(totalOwedToUs))}
+                <span className={styles['debt-tab-currency']}>₽</span>
+              </span>
+              {clientDebtCount > 0 && <span className={layoutStyles.countBadge}>{clientDebtCount}</span>}
+            </div>
           </button>
           <button
             type="button"
@@ -361,8 +366,13 @@ export function DebtsPage() {
             <span className={styles['debt-tab-label']}>
               <IconArrowUpRight size={14} stroke={2} /> Мы должны поставщикам
             </span>
-            <strong>{formatMoney(String(totalWeOwe))} ₽</strong>
-            {supplierDebtCount > 0 && <span className={layoutStyles.countBadge}>{supplierDebtCount}</span>}
+            <div className={styles['debt-tab-meta']}>
+              <span className={styles['debt-tab-amount']}>
+                {formatMoney(String(totalWeOwe))}
+                <span className={styles['debt-tab-currency']}>₽</span>
+              </span>
+              {supplierDebtCount > 0 && <span className={layoutStyles.countBadge}>{supplierDebtCount}</span>}
+            </div>
           </button>
         </div>
       )}
@@ -499,11 +509,14 @@ function DebtRow({
       <div className={styles['debt-row-main']}>
         <div className={styles['debt-row-top']}>
           <span className={styles['debt-row-name']}>{name}</span>
-          <strong>{formatMoney(debt.balance)} ₽</strong>
           <span className={DEBT_STATUS_BADGE_CLASS[debt.status]}>{DEBT_STATUS_LABELS[debt.status]}</span>
+          <span className={styles['debt-row-amount']}>
+            {formatMoney(debt.balance)}
+            <span className={styles['debt-row-currency']}>₽</span>
+          </span>
         </div>
         <div className={styles['debt-row-meta']}>
-          <span>Остаток из {formatMoney(debt.amount)} ₽</span>
+          <span>Из {formatMoney(debt.amount)} ₽</span>
           {debt.due_date && !debt.is_closed && (
             <span className={overdue ? layoutStyles.textDanger : undefined}>
               {overdue

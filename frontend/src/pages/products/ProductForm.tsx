@@ -351,7 +351,7 @@ export function ProductForm({
     <form className={styles.editForm} onSubmit={handleSubmit}>
       <fieldset className={styles.formFieldset} disabled={saving}>
         <section
-          className={`${detail.hero} ${detail.reveal} ${styles.heroEdit}`}
+          className={`${detail.hero} ${detail.heroWithMedia} ${styles.heroEdit} ${detail.reveal}`}
           style={{ '--reveal-delay': '0ms' } as CSSProperties}
         >
           <div

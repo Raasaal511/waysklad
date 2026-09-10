@@ -389,7 +389,10 @@ export function SaleDetailView({
               )}
             </div>
           </div>
-          <div className={detailStyles.heroPrice}>{formatMoney(sale.total)} ₽</div>
+          <div className={detailStyles.heroPrice}>
+            {formatMoney(sale.total)}
+            <span className={detailStyles.heroPriceCurrency}>₽</span>
+          </div>
           <div className={detailStyles.heroMeta}>
             <span>
               <IconCalendar size={15} stroke={1.8} />
@@ -423,7 +426,10 @@ export function SaleDetailView({
             <IconCoin size={18} stroke={1.8} />
           </span>
           <div className={detailStyles.metricBody}>
-            <strong>{formatMoney(sale.total)} ₽</strong>
+            <strong>
+              {formatMoney(sale.total)}
+              <span className={detailStyles.metricCurrency}> ₽</span>
+            </strong>
             <span>Итого</span>
           </div>
         </div>
@@ -443,7 +449,16 @@ export function SaleDetailView({
                 <IconCash size={18} stroke={1.8} />
               </span>
               <div className={detailStyles.metricBody}>
-                <strong>{sale.cash_received != null ? `${formatMoney(sale.cash_received)} ₽` : '—'}</strong>
+                <strong>
+                  {sale.cash_received != null ? (
+                    <>
+                      {formatMoney(sale.cash_received)}
+                      <span className={detailStyles.metricCurrency}> ₽</span>
+                    </>
+                  ) : (
+                    '—'
+                  )}
+                </strong>
                 <span>Внесено</span>
               </div>
             </div>
@@ -452,7 +467,16 @@ export function SaleDetailView({
                 <IconCoin size={18} stroke={1.8} />
               </span>
               <div className={detailStyles.metricBody}>
-                <strong>{sale.change != null ? `${formatMoney(sale.change)} ₽` : '—'}</strong>
+                <strong>
+                  {sale.change != null ? (
+                    <>
+                      {formatMoney(sale.change)}
+                      <span className={detailStyles.metricCurrency}> ₽</span>
+                    </>
+                  ) : (
+                    '—'
+                  )}
+                </strong>
                 <span>Сдача</span>
               </div>
             </div>

@@ -152,7 +152,10 @@ export function OrderDetailView({
               {headerActions}
             </div>
           </div>
-          <div className={detailStyles.heroPrice}>{formatMoney(order.total)} ₽</div>
+          <div className={detailStyles.heroPrice}>
+            {formatMoney(order.total)}
+            <span className={detailStyles.heroPriceCurrency}>₽</span>
+          </div>
           <div className={detailStyles.heroMeta}>
             {order.due_date && (
               <span className={isOverdue(order.due_date) ? styles.ordersBoardCardDueOverdue : undefined}>
@@ -183,7 +186,10 @@ export function OrderDetailView({
             <IconCoin size={18} stroke={1.8} />
           </span>
           <div className={detailStyles.metricBody}>
-            <strong>{formatMoney(order.total)} ₽</strong>
+            <strong>
+              {formatMoney(order.total)}
+              <span className={detailStyles.metricCurrency}> ₽</span>
+            </strong>
             <span>Итого</span>
           </div>
         </div>
@@ -193,7 +199,10 @@ export function OrderDetailView({
               <IconCash size={18} stroke={1.8} />
             </span>
             <div className={detailStyles.metricBody}>
-              <strong>{formatMoney(order.prepayment)} ₽</strong>
+              <strong>
+                {formatMoney(order.prepayment)}
+                <span className={detailStyles.metricCurrency}> ₽</span>
+              </strong>
               <span>Предоплата</span>
             </div>
           </div>
@@ -203,7 +212,10 @@ export function OrderDetailView({
             <IconCash size={18} stroke={1.8} />
           </span>
           <div className={detailStyles.metricBody}>
-            <strong>{formatMoney(order.to_pay)} ₽</strong>
+            <strong>
+              {formatMoney(order.to_pay)}
+              <span className={detailStyles.metricCurrency}> ₽</span>
+            </strong>
             <span>К доплате</span>
           </div>
         </div>

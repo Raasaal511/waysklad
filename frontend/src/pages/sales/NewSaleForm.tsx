@@ -7,7 +7,7 @@ import {
   useState,
 } from 'react'
 import { listProducts, getByBarcode, type Product } from '../../entities/product/api'
-import { type Client } from '../../entities/counterparty/api'
+import { type Client, createClient } from '../../entities/counterparty/api'
 import { useCatalog } from '../../app/CatalogContext'
 import {
   createSale,
@@ -27,8 +27,8 @@ import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
+import { CreatableSelect } from '../../shared/ui/CreatableSelect'
 import { DateInput } from '../../shared/ui/DateInput'
-import { QuickNewClientForm } from '../../shared/ui/QuickNewClientForm'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
 import { InfoHint } from '../../shared/ui/InfoHint'
@@ -110,7 +110,6 @@ export function NewSaleForm({
   )
   const clients = initialClients
   const [clientId, setClientId] = useState<number | null>(draft?.clientId ?? null)
-  const [showNewClientForm, setShowNewClientForm] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
@@ -470,20 +469,30 @@ export function NewSaleForm({
 
   const checkoutActions = (
     <>
-      <Button onClick={handleCheckout} disabled={saving || !warehouseId || cart.length === 0}>
-        {saving ? 'Проведение…' : 'Провести продажу'}
-      </Button>
-      <Button variant="secondary" onClick={handleClear} disabled={cart.length === 0}>
-        Очистить
-      </Button>
-      <span className={styles.modalFooterTotal}>
+      <div className={styles.salePageActionsTotal}>
         {discountAmount > 0 && (
           <span className={styles.modalFooterBreakdown}>
-            {formatMoney(subtotal)} ₽ − {formatMoney(discountAmount)} ₽ ={' '}
+            {formatMoney(subtotal)} ₽ − {formatMoney(discountAmount)} ₽
           </span>
         )}
-        Итого: <strong>{formatMoney(total)} ₽</strong>
-      </span>
+        <span className={styles.modalFooterTotalLabel}>Итого</span>
+        <strong className={styles.modalFooterTotalAmount}>
+          {formatMoney(total)}
+          <span className={styles.modalFooterTotalCurrency}>₽</span>
+        </strong>
+      </div>
+      <div className={styles.salePageActionsButtons}>
+        <Button variant="secondary" onClick={handleClear} disabled={cart.length === 0}>
+          Очистить
+        </Button>
+        <Button
+          className={styles.salePageActionsSubmit}
+          onClick={handleCheckout}
+          disabled={saving || !warehouseId || cart.length === 0}
+        >
+          {saving ? 'Проведение…' : 'Провести продажу'}
+        </Button>
+      </div>
     </>
   )
 
@@ -725,80 +734,88 @@ export function NewSaleForm({
               const overStock = availableNum !== null && Number(line.quantity || 0) > availableNum
               return (
                 <div key={line.product.id} className={styles.cartRow}>
-                  <IconButton
-                    variant="neutral"
-                    className={styles.cartRemoveBtn}
-                    onClick={() => removeLine(line.product.id)}
-                    aria-label="Убрать из чека"
-                  >
-                    <IconX size={14} stroke={2} />
-                  </IconButton>
-
-                  <div className={styles.cartRowName}>
-                    <div>{line.product.name}</div>
-                    {availableNum !== null && (
-                      <div className={styles.cartTableStock}>
-                        Остаток: {formatQuantity(availableNum)} {unitName(line.product.unit_code)}
-                      </div>
-                    )}
+                  <div className={styles.cartRowHead}>
+                    <div className={styles.cartRowName}>
+                      <div className={styles.cartRowTitle}>{line.product.name}</div>
+                      {availableNum !== null && (
+                        <div className={styles.cartTableStock}>
+                          Остаток: {formatQuantity(availableNum)} {unitName(line.product.unit_code)}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.cartRemoveBtn}
+                      onClick={() => removeLine(line.product.id)}
+                      aria-label="Убрать из чека"
+                    >
+                      <IconX size={16} stroke={2} />
+                    </button>
                   </div>
 
                   <div className={styles.cartRowFields}>
-                    <label className={styles.cartField}>
-                      <span className={styles.cartFieldLabel}>Кол-во</span>
-                      <div className={styles.cartQtyStepper}>
-                        <IconButton
-                          variant="muted"
+                    <div className={styles.cartQtyPriceGroup}>
+                      <div
+                        className={[
+                          styles.cartQtyStepper,
+                          overStock && styles.cartQtyStepperWarn,
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                      >
+                        <button
+                          type="button"
                           className={styles.cartQtyStep}
                           onClick={() => stepLineQuantity(line.product.id, -1, availableNum)}
                           aria-label="Уменьшить количество"
                         >
-                          <IconMinus size={12} stroke={2} />
-                        </IconButton>
+                          <IconMinus size={16} stroke={2.2} />
+                        </button>
                         <input
                           type="text"
                           inputMode="decimal"
-                          className={overStock ? styles.cartInputWarning : undefined}
+                          aria-label="Количество"
                           value={line.quantity}
-                          onChange={(e) => updateLine(line.product.id, 'quantity', e.target.value, availableNum)}
+                          onChange={(e) =>
+                            updateLine(line.product.id, 'quantity', e.target.value, availableNum)
+                          }
                         />
-                        <IconButton
-                          variant="muted"
+                        <button
+                          type="button"
                           className={styles.cartQtyStep}
                           onClick={() => stepLineQuantity(line.product.id, 1, availableNum)}
                           aria-label="Увеличить количество"
                         >
-                          <IconPlus size={12} stroke={2} />
-                        </IconButton>
+                          <IconPlus size={16} stroke={2.2} />
+                        </button>
                       </div>
-                      {overStock && availableNum !== null && (
-                        <div className={styles.cartTableWarning}>
-                          больше остатка ({formatQuantity(availableNum)})
-                        </div>
-                      )}
-                      {maxReachedProductId === line.product.id && (
-                        <div className={styles.cartTableMaxReached}>Больше нет на складе</div>
-                      )}
-                    </label>
 
-                    <label className={styles.cartField}>
-                      <span className={styles.cartFieldLabel}>Цена за шт.</span>
                       <div className={styles.cartPriceInputWrap}>
                         <input
                           type="text"
                           inputMode="decimal"
                           className={styles.cartPriceInput}
+                          aria-label="Цена за штуку"
                           value={line.price}
                           onChange={(e) => updateLine(line.product.id, 'price', e.target.value)}
                         />
                         <span className={styles.cartTablePriceSuffix}>₽</span>
                       </div>
-                    </label>
-
-                    <div className={styles.cartField}>
-                      <span className={styles.cartFieldLabel}>Сумма</span>
-                      <div className={styles.cartTableTotal}>{formatMoney(lineTotal)} ₽</div>
                     </div>
+
+                    <div className={styles.cartLineTotal} aria-label="Сумма строки">
+                      <span className={styles.cartLineTotalValue}>{formatMoney(lineTotal)}</span>
+                      <span className={styles.cartLineTotalCurrency}>₽</span>
+                    </div>
+
+                    {overStock && availableNum !== null && (
+                      <div className={styles.cartTableWarning}>
+                        больше остатка ({formatQuantity(availableNum)})
+                      </div>
+                    )}
+                    {maxReachedProductId === line.product.id && (
+                      <div className={styles.cartTableMaxReached}>Больше нет на складе</div>
+                    )}
                   </div>
                 </div>
               )
@@ -881,31 +898,23 @@ export function NewSaleForm({
               {payment === 'credit' && !clientId && (
                 <span className={styles.saleClientRequired}> — обязательно для продажи в долг</span>
               )}
-              <div className={styles.saleClientRow}>
-                <Select
-                  required={payment === 'credit'}
-                  value={String(clientId ?? '')}
-                  onChange={(v) => setClientId(v ? Number(v) : null)}
-                  options={[
-                    { value: '', label: 'Без клиента' },
-                    ...clients.map((c) => ({ value: String(c.id), label: c.name })),
-                  ]}
-                />
-                <QuickNewClientForm
-                  open={showNewClientForm}
-                  onOpenChange={setShowNewClientForm}
-                  trigger={
-                    <Button variant="secondary" onClick={() => setShowNewClientForm(true)}>
-                      <IconPlus size={16} stroke={1.8} /> Клиент
-                    </Button>
-                  }
-                  onCreated={(client) => {
-                    onClientsChange([...clients, client])
-                    setClientId(client.id)
-                    setShowNewClientForm(false)
-                  }}
-                />
-              </div>
+              <CreatableSelect
+                required={payment === 'credit'}
+                value={String(clientId ?? '')}
+                onChange={(v) => setClientId(v ? Number(v) : null)}
+                options={[
+                  { value: '', label: 'Без клиента' },
+                  ...clients.map((c) => ({ value: String(c.id), label: c.name })),
+                ]}
+                searchPlaceholder="Клиент или новый…"
+                createLabel={(q) => `Создать «${q}»`}
+                aria-label="Клиент"
+                onCreate={async (name) => {
+                  const client = await createClient({ name })
+                  onClientsChange([...clients, client])
+                  setClientId(client.id)
+                }}
+              />
             </div>
 
             {payment === 'credit' && (
