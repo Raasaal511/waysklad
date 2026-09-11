@@ -1,9 +1,13 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.marketplace.repository import MarketplaceProductRow
+from app.infrastructure.cache_aside import cached_use_case
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
+
+_CACHE_TTL_SECONDS = 20
 
 # та же публично безопасная сортировка, что у витрины одного магазина (см. storefront/get_catalog.py) —
 # ни margin, ни точный stock наружу не отдаются
@@ -35,18 +39,37 @@ class ListMarketplaceProductsResult:
     products: list[MarketplaceProductRow]
     total: int
 
+    def to_json(self) -> dict:
+        return {"products": [p.to_dict() for p in self.products], "total": self.total}
+
+    @classmethod
+    def from_json(cls, d: dict) -> "ListMarketplaceProductsResult":
+        return cls(
+            products=[MarketplaceProductRow.from_dict(p) for p in d["products"]], total=d["total"]
+        )
+
 
 class ListMarketplaceProductsUseCase:
     """Публичный (без авторизации, без actor) общий каталог товаров всех магазинов платформы —
-    отдельно от витрины одного магазина (GetStorefrontCatalogUseCase)."""
+    отдельно от витрины одного магазина (GetStorefrontCatalogUseCase).
 
-    def __init__(self, session_factory):
+    Результат кешируется на _CACHE_TTL_SECONDS: тяжёлый кросс-тенантный
+    запрос, дергается анонимно и часто, а устаревание на 20 секунд не
+    критично для каталога. Без точной инвалидации по событиям — короткий
+    TTL проще и безопаснее (промах = обычный пересчёт, а не ошибка)."""
+
+    def __init__(self, session_factory, cache: ICache | None = None):
         self._session_factory = session_factory
+        self._cache = cache
 
     async def execute(self, cmd: ListMarketplaceProductsCommand) -> ListMarketplaceProductsResult:
         if cmd.sort not in _SORT_ALIASES:
             raise DomainError(f"Неизвестная сортировка: «{cmd.sort}»")
+        return await self._cached_execute(cmd)
 
+    async def _execute_uncached(
+        self, cmd: ListMarketplaceProductsCommand
+    ) -> ListMarketplaceProductsResult:
         async with SqlAlchemyUnitOfWork(None, session_factory=self._session_factory) as uow:
             all_tenants = await uow.tenants.list_all()
             visible_tenants = [t for t in all_tenants if t.storefront_enabled]
@@ -76,3 +99,10 @@ class ListMarketplaceProductsUseCase:
                 offset=cmd.offset,
             )
         return ListMarketplaceProductsResult(products=products, total=total)
+
+    _cached_execute = cached_use_case(
+        "marketplace_catalog",
+        _CACHE_TTL_SECONDS,
+        to_json=lambda r: r.to_json(),
+        from_json=ListMarketplaceProductsResult.from_json,
+    )(_execute_uncached)

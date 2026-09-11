@@ -2,9 +2,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from app.domain.catalog.entities import Category, Product
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.identity.entities import Warehouse
+from app.infrastructure.cache_aside import cached_use_case
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
+
+_CACHE_TTL_SECONDS = 20
 
 # покупателю доступна только эта часть сортировок ProductFilterFactory —
 # ни margin (закупочная маржа), ни stock (точный остаток) публично не отдаются
@@ -49,6 +53,39 @@ class StorefrontCatalogResult:
     available_colors: list[str]  # для фильтра «Цвет»
     total: int
 
+    def to_json(self) -> dict:
+        return {
+            "shop_name": self.shop_name,
+            "products": [p.to_dict() for p in self.products],
+            "in_stock_product_ids": sorted(self.in_stock_product_ids),
+            "categories": [
+                {"category": c.category.to_dict(), "product_count": c.product_count}
+                for c in self.categories
+            ],
+            "warehouses": [w.to_dict() for w in self.warehouses],
+            "available_sizes": self.available_sizes,
+            "available_colors": self.available_colors,
+            "total": self.total,
+        }
+
+    @classmethod
+    def from_json(cls, d: dict) -> "StorefrontCatalogResult":
+        return cls(
+            shop_name=d["shop_name"],
+            products=[Product.from_dict(p) for p in d["products"]],
+            in_stock_product_ids=set(d["in_stock_product_ids"]),
+            categories=[
+                StorefrontCategoryCount(
+                    category=Category.from_dict(c["category"]), product_count=c["product_count"]
+                )
+                for c in d["categories"]
+            ],
+            warehouses=[Warehouse.from_dict(w) for w in d["warehouses"]],
+            available_sizes=d["available_sizes"],
+            available_colors=d["available_colors"],
+            total=d["total"],
+        )
+
 
 class GetStorefrontCatalogUseCase:
     """Публичный (без авторизации) каталог товаров магазина по Tenant.slug.
@@ -56,12 +93,19 @@ class GetStorefrontCatalogUseCase:
     Открывает свой UoW на резолвленный tenant_id — вызывающий (публичный
     роутер) не имеет аутентифицированного пользователя, поэтому обычный
     UowDep здесь неприменим.
+
+    Результат кешируется на _CACHE_TTL_SECONDS (пять запросов к БД на один
+    вызов, дергается анонимно). Без точной инвалидации по событиям —
+    короткий TTL проще и безопаснее (промах = обычный пересчёт).
     """
 
-    def __init__(self, session_factory):
+    def __init__(self, session_factory, cache: ICache | None = None):
         self._session_factory = session_factory
+        self._cache = cache
 
-    async def execute(self, cmd: GetStorefrontCatalogCommand) -> StorefrontCatalogResult | None:
+    async def _execute_uncached(
+        self, cmd: GetStorefrontCatalogCommand
+    ) -> StorefrontCatalogResult | None:
         async with SqlAlchemyUnitOfWork(None, session_factory=self._session_factory) as public_uow:
             tenant = await public_uow.tenants.get_by_slug(cmd.slug)
         if tenant is None or not tenant.storefront_enabled:
@@ -130,3 +174,11 @@ class GetStorefrontCatalogUseCase:
             available_colors=available_colors,
             total=total,
         )
+
+    execute = cached_use_case(
+        "storefront_catalog",
+        _CACHE_TTL_SECONDS,
+        to_json=lambda r: r.to_json(),
+        from_json=StorefrontCatalogResult.from_json,
+        shop_slug=lambda cmd: cmd.slug,
+    )(_execute_uncached)

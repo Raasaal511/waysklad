@@ -22,6 +22,41 @@ class MarketplaceProductRow:
     shop_name: str
     sku: str
 
+    def to_dict(self) -> dict:
+        return {
+            "product_id": self.product_id,
+            "name": self.name,
+            "retail_price": str(self.retail_price),
+            "photo": self.photo,
+            "category_name": self.category_name,
+            "in_stock": self.in_stock,
+            "min_order_qty": str(self.min_order_qty) if self.min_order_qty is not None else None,
+            "order_step_qty": str(self.order_step_qty)
+            if self.order_step_qty is not None
+            else None,
+            "shop_slug": self.shop_slug,
+            "shop_name": self.shop_name,
+            "sku": self.sku,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "MarketplaceProductRow":
+        return cls(
+            product_id=d["product_id"],
+            name=d["name"],
+            retail_price=Decimal(d["retail_price"]),
+            photo=d["photo"],
+            category_name=d["category_name"],
+            in_stock=d["in_stock"],
+            min_order_qty=Decimal(d["min_order_qty"]) if d["min_order_qty"] is not None else None,
+            order_step_qty=Decimal(d["order_step_qty"])
+            if d["order_step_qty"] is not None
+            else None,
+            shop_slug=d["shop_slug"],
+            shop_name=d["shop_name"],
+            sku=d["sku"],
+        )
+
 
 class IMarketplaceProductRepository(Protocol):
     """Отдельный от IProductRepository протокол: тот завязан на SqlAlchemyRepository._tenant

@@ -3,12 +3,14 @@ from datetime import date
 
 from app.application.inventory.common import LineInput, build_lines, require_warehouse_access
 from app.domain.audit.entities import AuditEntry
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.common.money import Money
 from app.domain.common.uow import IUnitOfWork
 from app.domain.debts.entities import Debt
 from app.domain.identity.permissions import Actor, Permission, require
 from app.domain.inventory.entities import StockDocType, StockDocument
+from app.infrastructure.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)
@@ -22,8 +24,9 @@ class ReceiveGoodsCommand:
 
 
 class ReceiveGoodsUseCase:
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None):
         self._uow = uow
+        self._cache = cache
 
     async def execute(self, actor: Actor, cmd: ReceiveGoodsCommand) -> StockDocument:
         require(actor, Permission.STOCK_RECEIVE)
@@ -98,4 +101,5 @@ class ReceiveGoodsUseCase:
                 )
             )
             await uow.commit()
+            await invalidate_shop_cache(self._cache, uow)
             return document

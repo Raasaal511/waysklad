@@ -5,9 +5,11 @@ from typing import Literal
 from app.application.products.create_product import CreateProductCommand, CreateProductUseCase
 from app.application.products.update_product import UpdateProductCommand, UpdateProductUseCase
 from app.domain.audit.entities import AuditEntry
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Actor, Permission, require
+from app.infrastructure.cache_aside import invalidate_shop_cache
 
 ImportAction = Literal["create", "update", "skip"]
 
@@ -47,14 +49,15 @@ class ApplyImportResult:
 
 
 class ApplyProductImportUseCase:
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None):
         self._uow = uow
+        self._cache = cache
 
     async def execute(self, actor: Actor, cmd: ApplyImportCommand) -> ApplyImportResult:
         require(actor, Permission.PRODUCTS_MANAGE)
 
-        create_uc = CreateProductUseCase(self._uow)
-        update_uc = UpdateProductUseCase(self._uow)
+        create_uc = CreateProductUseCase(self._uow, self._cache)
+        update_uc = UpdateProductUseCase(self._uow, self._cache)
         created = updated = skipped = 0
         errors: list[ApplyImportRowError] = []
 
@@ -112,4 +115,5 @@ class ApplyProductImportUseCase:
                 )
             )
             await uow.commit()
+            await invalidate_shop_cache(self._cache, uow)
         return ApplyImportResult(created=created, updated=updated, skipped=skipped, errors=errors)

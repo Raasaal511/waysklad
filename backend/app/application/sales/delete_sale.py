@@ -3,11 +3,13 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from app.domain.audit.entities import AuditEntry
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Actor, Permission, require, require_warehouse
 from app.domain.sales.entities import SaleReturn
 from app.domain.sales.payment import PaymentMethod
+from app.infrastructure.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)
@@ -23,8 +25,9 @@ class DeleteSaleUseCase:
     и не ломать уже сформированную аналитику/аудит за прошлые периоды.
     """
 
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None):
         self._uow = uow
+        self._cache = cache
 
     async def execute(self, actor: Actor, cmd: DeleteSaleCommand) -> None:
         require(actor, Permission.SALES_DELETE)
@@ -60,6 +63,7 @@ class DeleteSaleUseCase:
                 AuditEntry.record(actor, "sale.delete", sale.id, total=str(sale.total.amount))
             )
             await uow.commit()
+            await invalidate_shop_cache(self._cache, uow)
 
     @staticmethod
     def _already_returned(returns: list[SaleReturn]) -> dict[int, Decimal]:

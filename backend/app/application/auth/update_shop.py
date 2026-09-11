@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 
 from app.domain.audit.entities import AuditEntry
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.entities import Tenant
 from app.domain.identity.permissions import Actor, Permission, require
+from app.infrastructure.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)
@@ -20,8 +22,9 @@ class UpdateShopCommand:
 class UpdateShopUseCase:
     """Владелец меняет название магазина и настройки Telegram-сводки."""
 
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None):
         self._uow = uow
+        self._cache = cache
 
     async def execute(self, actor: Actor, cmd: UpdateShopCommand) -> Tenant:
         require(actor, Permission.SETTINGS_MANAGE)
@@ -46,4 +49,5 @@ class UpdateShopUseCase:
             tenant = await uow.tenants.save(tenant)
             await uow.audit.add(AuditEntry.record(actor, "shop.update", tenant.id))
             await uow.commit()
+            await invalidate_shop_cache(self._cache, uow)
             return tenant

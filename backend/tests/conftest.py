@@ -8,6 +8,11 @@ os.environ["RATE_LIMIT_ENABLED"] = "false"
 # тестовое окружение намеренно не хранит секретов — стартовая проверка
 # SECRET_KEY (см. app/main.py) иначе не даст приложению импортироваться
 os.environ["DEBUG"] = "true"
+# CACHE_REDIS_URL обязателен (deps/cache.py падает при старте без него) —
+# локальный Redis, отдельная логическая БД, чтобы не пересекаться с dev/prod
+os.environ.setdefault("CACHE_REDIS_URL", "redis://localhost:6379/15")
+# фиксированное значение — тесты admin-роутера авторизуются этим токеном
+os.environ.setdefault("ADMIN_API_TOKEN", "test-admin-token")
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -28,6 +33,9 @@ from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.files import LocalFileStorage
 from app.infrastructure.security import BcryptPasswordHasher
 from app.main import app as fastapi_app
+from app.infrastructure.cache import RedisCache
+from app.infrastructure.config import settings
+from app.presentation.deps.cache import get_cache
 from app.presentation.deps.notifier import get_notifier
 from app.presentation.deps.security import get_file_storage
 from app.presentation.deps.uow import get_session_factory
@@ -150,12 +158,21 @@ def create_product(make_uow) -> Callable:
 @pytest.fixture
 async def client(db_session_factory, tmp_path) -> AsyncIterator[AsyncClient]:
     """HTTP-клиент FastAPI-приложения с подменённой тестовой БД и хранилищем файлов."""
+    # свежий RedisCache на тест: соединение привязано к event loop текущего
+    # теста (pytest-asyncio создаёт новый loop на каждую функцию), общий
+    # на модуль клиент из deps/cache.py пережить это не может — тестовая БД
+    # 15 flushdb'ится тут же, так что кеш предыдущего теста не просачивается
+    test_cache = RedisCache(settings.cache_redis_url)
+    await test_cache._redis.flushdb()
+    fastapi_app.dependency_overrides[get_cache] = lambda: test_cache
+
     fastapi_app.dependency_overrides[get_session_factory] = lambda: db_session_factory
     fastapi_app.dependency_overrides[get_file_storage] = lambda: LocalFileStorage(tmp_path)
     fastapi_app.dependency_overrides[get_notifier] = lambda: None  # без реальных HTTP-запросов в Telegram
     transport = ASGITransport(app=fastapi_app)
     async with AsyncClient(transport=transport, base_url="http://test") as http:
         yield http
+    await test_cache._redis.aclose()
     fastapi_app.dependency_overrides.clear()
 
 

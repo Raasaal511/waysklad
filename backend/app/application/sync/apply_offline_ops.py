@@ -6,6 +6,7 @@ from app.application.inventory.receive_goods import ReceiveGoodsCommand, Receive
 from app.application.inventory.write_off import WriteOffCommand, WriteOffUseCase
 from app.application.sales.create_sale import CreateSaleCommand, CreateSaleUseCase
 from app.application.sales.return_sale import ReturnSaleCommand, ReturnSaleUseCase
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Actor
@@ -50,8 +51,9 @@ class ApplyOfflineSalesUseCase:
     здесь же, чтобы не оборвать обработку оставшихся операций пачки
     необработанным IntegrityError."""
 
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None):
         self._uow = uow
+        self._cache = cache
 
     async def execute(self, actor: Actor, cmd: ApplyOfflineSalesCommand) -> ApplyOfflineSalesResult:
         applied: list[Sale] = []
@@ -62,7 +64,7 @@ class ApplyOfflineSalesUseCase:
 
         for sale_cmd in cmd.sales:
             try:
-                result = await CreateSaleUseCase(self._uow).execute(actor, sale_cmd)
+                result = await CreateSaleUseCase(self._uow, self._cache).execute(actor, sale_cmd)
                 applied.append(result.sale)
             except DomainError as exc:
                 errors.append(
@@ -85,7 +87,7 @@ class ApplyOfflineSalesUseCase:
 
         for return_cmd in cmd.returns:
             try:
-                result = await ReturnSaleUseCase(self._uow).execute(actor, return_cmd)
+                result = await ReturnSaleUseCase(self._uow, self._cache).execute(actor, return_cmd)
                 applied_returns.append(result.sale_return)
             except DomainError as exc:
                 errors.append(
@@ -108,7 +110,7 @@ class ApplyOfflineSalesUseCase:
 
         for receipt_cmd in cmd.receipts:
             try:
-                document = await ReceiveGoodsUseCase(self._uow).execute(actor, receipt_cmd)
+                document = await ReceiveGoodsUseCase(self._uow, self._cache).execute(actor, receipt_cmd)
                 applied_receipts.append(document)
             except DomainError as exc:
                 errors.append(
@@ -133,7 +135,7 @@ class ApplyOfflineSalesUseCase:
 
         for writeoff_cmd in cmd.writeoffs:
             try:
-                document = await WriteOffUseCase(self._uow).execute(actor, writeoff_cmd)
+                document = await WriteOffUseCase(self._uow, self._cache).execute(actor, writeoff_cmd)
                 applied_writeoffs.append(document)
             except DomainError as exc:
                 errors.append(

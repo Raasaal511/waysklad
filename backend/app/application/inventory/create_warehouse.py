@@ -1,10 +1,12 @@
 from dataclasses import dataclass, field
 
 from app.domain.audit.entities import AuditEntry
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.entities import Role, Warehouse
 from app.domain.identity.permissions import Actor, Permission, require
+from app.infrastructure.cache_aside import invalidate_shop_cache
 
 
 _ASSIGNABLE_ROLES = (Role.MANAGER, Role.SELLER, Role.STOREKEEPER)
@@ -19,8 +21,9 @@ class CreateWarehouseCommand:
 
 
 class CreateWarehouseUseCase:
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None):
         self._uow = uow
+        self._cache = cache
 
     async def execute(self, actor: Actor, cmd: CreateWarehouseCommand) -> Warehouse:
         require(actor, Permission.WAREHOUSES_MANAGE)
@@ -49,4 +52,5 @@ class CreateWarehouseUseCase:
                 )
             )
             await uow.commit()
+            await invalidate_shop_cache(self._cache, uow)
             return warehouse

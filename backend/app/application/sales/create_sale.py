@@ -3,6 +3,7 @@ from datetime import date
 from decimal import Decimal
 
 from app.domain.audit.entities import AuditEntry
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError, InsufficientStockError
 from app.domain.common.money import Money
 from app.domain.common.quantity import Quantity
@@ -11,6 +12,7 @@ from app.domain.debts.entities import Debt, total_balance
 from app.domain.identity.permissions import Actor, Permission, require, require_warehouse
 from app.domain.sales.entities import Sale, SaleLine
 from app.domain.sales.payment import PaymentMethod
+from app.infrastructure.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)
@@ -42,8 +44,9 @@ class CreateSaleResult:
 class CreateSaleUseCase:
     """Экран быстрой продажи: скан → количество → скидка → способ оплаты → готово."""
 
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None):
         self._uow = uow
+        self._cache = cache
 
     async def execute(self, actor: Actor, cmd: CreateSaleCommand) -> CreateSaleResult:
         require(actor, Permission.SALES_CREATE)
@@ -133,6 +136,7 @@ class CreateSaleUseCase:
                 )
             )
             await uow.commit()
+            await invalidate_shop_cache(self._cache, uow)
             return CreateSaleResult(sale=sale, change=change)
 
     @staticmethod

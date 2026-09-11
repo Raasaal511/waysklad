@@ -122,6 +122,7 @@ from app.application.tasks.get_task_history import GetTaskHistoryUseCase
 from app.application.tasks.list_tasks import ListActiveTasksUseCase, ListCompletedTasksUseCase
 from app.application.tasks.update_task import UpdateTaskUseCase
 from app.application.tasks.create_task import CreateTaskUseCase
+from app.presentation.deps.cache import CacheDep
 from app.presentation.deps.notifier import NotifierDep
 from app.presentation.deps.security import FileStorageDep, HasherDep
 from app.presentation.deps.session import SessionFactoryDep
@@ -131,6 +132,16 @@ from app.presentation.deps.uow import PublicUowDep, UowDep
 def _with_uow(use_case_cls):
     def provider(uow: UowDep):
         return use_case_cls(uow)
+
+    return provider
+
+
+def _with_uow_and_cache(use_case_cls):
+    """Для use case, чьи мутации инвалидируют storefront-кеш (см. invalidate_shop_cache
+    в app/infrastructure/cache_aside.py) — в отличие от _with_uow, пробрасывает CacheDep."""
+
+    def provider(uow: UowDep, cache: CacheDep):
+        return use_case_cls(uow, cache)
 
     return provider
 
@@ -159,17 +170,19 @@ def get_change_password(uow: UowDep, hasher: HasherDep) -> ChangePasswordUseCase
 get_logout_all = _with_uow(LogoutAllUseCase)
 
 
-def get_set_product_photo(uow: UowDep, storage: FileStorageDep) -> SetProductPhotoUseCase:
-    return SetProductPhotoUseCase(uow, storage)
+def get_set_product_photo(
+    uow: UowDep, storage: FileStorageDep, cache: CacheDep
+) -> SetProductPhotoUseCase:
+    return SetProductPhotoUseCase(uow, storage, cache)
 
 
-get_create_product = _with_uow(CreateProductUseCase)
-get_update_product = _with_uow(UpdateProductUseCase)
+get_create_product = _with_uow_and_cache(CreateProductUseCase)
+get_update_product = _with_uow_and_cache(UpdateProductUseCase)
 get_create_unit = _with_uow(CreateUnitUseCase)
-get_create_category = _with_uow(CreateCategoryUseCase)
-get_import_products = _with_uow(ImportProductsUseCase)
+get_create_category = _with_uow_and_cache(CreateCategoryUseCase)
+get_import_products = _with_uow_and_cache(ImportProductsUseCase)
 get_preview_import_products = _with_uow(PreviewProductsUseCase)
-get_apply_import_products = _with_uow(ApplyProductImportUseCase)
+get_apply_import_products = _with_uow_and_cache(ApplyProductImportUseCase)
 get_list_units = _with_uow(ListUnitsUseCase)
 get_list_categories = _with_uow(ListCategoriesUseCase)
 get_search_products = _with_uow(SearchProductsUseCase)
@@ -177,22 +190,22 @@ get_product_by_barcode = _with_uow(GetProductByBarcodeUseCase)
 get_product = _with_uow(GetProductUseCase)
 get_product_history = _with_uow(GetProductHistoryUseCase)
 get_products_export_data = _with_uow(GetProductsExportDataUseCase)
-get_receive_goods = _with_uow(ReceiveGoodsUseCase)
-get_write_off = _with_uow(WriteOffUseCase)
-get_transfer = _with_uow(TransferUseCase)
-get_stocktake = _with_uow(StocktakeUseCase)
-get_create_warehouse = _with_uow(CreateWarehouseUseCase)
+get_receive_goods = _with_uow_and_cache(ReceiveGoodsUseCase)
+get_write_off = _with_uow_and_cache(WriteOffUseCase)
+get_transfer = _with_uow_and_cache(TransferUseCase)
+get_stocktake = _with_uow_and_cache(StocktakeUseCase)
+get_create_warehouse = _with_uow_and_cache(CreateWarehouseUseCase)
 get_set_warehouse_assignments = _with_uow(SetWarehouseAssignmentsUseCase)
-get_update_warehouse_details = _with_uow(UpdateWarehouseDetailsUseCase)
+get_update_warehouse_details = _with_uow_and_cache(UpdateWarehouseDetailsUseCase)
 get_list_warehouses = _with_uow(ListWarehousesUseCase)
 get_list_stock = _with_uow(ListStockUseCase)
 get_list_documents = _with_uow(ListDocumentsUseCase)
 get_document = _with_uow(GetDocumentUseCase)
 get_document_export_data = _with_uow(GetDocumentExportDataUseCase)
-get_create_sale = _with_uow(CreateSaleUseCase)
-get_return_sale = _with_uow(ReturnSaleUseCase)
+get_create_sale = _with_uow_and_cache(CreateSaleUseCase)
+get_return_sale = _with_uow_and_cache(ReturnSaleUseCase)
 get_edit_sale = _with_uow(EditSaleUseCase)
-get_delete_sale = _with_uow(DeleteSaleUseCase)
+get_delete_sale = _with_uow_and_cache(DeleteSaleUseCase)
 get_list_sales = _with_uow(ListSalesUseCase)
 get_sales_summary = _with_uow(GetSalesSummaryUseCase)
 get_sale = _with_uow(GetSaleUseCase)
@@ -215,7 +228,7 @@ get_create_order = _with_uow(CreateOrderUseCase)
 get_update_order = _with_uow(UpdateOrderUseCase)
 get_change_order_status = _with_uow(ChangeOrderStatusUseCase)
 get_cancel_order = _with_uow(CancelOrderUseCase)
-get_issue_order = _with_uow(IssueOrderUseCase)
+get_issue_order = _with_uow_and_cache(IssueOrderUseCase)
 get_list_active_orders = _with_uow(ListActiveOrdersUseCase)
 get_list_completed_orders = _with_uow(ListCompletedOrdersUseCase)
 get_order = _with_uow(GetOrderUseCase)
@@ -235,24 +248,30 @@ get_category_profit = _with_uow(GetCategoryProfitUseCase)
 get_dead_stock = _with_uow(GetDeadStockUseCase)
 get_stock_value = _with_uow(GetStockValueUseCase)
 get_restock_recommendations = _with_uow(GetRestockRecommendationsUseCase)
-get_apply_offline_sales = _with_uow(ApplyOfflineSalesUseCase)
+get_apply_offline_sales = _with_uow_and_cache(ApplyOfflineSalesUseCase)
 get_connect_telegram = _with_uow(ConnectTelegramUseCase)
-get_update_shop = _with_uow(UpdateShopUseCase)
+get_update_shop = _with_uow_and_cache(UpdateShopUseCase)
 get_mark_notification_read = _with_uow(MarkNotificationReadUseCase)
 get_mark_all_notifications_read = _with_uow(MarkAllNotificationsReadUseCase)
 get_list_notifications = _with_uow(ListNotificationsUseCase)
 
 
-def get_storefront_catalog(factory: SessionFactoryDep) -> GetStorefrontCatalogUseCase:
-    return GetStorefrontCatalogUseCase(factory)
+def get_storefront_catalog(
+    factory: SessionFactoryDep, cache: CacheDep
+) -> GetStorefrontCatalogUseCase:
+    return GetStorefrontCatalogUseCase(factory, cache)
 
 
-def get_list_marketplace_products(factory: SessionFactoryDep) -> ListMarketplaceProductsUseCase:
-    return ListMarketplaceProductsUseCase(factory)
+def get_list_marketplace_products(
+    factory: SessionFactoryDep, cache: CacheDep
+) -> ListMarketplaceProductsUseCase:
+    return ListMarketplaceProductsUseCase(factory, cache)
 
 
-def get_storefront_product(factory: SessionFactoryDep) -> GetStorefrontProductUseCase:
-    return GetStorefrontProductUseCase(factory)
+def get_storefront_product(
+    factory: SessionFactoryDep, cache: CacheDep
+) -> GetStorefrontProductUseCase:
+    return GetStorefrontProductUseCase(factory, cache)
 
 
 def get_storefront_request_status(factory: SessionFactoryDep) -> GetStorefrontRequestStatusUseCase:

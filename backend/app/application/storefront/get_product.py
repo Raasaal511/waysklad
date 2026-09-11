@@ -1,8 +1,12 @@
 from dataclasses import dataclass
 
 from app.domain.catalog.entities import Product
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import NotFoundError
+from app.infrastructure.cache_aside import cached_use_case
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
+
+_CACHE_TTL_SECONDS = 20
 
 
 @dataclass(frozen=True)
@@ -17,15 +21,36 @@ class StorefrontProductResult:
     product: Product
     in_stock: bool
 
+    def to_json(self) -> dict:
+        return {
+            "shop_name": self.shop_name,
+            "product": self.product.to_dict(),
+            "in_stock": self.in_stock,
+        }
+
+    @classmethod
+    def from_json(cls, d: dict) -> "StorefrontProductResult":
+        return cls(
+            shop_name=d["shop_name"],
+            product=Product.from_dict(d["product"]),
+            in_stock=d["in_stock"],
+        )
+
 
 class GetStorefrontProductUseCase:
     """Карточка одного товара на публичной витрине — для отдельной ссылки,
-    например «скинуть этот товар клиенту в WhatsApp»."""
+    например «скинуть этот товар клиенту в WhatsApp».
 
-    def __init__(self, session_factory):
+    Результат кешируется на _CACHE_TTL_SECONDS — та же логика, что у
+    GetStorefrontCatalogUseCase (короткий TTL вместо точной инвалидации)."""
+
+    def __init__(self, session_factory, cache: ICache | None = None):
         self._session_factory = session_factory
+        self._cache = cache
 
-    async def execute(self, cmd: GetStorefrontProductCommand) -> StorefrontProductResult | None:
+    async def _execute_uncached(
+        self, cmd: GetStorefrontProductCommand
+    ) -> StorefrontProductResult | None:
         async with SqlAlchemyUnitOfWork(None, session_factory=self._session_factory) as public_uow:
             tenant = await public_uow.tenants.get_by_slug(cmd.slug)
         if tenant is None or not tenant.storefront_enabled:
@@ -44,3 +69,11 @@ class GetStorefrontProductUseCase:
             item.product_id == product.id and item.quantity > 0 for item in stock_items
         )
         return StorefrontProductResult(shop_name=tenant.name, product=product, in_stock=in_stock)
+
+    execute = cached_use_case(
+        "storefront_product",
+        _CACHE_TTL_SECONDS,
+        to_json=lambda r: r.to_json(),
+        from_json=StorefrontProductResult.from_json,
+        shop_slug=lambda cmd: cmd.slug,
+    )(_execute_uncached)

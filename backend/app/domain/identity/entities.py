@@ -43,6 +43,25 @@ class Warehouse:
     assigned_user_ids: list[int] = field(default_factory=list)
     show_on_storefront: bool = False  # видимость на публичной витрине — по умолчанию скрыт
 
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "address": self.address,
+            "assigned_user_ids": self.assigned_user_ids,
+            "show_on_storefront": self.show_on_storefront,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Warehouse":
+        return cls(
+            id=d["id"],
+            name=d["name"],
+            address=d["address"],
+            assigned_user_ids=d["assigned_user_ids"],
+            show_on_storefront=d["show_on_storefront"],
+        )
+
 
 @dataclass
 class User:
