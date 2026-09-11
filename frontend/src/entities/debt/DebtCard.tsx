@@ -201,6 +201,7 @@ export function DebtCard({
   units,
   onReload,
   showHeader = true,
+  embedded = false,
 }: {
   debt: Debt
   clients: Client[]
@@ -211,6 +212,8 @@ export function DebtCard({
   units: Unit[]
   onReload: () => void
   showHeader?: boolean
+  /** На странице долга: без дублирующего прогресса/источника, акцент на действиях. */
+  embedded?: boolean
 }) {
   const [showRepay, setShowRepay] = useState(false)
   const [showExtend, setShowExtend] = useState(false)
@@ -254,42 +257,72 @@ export function DebtCard({
         </div>
       )}
 
-      <div className={styles['debt-pay-progress']}>
-        <span className={styles['debt-pay-progress-paid']}>Оплачено {formatMoney(debt.repaid)} ₽</span>
-        {!debt.is_closed && (
-          <div className={styles['debt-pay-progress-labels']}>
-            <span className={styles['debt-pay-progress-balance']}>
-              Остаток {formatMoney(debt.balance)} ₽{' '}
-              <span className={layoutStyles.textMuted}>из {formatMoney(debt.amount)} ₽</span>
-            </span>
-            {nextPaymentDue(debt) && (
-              <span className={[styles['debt-pay-progress-next'], layoutStyles.textMuted].join(' ')}>
-                Следующая оплата · {formatDate(nextPaymentDue(debt)!)}
-              </span>
+      {!embedded && (
+        <>
+          <div className={styles['debt-pay-progress']}>
+            <span className={styles['debt-pay-progress-paid']}>Оплачено {formatMoney(debt.repaid)} ₽</span>
+            {!debt.is_closed && (
+              <div className={styles['debt-pay-progress-labels']}>
+                <span className={styles['debt-pay-progress-balance']}>
+                  Остаток {formatMoney(debt.balance)} ₽{' '}
+                  <span className={layoutStyles.textMuted}>из {formatMoney(debt.amount)} ₽</span>
+                </span>
+                {nextPaymentDue(debt) && (
+                  <span className={[styles['debt-pay-progress-next'], layoutStyles.textMuted].join(' ')}>
+                    Следующая оплата · {formatDate(nextPaymentDue(debt)!)}
+                  </span>
+                )}
+              </div>
             )}
           </div>
-        )}
-      </div>
 
-      <span className={styles['debt-item-source']}>
-        {debt.sale_id != null ? (
-          <Link to={`/?openSale=${debt.sale_id}`} className={styles['debt-item-source-link']}>
-            <IconReceipt size={13} stroke={1.8} /> Из продажи №{debt.sale_id}
-          </Link>
-        ) : debt.receipt_document_id != null ? (
-          <span className={layoutStyles.textMuted}>
-            <IconReceipt size={13} stroke={1.8} /> Из приёмки №
-            {receiptDocument?.number ?? debt.receipt_document_id}
+          <span className={styles['debt-item-source']}>
+            {debt.sale_id != null ? (
+              <Link to={`/sales/${debt.sale_id}`} className={styles['debt-item-source-link']}>
+                <IconReceipt size={13} stroke={1.8} /> Из продажи №{debt.sale_id}
+              </Link>
+            ) : debt.receipt_document_id != null ? (
+              <span className={layoutStyles.textMuted}>
+                <IconReceipt size={13} stroke={1.8} /> Из приёмки №
+                {receiptDocument?.number ?? debt.receipt_document_id}
+              </span>
+            ) : debt.note ? (
+              <span className={layoutStyles.textMuted}>{debt.note}</span>
+            ) : (
+              <span className={layoutStyles.textMuted}>Выдан вручную</span>
+            )}
           </span>
-        ) : debt.note ? (
-          <span className={layoutStyles.textMuted}>{debt.note}</span>
-        ) : (
-          <span className={layoutStyles.textMuted}>Выдан вручную</span>
-        )}
-      </span>
+        </>
+      )}
+
+      {!debt.is_closed && (
+        <div className={styles['debt-detail-actions']}>
+          {debt.schedule.length === 0 && (
+            <Button variant={embedded ? 'primary' : 'secondary'} onClick={() => setShowRepay(true)}>
+              <IconCash size={15} stroke={1.8} /> Внести оплату
+            </Button>
+          )}
+          <Button variant="secondary" onClick={() => setShowExtend(true)}>
+            <IconCalendarTime size={15} stroke={1.8} /> Продлить срок
+          </Button>
+          <Button variant="secondary" onClick={() => setShowInstallment(true)}>
+            <IconCalendarRepeat size={15} stroke={1.8} />{' '}
+            {debt.schedule.length === 0 ? 'Рассрочка' : 'Пересобрать график'}
+          </Button>
+        </div>
+      )}
 
       {sale && sale.lines.length > 0 && (
-        <div className={[layoutStyles.card, layoutStyles.cardFull, layoutStyles.stack].join(' ')}>
+        <div
+          className={[
+            layoutStyles.card,
+            layoutStyles.cardFull,
+            layoutStyles.stack,
+            embedded && styles['debt-section-card'],
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           <div className={styles['debt-receipt-header']}>
             <h3>Товары из продажи</h3>
             <span className={styles['debt-receipt-count']}>
@@ -318,7 +351,16 @@ export function DebtCard({
       )}
 
       {receiptDocument && receiptDocument.lines.length > 0 && (
-        <div className={[layoutStyles.card, layoutStyles.cardFull, layoutStyles.stack].join(' ')}>
+        <div
+          className={[
+            layoutStyles.card,
+            layoutStyles.cardFull,
+            layoutStyles.stack,
+            embedded && styles['debt-section-card'],
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           <div className={styles['debt-receipt-header']}>
             <h3>Товары из приёмки</h3>
             <span className={styles['debt-receipt-count']}>
@@ -341,23 +383,6 @@ export function DebtCard({
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {!debt.is_closed && (
-        <div className={styles['debt-detail-actions']}>
-          {debt.schedule.length === 0 && (
-            <Button variant="secondary" onClick={() => setShowRepay(true)}>
-              <IconCash size={15} stroke={1.8} /> Внести оплату
-            </Button>
-          )}
-          <Button variant="secondary" onClick={() => setShowExtend(true)}>
-            <IconCalendarTime size={15} stroke={1.8} /> Продлить срок
-          </Button>
-          <Button variant="secondary" onClick={() => setShowInstallment(true)}>
-            <IconCalendarRepeat size={15} stroke={1.8} />{' '}
-            {debt.schedule.length === 0 ? 'Рассрочка' : 'Пересобрать график'}
-          </Button>
         </div>
       )}
 
@@ -418,14 +443,32 @@ export function DebtCard({
       )}
 
       {debt.schedule.length > 0 && (
-        <div className={[layoutStyles.card, layoutStyles.cardFull, layoutStyles.stack].join(' ')}>
+        <div
+          className={[
+            layoutStyles.card,
+            layoutStyles.cardFull,
+            layoutStyles.stack,
+            embedded && styles['debt-section-card'],
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           <h3>График рассрочки</h3>
           <InstallmentSchedule debt={debt} onDone={onReload} />
         </div>
       )}
 
       {debt.schedule.length === 0 && debt.repayments.length > 0 && (
-        <div className={[layoutStyles.card, layoutStyles.cardFull, layoutStyles.stack].join(' ')}>
+        <div
+          className={[
+            layoutStyles.card,
+            layoutStyles.cardFull,
+            layoutStyles.stack,
+            embedded && styles['debt-section-card'],
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           <div className={styles['debt-payments-header']}>
             <span className={layoutStyles.row} style={{ gap: 8 }}>
               <h3>Оплаты</h3>

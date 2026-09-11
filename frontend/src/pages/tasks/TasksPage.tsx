@@ -12,6 +12,7 @@ import {
   type TaskStatus,
   type TaskHistoryEntry,
 } from '../../entities/task/api'
+import { searchClients, type Client } from '../../entities/counterparty/api'
 import { receiveGoods, type Warehouse, type StockItem } from '../../entities/inventory/api'
 import type { Product, Unit } from '../../entities/product/api'
 import { useCatalog } from '../../app/CatalogContext'
@@ -950,11 +951,19 @@ function NewTaskForm({
   const [note, setNote] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [assignedUserId, setAssignedUserId] = useState<number | null>(user?.id ?? null)
+  const [clientId, setClientId] = useState<number | null>(null)
+  const [clients, setClients] = useState<Client[]>([])
   const [productId, setProductId] = useState<number | null>(null)
   const [warehouseId, setWarehouseId] = useState<number | null>(warehouses[0]?.id ?? null)
   const [quantity, setQuantity] = useState('1')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    searchClients('')
+      .then(setClients)
+      .catch(() => {})
+  }, [])
 
   const assigneeOptions = user
     ? [
@@ -965,6 +974,10 @@ function NewTaskForm({
 
   const productOptions = products.map((p) => ({ value: String(p.id), label: p.name }))
   const warehouseOptions = warehouses.map((w) => ({ value: String(w.id), label: w.name }))
+  const clientOptions = [
+    { value: '', label: 'Без клиента' },
+    ...clients.map((c) => ({ value: String(c.id), label: c.name })),
+  ]
 
   const selectedProduct = productId != null ? products.find((p) => p.id === productId) ?? null : null
   const unitName = (code: string) => units.find((u) => u.code === code)?.name ?? code
@@ -996,6 +1009,7 @@ function NewTaskForm({
           assigned_user_id: assignedUserId,
           note,
           due_date: dueDate || null,
+          client_id: clientId,
         })
       } else {
         await createTask({
@@ -1003,6 +1017,7 @@ function NewTaskForm({
           assigned_user_id: assignedUserId,
           note,
           due_date: dueDate || null,
+          client_id: clientId,
         })
       }
       onDone()
@@ -1074,6 +1089,14 @@ function NewTaskForm({
           onChange={(e) => setNote(e.target.value)}
           placeholder="детали…"
           rows={5}
+        />
+      </label>
+      <label className={layoutStyles.field}>
+        Клиент
+        <Select
+          value={clientId != null ? String(clientId) : ''}
+          onChange={(v) => setClientId(v ? Number(v) : null)}
+          options={clientOptions}
         />
       </label>
       <div className={styles.taskFormMetaRow}>

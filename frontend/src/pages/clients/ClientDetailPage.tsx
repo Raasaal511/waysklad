@@ -20,13 +20,15 @@ import { searchClients, updateClient, getClient, getClientTimeline, type Client,
 import { listClientDebts, type Debt } from '../../entities/debt/api'
 import { DebtCard } from '../../entities/debt/DebtCard'
 import { listSales, getSale, type Sale } from '../../entities/sale/api'
-import { listDocuments, type DocumentHistoryEntry } from '../../entities/inventory/api'
+import { getDocument, type DocumentHistoryEntry } from '../../entities/inventory/api'
 import { useCatalog } from '../../app/CatalogContext'
 import { ApiError } from '../../shared/api/client'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Modal } from '../../shared/ui/Modal'
+import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
+import { DateInput } from '../../shared/ui/DateInput'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
 import { daysOverdue, pluralDays } from '../../entities/debt/dueDate'
@@ -122,6 +124,8 @@ export function ClientDetailPage() {
   const [debtSale, setDebtSale] = useState<Sale | null>(null)
   const [debtReceipt, setDebtReceipt] = useState<DocumentHistoryEntry | null>(null)
   const [debtLoading, setDebtLoading] = useState(false)
+  const [debtsAsOf, setDebtsAsOf] = useState('')
+  const [debtsBalance, setDebtsBalance] = useState<string | null>(null)
 
   async function openDebt(debtId: number) {
     setOpenDebtId(debtId)
@@ -133,9 +137,13 @@ export function ClientDetailPage() {
         setDebtSale(s)
         setDebtReceipt(null)
       } else if (target?.receipt_document_id != null) {
-        const [documents] = await Promise.all([listDocuments(), ensureProducts(), ensureUnits()])
+        const [doc] = await Promise.all([
+          getDocument(target.receipt_document_id),
+          ensureProducts(),
+          ensureUnits(),
+        ])
         setDebtSale(null)
-        setDebtReceipt(documents.find((doc) => doc.id === target.receipt_document_id) ?? null)
+        setDebtReceipt(doc)
       } else {
         setDebtSale(null)
         setDebtReceipt(null)
@@ -146,8 +154,15 @@ export function ClientDetailPage() {
   }
 
   async function reloadOpenDebt() {
-    const debtsSummary = await listClientDebts(clientId)
+    const debtsSummary = await listClientDebts(clientId, debtsAsOf || undefined)
     setDebts(debtsSummary.debts)
+    setDebtsBalance(debtsSummary.total_balance)
+  }
+
+  async function reloadDebts(on?: string) {
+    const debtsSummary = await listClientDebts(clientId, on || undefined)
+    setDebts(debtsSummary.debts)
+    setDebtsBalance(debtsSummary.total_balance)
   }
 
   useEffect(() => {
@@ -165,6 +180,7 @@ export function ClientDetailPage() {
         setSummary(summaryData)
         setClient(summaryData.client)
         setDebts(debtsSummary.debts)
+        setDebtsBalance(debtsSummary.total_balance)
         setSales(salesResult.items)
         setTimeline(timelineData)
       } catch (err) {
@@ -179,6 +195,7 @@ export function ClientDetailPage() {
             if (cancelled) return
             setClient(clients.find((c) => c.id === clientId) ?? null)
             setDebts(debtsSummary.debts)
+            setDebtsBalance(debtsSummary.total_balance)
             setSales(salesResult.items)
           } catch (fallbackErr) {
             setError(
@@ -350,6 +367,34 @@ export function ClientDetailPage() {
               <p className={layoutStyles.textMuted}>Долгов пока нет</p>
             ) : (
               <div className={layoutStyles.stack} style={{ gap: 16 }}>
+                <div className={layoutStyles.row} style={{ gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <label className={layoutStyles.field} style={{ margin: 0, minWidth: 180 }}>
+                    Сверка на дату
+                    <DateInput
+                      value={debtsAsOf}
+                      onChange={(v) => {
+                        setDebtsAsOf(v)
+                        reloadDebts(v).catch(() => {})
+                      }}
+                    />
+                  </label>
+                  {debtsAsOf && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setDebtsAsOf('')
+                        reloadDebts().catch(() => {})
+                      }}
+                    >
+                      Сейчас
+                    </Button>
+                  )}
+                  {debtsBalance != null && (
+                    <span className={layoutStyles.textMuted}>
+                      Баланс{debtsAsOf ? ` на ${debtsAsOf}` : ''}: {formatMoney(debtsBalance)} ₽
+                    </span>
+                  )}
+                </div>
                 <div className={debtsStyles['debt-closed-group']}>
                   <div className={debtsStyles['debt-closed-group-head']}>
                     Текущие долги{activeDebts.length > 0 ? ` · ${activeDebts.length}` : ''}
@@ -444,7 +489,7 @@ export function ClientDetailPage() {
                     return (
                       <Link
                         key={`${ev.type}-${ev.entity_id}-${i}`}
-                        to={`/?openSale=${ev.entity_id}`}
+                        to={`/sales/${ev.entity_id}`}
                         className={`${styles['client-history-row']} ${styles['client-history-row-link']}`}
                       >
                         {content}
@@ -523,9 +568,9 @@ function EditClientForm({ client, onDone }: { client: Client; onDone: (updated: 
   const [isActive, setIsActive] = useState(client.is_active)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [forceMessage, setForceMessage] = useState<string | null>(null)
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
+  async function save(force = false) {
     setError(null)
     setSaving(true)
     try {
@@ -535,50 +580,79 @@ function EditClientForm({ client, onDone }: { client: Client; onDone: (updated: 
         city,
         debt_limit: debtLimit || null,
         is_active: isActive,
+        ...(force ? { force: true } : {}),
       })
+      setForceMessage(null)
       onDone(updated)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось сохранить клиента')
+      if (
+        err instanceof ApiError &&
+        err.status === 400 &&
+        client.is_active &&
+        !isActive &&
+        !force
+      ) {
+        setForceMessage(err.message)
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Не удалось сохранить клиента')
+      }
     } finally {
       setSaving(false)
     }
   }
 
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    await save(false)
+  }
+
   return (
-    <form className={layoutStyles.form} onSubmit={handleSubmit}>
-      <label className={layoutStyles.field}>
-        Имя
-        <input value={name} onChange={(e) => setName(e.target.value)} required />
-      </label>
-      <label className={layoutStyles.field}>
-        Телефон
-        <PhoneInput value={phone} onChange={setPhone} />
-      </label>
-      <label className={layoutStyles.field}>
-        Город
-        <input value={city} onChange={(e) => setCity(e.target.value)} />
-      </label>
-      <label className={layoutStyles.field}>
-        Лимит долга
-        <input
-          type="text"
-          inputMode="decimal"
-          value={debtLimit}
-          onChange={(e) => {
-            const normalized = normalizeDecimalInput(e.target.value)
-            if (normalized !== null) setDebtLimit(normalized)
-          }}
+    <>
+      <form className={layoutStyles.form} onSubmit={handleSubmit}>
+        <label className={layoutStyles.field}>
+          Имя
+          <input value={name} onChange={(e) => setName(e.target.value)} required />
+        </label>
+        <label className={layoutStyles.field}>
+          Телефон
+          <PhoneInput value={phone} onChange={setPhone} />
+        </label>
+        <label className={layoutStyles.field}>
+          Город
+          <input value={city} onChange={(e) => setCity(e.target.value)} />
+        </label>
+        <label className={layoutStyles.field}>
+          Лимит долга
+          <input
+            type="text"
+            inputMode="decimal"
+            value={debtLimit}
+            onChange={(e) => {
+              const normalized = normalizeDecimalInput(e.target.value)
+              if (normalized !== null) setDebtLimit(normalized)
+            }}
+          />
+        </label>
+        <label className={layoutStyles.row} style={{ gap: 8 }}>
+          <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+          Активен
+        </label>
+        {error && <p className={layoutStyles.error}>{error}</p>}
+        <Button type="submit" disabled={saving}>
+          {saving ? 'Сохранение…' : 'Сохранить'}
+        </Button>
+      </form>
+      {forceMessage && (
+        <ConfirmDialog
+          title="Деактивировать клиента?"
+          message={forceMessage}
+          confirmLabel="Деактивировать"
+          danger
+          onConfirm={() => save(true)}
+          onClose={() => setForceMessage(null)}
         />
-      </label>
-      <label className={layoutStyles.row} style={{ gap: 8 }}>
-        <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-        Активен
-      </label>
-      {error && <p className={layoutStyles.error}>{error}</p>}
-      <Button type="submit" disabled={saving}>
-        {saving ? 'Сохранение…' : 'Сохранить'}
-      </Button>
-    </form>
+      )}
+    </>
   )
 }
 

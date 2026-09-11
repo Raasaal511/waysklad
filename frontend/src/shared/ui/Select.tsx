@@ -6,6 +6,8 @@ import layoutStyles from './Layout.module.css'
 export interface SelectOption {
   value: string
   label: string
+  /** Текст для поиска/точного совпадения; по умолчанию = label */
+  searchText?: string
   disabled?: boolean
 }
 

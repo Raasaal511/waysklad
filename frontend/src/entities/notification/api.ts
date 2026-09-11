@@ -7,6 +7,7 @@ export type NotificationKind =
   | 'debt_overdue'
   | 'low_stock'
   | 'storefront_message'
+  | 'storefront_request_new'
 
 export function notificationsWsUrl(token: string): string {
   const apiBase = import.meta.env.VITE_API_URL ?? '/api'

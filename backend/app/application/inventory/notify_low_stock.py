@@ -42,7 +42,7 @@ async def _notify_tenant(uow: SqlAlchemyUnitOfWork, notifier: INotifier) -> None
                 user_id=user.id,
                 kind=NotificationKind.LOW_STOCK,
                 text=text,
-                link=f"/products?highlight={item.product_id}",
+                link=f"/products/{item.product_id}",
                 entity_id=item.product_id,
             )
 

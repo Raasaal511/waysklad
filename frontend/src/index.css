@@ -958,8 +958,7 @@ button.product-tile-remove:hover:not(:disabled) {
 
 /* ProductPhoto — перенесено в src/shared/ui/ProductPhoto.module.css */
 
-/* ProductDetailCard (эксклюзивные классы) — перенесено в
-   src/shared/ui/ProductDetailCard.module.css */
+/* ProductDetailCard удалён — карточка товара теперь на /products/:id */
 
 .cart-table-wrap {
   max-height: 360px;

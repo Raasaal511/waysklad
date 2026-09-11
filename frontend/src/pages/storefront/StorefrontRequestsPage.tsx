@@ -6,6 +6,7 @@ import {
   IconX,
   IconSend,
   IconChevronLeft,
+  IconAlertTriangle,
 } from '@tabler/icons-react'
 import {
   acceptStorefrontRequest,
@@ -118,7 +119,15 @@ export function StorefrontRequestsPanel({ embedded = false }: { embedded?: boole
                     <span className={layoutStyles.textMuted}> · {req.customer_phone}</span>
                   )}
                 </div>
-                <span className="badge accent">Новая</span>
+                <div className={styles.badges}>
+                  <span className="badge accent">Новая</span>
+                  {req.insufficient_stock_at_request && (
+                    <span className={styles.stockBadge} title="При создании заявки остатка могло не хватить">
+                      <IconAlertTriangle size={13} stroke={1.8} />
+                      Остаток под вопросом
+                    </span>
+                  )}
+                </div>
               </div>
               {req.note && <p className={styles.note}>{req.note}</p>}
               <ul className={styles.lines}>
@@ -205,6 +214,12 @@ function AcceptModal({
   return (
     <Modal title={`Принять заявку · ${request.customer_name}`} onClose={onClose}>
       <form className={layoutStyles.form} onSubmit={handleSubmit}>
+        {request.insufficient_stock_at_request && (
+          <p className={styles.acceptWarn}>
+            <IconAlertTriangle size={16} stroke={1.8} />
+            При создании заявки остатка могло не хватить — проверьте наличие перед принятием.
+          </p>
+        )}
         <label className={layoutStyles.field}>
           Склад
           <Select

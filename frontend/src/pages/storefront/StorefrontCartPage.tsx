@@ -66,7 +66,9 @@ export function StorefrontCartPage() {
       })
       saveRequestToken(slug, created.access_token)
       saveCart(slug, [])
-      navigate(`/store/${slug}/request`)
+      navigate(`/store/${slug}/request`, {
+        state: { insufficientStock: created.insufficient_stock_at_request },
+      })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось отправить заявку')
     } finally {

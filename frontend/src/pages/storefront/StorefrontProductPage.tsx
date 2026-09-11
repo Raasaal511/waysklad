@@ -11,6 +11,8 @@ import {
 } from '@tabler/icons-react'
 import {
   getStorefrontProduct,
+  initialOrderQty,
+  bumpOrderQty,
   type StorefrontProductDetail,
 } from '../../entities/storefront/api'
 import { ApiError } from '../../shared/api/client'
@@ -60,7 +62,7 @@ export function StorefrontProductPage() {
         setShopName(data.shop_name)
         setProduct(data.product)
         setVariantId(data.product.variants[0]?.id ?? null)
-        setQty(1)
+        setQty(initialOrderQty(data.product.min_order_qty, data.product.order_step_qty))
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -89,8 +91,9 @@ export function StorefrontProductPage() {
     return () => window.removeEventListener('waysklad:storefront-cart', sync)
   }, [slug])
 
-  function bump(delta: number) {
-    setQty((q) => Math.max(1, Math.min(999, q + delta)))
+  function bump(deltaSteps: number) {
+    if (!product) return
+    setQty((q) => bumpOrderQty(q, deltaSteps, product.min_order_qty, product.order_step_qty))
   }
 
   function toggleFavorite() {
@@ -152,6 +155,7 @@ export function StorefrontProductPage() {
   }
 
   const lineTotal = (Number(product.retail_price) * qty).toFixed(2)
+  const minQty = initialOrderQty(product.min_order_qty, product.order_step_qty)
 
   return (
     <div className={styles.shell}>
@@ -227,7 +231,7 @@ export function StorefrontProductPage() {
                 type="button"
                 className={styles.qtyBtn}
                 onClick={() => bump(-1)}
-                disabled={qty <= 1}
+                disabled={qty <= minQty}
                 aria-label="Меньше"
               >
                 <IconMinus size={18} stroke={2} />
@@ -240,10 +244,17 @@ export function StorefrontProductPage() {
                 onChange={(e) => {
                   const digits = e.target.value.replace(/\D/g, '')
                   if (digits === '') {
-                    setQty(1)
+                    setQty(minQty)
                     return
                   }
-                  setQty(Math.max(1, Math.min(999, Number(digits))))
+                  setQty(
+                    bumpOrderQty(
+                      Number(digits),
+                      0,
+                      product.min_order_qty,
+                      product.order_step_qty,
+                    ),
+                  )
                 }}
                 aria-label="Количество"
               />
@@ -251,12 +262,19 @@ export function StorefrontProductPage() {
                 type="button"
                 className={styles.qtyBtn}
                 onClick={() => bump(1)}
-                disabled={qty >= 999}
+                disabled={qty >= 9999}
                 aria-label="Больше"
               >
                 <IconPlus size={18} stroke={2} />
               </button>
             </div>
+            {(product.min_order_qty || product.order_step_qty) && (
+              <p className={styles.qtyHint}>
+                {product.min_order_qty ? `минимум ${product.min_order_qty}` : null}
+                {product.min_order_qty && product.order_step_qty ? ' · ' : null}
+                {product.order_step_qty ? `шаг ${product.order_step_qty}` : null}
+              </p>
+            )}
           </div>
 
           <div className={styles.productActionsDesktop}>
@@ -287,7 +305,7 @@ export function StorefrontProductPage() {
               type="button"
               className={styles.qtyBtn}
               onClick={() => bump(-1)}
-              disabled={qty <= 1}
+              disabled={qty <= minQty}
               aria-label="Меньше"
             >
               <IconMinus size={16} stroke={2} />
@@ -297,7 +315,7 @@ export function StorefrontProductPage() {
               type="button"
               className={styles.qtyBtn}
               onClick={() => bump(1)}
-              disabled={qty >= 999}
+              disabled={qty >= 9999}
               aria-label="Больше"
             >
               <IconPlus size={16} stroke={2} />

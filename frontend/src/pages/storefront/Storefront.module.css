@@ -188,12 +188,148 @@
   font-size: 15px;
 }
 
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  align-items: flex-end;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--bg) 70%, var(--bg-muted));
+}
+
+.filterField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.filterField input {
+  width: 100px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.filterField input:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: 1px;
+}
+
+.filterCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 9px 0;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.filterCheck input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.filterChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.filterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.filterChip:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: var(--accent-soft);
+}
+
+.filterChipClear {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 6px 4px;
+}
+
+.filterChipClear:hover {
+  color: var(--text);
+}
+
+.resultMeta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.resultMeta strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.qtyHint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.marketplaceLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.marketplaceLink:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--bg-muted) 70%, transparent);
+}
+
 .categories {
   display: flex;
   gap: 8px;
   flex-wrap: nowrap;
   overflow-x: auto;
   padding-bottom: 4px;
+  margin-top: 12px;
   scrollbar-width: thin;
 }
 
@@ -796,6 +932,95 @@
   border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
   background: var(--accent-soft);
   margin-bottom: 16px;
+}
+
+.stockWarning {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, #eab308 14%, transparent);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.shopChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 12px 12px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-muted) 80%, transparent);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shopChip:hover {
+  color: var(--text);
+  background: var(--accent-soft);
+}
+
+.mpCardMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.mpShopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 12px 12px;
+}
+
+.mpShopName {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.mpShopName:hover {
+  color: var(--text);
+}
+
+.mpShopLink {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.mpShopLink:hover {
+  text-decoration: underline;
+}
+
+.mpCategory {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .statusDetails {

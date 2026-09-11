@@ -3,6 +3,53 @@
    restock-toast-* остался в index.css как общий класс — переиспользуется
    в TasksPage для тоста создания задачи. */
 
+.hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 18px;
+  padding: 18px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  align-items: start;
+}
+
+.heroIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: calc(var(--radius) - 4px);
+  background: var(--bg-muted);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .hero {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .heroIcon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .heroActions {
+    width: 100%;
+  }
+}
+
 .restock-title-icon {
   color: var(--accent);
   flex-shrink: 0;
