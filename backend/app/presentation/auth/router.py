@@ -51,7 +51,7 @@ async def register_shop(
 
 
 @router.post("/login")
-@limiter.limit("10/minute")
+@limiter.limit("20/minute")
 async def login(request: Request, body: LoginRequest, use_case: LoginDep) -> TokenResponse:
     return _token_response(await use_case.execute(body.to_command()))
 

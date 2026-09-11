@@ -10,7 +10,7 @@ router = APIRouter(prefix="/marketplace", tags=["marketplace"])
 
 
 @router.get("/products")
-@limiter.limit("60/minute")
+@limiter.limit("300/minute")
 async def list_marketplace_products(
     request: Request,
     params: Annotated[MarketplaceCatalogParams, Depends()],

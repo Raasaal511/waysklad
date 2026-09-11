@@ -48,7 +48,7 @@ _manage = require_permission(Permission.ORDERS_MANAGE)
 
 
 @router.get("/{slug}")
-@limiter.limit("60/minute")
+@limiter.limit("300/minute")
 async def get_storefront_catalog(
     request: Request,
     slug: str,
@@ -62,7 +62,7 @@ async def get_storefront_catalog(
 
 
 @router.get("/{slug}/products/{product_id}")
-@limiter.limit("60/minute")
+@limiter.limit("300/minute")
 async def get_storefront_product(
     request: Request, slug: str, product_id: int, use_case: GetStorefrontProductDep
 ) -> StorefrontProductPageResponse:
@@ -73,7 +73,7 @@ async def get_storefront_product(
 
 
 @router.post("/{slug}/requests", status_code=201)
-@limiter.limit("20/hour")
+@limiter.limit("40/hour")
 async def create_storefront_request(
     request: Request,
     slug: str,
@@ -95,7 +95,7 @@ async def list_new_storefront_requests(
 
 
 @router.get("/requests/status")
-@limiter.limit("60/minute")
+@limiter.limit("300/minute")
 async def get_storefront_request_status(
     request: Request, token: str, use_case: GetStorefrontRequestStatusDep
 ) -> StorefrontRequestStatusResponse:
@@ -106,7 +106,7 @@ async def get_storefront_request_status(
 
 
 @router.get("/requests/chat")
-@limiter.limit("60/minute")
+@limiter.limit("300/minute")
 async def get_storefront_chat(
     request: Request, token: str, use_case: ListStorefrontMessagesDep
 ) -> list[StorefrontMessageResponse]:
@@ -115,7 +115,7 @@ async def get_storefront_chat(
 
 
 @router.post("/requests/chat", status_code=201)
-@limiter.limit("60/minute")
+@limiter.limit("120/minute")
 async def send_storefront_chat_message(
     request: Request, token: str, body: SendStorefrontMessageRequest, use_case: SendStorefrontMessageDep
 ) -> StorefrontMessageResponse:
