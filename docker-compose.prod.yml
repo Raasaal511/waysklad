@@ -17,10 +17,15 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    # requirepass — порт наружу не пробрасывается (только внутренняя docker-сеть),
+    # но пароль даёт defense-in-depth: не выручит только если порт случайно
+    # пробросят наружу или сосед по сети получит RCE в другом контейнере.
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    env_file: .env
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -33,11 +38,14 @@ services:
       # 4 воркера без общего storage для rate limit считали бы независимо
       # (реальный лимит стал бы в 4 раза мягче заявленного) — Redis даёт им
       # один общий счётчик.
-      RATE_LIMIT_STORAGE_URI: redis://redis:6379/0
+      RATE_LIMIT_STORAGE_URI: redis://:${REDIS_PASSWORD}@redis:6379/0
       # тот же Redis, отдельная логическая БД (/1) — pub/sub для WebSocket-push
       # уведомлений между воркерами (открытое соединение клиента живёт только
       # в одном воркере, событие может создаться HTTP-запросом в другом).
-      NOTIFICATIONS_REDIS_URL: redis://redis:6379/1
+      NOTIFICATIONS_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      # тот же Redis, отдельная логическая БД (/2) — кеш read-моделей витрины
+      # и общего каталога платформы, общий между воркерами.
+      CACHE_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
     # --proxy-headers/--forwarded-allow-ips — доверяем X-Forwarded-For от nginx
     # (см. frontend/nginx.conf), иначе rate_limit.py видит один и тот же IP
     # (адрес nginx) для всех клиентов и лимитирует их одним общим счётчиком.
