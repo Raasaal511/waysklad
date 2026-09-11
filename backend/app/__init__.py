@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.presentation.admin.router import router as admin_router
 from app.presentation.analytics.router import router as analytics_router
 from app.presentation.auth.router import router as auth_router
 from app.presentation.counterparties.router import router as counterparties_router
@@ -29,3 +30,4 @@ router.include_router(analytics_router)
 router.include_router(sync_router)
 router.include_router(storefront_router)
 router.include_router(marketplace_router)
+router.include_router(admin_router)

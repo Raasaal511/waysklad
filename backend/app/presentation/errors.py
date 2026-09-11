@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import BackgroundTasks, FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
@@ -38,7 +38,10 @@ def register_exception_handlers(app: FastAPI) -> None:
         # явные обработчики выше. Раньше такие ошибки тихо превращались в 500
         # без единого следа в логах — на проде о падении продажи/долга/синка
         # никто не узнавал, пока не пожалуется пользователь.
-        report_unhandled_error(request.method, request.url.path, exc)
+        # BackgroundTasks — отправка в Telegram (блокирующий httpx.post) и запись
+        # в Redis происходят уже ПОСЛЕ отправки ответа клиенту, не задерживая его.
+        tasks = BackgroundTasks()
+        tasks.add_task(report_unhandled_error, request.method, request.url.path, exc)
         return JSONResponse(
-            status_code=500, content={"detail": "Внутренняя ошибка сервера"}
+            status_code=500, content={"detail": "Внутренняя ошибка сервера"}, background=tasks
         )

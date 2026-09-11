@@ -57,6 +57,11 @@ class ConnectionRegistry:
             except Exception:
                 _logger.exception("Не удалось отправить событие в WebSocket channel=%s", channel)
 
+    def count_connections(self) -> int:
+        """Для admin-статуса — только этот воркер (см. get_server_status.py),
+        не общее число по всей платформе (--workers N в проде)."""
+        return sum(len(sockets) for sockets in self._by_channel.values())
+
 
 class Broadcaster:
     """Единая точка публикации события в канал — скрывает, идёт ли оно через
