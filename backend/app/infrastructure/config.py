@@ -38,11 +38,16 @@ class Settings(BaseSettings):
     # требует абсолютный адрес). Пустая строка (дефолт, пока нет прод-домена) —
     # бот показывает карточку товара без фото, а не падает.
     public_base_url: str = ""
-    # Секрет для GET /api/admin/* (статус сервера, лог ошибок) — сравнивается с
-    # заголовком X-Admin-Token. Отдельно от JWT/Role: это не про конкретный
-    # магазин (tenant), в проекте нет понятия "владелец платформы". Пустая
-    # строка (дефолт) — admin-роутер отключён (см. deps/admin.py).
-    admin_api_token: str = ""
+    # Логин/bcrypt-хеш пароля для POST /api/admin/login — единственная платформенная
+    # учётная запись (не User внутри tenant, в проекте нет понятия "владелец
+    # платформы"). Пусто (дефолт) — admin-роутер отключён (см. deps/admin.py).
+    # Хеш сгенерировать: python -c "from app.infrastructure.security import hash_password;
+    # print(hash_password('...'))"
+    admin_login: str = ""
+    admin_password_hash: str = ""
+    # Срок жизни admin-токена короче обычного (access_token_expire_minutes) —
+    # привилегированный доступ ко всей платформе, риск от утечки выше.
+    admin_token_expire_minutes: int = 120
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

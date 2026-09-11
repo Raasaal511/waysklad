@@ -38,8 +38,13 @@ async def _resolve_current_user(token: str, factory: SessionFactoryDep) -> Curre
     uow = SqlAlchemyUnitOfWork(tenant_id, session_factory=factory)
     async with uow:
         current_version = await uow.users.get_token_version(user_id)
+        tenant = await uow.tenants.get(tenant_id)
     if current_version is None or current_version != token_version:
         raise HTTPException(status_code=401, detail="Сессия завершена, войдите снова")
+    if tenant.is_suspended:
+        # блокировка платформой действует немедленно на уже выданные токены —
+        # не ждать истечения access_token_expire_minutes (до 30 дней)
+        raise HTTPException(status_code=403, detail="Магазин заблокирован")
     return CurrentUser(
         id=user_id,
         tenant_id=tenant_id,

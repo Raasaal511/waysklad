@@ -11,8 +11,12 @@ os.environ["DEBUG"] = "true"
 # CACHE_REDIS_URL обязателен (deps/cache.py падает при старте без него) —
 # локальный Redis, отдельная логическая БД, чтобы не пересекаться с dev/prod
 os.environ.setdefault("CACHE_REDIS_URL", "redis://localhost:6379/15")
-# фиксированное значение — тесты admin-роутера авторизуются этим токеном
-os.environ.setdefault("ADMIN_API_TOKEN", "test-admin-token")
+# фиксированные логин/пароль — тесты admin-роутера логинятся через POST /api/admin/login
+os.environ.setdefault("ADMIN_LOGIN", "test-admin")
+os.environ.setdefault(
+    "ADMIN_PASSWORD_HASH",
+    "$2b$12$hVd0LRFO6SZp0qzOTV3pAOxTeF0fB18uj/us6lvrgGHJxvaQL4d/W",  # "test-admin-password"
+)
 
 import pytest
 from httpx import ASGITransport, AsyncClient

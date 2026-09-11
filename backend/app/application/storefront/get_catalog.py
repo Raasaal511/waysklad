@@ -108,7 +108,7 @@ class GetStorefrontCatalogUseCase:
     ) -> StorefrontCatalogResult | None:
         async with SqlAlchemyUnitOfWork(None, session_factory=self._session_factory) as public_uow:
             tenant = await public_uow.tenants.get_by_slug(cmd.slug)
-        if tenant is None or not tenant.storefront_enabled:
+        if tenant is None or not tenant.storefront_enabled or tenant.is_suspended:
             return None
 
         async with SqlAlchemyUnitOfWork(tenant.id, session_factory=self._session_factory) as uow:

@@ -1,27 +1,61 @@
-"""Приватный admin API (/api/admin/*) — статус сервера и лог ошибок,
-доступен по X-Admin-Token, а не JWT/Role (см. presentation/deps/admin.py)."""
+"""Приватный admin API (/api/admin/*) — логин по логину/паролю
+(POST /api/admin/login), не JWT/Role обычного пользователя, не User внутри
+tenant (см. presentation/deps/admin.py)."""
 
 from app.infrastructure.admin_alerts import report_unhandled_error
 
-_ADMIN_TOKEN = "test-admin-token"  # см. tests/conftest.py: os.environ["ADMIN_API_TOKEN"]
+_LOGIN = "test-admin"  # см. tests/conftest.py: os.environ["ADMIN_LOGIN"]
+_PASSWORD = "test-admin-password"  # соответствует ADMIN_PASSWORD_HASH в conftest.py
+
+
+async def _admin_headers(client) -> dict:
+    response = await client.post(
+        "/api/admin/login", json={"login": _LOGIN, "password": _PASSWORD}
+    )
+    assert response.status_code == 200, response.text
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+async def test_admin_login_wrong_password(client):
+    response = await client.post(
+        "/api/admin/login", json={"login": _LOGIN, "password": "wrong"}
+    )
+    assert response.status_code == 401, response.text
+
+
+async def test_admin_login_wrong_login(client):
+    response = await client.post(
+        "/api/admin/login", json={"login": "someone-else", "password": _PASSWORD}
+    )
+    assert response.status_code == 401, response.text
+
+
+async def test_admin_login_success(client):
+    response = await client.post(
+        "/api/admin/login", json={"login": _LOGIN, "password": _PASSWORD}
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["access_token"]
+    assert body["expires_in_minutes"] > 0
 
 
 async def test_admin_status_requires_token(client):
     response = await client.get("/api/admin/status")
-    assert response.status_code == 403, response.text
+    assert response.status_code == 401, response.text
 
 
 async def test_admin_status_rejects_wrong_token(client):
     response = await client.get(
-        "/api/admin/status", headers={"X-Admin-Token": "wrong-token"}
+        "/api/admin/status", headers={"Authorization": "Bearer wrong-token"}
     )
-    assert response.status_code == 403, response.text
+    assert response.status_code == 401, response.text
 
 
 async def test_admin_status_with_valid_token(client):
-    response = await client.get(
-        "/api/admin/status", headers={"X-Admin-Token": _ADMIN_TOKEN}
-    )
+    headers = await _admin_headers(client)
+    response = await client.get("/api/admin/status", headers=headers)
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["db_connected"] is True
@@ -33,13 +67,12 @@ async def test_admin_status_with_valid_token(client):
 
 async def test_admin_error_logs_requires_token(client):
     response = await client.get("/api/admin/error-logs")
-    assert response.status_code == 403, response.text
+    assert response.status_code == 401, response.text
 
 
 async def test_admin_error_logs_with_valid_token(client):
-    response = await client.get(
-        "/api/admin/error-logs", headers={"X-Admin-Token": _ADMIN_TOKEN}
-    )
+    headers = await _admin_headers(client)
+    response = await client.get("/api/admin/error-logs", headers=headers)
     assert response.status_code == 200, response.text
     assert response.json() == {"errors": []}
 
@@ -47,9 +80,8 @@ async def test_admin_error_logs_with_valid_token(client):
 async def test_admin_error_logs_records_unhandled_error(client):
     await report_unhandled_error("GET", "/api/test/boom", ValueError("что-то сломалось"))
 
-    response = await client.get(
-        "/api/admin/error-logs", headers={"X-Admin-Token": _ADMIN_TOKEN}
-    )
+    headers = await _admin_headers(client)
+    response = await client.get("/api/admin/error-logs", headers=headers)
     assert response.status_code == 200, response.text
     errors = response.json()["errors"]
     assert len(errors) >= 1
@@ -58,3 +90,63 @@ async def test_admin_error_logs_records_unhandled_error(client):
     assert latest["path"] == "/api/test/boom"
     assert latest["error_type"] == "ValueError"
     assert latest["message"] == "что-то сломалось"
+
+
+async def test_admin_list_and_suspend_tenant(client, random_phone):
+    register = await client.post(
+        "/api/auth/register",
+        json={
+            "shop_name": "Магазин для теста блокировки",
+            "owner_name": "Владелец",
+            "phone": random_phone(),
+            "password": "secret123",
+        },
+    )
+    assert register.status_code == 201, register.text
+    owner_headers = {"Authorization": f"Bearer {register.json()['access_token']}"}
+    owner_phone = register.json()["user"]["phone"]
+
+    headers = await _admin_headers(client)
+
+    list_response = await client.get("/api/admin/tenants", headers=headers)
+    assert list_response.status_code == 200, list_response.text
+    tenants = list_response.json()["tenants"]
+    tenant_id = next(t["id"] for t in tenants if t["name"] == "Магазин для теста блокировки")
+
+    detail_response = await client.get(f"/api/admin/tenants/{tenant_id}", headers=headers)
+    assert detail_response.status_code == 200, detail_response.text
+    detail = detail_response.json()
+    assert detail["is_suspended"] is False
+    assert detail["owner"]["phone"] == owner_phone
+    assert detail["users_count"] == 1
+
+    suspend_response = await client.post(
+        f"/api/admin/tenants/{tenant_id}/suspend", headers=headers
+    )
+    assert suspend_response.status_code == 200, suspend_response.text
+    assert suspend_response.json()["is_suspended"] is True
+
+    # уже выданный токен владельца немедленно перестаёт работать
+    blocked = await client.get("/api/auth/shop", headers=owner_headers)
+    assert blocked.status_code == 403, blocked.text
+
+    # новый логин тоже заблокирован
+    login_attempt = await client.post(
+        "/api/auth/login", json={"phone": owner_phone, "password": "secret123"}
+    )
+    assert login_attempt.status_code == 403, login_attempt.text
+
+    unsuspend_response = await client.post(
+        f"/api/admin/tenants/{tenant_id}/unsuspend", headers=headers
+    )
+    assert unsuspend_response.status_code == 200, unsuspend_response.text
+    assert unsuspend_response.json()["is_suspended"] is False
+
+    restored = await client.get("/api/auth/shop", headers=owner_headers)
+    assert restored.status_code == 200, restored.text
+
+
+async def test_admin_suspend_unknown_tenant_returns_404(client):
+    headers = await _admin_headers(client)
+    response = await client.post("/api/admin/tenants/999999/suspend", headers=headers)
+    assert response.status_code == 404, response.text

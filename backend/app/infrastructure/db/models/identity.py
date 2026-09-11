@@ -23,6 +23,7 @@ class TenantModel(Base, TimestampMixin):
     summary_weekly_enabled: Mapped[bool] = mapped_column(default=False)
     summary_monthly_enabled: Mapped[bool] = mapped_column(default=False)
     summary_daily_hour_msk: Mapped[int] = mapped_column(SmallInteger, default=20)
+    is_suspended: Mapped[bool] = mapped_column(default=False)
 
 
 class WarehouseModel(Base, TenantMixin, TimestampMixin):

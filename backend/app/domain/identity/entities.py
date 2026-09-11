@@ -28,6 +28,10 @@ class Tenant:
     summary_weekly_enabled: bool = False
     summary_monthly_enabled: bool = False
     summary_daily_hour_msk: int = 20
+    # Блокировка платформой (не владельцем самого магазина) — например, за
+    # неоплату. Заблокированный tenant: обычный логин (get_current_user) и
+    # публичная витрина недоступны, существующие данные не удаляются.
+    is_suspended: bool = False
 
 
 @dataclass

@@ -38,3 +38,22 @@ def create_access_token(user_id: int, tenant_id: int, role: str, token_version: 
 
 def decode_access_token(token: str) -> dict:
     return jwt.decode(token, settings.secret_key, algorithms=["HS256"])
+
+
+def create_admin_access_token() -> str:
+    """Отдельный scope claim ("admin") — токен обычного пользователя (create_access_token)
+    и admin-токен подписаны одним secret_key, но не взаимозаменяемы: decode_admin_access_token
+    проверяет scope, обычный decode_access_token его не содержит."""
+    payload = {
+        "scope": "admin",
+        "exp": datetime.now(timezone.utc)
+        + timedelta(minutes=settings.admin_token_expire_minutes),
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm="HS256")
+
+
+def decode_admin_access_token(token: str) -> dict:
+    payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
+    if payload.get("scope") != "admin":
+        raise jwt.InvalidTokenError("Не admin-токен")
+    return payload

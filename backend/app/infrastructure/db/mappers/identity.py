@@ -15,6 +15,7 @@ class TenantMapper:
             summary_weekly_enabled=tenant.summary_weekly_enabled,
             summary_monthly_enabled=tenant.summary_monthly_enabled,
             summary_daily_hour_msk=tenant.summary_daily_hour_msk,
+            is_suspended=tenant.is_suspended,
         )
 
     @staticmethod
@@ -29,6 +30,7 @@ class TenantMapper:
             summary_weekly_enabled=model.summary_weekly_enabled,
             summary_monthly_enabled=model.summary_monthly_enabled,
             summary_daily_hour_msk=model.summary_daily_hour_msk,
+            is_suspended=model.is_suspended,
         )
 
 
