@@ -104,6 +104,7 @@ export function NewSaleForm({
   const [payment, setPayment] = useState<PaymentMethod>(draft?.payment ?? 'cash')
   const [debtDueDate, setDebtDueDate] = useState('')
   const [cashReceived, setCashReceived] = useState('')
+  const [keepChange, setKeepChange] = useState(false)
   const [discount, setDiscount] = useState(draft?.discount ?? '0')
   const [discountMode, setDiscountMode] = useState<'amount' | 'percent'>(
     draft?.discountMode ?? 'amount',
@@ -396,8 +397,11 @@ export function NewSaleForm({
   const totalCents = Math.max(0, subtotalCents - discountAmountCents)
   const total = centsToMoney(totalCents)
   const cashReceivedCents = Math.round(Number(cashReceived || 0) * 100)
-  const changeCents = cashReceivedCents - totalCents
+  const rawChangeCents = cashReceivedCents - totalCents
+  const changeKeptCents = keepChange && rawChangeCents > 0 ? rawChangeCents : 0
+  const changeCents = rawChangeCents - changeKeptCents
   const change = centsToMoney(Math.max(0, changeCents))
+  const changeKept = centsToMoney(changeKeptCents)
 
   async function handleCheckout() {
     if (!warehouseId || cart.length === 0) return
@@ -426,6 +430,8 @@ export function NewSaleForm({
     }))
     const cashReceivedValue =
       payment === 'cash' && cashReceived && cashReceivedCents >= totalCents ? cashReceived : null
+    const changeKeptValue =
+      cashReceivedValue && changeKeptCents > 0 ? centsToMoney(changeKeptCents) : null
     try {
       const sale = await createSale({
         warehouse_id: warehouseId,
@@ -434,6 +440,7 @@ export function NewSaleForm({
         discount: discountAmount.toFixed(2),
         client_id: clientId,
         cash_received: cashReceivedValue,
+        change_kept: changeKeptValue,
         debt_due_date: payment === 'credit' ? debtDueDate : null,
       })
       clearDraft()
@@ -450,6 +457,7 @@ export function NewSaleForm({
           discount: discountAmount.toFixed(2),
           client_id: clientId,
           cash_received: cashReceivedValue,
+          change_kept: changeKeptValue,
           debt_due_date: payment === 'credit' ? debtDueDate : null,
         })
         clearDraft()
@@ -877,15 +885,30 @@ export function NewSaleForm({
                     value={cashReceived}
                     onChange={(e) => {
                       const normalized = normalizeDecimalInput(e.target.value)
-                      if (normalized !== null) setCashReceived(normalized)
+                      if (normalized !== null) {
+                        setCashReceived(normalized)
+                        setKeepChange(false)
+                      }
                     }}
                   />
                   {cashReceivedCents > 0 && (
-                    <span className={changeCents < 0 ? styles.saleChangeShort : layoutStyles.textMuted}>
-                      {changeCents >= 0
-                        ? `Сдача: ${formatMoney(change)} ₽`
-                        : `Не хватает: ${formatMoney(centsToMoney(-changeCents))} ₽`}
+                    <span className={changeCents < 0 && !keepChange ? styles.saleChangeShort : layoutStyles.textMuted}>
+                      {rawChangeCents < 0
+                        ? `Не хватает: ${formatMoney(centsToMoney(-rawChangeCents))} ₽`
+                        : keepChange
+                          ? `Сдача не выдана · осталось в кассе ${formatMoney(changeKept)} ₽`
+                          : `Сдача: ${formatMoney(change)} ₽`}
                     </span>
+                  )}
+                  {rawChangeCents > 0 && (
+                    <label className={styles.keepChangeRow}>
+                      <input
+                        type="checkbox"
+                        checked={keepChange}
+                        onChange={(e) => setKeepChange(e.target.checked)}
+                      />
+                      Клиент не взял сдачу
+                    </label>
                   )}
                 </label>
               )}

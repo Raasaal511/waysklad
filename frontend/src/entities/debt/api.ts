@@ -171,3 +171,12 @@ export function createInstallment(
 ) {
   return api.post<Debt>(`/debts/${debtId}/installments`, { schedule })
 }
+
+export interface DebtReceipt {
+  text: string
+  whatsapp_link: string | null
+}
+
+export function getDebtReceipt(debtId: number) {
+  return api.get<DebtReceipt>(`/debts/${debtId}/receipt`)
+}

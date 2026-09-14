@@ -26,6 +26,8 @@ export interface Product {
   category_id: number | null
   min_stock: string
   photo: string
+  description: string
+  storefront_photos: string[]
   show_on_storefront: boolean
   storefront_min_qty: string | null
   storefront_step_qty: string | null
@@ -124,6 +126,7 @@ interface ProductInput {
   barcode?: string | null
   category_id?: number | null
   min_stock?: string
+  description?: string
   show_on_storefront?: boolean
   storefront_min_qty?: string | null
   storefront_step_qty?: string | null
@@ -208,10 +211,32 @@ export function updateProduct(id: number, input: ProductInput & { photo?: string
   return api.put<Product>(`/products/${id}`, input)
 }
 
+export function deleteProduct(id: number) {
+  return api.delete<void>(`/products/${id}`)
+}
+
+export function generateBarcode() {
+  return api.post<{ barcode: string }>('/products/barcode/generate')
+}
+
 export function setProductPhoto(productId: number, file: File) {
   const form = new FormData()
   form.append('file', file)
   return api.postForm<Product>(`/products/${productId}/photo`, form)
+}
+
+export function generateProductDescription(productId: number) {
+  return api.post<{ description: string }>(`/products/${productId}/description/generate`)
+}
+
+export function addStorefrontPhoto(productId: number, file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return api.postForm<Product>(`/products/${productId}/storefront-photos`, form)
+}
+
+export function setStorefrontPhotos(productId: number, photos: string[]) {
+  return api.put<Product>(`/products/${productId}/storefront-photos`, { photos })
 }
 
 export function previewImport(file: File) {

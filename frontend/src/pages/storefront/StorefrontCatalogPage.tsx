@@ -19,11 +19,13 @@ import {
   type StorefrontSort,
 } from '../../entities/storefront/api'
 import { ApiError } from '../../shared/api/client'
-import { formatMoney } from '../../shared/lib/format'
+import { formatMoney, formatQuantity } from '../../shared/lib/format'
+import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { Select } from '../../shared/ui/Select'
 import { Button } from '../../shared/ui/Button'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { addToCart, loadCart, cartCount, type StorefrontCartItem } from './cart'
+import { CustomerAuthChip, CustomerLoginModal, notifyCustomerAuthChanged } from './CustomerLoginModal'
 import styles from './Storefront.module.css'
 
 const FAVORITES_KEY = 'waysklad:storefront-favorites'
@@ -74,6 +76,7 @@ export function StorefrontCatalogPage() {
   const [cart, setCart] = useState<StorefrontCartItem[]>(() => loadCart(slug))
   const [favorites, setFavorites] = useState<number[]>(() => loadFavorites(slug))
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
+  const [showLogin, setShowLogin] = useState(false)
   const requestToken = loadRequestToken(slug)
 
   useEffect(() => {
@@ -131,6 +134,15 @@ export function StorefrontCatalogPage() {
     variantSize,
     variantColor,
   ])
+
+  useEffect(() => {
+    if (!catalog?.shop_name) return
+    setPageMeta({
+      title: `${catalog.shop_name} · WaySklad`,
+      description: `Каталог магазина «${catalog.shop_name}»`,
+    })
+    return () => resetPageMeta()
+  }, [catalog?.shop_name])
 
   useEffect(() => {
     setMinPriceDraft(minPrice)
@@ -240,6 +252,7 @@ export function StorefrontCatalogPage() {
               <IconBuildingStore size={16} stroke={1.8} />
               Все магазины
             </Link>
+            <CustomerAuthChip slug={slug} onLoginClick={() => setShowLogin(true)} />
             {requestToken && (
               <Link to={`/store/${slug}/request`} className={styles.headerLink}>
                 Моя заявка
@@ -444,6 +457,16 @@ export function StorefrontCatalogPage() {
           <p className={styles.muted}>Показано {products.length} из {catalog.total}</p>
         )}
       </main>
+
+      {showLogin && (
+        <CustomerLoginModal
+          onClose={() => setShowLogin(false)}
+          onSuccess={() => {
+            notifyCustomerAuthChanged()
+            setShowLogin(false)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -469,6 +492,9 @@ function ProductCard({
         <div className={styles.cardPhoto}>
           <ProductPhoto src={product.photo} size={48} />
           {!product.in_stock && <span className={styles.outOfStock}>Нет в наличии</span>}
+          {Number(product.sold_count ?? 0) > 0 && (
+            <span className={styles.soldBadge}>Продано {formatQuantity(product.sold_count!)}</span>
+          )}
         </div>
         <div className={styles.cardBody}>
           <h2 className={styles.cardName}>{product.name}</h2>

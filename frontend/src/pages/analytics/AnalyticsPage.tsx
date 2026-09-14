@@ -7,6 +7,7 @@ import {
   getStockValue,
   getRevenueTimeline,
   getPeriodTotals,
+  getMissedSales,
   type Dashboard,
   type ProductSales,
   type CategoryProfit,
@@ -15,6 +16,7 @@ import {
   type TimelinePoint,
   type TimelineBucket,
   type PeriodTotals,
+  type MissedSaleItem,
 } from '../../entities/analytics/api'
 import { ApiError } from '../../shared/api/client'
 import { formatQuantity, formatMoney } from '../../shared/lib/format'
@@ -30,6 +32,8 @@ import {
   IconChartBar,
   IconPackageOff,
   IconReceipt,
+  IconCoinOff,
+  IconShoppingBagX,
 } from '@tabler/icons-react'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './AnalyticsPage.module.css'
@@ -37,6 +41,7 @@ import styles from './AnalyticsPage.module.css'
 const TOP_PRODUCTS_COLUMNS = '2fr 1fr 1fr 1fr 1fr'
 const CATEGORY_PROFIT_COLUMNS = '1.6fr 1fr 1fr 1fr 1fr'
 const DEAD_STOCK_COLUMNS = '2fr 1fr 1fr 1fr'
+const MISSED_SALES_COLUMNS = '2fr 1fr 1fr'
 
 type PeriodKey = 'month' | 'quarter' | 'year'
 
@@ -230,6 +235,8 @@ export function AnalyticsPage() {
   const [stockValue, setStockValue] = useState<StockValue | null>(null)
   const [timeline, setTimeline] = useState<TimelinePoint[]>([])
   const [prevTotals, setPrevTotals] = useState<PeriodTotals | null>(null)
+  const [periodTotals, setPeriodTotals] = useState<PeriodTotals | null>(null)
+  const [missedSales, setMissedSales] = useState<MissedSaleItem[]>([])
   // Предпочтение устройства, не аккаунта — переживает обновление страницы.
   const [period, setPeriod] = useState<PeriodKey>(() => {
     const saved = localStorage.getItem(PERIOD_FILTER_KEY)
@@ -286,12 +293,16 @@ export function AnalyticsPage() {
       getCategoryProfit(range),
       getRevenueTimeline({ ...range, bucket }),
       getPeriodTotals(prevRange),
+      getPeriodTotals(range),
+      getMissedSales(range),
     ])
-      .then(([t, cp, tl, prev]) => {
+      .then(([t, cp, tl, prev, current, missed]) => {
         setTopProducts(t)
         setCategoryProfit(cp)
         setTimeline(tl)
         setPrevTotals(prev)
+        setPeriodTotals(current)
+        setMissedSales(missed)
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Не удалось загрузить аналитику'))
       .finally(() => setPeriodLoading(false))
@@ -447,6 +458,18 @@ export function AnalyticsPage() {
             <div className={styles.heroBody}>
               <span className={styles.heroLabel}>Деньги в товаре</span>
               <span className={styles.heroValue}>{formatMoney(stockValue.total_value)} ₽</span>
+            </div>
+          </div>
+        )}
+        {periodTotals && Number(periodTotals.change_kept ?? 0) > 0 && (
+          <div className={styles.heroCard}>
+            <span className={styles.heroIcon}>
+              <IconCoinOff size={22} stroke={1.7} />
+            </span>
+            <div className={styles.heroBody}>
+              <span className={styles.heroLabel}>Невзятая сдача</span>
+              <span className={styles.heroValue}>{formatMoney(periodTotals.change_kept)} ₽</span>
+              <span className={styles.heroSub}>осталась в кассе сверх чека</span>
             </div>
           </div>
         )}
@@ -613,6 +636,45 @@ export function AnalyticsPage() {
                   </div>
                 )
               })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className={layoutStyles.stack}>
+        <div className={styles.sectionHeading}>
+          <IconShoppingBagX size={17} stroke={1.8} className={styles.sectionHeadingIcon} />
+          <h3>Упущенные продажи с витрины</h3>
+        </div>
+        <p className={styles.chartHint}>
+          Заявки, где покупатель просил товар, а остатка не хватило
+        </p>
+        {missedSales.length === 0 ? (
+          <p className={layoutStyles.textMuted}>За период таких заявок нет</p>
+        ) : (
+          <div className={layoutStyles.dataTable}>
+            <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: MISSED_SALES_COLUMNS }}>
+              <span>Товар</span>
+              <span>Заявок</span>
+              <span>Просили</span>
+            </div>
+            <div className={layoutStyles.dataTableBody}>
+              {missedSales.map((m, i) => (
+                <div
+                  key={m.product_id}
+                  className={`${layoutStyles.dataRow} sale-history-row-in`}
+                  style={
+                    {
+                      gridTemplateColumns: MISSED_SALES_COLUMNS,
+                      '--row-delay': `${Math.min(i, 12) * 25}ms`,
+                    } as CSSProperties
+                  }
+                >
+                  <span className={layoutStyles.dataRowName}>{m.product_name}</span>
+                  <span>{m.requests_count}</span>
+                  <span>{formatQuantity(m.quantity_requested)}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}

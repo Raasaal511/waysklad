@@ -3,12 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   getProduct,
   getProductHistory,
+  deleteProduct,
   type Product,
 } from '../../entities/product/api'
 import { useCatalog } from '../../app/CatalogContext'
 import { useAuth } from '../../app/AuthContext'
 import { ApiError } from '../../shared/api/client'
 import { IconButton } from '../../shared/ui/IconButton'
+import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { InfoHint } from '../../shared/ui/InfoHint'
 import { HistoryDisclosure } from '../../shared/ui/HistoryDisclosure'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
@@ -28,6 +30,7 @@ import {
   IconAlertTriangle,
   IconBuildingStore,
   IconShoppingBag,
+  IconTrash,
   type Icon as TablerIcon,
 } from '@tabler/icons-react'
 
@@ -62,11 +65,14 @@ export function ProductDetailPage() {
     ensureUnits,
     ensureWarehouses,
     ensureStock,
+    refresh,
   } = useCatalog()
 
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     ensureCategories().catch(() => {})
@@ -127,6 +133,22 @@ export function ProductDetailPage() {
   const out = product ? isOutOfStock(totalStock) : false
   const low = product ? isLowStock(totalStock, product.min_stock) : false
 
+  async function handleDelete() {
+    if (!product) return
+    setDeleting(true)
+    setError(null)
+    try {
+      await deleteProduct(product.id)
+      refresh(['products', 'stock']).catch(() => {})
+      navigate('/products', { replace: true })
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось удалить товар')
+      throw err
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (!loading && !product) {
     return (
       <div className={layoutStyles.stack}>
@@ -171,15 +193,26 @@ export function ProductDetailPage() {
                   </div>
                 </div>
                 {canManage && (
-                  <IconButton
-                    variant="muted"
-                    size="lg"
-                    tooltip="Редактировать товар"
-                    aria-label="Редактировать товар"
-                    onClick={() => navigate(`/products/${product.id}/edit`)}
-                  >
-                    <IconPencil size={22} stroke={1.8} />
-                  </IconButton>
+                  <div className={styles.heroActions}>
+                    <IconButton
+                      variant="muted"
+                      size="lg"
+                      tooltip="Редактировать товар"
+                      aria-label="Редактировать товар"
+                      onClick={() => navigate(`/products/${product.id}/edit`)}
+                    >
+                      <IconPencil size={22} stroke={1.8} />
+                    </IconButton>
+                    <IconButton
+                      variant="danger"
+                      size="lg"
+                      tooltip="Удалить товар"
+                      aria-label="Удалить товар"
+                      onClick={() => setShowDeleteConfirm(true)}
+                    >
+                      <IconTrash size={20} stroke={1.8} />
+                    </IconButton>
+                  </div>
                 )}
               </div>
               <div className={styles.heroPrice}>
@@ -354,16 +387,29 @@ export function ProductDetailPage() {
             </section>
           )}
 
-          {(product.storefront_min_qty || product.storefront_step_qty) && (
+          {(product.description ||
+            product.storefront_photos?.length ||
+            product.storefront_min_qty ||
+            product.storefront_step_qty) && (
             <section className={`${styles.section} ${styles.reveal}`} style={{ '--reveal-delay': '180ms' } as CSSProperties}>
               <h3 className={styles.sectionTitle}>Витрина</h3>
+              {product.description && (
+                <p className={styles.descriptionBlock}>{product.description}</p>
+              )}
+              {product.storefront_photos?.length > 0 && (
+                <div className={styles.galleryPreview}>
+                  {product.storefront_photos.map((url) => (
+                    <img key={url} src={url} alt="" />
+                  ))}
+                </div>
+              )}
               <div className={styles.metaGrid}>
                 <div className={styles.metaItem}>
-                  <span className={layoutStyles.textMuted}>Мин. заказ</span>
+                  <span className={layoutStyles.textMuted}>Минимум для покупки</span>
                   <span>{product.storefront_min_qty ? formatQuantity(product.storefront_min_qty) : '—'}</span>
                 </div>
                 <div className={styles.metaItem}>
-                  <span className={layoutStyles.textMuted}>Шаг заказа</span>
+                  <span className={layoutStyles.textMuted}>Прибавка + / −</span>
                   <span>{product.storefront_step_qty ? formatQuantity(product.storefront_step_qty) : '—'}</span>
                 </div>
               </div>
@@ -378,6 +424,21 @@ export function ProductDetailPage() {
             />
           </div>
         </>
+      )}
+
+      {error && product && <p className={layoutStyles.error}>{error}</p>}
+
+      {showDeleteConfirm && product && (
+        <ConfirmDialog
+          title="Удалить товар?"
+          message="Товар исчезнет из каталога и витрины. Продолжить?"
+          confirmLabel={deleting ? 'Удаление…' : 'Удалить'}
+          danger
+          onConfirm={handleDelete}
+          onClose={() => {
+            if (!deleting) setShowDeleteConfirm(false)
+          }}
+        />
       )}
     </div>
   )

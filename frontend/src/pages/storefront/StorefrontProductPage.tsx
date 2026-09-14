@@ -16,7 +16,8 @@ import {
   type StorefrontProductDetail,
 } from '../../entities/storefront/api'
 import { ApiError } from '../../shared/api/client'
-import { formatMoney } from '../../shared/lib/format'
+import { formatMoney, formatQuantity } from '../../shared/lib/format'
+import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { Button } from '../../shared/ui/Button'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { addToCart, cartCount, loadCart } from './cart'
@@ -49,8 +50,10 @@ export function StorefrontProductPage() {
   const [added, setAdded] = useState(false)
   const [cartItems, setCartItems] = useState(() => loadCart(slug))
   const [favorites, setFavorites] = useState(() => loadFavorites(slug))
+  const [activePhoto, setActivePhoto] = useState(0)
 
   const isFavorite = product ? favorites.includes(product.id) : false
+  const gallery = product?.storefront_photos ?? []
 
   useEffect(() => {
     let cancelled = false
@@ -63,6 +66,7 @@ export function StorefrontProductPage() {
         setProduct(data.product)
         setVariantId(data.product.variants[0]?.id ?? null)
         setQty(initialOrderQty(data.product.min_order_qty, data.product.order_step_qty))
+        setActivePhoto(0)
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -82,6 +86,17 @@ export function StorefrontProductPage() {
       cancelled = true
     }
   }, [slug, productId])
+
+  useEffect(() => {
+    if (!product || !shopName) return
+    setPageMeta({
+      title: `${product.name} · ${shopName}`,
+      description:
+        product.description?.trim() ||
+        `${formatMoney(product.retail_price)} ₽ · ${shopName}`,
+    })
+    return () => resetPageMeta()
+  }, [product, shopName])
 
   useEffect(() => {
     function sync() {
@@ -185,9 +200,31 @@ export function StorefrontProductPage() {
       </div>
 
       <main className={styles.productPage}>
-        <div className={styles.productHero}>
-          <ProductPhoto src={product.photo} size={56} />
-          {!product.in_stock && <span className={styles.heroBadge}>Нет в наличии</span>}
+        <div className={styles.productGallery}>
+          {gallery.length > 1 && (
+            <div className={styles.galleryThumbs} role="tablist" aria-label="Фото">
+              {gallery.map((url, i) => (
+                <button
+                  key={url}
+                  type="button"
+                  role="tab"
+                  aria-selected={activePhoto === i}
+                  className={activePhoto === i ? styles.galleryThumbActive : styles.galleryThumb}
+                  onClick={() => setActivePhoto(i)}
+                >
+                  <img src={url} alt="" />
+                </button>
+              ))}
+            </div>
+          )}
+          <div className={styles.productHero}>
+            {gallery.length > 0 ? (
+              <img src={gallery[Math.min(activePhoto, gallery.length - 1)]} alt="" className={styles.heroImg} />
+            ) : (
+              <ProductPhoto src="" size={56} />
+            )}
+            {!product.in_stock && <span className={styles.heroBadge}>Нет в наличии</span>}
+          </div>
         </div>
 
         <div className={styles.productInfo}>
@@ -195,12 +232,24 @@ export function StorefrontProductPage() {
             {product.sku && <span className={styles.skuChip}>арт. {product.sku}</span>}
             <h1>{product.name}</h1>
             <p className={styles.productPrice}>{formatMoney(product.retail_price)} ₽</p>
-            {product.in_stock ? (
-              <span className={styles.inStockChip}>В наличии</span>
-            ) : (
-              <span className={styles.outBadge}>Нет в наличии</span>
-            )}
+            <div className={styles.productChips}>
+              {product.in_stock ? (
+                <span className={styles.inStockChip}>В наличии</span>
+              ) : (
+                <span className={styles.outBadge}>Нет в наличии</span>
+              )}
+              {Number(product.sold_count ?? 0) > 0 && (
+                <span className={styles.soldChip}>Продано {formatQuantity(product.sold_count!)}</span>
+              )}
+            </div>
           </div>
+
+          {product.description?.trim() && (
+            <div className={styles.descriptionBlock}>
+              <h2 className={styles.optionLabel}>Описание</h2>
+              <p>{product.description}</p>
+            </div>
+          )}
 
           {product.variants.length > 0 && (
             <div className={styles.optionBlock}>

@@ -231,6 +231,38 @@ async def test_storefront_product_page_via_api(client, owner_headers):
     assert response.status_code == 404, response.text
 
 
+async def test_storefront_og_html_for_bots(client, owner_headers):
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={
+                "name": "Платье OG",
+                "purchase_price": "300",
+                "retail_price": "600",
+                "show_on_storefront": True,
+                "description": "Лёгкое летнее платье",
+            },
+        )
+    ).json()
+
+    catalog_og = await client.get(f"/api/storefront/{slug}/og")
+    assert catalog_og.status_code == 200, catalog_og.text
+    assert "text/html" in catalog_og.headers["content-type"]
+    assert 'property="og:title"' in catalog_og.text
+    assert "Магазин Беркат" in catalog_og.text
+
+    product_og = await client.get(f"/api/storefront/{slug}/products/{product['id']}/og")
+    assert product_og.status_code == 200, product_og.text
+    assert "Платье OG" in product_og.text
+    assert "Лёгкое летнее платье" in product_og.text
+    assert 'property="og:url"' in product_og.text
+
+
 async def test_storefront_catalog_sort_and_category_counts_via_api(client, owner_headers):
     slug = "magazin-berkat"
     await client.patch(

@@ -865,6 +865,17 @@ input.saleSearchInput:not([type='checkbox']):not([type='radio']):focus {
   font-weight: 600;
 }
 
+.keepChangeRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+}
+
 .saleDiscountRow {
   display: flex;
   gap: 8px;

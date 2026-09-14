@@ -477,9 +477,23 @@ export function SaleDetailView({
                     '—'
                   )}
                 </strong>
-                <span>Сдача</span>
+                <span>Сдача выдана</span>
               </div>
             </div>
+            {Number(sale.change_kept ?? 0) > 0 && (
+              <div className={detailStyles.metric}>
+                <span className={detailStyles.metricIcon}>
+                  <IconCoin size={18} stroke={1.8} />
+                </span>
+                <div className={detailStyles.metricBody}>
+                  <strong>
+                    {formatMoney(sale.change_kept)}
+                    <span className={detailStyles.metricCurrency}> ₽</span>
+                  </strong>
+                  <span>Не взяли сдачу</span>
+                </div>
+              </div>
+            )}
           </>
         )}
         <div className={detailStyles.metric}>

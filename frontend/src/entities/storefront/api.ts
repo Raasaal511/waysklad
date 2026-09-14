@@ -12,12 +12,15 @@ export interface StorefrontProduct {
   photo: string
   category_id: number | null
   in_stock: boolean
+  sold_count?: string
   min_order_qty: string | null
   order_step_qty: string | null
 }
 
 export interface StorefrontProductDetail extends StorefrontProduct {
   sku: string
+  description: string
+  storefront_photos: string[]
   variants: { id: number; size: string; color: string }[]
 }
 
@@ -135,14 +138,15 @@ export function createStorefrontRequest(
   slug: string,
   input: {
     customer_name: string
-    customer_phone?: string
     note?: string
     items: { product_id: number; quantity: string; variant_id?: number | null }[]
   },
+  customerAccessToken: string,
 ) {
   return api.post<StorefrontRequestCreated>(
     `/storefront/${encodeURIComponent(slug)}/requests`,
     input,
+    { headers: { Authorization: `Bearer ${customerAccessToken}` } },
   )
 }
 

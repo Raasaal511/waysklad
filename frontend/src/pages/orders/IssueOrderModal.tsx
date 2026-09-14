@@ -27,14 +27,18 @@ export function IssueOrderModal({
   const { refresh: refreshCatalog } = useCatalog()
   const [payment, setPayment] = useState<PaymentMethod>('cash')
   const [cashReceived, setCashReceived] = useState('')
+  const [keepChange, setKeepChange] = useState(false)
   const [debtDueDate, setDebtDueDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const toPayCents = Math.round(Number(order.to_pay) * 100)
   const cashReceivedCents = Math.round(Number(cashReceived || 0) * 100)
-  const changeCents = cashReceivedCents - toPayCents
+  const rawChangeCents = cashReceivedCents - toPayCents
+  const changeKeptCents = keepChange && rawChangeCents > 0 ? rawChangeCents : 0
+  const changeCents = rawChangeCents - changeKeptCents
   const change = centsToMoney(Math.max(0, changeCents))
+  const changeKept = centsToMoney(changeKeptCents)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -45,9 +49,12 @@ export function IssueOrderModal({
     setError(null)
     setSaving(true)
     try {
+      const cashReceivedValue = payment === 'cash' && cashReceived ? cashReceived : null
       const result = await issueOrder(order.id, {
         payment_method: payment,
-        cash_received: payment === 'cash' && cashReceived ? cashReceived : null,
+        cash_received: cashReceivedValue,
+        change_kept:
+          cashReceivedValue && changeKeptCents > 0 ? centsToMoney(changeKeptCents) : null,
         debt_due_date: payment === 'credit' ? debtDueDate : null,
       })
       refreshCatalog(['stock']).catch(() => {})
@@ -98,15 +105,33 @@ export function IssueOrderModal({
               value={cashReceived}
               onChange={(e) => {
                 const normalized = normalizeDecimalInput(e.target.value)
-                if (normalized !== null) setCashReceived(normalized)
+                if (normalized !== null) {
+                  setCashReceived(normalized)
+                  setKeepChange(false)
+                }
               }}
             />
             {cashReceivedCents > 0 && (
-              <span className={changeCents < 0 ? 'sale-change-short' : layoutStyles.textMuted}>
-                {changeCents >= 0
-                  ? `Сдача: ${formatMoney(change)} ₽`
-                  : `Не хватает: ${formatMoney(centsToMoney(-changeCents))} ₽`}
+              <span className={rawChangeCents < 0 ? 'sale-change-short' : layoutStyles.textMuted}>
+                {rawChangeCents < 0
+                  ? `Не хватает: ${formatMoney(centsToMoney(-rawChangeCents))} ₽`
+                  : keepChange
+                    ? `Сдача не выдана · осталось в кассе ${formatMoney(changeKept)} ₽`
+                    : `Сдача: ${formatMoney(change)} ₽`}
               </span>
+            )}
+            {rawChangeCents > 0 && (
+              <label
+                className={layoutStyles.row}
+                style={{ gap: 8, marginTop: 4, fontSize: 13, fontWeight: 500 }}
+              >
+                <input
+                  type="checkbox"
+                  checked={keepChange}
+                  onChange={(e) => setKeepChange(e.target.checked)}
+                />
+                Клиент не взял сдачу
+              </label>
             )}
           </label>
         )}
@@ -125,7 +150,7 @@ export function IssueOrderModal({
 
         {error && <p className={layoutStyles.error}>{error}</p>}
         <Button type="submit" disabled={saving}>
-          {saving ? 'Оформление…' : 'Выдать заказ'}
+          {saving ? 'Выдача…' : 'Выдать'}
         </Button>
       </form>
     </Modal>
