@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 
 from app.domain.analytics.period import SummaryPeriod, period_range
 from app.domain.identity.entities import Tenant
-from app.infrastructure.telegram import _is_due
+from app.infrastructure.notifications.telegram import _is_due
 
 
 def test_day_bounds_is_the_given_day_only():

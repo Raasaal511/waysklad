@@ -37,7 +37,7 @@ from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.files import LocalFileStorage
 from app.infrastructure.security import BcryptPasswordHasher
 from app.main import app as fastapi_app
-from app.infrastructure.cache import RedisCache
+from app.infrastructure.cache.redis_cache import RedisCache
 from app.infrastructure.config import settings
 from app.presentation.deps.cache import get_cache
 from app.presentation.deps.notifier import get_notifier

@@ -2,7 +2,7 @@
 (POST /api/admin/login), не JWT/Role обычного пользователя, не User внутри
 tenant (см. presentation/deps/admin.py)."""
 
-from app.infrastructure.admin_alerts import report_unhandled_error
+from app.infrastructure.observability.admin_alerts import report_unhandled_error
 
 _LOGIN = "test-admin"  # см. tests/conftest.py: os.environ["ADMIN_LOGIN"]
 _PASSWORD = "test-admin-password"  # соответствует ADMIN_PASSWORD_HASH в conftest.py
