@@ -5,7 +5,7 @@ Redis LPUSH+LTRIM (не растущий лог): фиксированный р�
 import json
 
 from app.domain.common.error_log import IErrorLog
-from app.infrastructure.logging import get_logger
+from app.infrastructure.observability.logging import get_logger
 
 _logger = get_logger("app.error_log")
 _MAX_ENTRIES = 200

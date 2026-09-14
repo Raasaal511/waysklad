@@ -7,6 +7,11 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24 * 30
     debug: bool = False
     telegram_bot_token: str = ""
+    # username бота витрины без "@" (например waysklad_shop_bot) — нужен backend,
+    # чтобы собрать полную deep-link ссылку t.me/<username>?start=... для входа
+    # покупателя (см. app/application/customers/request_login_link.py). Пусто
+    # (дефолт) — вход по Telegram недоступен (DomainError при попытке).
+    telegram_bot_username: str = ""
     # chat_id разработчика/оператора — куда шлются алерты о непредвиденных
     # серверных ошибках (500 на sales/debts/sync). Не путать с
     # Tenant.owner_telegram_chat_id — это про владельцев магазинов и сводки.
@@ -48,6 +53,11 @@ class Settings(BaseSettings):
     # Срок жизни admin-токена короче обычного (access_token_expire_minutes) —
     # привилегированный доступ ко всей платформе, риск от утечки выше.
     admin_token_expire_minutes: int = 120
+    # Пусто (дефолт) — эндпоинт генерации описания товара через ИИ отключён
+    # (DomainError при попытке вызвать). Модель — самая дешёвая в линейке
+    # Claude, достаточно для короткого описания по названию+категории.
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-haiku-4-5"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

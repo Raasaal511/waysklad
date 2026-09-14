@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter
 
 from app.application.analytics.dead_stock import DeadStockQuery
+from app.application.analytics.missed_sales import MissedSalesQuery
 from app.application.analytics.period_totals import PeriodTotalsQuery
 from app.application.analytics.revenue_timeline import RevenueTimelineQuery
 from app.application.analytics.top_products import CategoryProfitQuery, TopProductsQuery
@@ -12,6 +13,7 @@ from app.presentation.analytics.schemas import (
     CategoryProfitResponse,
     DashboardResponse,
     DeadStockItemResponse,
+    MissedSaleResponse,
     PeriodTotalsResponse,
     ProductSalesResponse,
     StockValueResponse,
@@ -22,6 +24,7 @@ from app.presentation.deps import (
     GetCategoryProfitDep,
     GetDashboardDep,
     GetDeadStockDep,
+    GetMissedSalesDep,
     GetPeriodTotalsDep,
     GetRevenueTimelineDep,
     GetStockValueDep,
@@ -98,6 +101,18 @@ async def get_category_profit(
         actor, CategoryProfitQuery(date_from=period_from, date_to=period_to)
     )
     return [CategoryProfitResponse.from_entity(item) for item in result]
+
+
+@router.get("/missed-sales")
+async def get_missed_sales(
+    actor: ActorDep, use_case: GetMissedSalesDep,
+    date_from: date | None = None, date_to: date | None = None,
+) -> list[MissedSaleResponse]:
+    period_from, period_to = _default_period(date_from, date_to)
+    result = await use_case.execute(
+        actor, MissedSalesQuery(date_from=period_from, date_to=period_to)
+    )
+    return [MissedSaleResponse.from_entity(item) for item in result]
 
 
 @router.get("/dead-stock")

@@ -12,7 +12,7 @@ from app.domain.identity.permissions import Actor, Permission, require, require_
 from app.domain.orders.entities import Order, OrderStatus
 from app.domain.sales.entities import Sale, SaleLine
 from app.domain.sales.payment import PaymentMethod
-from app.infrastructure.cache_aside import invalidate_shop_cache
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)
@@ -20,6 +20,7 @@ class IssueOrderCommand:
     order_id: int
     payment_method: PaymentMethod
     cash_received: Decimal | None = None  # для расчёта сдачи
+    change_kept: Decimal = Decimal("0")   # клиент не забрал (часть) сдачи
     debt_due_date: date | None = None     # обязателен при payment_method=CREDIT
 
 
@@ -77,6 +78,7 @@ class IssueOrderUseCase:
                 cash_received=(
                     Money.of(cmd.cash_received) if cmd.cash_received is not None else None
                 ),
+                change_kept=Money.of(cmd.change_kept),
                 note=f"Из заказа №{order.number}",
                 order_id=order.id,
             )
@@ -89,9 +91,19 @@ class IssueOrderUseCase:
                 await uow.stock.reserve(
                     line.product_id, order.warehouse_id, -line.quantity.value, line.variant_id
                 )
-                await uow.stock.change(
+                new_quantity = await uow.stock.change(
                     line.product_id, order.warehouse_id, -line.quantity.value, line.variant_id
                 )
+                if new_quantity < 0:
+                    # резерв на этапе создания заказа гарантировал остаток на тот
+                    # момент — отрицательный итог здесь означает, что остаток
+                    # уменьшили мимо резерва (например, инвентаризацией) уже
+                    # после того, как заказ был зарезервирован
+                    product = await uow.products.get(line.product_id)
+                    raise DomainError(
+                        f"Недостаточно остатка «{product.name}» для выдачи — "
+                        "проверьте остаток на складе"
+                    )
 
             if sale.payment_method is PaymentMethod.CREDIT:
                 await self._check_debt_limit(uow, sale)

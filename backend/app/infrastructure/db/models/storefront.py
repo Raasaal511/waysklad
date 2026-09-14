@@ -23,6 +23,9 @@ class StorefrontRequestModel(Base, TenantMixin, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     customer_name: Mapped[str] = mapped_column(String(200))
+    # None только у заявок до перехода на авторизацию (2026-09-13) — новые
+    # заявки требуют авторизованного Customer, см. CreateStorefrontRequestUseCase
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), index=True)
     customer_phone: Mapped[str] = mapped_column(String(20), default="")
     customer_telegram_chat_id: Mapped[str | None] = mapped_column(String(32))
     note: Mapped[str] = mapped_column(Text, default="")

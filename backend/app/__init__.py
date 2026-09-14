@@ -5,6 +5,7 @@ from app.presentation.admin.router import router as admin_router
 from app.presentation.analytics.router import router as analytics_router
 from app.presentation.auth.router import router as auth_router
 from app.presentation.counterparties.router import router as counterparties_router
+from app.presentation.customers.router import router as customers_router
 from app.presentation.debts.router import router as debts_router
 from app.presentation.inventory.router import router as inventory_router
 from app.presentation.marketplace.router import router as marketplace_router
@@ -23,6 +24,7 @@ router.include_router(products_router)
 router.include_router(inventory_router)
 router.include_router(sales_router)
 router.include_router(counterparties_router)
+router.include_router(customers_router)
 router.include_router(debts_router)
 router.include_router(orders_router)
 router.include_router(tasks_router)

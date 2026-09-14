@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from app.domain.audit.entities import AuditEntry
 from app.domain.common.exceptions import DomainError
 from app.domain.common.uow import IUnitOfWork
-from app.domain.identity.permissions import Actor, Permission, require
+from app.domain.identity.permissions import Actor, Permission, require, require_warehouse
 from app.domain.orders.entities import Order, OrderStatus
 
 
@@ -24,6 +24,7 @@ class CancelOrderUseCase:
 
         async with self._uow as uow:
             order = await uow.orders.get(cmd.order_id)
+            require_warehouse(actor, order.warehouse_id)
             if order.status in (OrderStatus.ISSUED, OrderStatus.CANCELLED):
                 raise DomainError(f"Заказ уже «{order.status}» — отмена недоступна")
 

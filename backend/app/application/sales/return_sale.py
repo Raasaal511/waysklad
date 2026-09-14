@@ -11,7 +11,7 @@ from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Actor, Permission, require, require_warehouse
 from app.domain.sales.entities import Sale, SaleReturn, SaleReturnLine
 from app.domain.sales.payment import PaymentMethod
-from app.infrastructure.cache_aside import invalidate_shop_cache
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)

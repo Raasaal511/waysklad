@@ -58,6 +58,10 @@ class Product:
     barcode: Barcode | None = None
     category_id: int | None = None
     photo: str = ""
+    description: str = ""  # для карточки товара на витрине, не складская характеристика
+    # галерея для карточки товара на витрине — независима от складского photo
+    # (то и другое можно загрузить и менять по отдельности)
+    storefront_photos: list[str] = field(default_factory=list)
     min_stock: Decimal = Decimal("0")  # порог «заканчивается»
     show_on_storefront: bool = False  # видимость на публичной витрине — по умолчанию скрыт
     # ограничения заявки с витрины — действуют только там, не в обычной продаже/заказе;
@@ -81,6 +85,8 @@ class Product:
             "barcode": self.barcode.value if self.barcode else None,
             "category_id": self.category_id,
             "photo": self.photo,
+            "description": self.description,
+            "storefront_photos": list(self.storefront_photos),
             "min_stock": str(self.min_stock),
             "show_on_storefront": self.show_on_storefront,
             "storefront_min_qty": str(self.storefront_min_qty)
@@ -104,6 +110,8 @@ class Product:
             barcode=Barcode(d["barcode"]) if d["barcode"] else None,
             category_id=d["category_id"],
             photo=d["photo"],
+            description=d.get("description", ""),
+            storefront_photos=d.get("storefront_photos", []),
             min_stock=Decimal(d["min_stock"]),
             show_on_storefront=d["show_on_storefront"],
             storefront_min_qty=Decimal(d["storefront_min_qty"])

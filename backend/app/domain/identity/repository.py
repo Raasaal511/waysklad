@@ -33,6 +33,9 @@ class IWarehouseRepository(Protocol):
     ) -> Warehouse:
         """Обновляет название, адрес и видимость на витрине, не трогая назначенных сотрудников."""
         ...
+    async def set_photo(self, warehouse_id: int, photo: str) -> Warehouse:
+        """Заменяет логотип склада (пустая строка — убрать логотип)."""
+        ...
     async def list(self) -> list[Warehouse]: ...
     async def list_for_user(self, user_id: int) -> list[Warehouse]:
         """Только склады, назначенные этому пользователю (manager/seller/storekeeper)."""

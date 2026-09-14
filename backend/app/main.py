@@ -9,9 +9,9 @@ from starlette.staticfiles import StaticFiles
 from app import router as main_router
 from app.infrastructure.config import settings
 from app.infrastructure.files import UPLOAD_DIR
-from app.infrastructure.logging import configure_logging
+from app.infrastructure.observability.logging import configure_logging
 from app.infrastructure.rate_limit import limiter
-from app.infrastructure.ws_broadcast import broadcaster
+from app.infrastructure.notifications.ws_broadcast import broadcaster
 from app.presentation.errors import register_exception_handlers
 
 configure_logging()

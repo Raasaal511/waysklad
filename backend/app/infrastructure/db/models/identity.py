@@ -33,6 +33,7 @@ class WarehouseModel(Base, TenantMixin, TimestampMixin):
     name: Mapped[str] = mapped_column(String(200))
     address: Mapped[str] = mapped_column(String(300), default="")
     show_on_storefront: Mapped[bool] = mapped_column(default=False)
+    photo: Mapped[str] = mapped_column(String(500), default="")
 
 
 class UserModel(Base, TenantMixin, TimestampMixin):

@@ -5,7 +5,7 @@ from app.domain.catalog.entities import Category, Product
 from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.identity.entities import Warehouse
-from app.infrastructure.cache_aside import cached_use_case
+from app.infrastructure.cache.cache_aside import cached_use_case
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 
 _CACHE_TTL_SECONDS = 20
@@ -47,6 +47,7 @@ class StorefrontCatalogResult:
     shop_name: str
     products: list[Product]
     in_stock_product_ids: set[int]  # факт наличия — точный остаток покупателю не показываем
+    sold_count_by_product_id: dict[int, Decimal]  # бейдж «Продано: N» — товары без продаж отсутствуют
     categories: list[StorefrontCategoryCount]
     warehouses: list[Warehouse]  # для выбора склада на самой странице витрины
     available_sizes: list[str]  # для фильтра «Размер» — только среди видимых на витрине товаров
@@ -58,6 +59,9 @@ class StorefrontCatalogResult:
             "shop_name": self.shop_name,
             "products": [p.to_dict() for p in self.products],
             "in_stock_product_ids": sorted(self.in_stock_product_ids),
+            "sold_count_by_product_id": {
+                str(pid): str(qty) for pid, qty in self.sold_count_by_product_id.items()
+            },
             "categories": [
                 {"category": c.category.to_dict(), "product_count": c.product_count}
                 for c in self.categories
@@ -74,6 +78,10 @@ class StorefrontCatalogResult:
             shop_name=d["shop_name"],
             products=[Product.from_dict(p) for p in d["products"]],
             in_stock_product_ids=set(d["in_stock_product_ids"]),
+            sold_count_by_product_id={
+                int(pid): Decimal(qty)
+                for pid, qty in d.get("sold_count_by_product_id", {}).items()
+            },
             categories=[
                 StorefrontCategoryCount(
                     category=Category.from_dict(c["category"]), product_count=c["product_count"]
@@ -151,6 +159,7 @@ class GetStorefrontCatalogUseCase:
             counts = await uow.products.count_storefront_by_category()
             available_sizes, available_colors = await uow.products.list_storefront_variant_options()
             stock_items = await uow.stock.list_all()
+            sold_counts = await uow.analytics.sold_count_by_products([p.id for p in products])
         in_stock_ids = {
             item.product_id
             for item in stock_items
@@ -168,6 +177,7 @@ class GetStorefrontCatalogUseCase:
             shop_name=tenant.name,
             products=products,
             in_stock_product_ids=in_stock_ids,
+            sold_count_by_product_id=sold_counts,
             categories=categories_with_counts,
             warehouses=warehouses,
             available_sizes=available_sizes,

@@ -1,7 +1,7 @@
 from sqlalchemy import select, update
 
 from app.domain.common.cache import ICache
-from app.infrastructure.cache_aside import shop_prefix
+from app.infrastructure.cache.cache_aside import shop_prefix
 from app.infrastructure.db.models.identity import TenantModel
 
 

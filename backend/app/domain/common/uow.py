@@ -12,6 +12,10 @@ if TYPE_CHECKING:
         IUnitRepository,
     )
     from app.domain.counterparties.repository import IClientRepository, ISupplierRepository
+    from app.domain.customers.repository import (
+        ICustomerLoginLinkRepository,
+        ICustomerRepository,
+    )
     from app.domain.debts.repository import IDebtRepository
     from app.domain.identity.repository import (
         ITenantRepository,
@@ -48,6 +52,8 @@ class IUnitOfWork(ABC):
     categories: ICategoryRepository
     clients: IClientRepository
     suppliers: ISupplierRepository
+    customers: ICustomerRepository
+    customer_login_links: ICustomerLoginLinkRepository
     stock: IStockRepository
     stock_documents: IStockDocumentRepository
     sales: ISaleRepository

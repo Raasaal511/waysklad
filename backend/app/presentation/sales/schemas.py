@@ -32,6 +32,7 @@ class SaleCreateRequest(BaseModel):
     discount: Decimal = Decimal("0")
     client_id: int | None = None
     cash_received: Decimal | None = None
+    change_kept: Decimal = Decimal("0")  # клиент не забрал (часть) сдачи
     client_op_id: str | None = None  # id операции с устройства — для повтора из офлайн-очереди
     debt_due_date: date | None = None  # «долг до» — обязателен при payment_method=credit
 
@@ -51,6 +52,7 @@ class SaleCreateRequest(BaseModel):
             discount=self.discount,
             client_id=self.client_id,
             cash_received=self.cash_received,
+            change_kept=self.change_kept,
             client_op_id=self.client_op_id,
             debt_due_date=self.debt_due_date,
         )
@@ -73,8 +75,9 @@ class SaleResponse(BaseModel):
     subtotal: Decimal
     discount: Decimal
     total: Decimal
-    change: Decimal | None  # сдача
+    change: Decimal | None  # сдача, реально выданная на руки
     cash_received: Decimal | None  # сколько внёс клиент наличными
+    change_kept: Decimal  # сколько из сдачи клиент не забрал
     client_id: int | None
     created_at: datetime
     note: str
@@ -105,6 +108,7 @@ class SaleResponse(BaseModel):
             total=sale.total.amount,
             change=change,
             cash_received=sale.cash_received.amount if sale.cash_received is not None else None,
+            change_kept=sale.change_kept.amount,
             client_id=sale.client_id,
             created_at=sale.created_at,
             note=sale.note,

@@ -10,7 +10,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.domain.inventory.entities import StockDocType, StockDocument
-from app.infrastructure.pdf_fonts import register_fonts
+from app.infrastructure.export.pdf_fonts import register_fonts
 
 _TYPE_LABELS = {
     StockDocType.RECEIPT: "Приёмка",

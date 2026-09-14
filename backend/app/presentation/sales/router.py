@@ -9,7 +9,7 @@ from app.application.sales.list_sales import ListSalesCommand
 from app.domain.identity.permissions import Permission, require_warehouse
 from app.domain.sales.payment import PaymentMethod
 from app.domain.sales.receipt import build_whatsapp_link, render_receipt_text
-from app.infrastructure.receipt_pdf import render_receipt_pdf
+from app.infrastructure.export.receipt_pdf import render_receipt_pdf
 from app.presentation.audit.schemas import AuditEntryResponse
 from app.presentation.deps import (
     ActorDep,

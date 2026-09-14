@@ -2,9 +2,11 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
+from app.application.debts.notify import notify_debt_issued
 from app.domain.audit.entities import AuditEntry
 from app.domain.common.exceptions import DomainError
 from app.domain.common.money import Money
+from app.domain.common.notifier import INotifier
 from app.domain.common.uow import IUnitOfWork
 from app.domain.debts.entities import Debt, total_balance
 from app.domain.identity.permissions import Actor, Permission, require, require_warehouse
@@ -22,8 +24,9 @@ class IssueDebtCommand:
 class IssueDebtUseCase:
     """«Запиши на меня» — долг без продажи (долг из продажи создаёт CreateSaleUseCase)."""
 
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, notifier: INotifier | None = None):
         self._uow = uow
+        self._notifier = notifier
 
     async def execute(self, actor: Actor, cmd: IssueDebtCommand) -> Debt:
         require(actor, Permission.DEBTS_MANAGE)
@@ -60,5 +63,6 @@ class IssueDebtUseCase:
                     client_id=cmd.client_id, amount=str(amount.amount),
                 )
             )
+            await notify_debt_issued(uow, self._notifier, debt)
             await uow.commit()
             return debt

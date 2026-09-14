@@ -1,17 +1,17 @@
 """Алерт разработчику/оператору при непредвиденной серверной ошибке —
-не путать с app.infrastructure.telegram (сводки владельцам магазинов)."""
+не путать с app.infrastructure.notifications.telegram (сводки владельцам магазинов)."""
 
 from datetime import UTC, datetime
 
 from app.infrastructure.config import settings
-from app.infrastructure.logging import get_logger
-from app.infrastructure.telegram import TelegramNotifier
+from app.infrastructure.notifications.telegram import TelegramNotifier
+from app.infrastructure.observability.logging import get_logger
 
 _logger = get_logger("app.errors")
 _notifier = TelegramNotifier()
 error_log = None
 if settings.cache_redis_url:
-    from app.infrastructure.error_log import RedisErrorLog
+    from app.infrastructure.observability.error_log import RedisErrorLog
 
     error_log = RedisErrorLog(settings.cache_redis_url)
 

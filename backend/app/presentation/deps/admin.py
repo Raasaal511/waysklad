@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.domain.common.error_log import IErrorLog
-from app.infrastructure.admin_alerts import error_log
+from app.infrastructure.observability.admin_alerts import error_log
 from app.infrastructure.security import decode_admin_access_token
 
 _bearer = HTTPBearer(auto_error=False)

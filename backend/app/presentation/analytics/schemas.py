@@ -7,6 +7,7 @@ from app.application.analytics.dashboard import DashboardResult
 from app.domain.analytics.repository import (
     CategoryProfit,
     DeadStockItem,
+    MissedSaleItem,
     PeriodTotals,
     ProductSales,
     StockValueItem,
@@ -19,6 +20,7 @@ class PeriodTotalsResponse(BaseModel):
     sales_count: int
     revenue: Decimal
     profit: Decimal
+    change_kept: Decimal  # невзятая клиентами сдача за период
 
     @classmethod
     def from_entity(cls, totals: PeriodTotals) -> "PeriodTotalsResponse":
@@ -26,6 +28,7 @@ class PeriodTotalsResponse(BaseModel):
             sales_count=totals.sales_count,
             revenue=Money.of(totals.revenue).amount,
             profit=Money.of(totals.profit).amount,
+            change_kept=Money.of(totals.change_kept).amount,
         )
 
 
@@ -70,6 +73,22 @@ class ProductSalesResponse(BaseModel):
         return cls(
             product_id=item.product_id, product_name=item.product_name,
             quantity_sold=item.quantity_sold, revenue=Money.of(item.revenue).amount,
+        )
+
+
+class MissedSaleResponse(BaseModel):
+    product_id: int
+    product_name: str
+    requests_count: int
+    quantity_requested: Decimal
+
+    @classmethod
+    def from_entity(cls, item: MissedSaleItem) -> "MissedSaleResponse":
+        return cls(
+            product_id=item.product_id,
+            product_name=item.product_name,
+            requests_count=item.requests_count,
+            quantity_requested=item.quantity_requested,
         )
 
 

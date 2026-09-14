@@ -4,7 +4,7 @@ from decimal import Decimal
 from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.marketplace.repository import MarketplaceProductRow
-from app.infrastructure.cache_aside import cached_use_case
+from app.infrastructure.cache.cache_aside import cached_use_case
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 
 _CACHE_TTL_SECONDS = 20

@@ -57,3 +57,25 @@ def decode_admin_access_token(token: str) -> dict:
     if payload.get("scope") != "admin":
         raise jwt.InvalidTokenError("Не admin-токен")
     return payload
+
+
+def create_customer_access_token(customer_id: int, token_version: int = 0) -> str:
+    """Отдельный scope claim ("customer") — покупатель не привязан к одному
+    tenant (в отличие от create_access_token), долгоживущий токен (30 дней по
+    умолчанию, как у обычного пользователя), tv — для отзыва всех токенов
+    разом (logout-all), тот же смысл, что и token_version у User."""
+    payload = {
+        "scope": "customer",
+        "sub": str(customer_id),
+        "tv": token_version,
+        "exp": datetime.now(timezone.utc)
+        + timedelta(minutes=settings.access_token_expire_minutes),
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm="HS256")
+
+
+def decode_customer_access_token(token: str) -> dict:
+    payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
+    if payload.get("scope") != "customer":
+        raise jwt.InvalidTokenError("Не customer-токен")
+    return payload

@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from app.domain.common.cache import ICache
-from app.infrastructure.cache import RedisCache
+from app.infrastructure.cache.redis_cache import RedisCache
 from app.infrastructure.config import settings
 
 if not settings.cache_redis_url:

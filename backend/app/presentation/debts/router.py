@@ -4,10 +4,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response
 
 from app.application.debts.list_debts import ListDebtsCommand
+from app.domain.debts.receipt import render_debt_message
 from app.domain.identity.permissions import Permission
+from app.domain.sales.receipt import build_whatsapp_link
 from app.presentation.audit.schemas import AuditEntryResponse
 from app.presentation.debts.schemas import (
     CreateInstallmentRequest,
+    DebtReceiptResponse,
     DebtResponse,
     DebtsFilterParams,
     DebtsOverviewResponse,
@@ -24,6 +27,7 @@ from app.presentation.deps import (
     ExtendDebtDep,
     GetDebtDep,
     GetDebtHistoryDep,
+    GetDebtReceiptDataDep,
     GetDebtsOverviewDep,
     IssueDebtDep,
     IssueSupplierDebtDep,
@@ -124,6 +128,14 @@ async def get_debt_history(
 ) -> list[AuditEntryResponse]:
     entries = await use_case.execute(actor, debt_id)
     return [AuditEntryResponse.from_entity(e) for e in entries]
+
+
+@router.get("/{debt_id}/receipt", dependencies=[_view])
+async def get_debt_receipt(debt_id: int, use_case: GetDebtReceiptDataDep) -> DebtReceiptResponse:
+    data = await use_case.execute(debt_id)
+    text = render_debt_message(data.tenant.name, data.debt, data.client.name)
+    phone = data.client.whatsapp or data.client.phone
+    return DebtReceiptResponse(text=text, whatsapp_link=build_whatsapp_link(phone, text) if phone else None)
 
 
 @router.post("/{debt_id}/repayments")

@@ -2,22 +2,32 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, UploadFile
 
+from app.application.products.add_storefront_photo import AddStorefrontPhotoCommand
+from app.application.products.delete_product import DeleteProductCommand
+from app.application.products.generate_description import (
+    GenerateProductDescriptionCommand,
+)
 from app.application.products.import_excel import ImportProductsCommand
 from app.application.products.import_preview import PreviewProductsCommand
 from app.application.products.search_products import SearchProductsCommand
 from app.application.products.set_product_photo import SetProductPhotoCommand
+from app.application.products.set_storefront_photos import SetStorefrontPhotosCommand
 from app.domain.catalog.barcode import Barcode
-from app.infrastructure.products_export import (
+from app.infrastructure.export.products_export import (
     render_products_csv,
     render_products_pdf,
     render_products_xlsx,
 )
 from app.presentation.deps import (
     ActorDep,
+    AddStorefrontPhotoDep,
     ApplyImportProductsDep,
     CreateCategoryDep,
     CreateProductDep,
     CreateUnitDep,
+    DeleteProductDep,
+    GenerateBarcodeDep,
+    GenerateProductDescriptionDep,
     GetProductByBarcodeDep,
     GetProductDep,
     GetProductHistoryDep,
@@ -28,6 +38,7 @@ from app.presentation.deps import (
     PreviewImportProductsDep,
     SearchProductsDep,
     SetProductPhotoDep,
+    SetStorefrontPhotosDep,
     ShowPurchaseDep,
     UpdateProductDep,
 )
@@ -37,12 +48,15 @@ from app.presentation.products.schemas import (
     ApplyImportResponse,
     CategoryCreateRequest,
     CategoryResponse,
+    GenerateBarcodeResponse,
+    GenerateDescriptionResponse,
     ImportProductsResponse,
     PreviewProductsResponse,
     ProductCreateRequest,
     ProductResponse,
     ProductsFilterParams,
     ProductUpdateRequest,
+    SetStorefrontPhotosRequest,
     UnitCreateRequest,
     UnitResponse,
 )
@@ -89,6 +103,11 @@ async def update_product(
     return ProductResponse.from_entity(product, show_purchase)
 
 
+@router.delete("/{product_id}", status_code=204)
+async def delete_product(product_id: int, actor: ActorDep, use_case: DeleteProductDep) -> None:
+    await use_case.execute(actor, DeleteProductCommand(product_id))
+
+
 @router.post("/{product_id}/photo", status_code=201)
 async def set_product_photo(
     product_id: int,
@@ -99,6 +118,48 @@ async def set_product_photo(
 ) -> ProductResponse:
     product = await use_case.execute(actor, await _photo_command(product_id, file))
     return ProductResponse.from_entity(product, show_purchase)
+
+
+@router.post("/{product_id}/storefront-photos", status_code=201)
+async def add_storefront_photo(
+    product_id: int,
+    actor: ActorDep,
+    file: UploadFile,
+    show_purchase: ShowPurchaseDep,
+    use_case: AddStorefrontPhotoDep,
+) -> ProductResponse:
+    command = AddStorefrontPhotoCommand(product_id, file.filename or "photo.jpg", await file.read())
+    product = await use_case.execute(actor, command)
+    return ProductResponse.from_entity(product, show_purchase)
+
+
+@router.put("/{product_id}/storefront-photos")
+async def set_storefront_photos(
+    product_id: int,
+    body: SetStorefrontPhotosRequest,
+    actor: ActorDep,
+    show_purchase: ShowPurchaseDep,
+    use_case: SetStorefrontPhotosDep,
+) -> ProductResponse:
+    command = SetStorefrontPhotosCommand(product_id, body.photos)
+    product = await use_case.execute(actor, command)
+    return ProductResponse.from_entity(product, show_purchase)
+
+
+@router.post("/{product_id}/description/generate")
+async def generate_product_description(
+    product_id: int, actor: ActorDep, use_case: GenerateProductDescriptionDep
+) -> GenerateDescriptionResponse:
+    result = await use_case.execute(actor, GenerateProductDescriptionCommand(product_id))
+    return GenerateDescriptionResponse.from_result(result)
+
+
+@router.post("/barcode/generate")
+async def generate_barcode(
+    actor: ActorDep, use_case: GenerateBarcodeDep
+) -> GenerateBarcodeResponse:
+    result = await use_case.execute(actor)
+    return GenerateBarcodeResponse.from_result(result)
 
 
 @router.post("/import", status_code=201)

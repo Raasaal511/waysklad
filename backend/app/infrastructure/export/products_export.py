@@ -11,7 +11,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 from decimal import Decimal
 
 from app.domain.catalog.entities import Product
-from app.infrastructure.pdf_fonts import register_fonts
+from app.infrastructure.export.pdf_fonts import register_fonts
 
 _COLUMNS = [
     "Название",

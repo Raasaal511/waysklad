@@ -10,7 +10,7 @@ from app.domain.common.uow import IUnitOfWork
 from app.domain.debts.entities import Debt
 from app.domain.identity.permissions import Actor, Permission, require
 from app.domain.inventory.entities import StockDocType, StockDocument
-from app.infrastructure.cache_aside import invalidate_shop_cache
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)

@@ -9,7 +9,7 @@ from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Actor, Permission, require
-from app.infrastructure.cache_aside import invalidate_shop_cache
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 
 ImportAction = Literal["create", "update", "skip"]
 

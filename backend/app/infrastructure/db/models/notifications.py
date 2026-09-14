@@ -1,6 +1,17 @@
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Enum as SAEnum, ForeignKey, Index, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Enum as SAEnum,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domain.notifications.entities import NotificationKind
@@ -25,6 +36,7 @@ class NotificationModel(Base, TenantMixin):
     text: Mapped[str] = mapped_column(Text)
     link: Mapped[str] = mapped_column(String(200), default="")
     entity_id: Mapped[int | None]
+    snapshot_value: Mapped[Decimal | None] = mapped_column(Numeric(14, 3))
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

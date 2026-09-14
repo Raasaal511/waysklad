@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Response, UploadFile
 
-from app.infrastructure.inventory_export import (
+from app.infrastructure.export.inventory_export import (
     render_documents_csv,
     render_documents_pdf,
     render_documents_xlsx,
@@ -8,6 +8,7 @@ from app.infrastructure.inventory_export import (
 from app.application.analytics.restock_recommendations import (
     RestockRecommendationsQuery,
 )
+from app.application.inventory.set_warehouse_photo import SetWarehousePhotoCommand
 from app.presentation.deps import (
     ActorDep,
     CreateWarehouseDep,
@@ -19,6 +20,7 @@ from app.presentation.deps import (
     ListWarehousesDep,
     ReceiveGoodsDep,
     SetWarehouseAssignmentsDep,
+    SetWarehousePhotoDep,
     StocktakeDep,
     TransferDep,
     UpdateWarehouseDetailsDep,
@@ -60,6 +62,17 @@ async def update_warehouse_details(
     return WarehouseResponse.from_entity(
         await use_case.execute(actor, body.to_command(warehouse_id))
     )
+
+
+@router.post("/warehouses/{warehouse_id}/photo", status_code=201)
+async def set_warehouse_photo(
+    warehouse_id: int,
+    actor: ActorDep,
+    file: UploadFile,
+    use_case: SetWarehousePhotoDep,
+) -> WarehouseResponse:
+    cmd = SetWarehousePhotoCommand(warehouse_id, file.filename or "photo.jpg", await file.read())
+    return WarehouseResponse.from_entity(await use_case.execute(actor, cmd))
 
 
 @router.put("/warehouses/{warehouse_id}/assignments")

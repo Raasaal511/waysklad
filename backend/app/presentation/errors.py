@@ -7,7 +7,7 @@ from app.domain.common.exceptions import (
     DomainError,
     NotFoundError,
 )
-from app.infrastructure.admin_alerts import report_unhandled_error
+from app.infrastructure.observability.admin_alerts import report_unhandled_error
 
 
 def register_exception_handlers(app: FastAPI) -> None:

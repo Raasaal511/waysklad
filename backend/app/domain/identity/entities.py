@@ -46,6 +46,7 @@ class Warehouse:
     # owner имеет доступ ко всем складам магазина вне зависимости от списка
     assigned_user_ids: list[int] = field(default_factory=list)
     show_on_storefront: bool = False  # видимость на публичной витрине — по умолчанию скрыт
+    photo: str = ""  # необязательный логотип склада, тот же паттерн что Product.photo
 
     def to_dict(self) -> dict:
         return {
@@ -53,6 +54,7 @@ class Warehouse:
             "name": self.name,
             "address": self.address,
             "assigned_user_ids": self.assigned_user_ids,
+            "photo": self.photo,
             "show_on_storefront": self.show_on_storefront,
         }
 

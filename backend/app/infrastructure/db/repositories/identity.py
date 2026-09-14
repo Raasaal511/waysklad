@@ -172,6 +172,20 @@ class SqlAlchemyWarehouseRepository(SqlAlchemyRepository, IWarehouseRepository):
         await self._session.flush()
         return await self.get(warehouse_id)
 
+    async def set_photo(self, warehouse_id: int, photo: str) -> Warehouse:
+        model = (
+            await self._session.execute(
+                select(WarehouseModel).where(
+                    WarehouseModel.id == warehouse_id, WarehouseModel.tenant_id == self._tenant
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            raise NotFoundError(f"Склад {warehouse_id} не найден")
+        model.photo = photo
+        await self._session.flush()
+        return await self.get(warehouse_id)
+
     async def _assigned_user_ids(self, warehouse_ids: list[int]) -> dict[int, list[int]]:
         if not warehouse_ids:
             return {}

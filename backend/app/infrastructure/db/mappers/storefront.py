@@ -16,6 +16,7 @@ class StorefrontRequestMapper:
         return StorefrontRequestModel(
             tenant_id=tenant_id,
             customer_name=request.customer_name,
+            customer_id=request.customer_id,
             customer_phone=request.customer_phone,
             customer_telegram_chat_id=request.customer_telegram_chat_id or None,
             note=request.note,
@@ -40,6 +41,7 @@ class StorefrontRequestMapper:
         return StorefrontRequest(
             id=model.id,
             customer_name=model.customer_name,
+            customer_id=model.customer_id,
             customer_phone=model.customer_phone,
             customer_telegram_chat_id=model.customer_telegram_chat_id or "",
             note=model.note,

@@ -9,7 +9,7 @@ from app.domain.identity.permissions import Actor, Permission, require
 from app.domain.notifications.entities import NotificationKind
 from app.domain.storefront.entities import MessageAuthor, StorefrontMessage
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
-from app.infrastructure.ws_broadcast import broadcaster, storefront_request_channel
+from app.infrastructure.notifications.ws_broadcast import broadcaster, storefront_request_channel
 
 
 async def _publish_message(message: StorefrontMessage) -> None:

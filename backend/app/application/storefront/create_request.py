@@ -6,7 +6,6 @@ from app.application.storefront.reservation import reserve_request_stock
 from app.application.tasks.notify import notify_user
 from app.domain.catalog.entities import Product
 from app.domain.common.exceptions import DomainError
-from app.domain.common.phone import Phone
 from app.domain.identity.entities import Role
 from app.domain.notifications.entities import NotificationKind
 from app.domain.storefront.entities import StorefrontRequest, StorefrontRequestLine
@@ -40,9 +39,9 @@ class StorefrontRequestItemInput:
 @dataclass(frozen=True)
 class CreateStorefrontRequestCommand:
     slug: str
+    customer_id: int  # авторизованный покупатель — см. CurrentCustomerDep
     customer_name: str
     items: list[StorefrontRequestItemInput] = field(default_factory=list)
-    customer_phone: str = ""
     note: str = ""
     customer_telegram_chat_id: str = ""  # заполнено, только если заявка из Telegram-бота витрины
 
@@ -61,18 +60,18 @@ class CreateStorefrontRequestUseCase:
     async def execute(self, cmd: CreateStorefrontRequestCommand) -> StorefrontRequest | None:
         async with SqlAlchemyUnitOfWork(None, session_factory=self._session_factory) as public_uow:
             tenant = await public_uow.tenants.get_by_slug(cmd.slug)
+            customer = await public_uow.customers.get(cmd.customer_id)
         if tenant is None or not tenant.storefront_enabled:
             return None
 
-        phone = Phone(cmd.customer_phone) if cmd.customer_phone.strip() else None
+        phone = customer.phone
 
         async with SqlAlchemyUnitOfWork(tenant.id, session_factory=self._session_factory) as uow:
-            if phone is not None:
-                pending = await uow.storefront_requests.count_new_by_phone(str(phone))
-                if pending >= _MAX_PENDING_REQUESTS_PER_PHONE:
-                    raise DomainError(
-                        "У вас уже есть необработанные заявки — дождитесь ответа магазина"
-                    )
+            pending = await uow.storefront_requests.count_new_by_phone(str(phone))
+            if pending >= _MAX_PENDING_REQUESTS_PER_PHONE:
+                raise DomainError(
+                    "У вас уже есть необработанные заявки — дождитесь ответа магазина"
+                )
 
             products_by_id: dict[int, Product] = {}
             quantity_by_product: dict[int, Decimal] = {}
@@ -97,7 +96,8 @@ class CreateStorefrontRequestUseCase:
             request = StorefrontRequest(
                 id=None,
                 customer_name=cmd.customer_name.strip(),
-                customer_phone=str(phone) if phone else "",
+                customer_id=cmd.customer_id,
+                customer_phone=str(phone),
                 customer_telegram_chat_id=cmd.customer_telegram_chat_id,
                 note=cmd.note.strip(),
                 access_token=secrets.token_urlsafe(32),

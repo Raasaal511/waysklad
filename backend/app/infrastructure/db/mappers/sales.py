@@ -25,6 +25,7 @@ class SaleMapper:
             note=sale.note,
             cash_received=sale.cash_received.amount if sale.cash_received is not None else None,
             order_id=sale.order_id,
+            change_kept=sale.change_kept.amount,
             lines=[
                 SaleLineModel(
                     tenant_id=tenant_id,
@@ -53,6 +54,7 @@ class SaleMapper:
             deleted_at=model.deleted_at,
             cash_received=Money(model.cash_received) if model.cash_received is not None else None,
             order_id=model.order_id,
+            change_kept=Money(model.change_kept),
             lines=[
                 SaleLine(
                     id=line.id,

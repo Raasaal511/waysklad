@@ -20,7 +20,7 @@ from collections import defaultdict
 from fastapi import WebSocket
 
 from app.infrastructure.config import settings
-from app.infrastructure.logging import get_logger
+from app.infrastructure.observability.logging import get_logger
 
 _logger = get_logger("app.ws")
 _PUBSUB_PREFIX = "ws_channel:"

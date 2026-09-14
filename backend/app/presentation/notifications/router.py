@@ -13,7 +13,7 @@ from app.presentation.notifications.schemas import (
     NotificationListResponse,
     NotificationResponse,
 )
-from app.infrastructure.ws_broadcast import broadcaster, user_channel
+from app.infrastructure.notifications.ws_broadcast import broadcaster, user_channel
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 

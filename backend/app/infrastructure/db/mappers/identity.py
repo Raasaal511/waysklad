@@ -68,6 +68,7 @@ class WarehouseMapper:
             name=warehouse.name,
             address=warehouse.address,
             show_on_storefront=warehouse.show_on_storefront,
+            photo=warehouse.photo,
         )
 
     @staticmethod
@@ -78,4 +79,5 @@ class WarehouseMapper:
             address=model.address,
             assigned_user_ids=assigned_user_ids or [],
             show_on_storefront=model.show_on_storefront,
+            photo=model.photo,
         )

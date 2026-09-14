@@ -3,6 +3,7 @@ from app.infrastructure.db.models import (  # noqa: F401
     base,
     catalog,
     counterparties,
+    customers,
     debts,
     identity,
     inventory,

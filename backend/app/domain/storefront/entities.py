@@ -29,6 +29,11 @@ class StorefrontRequest:
 
     id: int | None
     customer_name: str
+    # авторизованный покупатель (app.domain.customers.entities.Customer) —
+    # обязателен для новых заявок с 2026-09-13, см. CreateStorefrontRequestUseCase;
+    # None только у заявок, созданных до перехода на авторизацию (сохраняем
+    # историю, не подчищаем задним числом)
+    customer_id: int | None = None
     lines: list[StorefrontRequestLine] = field(default_factory=list)
     customer_phone: str = ""
     # заполнено, только если заявка создана из Telegram-бота витрины — задел

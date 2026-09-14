@@ -9,7 +9,7 @@ from app.application.storefront.reject_request import RejectStorefrontRequestCom
 from app.domain.identity.permissions import Permission
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.rate_limit import limiter
-from app.infrastructure.ws_broadcast import broadcaster, storefront_request_channel
+from app.infrastructure.notifications.ws_broadcast import broadcaster, storefront_request_channel
 from app.presentation.deps import (
     AcceptStorefrontRequestDep,
     ActorDep,
@@ -18,6 +18,7 @@ from app.presentation.deps import (
     GetStorefrontProductDep,
     GetStorefrontRequestDep,
     GetStorefrontRequestStatusDep,
+    ListMyStorefrontRequestsDep,
     ListStaffStorefrontMessagesDep,
     ListStorefrontMessagesDep,
     ListStorefrontRequestsDep,
@@ -27,10 +28,12 @@ from app.presentation.deps import (
     SessionFactoryDep,
 )
 from app.presentation.deps.auth import require_permission
+from app.presentation.deps.customer_auth import CurrentCustomerDep
 from app.presentation.orders.schemas import OrderResponse
 from app.presentation.storefront.schemas import (
     AcceptStorefrontRequestRequest,
     CreateStorefrontRequestRequest,
+    MyStorefrontRequestResponse,
     SendStorefrontMessageRequest,
     StorefrontCatalogParams,
     StorefrontCatalogResponse,
@@ -78,9 +81,10 @@ async def create_storefront_request(
     request: Request,
     slug: str,
     body: CreateStorefrontRequestRequest,
+    customer: CurrentCustomerDep,
     use_case: CreateStorefrontRequestDep,
 ) -> StorefrontRequestCreatedResponse:
-    result = await use_case.execute(body.to_command(slug))
+    result = await use_case.execute(body.to_command(slug, customer.id))
     if result is None:
         raise HTTPException(status_code=404, detail="Витрина не найдена")
     return StorefrontRequestCreatedResponse.from_entity(result)
@@ -92,6 +96,14 @@ async def list_new_storefront_requests(
 ) -> list[StorefrontRequestResponse]:
     requests = await use_case.execute(actor)
     return [StorefrontRequestResponse.from_entity(r) for r in requests]
+
+
+@router.get("/requests/my")
+async def list_my_storefront_requests(
+    customer: CurrentCustomerDep, use_case: ListMyStorefrontRequestsDep
+) -> list[MyStorefrontRequestResponse]:
+    items = await use_case.execute(customer.id)
+    return [MyStorefrontRequestResponse.from_item(i) for i in items]
 
 
 @router.get("/requests/status")

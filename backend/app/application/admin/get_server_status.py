@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 
 from app.domain.common.cache import ICache
 from app.infrastructure.db.models.identity import TenantModel, UserModel
-from app.infrastructure.logging import get_logger
+from app.infrastructure.observability.logging import get_logger
 
 _logger = get_logger("app.admin")
 
@@ -51,7 +51,7 @@ async def get_server_status(session_factory, cache: ICache, online_now: int) -> 
 
 async def _check_redis(cache: ICache) -> bool:
     # RedisCache.get/set сами глотают исключения на сбое соединения (см.
-    # app.infrastructure.cache) — недоступность видна по несовпадению значения,
+    # app.infrastructure.cache.redis_cache) — недоступность видна по несовпадению значения,
     # не по exception
     probe_key = "admin:redis_probe"
     await cache.set(probe_key, b"1", ttl_seconds=5)

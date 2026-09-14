@@ -284,3 +284,8 @@ class DebtsOverviewResponse(BaseModel):
             supplier_debt_count=len(supplier_debts),
             upcoming_payments=upcoming,
         )
+
+
+class DebtReceiptResponse(BaseModel):
+    text: str
+    whatsapp_link: str | None  # None, если у клиента нет телефона/WhatsApp

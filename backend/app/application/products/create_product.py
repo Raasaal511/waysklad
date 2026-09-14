@@ -12,7 +12,7 @@ from app.domain.common.quantity import Quantity
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Actor, Permission, require
 from app.domain.inventory.entities import StockDocType, StockDocument, StockLine
-from app.infrastructure.cache_aside import invalidate_shop_cache
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)
@@ -32,6 +32,7 @@ class CreateProductCommand:
     barcode: str | None = None
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
+    description: str = ""
     show_on_storefront: bool = False
     storefront_min_qty: Decimal | None = None
     storefront_step_qty: Decimal | None = None
@@ -86,6 +87,7 @@ class CreateProductUseCase:
                 barcode=Barcode(cmd.barcode) if cmd.barcode else None,
                 category_id=cmd.category_id,
                 min_stock=cmd.min_stock,
+                description=cmd.description,
                 show_on_storefront=cmd.show_on_storefront,
                 storefront_min_qty=cmd.storefront_min_qty,
                 storefront_step_qty=cmd.storefront_step_qty,

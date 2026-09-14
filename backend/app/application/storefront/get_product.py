@@ -1,9 +1,10 @@
 from dataclasses import dataclass
+from decimal import Decimal
 
 from app.domain.catalog.entities import Product
 from app.domain.common.cache import ICache
 from app.domain.common.exceptions import NotFoundError
-from app.infrastructure.cache_aside import cached_use_case
+from app.infrastructure.cache.cache_aside import cached_use_case
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 
 _CACHE_TTL_SECONDS = 20
@@ -20,12 +21,14 @@ class StorefrontProductResult:
     shop_name: str
     product: Product
     in_stock: bool
+    sold_count: Decimal
 
     def to_json(self) -> dict:
         return {
             "shop_name": self.shop_name,
             "product": self.product.to_dict(),
             "in_stock": self.in_stock,
+            "sold_count": str(self.sold_count),
         }
 
     @classmethod
@@ -34,6 +37,7 @@ class StorefrontProductResult:
             shop_name=d["shop_name"],
             product=Product.from_dict(d["product"]),
             in_stock=d["in_stock"],
+            sold_count=Decimal(d.get("sold_count", "0")),
         )
 
 
@@ -64,11 +68,15 @@ class GetStorefrontProductUseCase:
             if not product.show_on_storefront:
                 return None
             stock_items = await uow.stock.list_all()
+            sold_counts = await uow.analytics.sold_count_by_products([product.id])
 
         in_stock = any(
             item.product_id == product.id and item.quantity > 0 for item in stock_items
         )
-        return StorefrontProductResult(shop_name=tenant.name, product=product, in_stock=in_stock)
+        sold_count = sold_counts.get(product.id, Decimal("0"))
+        return StorefrontProductResult(
+            shop_name=tenant.name, product=product, in_stock=in_stock, sold_count=sold_count
+        )
 
     execute = cached_use_case(
         "storefront_product",

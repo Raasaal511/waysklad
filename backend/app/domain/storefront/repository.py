@@ -20,6 +20,13 @@ class IStorefrontRequestRepository(Protocol):
         на авто-освобождение резерва (см. release_expired_storefront_reservations)."""
         ...
 
+    async def list_by_customer(self, customer_id: int) -> list[StorefrontRequest]:
+        """Все заявки покупателя во ВСЕХ магазинах платформы — без tenant-
+        фильтра (Customer не привязан к одному tenant), новые сначала.
+        Каждая StorefrontRequest.tenant_id заполнен (нужен для отображения,
+        к какому магазину относится заявка)."""
+        ...
+
 
 class IStorefrontMessageRepository(Protocol):
     async def add(self, message: StorefrontMessage) -> StorefrontMessage: ...

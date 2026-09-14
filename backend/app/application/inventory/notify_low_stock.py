@@ -29,13 +29,16 @@ async def _notify_tenant(uow: SqlAlchemyUnitOfWork, notifier: INotifier) -> None
     if not recipients:
         return
 
-    today = datetime.now().date()
     for item in recommendations:
         text = f"Заканчивается «{item.product_name}»: остаток {item.quantity} (порог {item.min_stock})"
         for user in recipients:
-            if await uow.notifications.exists_for_entity_on(
-                user.id, NotificationKind.LOW_STOCK, item.product_id, today
-            ):
+            # повтор только если остаток вырос с прошлого уведомления (пытались
+            # пополнить) — иначе не спамим одним и тем же каждые 15 минут/день,
+            # пока товар не появится на складе
+            last = await uow.notifications.last_snapshot_value(
+                user.id, NotificationKind.LOW_STOCK, item.product_id
+            )
+            if last is not None and item.quantity <= last:
                 continue
             await notify_user(
                 uow, notifier,
@@ -44,6 +47,7 @@ async def _notify_tenant(uow: SqlAlchemyUnitOfWork, notifier: INotifier) -> None
                 text=text,
                 link=f"/products/{item.product_id}",
                 entity_id=item.product_id,
+                snapshot_value=item.quantity,
             )
 
 
@@ -58,7 +62,7 @@ async def _run_async(notifier: INotifier) -> None:
 
 
 def notify_low_stock() -> None:
-    from app.infrastructure.telegram import TelegramNotifier
+    from app.infrastructure.notifications.telegram import TelegramNotifier
 
     asyncio.run(_run_async(TelegramNotifier()))
 

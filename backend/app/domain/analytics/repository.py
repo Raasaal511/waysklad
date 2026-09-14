@@ -11,6 +11,9 @@ class PeriodTotals:
     sales_count: int
     revenue: Decimal
     profit: Decimal
+    # невзятая клиентами сдача — отдельно от revenue/profit (не выручка по
+    # товарам, добровольная доплата сверх цены), см. Sale.change_kept
+    change_kept: Decimal = Decimal("0")
 
 
 @dataclass(frozen=True)
@@ -53,6 +56,21 @@ class RestockRecommendation:
     quantity: Decimal  # текущий остаток (на переданных складах)
     min_stock: Decimal
     quantity_sold: Decimal  # продано за период (см. RestockRecommendationsUseCase)
+
+
+@dataclass(frozen=True)
+class MissedSaleItem:
+    """Товар, которого не хватило хотя бы на одну позицию заявки с витрины —
+    покупатель хотел купить, но остатка не было (см. StorefrontRequest.
+    insufficient_stock_at_request). Точность на уровне заявки, не строки:
+    флаг общий для всей заявки, поэтому quantity_requested — это сумма
+    запрошенного по этому товару во ВСЕХ заявках с этим флагом, а не только
+    в тех строках, которых реально не хватило."""
+
+    product_id: int
+    product_name: str
+    requests_count: int
+    quantity_requested: Decimal
 
 
 @dataclass(frozen=True)
@@ -112,3 +130,21 @@ class IAnalyticsRepository(Protocol):
         ...
 
     async def debts_issued_total(self, date_from: datetime, date_to: datetime) -> Decimal: ...
+
+    async def missed_sales(
+        self, date_from: datetime, date_to: datetime
+    ) -> list[MissedSaleItem]:
+        """Товары из заявок с витрины (StorefrontRequest), где на момент заявки
+        не хватило остатка хотя бы на одну позицию — сортировка по числу таких
+        заявок, сначала самые частые. Без фильтра по складам: заявка с витрины
+        не привязана к складу до принятия владельцем."""
+        ...
+
+    async def sold_count_by_products(self, product_ids: list[int]) -> dict[int, Decimal]:
+        """Суммарно продано (SaleLine.quantity за вычетом SaleReturnLine.quantity)
+        по каждому из product_ids за всё время — тот же смысл и та же формула,
+        что и quantity_sold в top_products (полностью удалённые продажи
+        исключены), но без ограничения периода и batch по списку товаров
+        (для бейджа «Продано: N» на карточке/списке витрины). Товары без единой
+        продажи в результирующем словаре отсутствуют (не 0)."""
+        ...

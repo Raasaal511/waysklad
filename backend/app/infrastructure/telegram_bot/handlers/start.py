@@ -3,17 +3,43 @@ from aiogram.filters import CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
+from app.application.customers.confirm_login_link import (
+    ConfirmCustomerLoginLinkCommand,
+    ConfirmCustomerLoginLinkUseCase,
+)
 from app.application.storefront.get_catalog import GetStorefrontCatalogCommand, GetStorefrontCatalogUseCase
+from app.domain.common.exceptions import DomainError
+from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.telegram_bot.formatting import catalog_page_text
 from app.infrastructure.telegram_bot.keyboards import catalog_keyboard
 from app.infrastructure.telegram_bot.states import StorefrontFlow
 
 router = Router(name="start")
 
+_LOGIN_LINK_PREFIX = "login_"
+
+
+async def _confirm_login(token: str, chat_id: int, message: Message, session_factory) -> None:
+    uow = SqlAlchemyUnitOfWork(None, session_factory=session_factory)
+    try:
+        await ConfirmCustomerLoginLinkUseCase(uow).execute(
+            ConfirmCustomerLoginLinkCommand(token=token, telegram_chat_id=str(chat_id))
+        )
+    except DomainError as exc:
+        await message.answer(f"Не удалось войти: {exc}. Вернитесь на сайт и запросите вход заново.")
+        return
+    await message.answer("Готово — возвращайтесь на сайт, вход подтверждён.")
+
 
 @router.message(CommandStart())
 async def start(message: Message, command: CommandObject, state: FSMContext, session_factory) -> None:
-    slug = (command.args or "").strip()
+    arg = (command.args or "").strip()
+    if arg.startswith(_LOGIN_LINK_PREFIX):
+        token = arg[len(_LOGIN_LINK_PREFIX):]
+        await _confirm_login(token, message.chat.id, message, session_factory)
+        return
+
+    slug = arg
     if not slug:
         await message.answer(
             "Это бот-витрина ВайСклад. Чтобы посмотреть каталог магазина, "

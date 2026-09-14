@@ -13,6 +13,7 @@ from app.application.storefront.get_catalog import (
     StorefrontCatalogResult,
     StorefrontCategoryCount,
 )
+from app.application.customers.list_my_requests import MyStorefrontRequestItem
 from app.application.storefront.get_product import StorefrontProductResult
 from app.application.storefront.get_request_status import StorefrontRequestStatusResult
 from app.application.storefront.send_message import (
@@ -83,9 +84,12 @@ class StorefrontProductResponse(BaseModel):
     in_stock: bool
     min_order_qty: Decimal | None
     order_step_qty: Decimal | None
+    sold_count: Decimal
 
     @classmethod
-    def from_entity(cls, product: Product, in_stock: bool) -> "StorefrontProductResponse":
+    def from_entity(
+        cls, product: Product, in_stock: bool, sold_count: Decimal = Decimal("0")
+    ) -> "StorefrontProductResponse":
         return cls(
             id=product.id,
             name=product.name,
@@ -95,6 +99,7 @@ class StorefrontProductResponse(BaseModel):
             in_stock=in_stock,
             min_order_qty=product.storefront_min_qty,
             order_step_qty=product.storefront_step_qty,
+            sold_count=sold_count,
         )
 
 
@@ -118,7 +123,11 @@ class StorefrontCatalogResponse(BaseModel):
         return cls(
             shop_name=result.shop_name,
             products=[
-                StorefrontProductResponse.from_entity(p, p.id in result.in_stock_product_ids)
+                StorefrontProductResponse.from_entity(
+                    p,
+                    p.id in result.in_stock_product_ids,
+                    result.sold_count_by_product_id.get(p.id, Decimal("0")),
+                )
                 for p in result.products
             ],
             categories=[StorefrontCategoryResponse.from_count(c) for c in result.categories],
@@ -143,14 +152,20 @@ class StorefrontProductDetailResponse(StorefrontProductResponse):
     (размер/цвет) для полноты информации на отдельной странице/при шеринге."""
 
     sku: str
+    description: str
+    storefront_photos: list[str]
     variants: list[StorefrontProductVariantResponse]
 
     @classmethod
-    def from_entity(cls, product: Product, in_stock: bool) -> "StorefrontProductDetailResponse":
-        base = StorefrontProductResponse.from_entity(product, in_stock)
+    def from_entity(
+        cls, product: Product, in_stock: bool, sold_count: Decimal = Decimal("0")
+    ) -> "StorefrontProductDetailResponse":
+        base = StorefrontProductResponse.from_entity(product, in_stock, sold_count)
         return cls(
             **base.model_dump(),
             sku=product.sku,
+            description=product.description,
+            storefront_photos=list(product.storefront_photos),
             variants=[
                 StorefrontProductVariantResponse(id=v.id, size=v.size, color=v.color)
                 for v in product.variants
@@ -166,7 +181,9 @@ class StorefrontProductPageResponse(BaseModel):
     def from_result(cls, result: StorefrontProductResult) -> "StorefrontProductPageResponse":
         return cls(
             shop_name=result.shop_name,
-            product=StorefrontProductDetailResponse.from_entity(result.product, result.in_stock),
+            product=StorefrontProductDetailResponse.from_entity(
+                result.product, result.in_stock, result.sold_count
+            ),
         )
 
 
@@ -179,14 +196,14 @@ class StorefrontRequestItemRequest(BaseModel):
 class CreateStorefrontRequestRequest(BaseModel):
     customer_name: str = Field(min_length=1, max_length=200)
     items: list[StorefrontRequestItemRequest] = Field(min_length=1)
-    customer_phone: str = ""
     note: str = Field("", max_length=1000)
 
     model_config = {"extra": "forbid"}
 
-    def to_command(self, slug: str) -> CreateStorefrontRequestCommand:
+    def to_command(self, slug: str, customer_id: int) -> CreateStorefrontRequestCommand:
         return CreateStorefrontRequestCommand(
             slug=slug,
+            customer_id=customer_id,
             customer_name=self.customer_name,
             items=[
                 StorefrontRequestItemInput(
@@ -194,7 +211,6 @@ class CreateStorefrontRequestRequest(BaseModel):
                 )
                 for i in self.items
             ],
-            customer_phone=self.customer_phone,
             note=self.note,
         )
 
@@ -244,6 +260,19 @@ class StorefrontRequestCreatedResponse(StorefrontRequestResponse):
     def from_entity(cls, request: StorefrontRequest) -> "StorefrontRequestCreatedResponse":
         base = StorefrontRequestResponse.from_entity(request)
         return cls(**base.model_dump(), access_token=request.access_token)
+
+
+class MyStorefrontRequestResponse(StorefrontRequestResponse):
+    """Для авторизованного покупателя — список его заявок по всем магазинам
+    платформы, с названием магазина (владелец видит только свои, ему это
+    поле не нужно — см. StorefrontRequestResponse)."""
+
+    shop_name: str
+
+    @classmethod
+    def from_item(cls, item: MyStorefrontRequestItem) -> "MyStorefrontRequestResponse":
+        base = StorefrontRequestResponse.from_entity(item.request)
+        return cls(**base.model_dump(), shop_name=item.shop_name)
 
 
 class AcceptStorefrontRequestRequest(BaseModel):

@@ -96,6 +96,7 @@ class CancelOrderRequest(BaseModel):
 class IssueOrderRequest(BaseModel):
     payment_method: PaymentMethod
     cash_received: Decimal | None = None
+    change_kept: Decimal = Decimal("0")  # клиент не забрал (часть) сдачи
     debt_due_date: date | None = None
 
     def to_command(self, order_id: int) -> IssueOrderCommand:
@@ -103,6 +104,7 @@ class IssueOrderRequest(BaseModel):
             order_id=order_id,
             payment_method=self.payment_method,
             cash_received=self.cash_received,
+            change_kept=self.change_kept,
             debt_due_date=self.debt_due_date,
         )
 

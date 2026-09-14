@@ -4,6 +4,7 @@ from fastapi import Depends
 
 from app.application.analytics.dashboard import GetDashboardUseCase
 from app.application.analytics.dead_stock import GetDeadStockUseCase, GetStockValueUseCase
+from app.application.analytics.missed_sales import GetMissedSalesUseCase
 from app.application.analytics.period_totals import GetPeriodTotalsUseCase
 from app.application.analytics.restock_recommendations import (
     GetRestockRecommendationsUseCase,
@@ -30,10 +31,14 @@ from app.application.counterparties.get_client_timeline import GetClientTimeline
 from app.application.counterparties.list_suppliers import ListSuppliersUseCase
 from app.application.counterparties.search_clients import SearchClientsUseCase
 from app.application.counterparties.update_client import UpdateClientUseCase
+from app.application.customers.get_login_status import GetCustomerLoginStatusUseCase
+from app.application.customers.list_my_requests import ListMyStorefrontRequestsUseCase
+from app.application.customers.request_login_link import RequestCustomerLoginLinkUseCase
 from app.application.debts.create_installment import CreateInstallmentUseCase
 from app.application.debts.extend_debt import ExtendDebtUseCase
 from app.application.debts.get_debt import GetDebtUseCase
 from app.application.debts.get_debt_history import GetDebtHistoryUseCase
+from app.application.debts.get_debt_receipt_data import GetDebtReceiptDataUseCase
 from app.application.debts.get_debts_overview import GetDebtsOverviewUseCase
 from app.application.debts.issue_debt import IssueDebtUseCase
 from app.application.debts.issue_supplier_debt import IssueSupplierDebtUseCase
@@ -54,6 +59,7 @@ from app.application.inventory.receive_goods import ReceiveGoodsUseCase
 from app.application.inventory.set_warehouse_assignments import (
     SetWarehouseAssignmentsUseCase,
 )
+from app.application.inventory.set_warehouse_photo import SetWarehousePhotoUseCase
 from app.application.inventory.stocktake import StocktakeUseCase
 from app.application.inventory.transfer import TransferUseCase
 from app.application.inventory.update_warehouse_details import (
@@ -74,10 +80,16 @@ from app.application.orders.get_order_history import GetOrderHistoryUseCase
 from app.application.orders.issue_order import IssueOrderUseCase
 from app.application.orders.list_orders import ListActiveOrdersUseCase, ListCompletedOrdersUseCase
 from app.application.orders.update_order import UpdateOrderUseCase
+from app.application.products.add_storefront_photo import AddStorefrontPhotoUseCase
 from app.application.products.apply_import import ApplyProductImportUseCase
 from app.application.products.create_category import CreateCategoryUseCase
 from app.application.products.create_product import CreateProductUseCase
 from app.application.products.create_unit import CreateUnitUseCase
+from app.application.products.delete_product import DeleteProductUseCase
+from app.application.products.generate_barcode import GenerateBarcodeUseCase
+from app.application.products.generate_description import (
+    GenerateProductDescriptionUseCase,
+)
 from app.application.products.get_export_data import GetProductsExportDataUseCase
 from app.application.products.get_product import GetProductUseCase
 from app.application.products.get_product_by_barcode import GetProductByBarcodeUseCase
@@ -88,6 +100,7 @@ from app.application.products.list_categories import ListCategoriesUseCase
 from app.application.products.list_units import ListUnitsUseCase
 from app.application.products.search_products import SearchProductsUseCase
 from app.application.products.set_product_photo import SetProductPhotoUseCase
+from app.application.products.set_storefront_photos import SetStorefrontPhotosUseCase
 from app.application.products.update_product import UpdateProductUseCase
 from app.application.sales.create_sale import CreateSaleUseCase
 from app.application.sales.delete_sale import DeleteSaleUseCase
@@ -123,6 +136,7 @@ from app.application.tasks.list_tasks import ListActiveTasksUseCase, ListComplet
 from app.application.tasks.update_task import UpdateTaskUseCase
 from app.application.tasks.create_task import CreateTaskUseCase
 from app.presentation.deps.cache import CacheDep
+from app.presentation.deps.description_generator import DescriptionGeneratorDep
 from app.presentation.deps.notifier import NotifierDep
 from app.presentation.deps.security import FileStorageDep, HasherDep
 from app.presentation.deps.session import SessionFactoryDep
@@ -146,8 +160,26 @@ def _with_uow_and_cache(use_case_cls):
     return provider
 
 
+def _with_uow_and_notifier(use_case_cls):
+    """Для use case, отправляющих мгновенное уведомление (Telegram + in-app) —
+    пробрасывает NotifierDep вторым позиционным аргументом."""
+
+    def provider(uow: UowDep, notifier: NotifierDep):
+        return use_case_cls(uow, notifier)
+
+    return provider
+
+
 def get_register_shop(uow: PublicUowDep, hasher: HasherDep) -> RegisterShopUseCase:
     return RegisterShopUseCase(uow, hasher)
+
+
+def get_request_customer_login_link(uow: PublicUowDep) -> RequestCustomerLoginLinkUseCase:
+    return RequestCustomerLoginLinkUseCase(uow)
+
+
+def get_customer_login_status(uow: PublicUowDep) -> GetCustomerLoginStatusUseCase:
+    return GetCustomerLoginStatusUseCase(uow)
 
 
 def get_login(uow: PublicUowDep, hasher: HasherDep) -> LoginUseCase:
@@ -176,12 +208,35 @@ def get_set_product_photo(
     return SetProductPhotoUseCase(uow, storage, cache)
 
 
+def get_add_storefront_photo(
+    uow: UowDep, storage: FileStorageDep, cache: CacheDep
+) -> AddStorefrontPhotoUseCase:
+    return AddStorefrontPhotoUseCase(uow, storage, cache)
+
+
+def get_set_storefront_photos(
+    uow: UowDep, storage: FileStorageDep, cache: CacheDep
+) -> SetStorefrontPhotosUseCase:
+    return SetStorefrontPhotosUseCase(uow, storage, cache)
+
+
 get_create_product = _with_uow_and_cache(CreateProductUseCase)
 get_update_product = _with_uow_and_cache(UpdateProductUseCase)
+get_delete_product = _with_uow_and_cache(DeleteProductUseCase)
 get_create_unit = _with_uow(CreateUnitUseCase)
 get_create_category = _with_uow_and_cache(CreateCategoryUseCase)
 get_import_products = _with_uow_and_cache(ImportProductsUseCase)
 get_preview_import_products = _with_uow(PreviewProductsUseCase)
+
+
+def get_generate_product_description(
+    uow: UowDep, generator: DescriptionGeneratorDep
+) -> GenerateProductDescriptionUseCase:
+    return GenerateProductDescriptionUseCase(uow, generator)
+
+
+get_generate_barcode = _with_uow(GenerateBarcodeUseCase)
+
 get_apply_import_products = _with_uow_and_cache(ApplyProductImportUseCase)
 get_list_units = _with_uow(ListUnitsUseCase)
 get_list_categories = _with_uow(ListCategoriesUseCase)
@@ -197,12 +252,19 @@ get_stocktake = _with_uow_and_cache(StocktakeUseCase)
 get_create_warehouse = _with_uow_and_cache(CreateWarehouseUseCase)
 get_set_warehouse_assignments = _with_uow(SetWarehouseAssignmentsUseCase)
 get_update_warehouse_details = _with_uow_and_cache(UpdateWarehouseDetailsUseCase)
+
+
+def get_set_warehouse_photo(uow: UowDep, storage: FileStorageDep) -> SetWarehousePhotoUseCase:
+    return SetWarehousePhotoUseCase(uow, storage)
+
 get_list_warehouses = _with_uow(ListWarehousesUseCase)
 get_list_stock = _with_uow(ListStockUseCase)
 get_list_documents = _with_uow(ListDocumentsUseCase)
 get_document = _with_uow(GetDocumentUseCase)
 get_document_export_data = _with_uow(GetDocumentExportDataUseCase)
-get_create_sale = _with_uow_and_cache(CreateSaleUseCase)
+def get_create_sale(uow: UowDep, cache: CacheDep, notifier: NotifierDep) -> CreateSaleUseCase:
+    return CreateSaleUseCase(uow, cache, notifier)
+
 get_return_sale = _with_uow_and_cache(ReturnSaleUseCase)
 get_edit_sale = _with_uow(EditSaleUseCase)
 get_delete_sale = _with_uow_and_cache(DeleteSaleUseCase)
@@ -212,8 +274,8 @@ get_sale = _with_uow(GetSaleUseCase)
 get_sale_history = _with_uow(GetSaleHistoryUseCase)
 get_sale_returns = _with_uow(ListSaleReturnsUseCase)
 get_receipt_data = _with_uow(GetReceiptDataUseCase)
-get_issue_debt = _with_uow(IssueDebtUseCase)
-get_issue_supplier_debt = _with_uow(IssueSupplierDebtUseCase)
+get_issue_debt = _with_uow_and_notifier(IssueDebtUseCase)
+get_issue_supplier_debt = _with_uow_and_notifier(IssueSupplierDebtUseCase)
 get_repay_debt = _with_uow(RepayDebtUseCase)
 get_create_installment = _with_uow(CreateInstallmentUseCase)
 get_extend_debt = _with_uow(ExtendDebtUseCase)
@@ -224,6 +286,7 @@ get_list_client_debts = _with_uow(ListClientDebtsUseCase)
 get_list_supplier_debts = _with_uow(ListSupplierDebtsUseCase)
 get_debt = _with_uow(GetDebtUseCase)
 get_debt_history = _with_uow(GetDebtHistoryUseCase)
+get_debt_receipt_data = _with_uow(GetDebtReceiptDataUseCase)
 get_create_order = _with_uow(CreateOrderUseCase)
 get_update_order = _with_uow(UpdateOrderUseCase)
 get_change_order_status = _with_uow(ChangeOrderStatusUseCase)
@@ -248,6 +311,7 @@ get_category_profit = _with_uow(GetCategoryProfitUseCase)
 get_dead_stock = _with_uow(GetDeadStockUseCase)
 get_stock_value = _with_uow(GetStockValueUseCase)
 get_restock_recommendations = _with_uow(GetRestockRecommendationsUseCase)
+get_missed_sales = _with_uow(GetMissedSalesUseCase)
 get_apply_offline_sales = _with_uow_and_cache(ApplyOfflineSalesUseCase)
 get_connect_telegram = _with_uow(ConnectTelegramUseCase)
 get_update_shop = _with_uow_and_cache(UpdateShopUseCase)
@@ -276,6 +340,12 @@ def get_storefront_product(
 
 def get_storefront_request_status(factory: SessionFactoryDep) -> GetStorefrontRequestStatusUseCase:
     return GetStorefrontRequestStatusUseCase(factory)
+
+
+def get_list_my_storefront_requests(
+    factory: SessionFactoryDep,
+) -> ListMyStorefrontRequestsUseCase:
+    return ListMyStorefrontRequestsUseCase(factory)
 
 
 def get_create_storefront_request(
@@ -321,6 +391,12 @@ get_task_history = _with_uow(GetTaskHistoryUseCase)
 
 # готовые зависимости для сигнатур роутов
 RegisterShopDep = Annotated[RegisterShopUseCase, Depends(get_register_shop)]
+RequestCustomerLoginLinkDep = Annotated[
+    RequestCustomerLoginLinkUseCase, Depends(get_request_customer_login_link)
+]
+GetCustomerLoginStatusDep = Annotated[
+    GetCustomerLoginStatusUseCase, Depends(get_customer_login_status)
+]
 LoginDep = Annotated[LoginUseCase, Depends(get_login)]
 CreateEmployeeDep = Annotated[CreateEmployeeUseCase, Depends(get_create_employee)]
 UpdateEmployeeDep = Annotated[UpdateEmployeeUseCase, Depends(get_update_employee)]
@@ -328,10 +404,15 @@ ListEmployeesDep = Annotated[ListEmployeesUseCase, Depends(get_list_employees)]
 GetShopDep = Annotated[GetShopUseCase, Depends(get_shop)]
 CreateProductDep = Annotated[CreateProductUseCase, Depends(get_create_product)]
 UpdateProductDep = Annotated[UpdateProductUseCase, Depends(get_update_product)]
+DeleteProductDep = Annotated[DeleteProductUseCase, Depends(get_delete_product)]
 CreateUnitDep = Annotated[CreateUnitUseCase, Depends(get_create_unit)]
 CreateCategoryDep = Annotated[CreateCategoryUseCase, Depends(get_create_category)]
 ImportProductsDep = Annotated[ImportProductsUseCase, Depends(get_import_products)]
 PreviewImportProductsDep = Annotated[PreviewProductsUseCase, Depends(get_preview_import_products)]
+GenerateProductDescriptionDep = Annotated[
+    GenerateProductDescriptionUseCase, Depends(get_generate_product_description)
+]
+GenerateBarcodeDep = Annotated[GenerateBarcodeUseCase, Depends(get_generate_barcode)]
 ApplyImportProductsDep = Annotated[ApplyProductImportUseCase, Depends(get_apply_import_products)]
 ListUnitsDep = Annotated[ListUnitsUseCase, Depends(get_list_units)]
 ListCategoriesDep = Annotated[ListCategoriesUseCase, Depends(get_list_categories)]
@@ -343,6 +424,12 @@ GetProductsExportDataDep = Annotated[
     GetProductsExportDataUseCase, Depends(get_products_export_data)
 ]
 SetProductPhotoDep = Annotated[SetProductPhotoUseCase, Depends(get_set_product_photo)]
+AddStorefrontPhotoDep = Annotated[
+    AddStorefrontPhotoUseCase, Depends(get_add_storefront_photo)
+]
+SetStorefrontPhotosDep = Annotated[
+    SetStorefrontPhotosUseCase, Depends(get_set_storefront_photos)
+]
 ReceiveGoodsDep = Annotated[ReceiveGoodsUseCase, Depends(get_receive_goods)]
 WriteOffDep = Annotated[WriteOffUseCase, Depends(get_write_off)]
 TransferDep = Annotated[TransferUseCase, Depends(get_transfer)]
@@ -354,6 +441,7 @@ SetWarehouseAssignmentsDep = Annotated[
 UpdateWarehouseDetailsDep = Annotated[
     UpdateWarehouseDetailsUseCase, Depends(get_update_warehouse_details)
 ]
+SetWarehousePhotoDep = Annotated[SetWarehousePhotoUseCase, Depends(get_set_warehouse_photo)]
 ListWarehousesDep = Annotated[ListWarehousesUseCase, Depends(get_list_warehouses)]
 ListStockDep = Annotated[ListStockUseCase, Depends(get_list_stock)]
 ListDocumentsDep = Annotated[ListDocumentsUseCase, Depends(get_list_documents)]
@@ -385,6 +473,7 @@ ListClientDebtsDep = Annotated[ListClientDebtsUseCase, Depends(get_list_client_d
 ListSupplierDebtsDep = Annotated[ListSupplierDebtsUseCase, Depends(get_list_supplier_debts)]
 GetDebtDep = Annotated[GetDebtUseCase, Depends(get_debt)]
 GetDebtHistoryDep = Annotated[GetDebtHistoryUseCase, Depends(get_debt_history)]
+GetDebtReceiptDataDep = Annotated[GetDebtReceiptDataUseCase, Depends(get_debt_receipt_data)]
 CreateOrderDep = Annotated[CreateOrderUseCase, Depends(get_create_order)]
 UpdateOrderDep = Annotated[UpdateOrderUseCase, Depends(get_update_order)]
 ChangeOrderStatusDep = Annotated[ChangeOrderStatusUseCase, Depends(get_change_order_status)]
@@ -411,6 +500,7 @@ GetStockValueDep = Annotated[GetStockValueUseCase, Depends(get_stock_value)]
 GetRestockRecommendationsDep = Annotated[
     GetRestockRecommendationsUseCase, Depends(get_restock_recommendations)
 ]
+GetMissedSalesDep = Annotated[GetMissedSalesUseCase, Depends(get_missed_sales)]
 ApplyOfflineSalesDep = Annotated[
     ApplyOfflineSalesUseCase, Depends(get_apply_offline_sales)
 ]
@@ -443,6 +533,9 @@ GetStorefrontProductDep = Annotated[
 ]
 GetStorefrontRequestStatusDep = Annotated[
     GetStorefrontRequestStatusUseCase, Depends(get_storefront_request_status)
+]
+ListMyStorefrontRequestsDep = Annotated[
+    ListMyStorefrontRequestsUseCase, Depends(get_list_my_storefront_requests)
 ]
 CreateStorefrontRequestDep = Annotated[
     CreateStorefrontRequestUseCase, Depends(get_create_storefront_request)

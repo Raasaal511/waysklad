@@ -24,6 +24,11 @@ from app.infrastructure.db.models.catalog import (
     ProductVariantModel,
     UnitModel,
 )
+from app.infrastructure.db.models.inventory import StockDocumentLineModel
+from app.infrastructure.db.models.orders import OrderLineModel
+from app.infrastructure.db.models.sales import SaleLineModel
+from app.infrastructure.db.models.storefront import StorefrontRequestLineModel
+from app.infrastructure.db.models.tasks import TaskModel
 from app.infrastructure.db.repositories.base import SqlAlchemyRepository
 
 
@@ -133,6 +138,45 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
         if model is None:
             raise NotFoundError(f"Товар {product_id} не найден")
         return ProductMapper.to_entity(model, await self._units_map())
+
+    async def deactivate(self, product_id: int) -> None:
+        model = await self._get_model(product_id)
+        if model is None:
+            raise NotFoundError(f"Товар {product_id} не найден")
+        model.is_active = False
+        await self._session.flush()
+
+    async def delete(self, product_id: int) -> None:
+        model = await self._get_model(product_id)
+        if model is None:
+            raise NotFoundError(f"Товар {product_id} не найден")
+        await self._session.delete(model)
+        await self._session.flush()
+
+    async def has_activity(self, product_id: int) -> bool:
+        checks = (
+            select(SaleLineModel.id).where(
+                SaleLineModel.tenant_id == self._tenant, SaleLineModel.product_id == product_id
+            ),
+            select(OrderLineModel.id).where(
+                OrderLineModel.tenant_id == self._tenant, OrderLineModel.product_id == product_id
+            ),
+            select(StorefrontRequestLineModel.id).where(
+                StorefrontRequestLineModel.tenant_id == self._tenant,
+                StorefrontRequestLineModel.product_id == product_id,
+            ),
+            select(StockDocumentLineModel.id).where(
+                StockDocumentLineModel.tenant_id == self._tenant,
+                StockDocumentLineModel.product_id == product_id,
+            ),
+            select(TaskModel.id).where(
+                TaskModel.tenant_id == self._tenant, TaskModel.product_id == product_id
+            ),
+        )
+        for query in checks:
+            if (await self._session.execute(query.limit(1))).first() is not None:
+                return True
+        return False
 
     def _search_filter(self, query: str, category_id: int | None = None):
         pattern = f"%{query}%"

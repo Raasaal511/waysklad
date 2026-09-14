@@ -10,6 +10,9 @@ from app.application.storefront.create_request import (
     StorefrontRequestItemInput,
 )
 from app.domain.common.exceptions import DomainError
+from app.domain.common.phone import Phone
+from app.domain.customers.entities import Customer
+from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.telegram_bot.formatting import confirmation_text, quantity_prompt_text
 from app.infrastructure.telegram_bot.keyboards import (
     confirm_keyboard,
@@ -44,8 +47,8 @@ async def adjust_quantity(callback: CallbackQuery, state: FSMContext) -> None:
 async def ask_phone(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(StorefrontFlow.entering_phone)
     await callback.message.answer(
-        "Оставьте номер телефона, чтобы магазин мог с вами связаться "
-        "(или нажмите «Пропустить», если не хотите указывать):",
+        "Укажите номер телефона, чтобы магазин мог с вами связаться — он же "
+        "используется для входа в аккаунт покупателя:",
         reply_markup=phone_request_keyboard(),
     )
     await callback.answer()
@@ -53,19 +56,21 @@ async def ask_phone(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(StorefrontFlow.entering_phone, F.contact)
 async def phone_from_contact(message: Message, state: FSMContext) -> None:
-    await state.update_data(phone=message.contact.phone_number)
-    await _ask_name(message, state)
-
-
-@router.message(StorefrontFlow.entering_phone, F.text.lower() == "пропустить")
-async def skip_phone(message: Message, state: FSMContext) -> None:
-    await state.update_data(phone="")
-    await _ask_name(message, state)
+    await _phone_entered(message.contact.phone_number, message, state)
 
 
 @router.message(StorefrontFlow.entering_phone)
 async def phone_as_text(message: Message, state: FSMContext) -> None:
-    await state.update_data(phone=message.text.strip())
+    await _phone_entered(message.text.strip(), message, state)
+
+
+async def _phone_entered(raw_phone: str, message: Message, state: FSMContext) -> None:
+    try:
+        phone = Phone(raw_phone)
+    except DomainError:
+        await message.answer("Не удалось распознать номер телефона, попробуйте ещё раз.")
+        return
+    await state.update_data(phone=str(phone))
     await _ask_name(message, state)
 
 
@@ -97,16 +102,33 @@ async def cancel(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
 
 
+async def _get_or_create_customer(phone: Phone, chat_id: str, session_factory) -> Customer:
+    uow = SqlAlchemyUnitOfWork(None, session_factory=session_factory)
+    async with uow:
+        customer = await uow.customers.get_by_phone(str(phone))
+        if customer is None:
+            customer = Customer(id=None, phone=phone, telegram_chat_id=chat_id)
+            await uow.customers.add(customer)
+        elif customer.telegram_chat_id != chat_id:
+            customer.telegram_chat_id = chat_id
+            await uow.customers.save(customer)
+        await uow.commit()
+    return customer
+
+
 @router.callback_query(StorefrontFlow.confirming, F.data == "confirm:yes")
 async def confirm(callback: CallbackQuery, state: FSMContext, session_factory) -> None:
     data = await state.get_data()
+    customer = await _get_or_create_customer(
+        Phone(data["phone"]), str(callback.from_user.id), session_factory
+    )
     use_case = CreateStorefrontRequestUseCase(session_factory)
     try:
         request = await use_case.execute(
             CreateStorefrontRequestCommand(
                 slug=data["slug"],
+                customer_id=customer.id,
                 customer_name=data["customer_name"],
-                customer_phone=data.get("phone", ""),
                 customer_telegram_chat_id=str(callback.from_user.id),
                 items=[
                     StorefrontRequestItemInput(

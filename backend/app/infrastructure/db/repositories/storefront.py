@@ -62,6 +62,24 @@ class SqlAlchemyStorefrontRequestRepository(SqlAlchemyRepository, IStorefrontReq
         entity.tenant_id = model.tenant_id
         return entity
 
+    async def list_by_customer(self, customer_id: int) -> list[StorefrontRequest]:
+        # без tenant-фильтра: покупатель — сущность платформы, его заявки
+        # могут лежать в разных магазинах разом (тот же смысл, что у
+        # get_by_token — доступ доказан не принадлежностью к tenant'у сессии)
+        models = (
+            await self._session.execute(
+                select(StorefrontRequestModel)
+                .where(StorefrontRequestModel.customer_id == customer_id)
+                .order_by(StorefrontRequestModel.created_at.desc())
+            )
+        ).scalars().all()
+        entities = []
+        for m in models:
+            entity = StorefrontRequestMapper.to_entity(m)
+            entity.tenant_id = m.tenant_id
+            entities.append(entity)
+        return entities
+
     async def list_new(self) -> list[StorefrontRequest]:
         models = (
             await self._session.execute(

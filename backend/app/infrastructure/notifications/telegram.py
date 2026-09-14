@@ -2,7 +2,7 @@
 
 Запуск по расписанию — см. app.infrastructure.scheduler (сервис scheduler
 в docker-compose.prod.yml). Ручной разовый запуск ежедневной сводки:
-    docker compose exec backend python -m app.infrastructure.telegram
+    docker compose exec backend python -m app.infrastructure.notifications.telegram
 """
 
 import asyncio
@@ -17,7 +17,7 @@ from app.domain.identity.entities import Tenant
 from app.domain.sales.entities import Sale
 from app.infrastructure.config import settings
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
-from app.infrastructure.summary_export import render_summary_xlsx
+from app.infrastructure.export.summary_export import render_summary_xlsx
 
 _PERIOD_FILENAME = {
     SummaryPeriod.DAY: "сводка-за-день.xlsx",

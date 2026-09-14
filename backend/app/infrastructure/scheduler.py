@@ -11,13 +11,14 @@ import traceback
 from calendar import monthrange
 from datetime import datetime, timezone
 
+from app.application.customers.cleanup_login_links import cleanup_customer_login_links
 from app.application.debts.notify_due_debts import notify_due_debts
 from app.application.inventory.notify_low_stock import notify_low_stock
 from app.application.storefront.release_expired_reservations import (
     release_expired_storefront_reservations,
 )
 from app.domain.analytics.period import SummaryPeriod
-from app.infrastructure.telegram import MSK_OFFSET, send_summaries_for
+from app.infrastructure.notifications.telegram import MSK_OFFSET, send_summaries_for
 
 CHECK_INTERVAL_SECONDS = 15 * 60  # проверка — раз в 15 минут
 
@@ -57,6 +58,10 @@ def main() -> None:
         if ("storefront_reservations", hour_key) not in sent_hours:
             _run_safely("release_expired_storefront_reservations", release_expired_storefront_reservations)
             sent_hours.add(("storefront_reservations", hour_key))
+
+        if ("customer_login_links", hour_key) not in sent_hours:
+            _run_safely("cleanup_customer_login_links", cleanup_customer_login_links)
+            sent_hours.add(("customer_login_links", hour_key))
 
         if (SummaryPeriod.DAY, hour_key) not in sent_hours:
             _run_safely("send_summaries[day]", lambda: send_summaries_for(SummaryPeriod.DAY, now))

@@ -137,6 +137,7 @@ class WarehouseResponse(BaseModel):
     address: str
     assigned_user_ids: list[int]
     show_on_storefront: bool
+    photo: str
 
     @classmethod
     def from_entity(cls, warehouse: Warehouse) -> "WarehouseResponse":
@@ -144,6 +145,7 @@ class WarehouseResponse(BaseModel):
             id=warehouse.id, name=warehouse.name, address=warehouse.address,
             assigned_user_ids=warehouse.assigned_user_ids,
             show_on_storefront=warehouse.show_on_storefront,
+            photo=warehouse.photo,
         )
 
 

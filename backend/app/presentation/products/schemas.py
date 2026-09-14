@@ -11,6 +11,10 @@ from app.application.products.apply_import import (
 from app.application.products.create_category import CreateCategoryCommand
 from app.application.products.create_product import CreateProductCommand, VariantInput
 from app.application.products.create_unit import CreateUnitCommand
+from app.application.products.generate_barcode import GenerateBarcodeResult
+from app.application.products.generate_description import (
+    GenerateProductDescriptionResult,
+)
 from app.application.products.import_excel import ImportProductsResult, RowError
 from app.application.products.import_preview import PreviewProductsResult, PreviewRow
 from app.application.products.update_product import (
@@ -80,6 +84,7 @@ class ProductCreateRequest(BaseModel):
     barcode: str | None = None
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
+    description: str = ""
     show_on_storefront: bool = False
     storefront_min_qty: Decimal | None = None
     storefront_step_qty: Decimal | None = None
@@ -97,6 +102,7 @@ class ProductCreateRequest(BaseModel):
             barcode=self.barcode,
             category_id=self.category_id,
             min_stock=self.min_stock,
+            description=self.description,
             show_on_storefront=self.show_on_storefront,
             storefront_min_qty=self.storefront_min_qty,
             storefront_step_qty=self.storefront_step_qty,
@@ -119,6 +125,7 @@ class ProductUpdateRequest(BaseModel):
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
     photo: str = ""
+    description: str = ""
     show_on_storefront: bool = False
     storefront_min_qty: Decimal | None = None
     storefront_step_qty: Decimal | None = None
@@ -136,6 +143,7 @@ class ProductUpdateRequest(BaseModel):
             category_id=self.category_id,
             min_stock=self.min_stock,
             photo=self.photo,
+            description=self.description,
             show_on_storefront=self.show_on_storefront,
             storefront_min_qty=self.storefront_min_qty,
             storefront_step_qty=self.storefront_step_qty,
@@ -339,6 +347,28 @@ class ApplyImportResponse(BaseModel):
         )
 
 
+class GenerateBarcodeResponse(BaseModel):
+    barcode: str
+
+    @classmethod
+    def from_result(cls, result: GenerateBarcodeResult) -> "GenerateBarcodeResponse":
+        return cls(barcode=result.barcode)
+
+
+class SetStorefrontPhotosRequest(BaseModel):
+    photos: list[str] = []
+
+
+class GenerateDescriptionResponse(BaseModel):
+    description: str
+
+    @classmethod
+    def from_result(
+        cls, result: GenerateProductDescriptionResult
+    ) -> "GenerateDescriptionResponse":
+        return cls(description=result.description)
+
+
 class VariantResponse(BaseModel):
     id: int
     size: str
@@ -358,6 +388,8 @@ class ProductResponse(BaseModel):
     category_id: int | None
     min_stock: Decimal
     photo: str
+    description: str
+    storefront_photos: list[str]
     show_on_storefront: bool
     storefront_min_qty: Decimal | None
     storefront_step_qty: Decimal | None
@@ -377,6 +409,8 @@ class ProductResponse(BaseModel):
             category_id=product.category_id,
             min_stock=product.min_stock,
             photo=product.photo,
+            description=product.description,
+            storefront_photos=list(product.storefront_photos),
             show_on_storefront=product.show_on_storefront,
             storefront_min_qty=product.storefront_min_qty,
             storefront_step_qty=product.storefront_step_qty,

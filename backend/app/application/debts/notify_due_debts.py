@@ -67,7 +67,7 @@ async def _run_async(notifier: INotifier) -> None:
 
 
 def notify_due_debts() -> None:
-    from app.infrastructure.telegram import TelegramNotifier
+    from app.infrastructure.notifications.telegram import TelegramNotifier
 
     asyncio.run(_run_async(TelegramNotifier()))
 

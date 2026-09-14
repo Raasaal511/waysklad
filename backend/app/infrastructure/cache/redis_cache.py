@@ -8,7 +8,7 @@ from redis.exceptions import TimeoutError as RedisTimeoutError
 from redis.retry import Retry
 
 from app.domain.common.cache import ICache
-from app.infrastructure.logging import get_logger
+from app.infrastructure.observability.logging import get_logger
 
 _logger = get_logger("app.cache")
 

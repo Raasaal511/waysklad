@@ -1,10 +1,12 @@
 import asyncio
 
+from decimal import Decimal
+
 from app.domain.common.notifier import INotifier
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.entities import Role
 from app.domain.notifications.entities import Notification, NotificationKind
-from app.infrastructure.ws_broadcast import broadcaster, user_channel
+from app.infrastructure.notifications.ws_broadcast import broadcaster, user_channel
 
 
 async def notify_user(
@@ -16,11 +18,15 @@ async def notify_user(
     text: str,
     link: str = "",
     entity_id: int | None = None,
+    snapshot_value: Decimal | None = None,
 ) -> None:
     """In-app уведомление — всем; WebSocket-push — всем с открытым соединением;
     Telegram — только владельцу (один чат на магазин)."""
     saved = await uow.notifications.add(
-        Notification(id=None, user_id=user_id, kind=kind, text=text, link=link, entity_id=entity_id)
+        Notification(
+            id=None, user_id=user_id, kind=kind, text=text, link=link,
+            entity_id=entity_id, snapshot_value=snapshot_value,
+        )
     )
     try:
         await broadcaster.publish(

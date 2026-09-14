@@ -7,11 +7,11 @@ from app.application.admin.get_server_status import ServerStatusResult, get_serv
 from app.application.admin.get_tenant_detail import get_tenant_detail
 from app.application.admin.list_tenants import list_tenants
 from app.application.admin.set_tenant_suspended import set_tenant_suspended
-from app.infrastructure.cache_aside import cached
+from app.infrastructure.cache.cache_aside import cached
 from app.infrastructure.config import settings
 from app.infrastructure.rate_limit import limiter
 from app.infrastructure.security import create_admin_access_token, verify_password
-from app.infrastructure.ws_broadcast import broadcaster
+from app.infrastructure.notifications.ws_broadcast import broadcaster
 from app.presentation.admin.schemas import (
     AdminLoginRequest,
     AdminTokenResponse,
