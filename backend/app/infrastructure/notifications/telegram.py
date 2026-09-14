@@ -40,6 +40,24 @@ class TelegramNotifier:
             timeout=10,
         )
 
+    def send_with_buttons(
+        self, chat_id: str, text: str, buttons: list[tuple[str, str]]
+    ) -> None:
+        httpx.post(
+            f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage",
+            json={
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "reply_markup": {
+                    "inline_keyboard": [
+                        [{"text": label, "callback_data": data}] for label, data in buttons
+                    ]
+                },
+            },
+            timeout=10,
+        )
+
     def send_document(self, chat_id: str, filename: str, content: bytes, caption: str = "") -> None:
         httpx.post(
             f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendDocument",

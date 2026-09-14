@@ -70,6 +70,14 @@ class SqlAlchemyTenantRepository(SqlAlchemyRepository, ITenantRepository):
         ).scalar_one_or_none()
         return TenantMapper.to_entity(model) if model else None
 
+    async def get_by_owner_chat_id(self, chat_id: str) -> Tenant | None:
+        model = (
+            await self._session.execute(
+                select(TenantModel).where(TenantModel.owner_telegram_chat_id == chat_id)
+            )
+        ).scalar_one_or_none()
+        return TenantMapper.to_entity(model) if model else None
+
     async def list_all(self) -> list[Tenant]:
         models = (await self._session.execute(select(TenantModel))).scalars()
         return [TenantMapper.to_entity(m) for m in models]

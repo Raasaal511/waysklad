@@ -51,6 +51,18 @@ async def notify_user(
     if not tenant.owner_telegram_chat_id:
         return
     try:
-        await asyncio.to_thread(notifier.send, tenant.owner_telegram_chat_id, text)
+        if kind is NotificationKind.STOREFRONT_REQUEST_NEW and entity_id is not None:
+            # "Принять" не влезает в одну кнопку (нужен выбор склада и даты
+            # готовности) — остаётся через панель; "Отклонить" однозначно,
+            # можно прямо в чате. Кто не подключил Telegram — работает как
+            # раньше, целиком через панель, эта кнопка только ускоряет путь.
+            await asyncio.to_thread(
+                notifier.send_with_buttons,
+                tenant.owner_telegram_chat_id,
+                text,
+                [("❌ Отклонить заявку", f"reject_request:{entity_id}")],
+            )
+        else:
+            await asyncio.to_thread(notifier.send, tenant.owner_telegram_chat_id, text)
     except Exception:
         pass  # уведомление не должно валить бизнес-операцию
