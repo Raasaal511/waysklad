@@ -33,7 +33,10 @@ services:
       # кеш read-моделей витрины/маркетплейса — тот же Redis, что в проде
       # (см. docker-compose.prod.yml), отдельная логическая БД
       CACHE_REDIS_URL: redis://redis:6379/2
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # alembic upgrade head перед стартом — без этого шага схема БД может
+    # отстать от ORM-моделей после git pull (см. 2026-09-14: 8 неприменённых
+    # миграций → "column products.description does not exist")
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - ./backend:/app
     ports:
@@ -63,11 +66,15 @@ services:
     build: ./backend
     image: waysklad-backend-dev
     env_file: .env
+    environment:
+      CACHE_REDIS_URL: redis://redis:6379/2
     command: python -m app.infrastructure.telegram_bot.bot
     volumes:
       - ./backend:/app
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
