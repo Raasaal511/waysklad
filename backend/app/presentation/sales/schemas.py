@@ -74,6 +74,7 @@ class SaleResponse(BaseModel):
     payment_method: PaymentMethod
     subtotal: Decimal
     discount: Decimal
+    prepayment: Decimal  # предоплата, уже полученная раньше (продажа из выдачи заказа)
     total: Decimal
     change: Decimal | None  # сдача, реально выданная на руки
     cash_received: Decimal | None  # сколько внёс клиент наличными
@@ -105,6 +106,7 @@ class SaleResponse(BaseModel):
             payment_method=sale.payment_method,
             subtotal=sale.subtotal.amount,
             discount=sale.discount.amount,
+            prepayment=sale.prepayment.amount,
             total=sale.total.amount,
             change=change,
             cash_received=sale.cash_received.amount if sale.cash_received is not None else None,

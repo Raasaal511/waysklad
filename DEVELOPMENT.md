@@ -5,7 +5,7 @@
 ```
 cp .env.example .env      # заполнить SECRET_KEY и т.п.
 docker compose up -d
-docker compose exec backend alembic upgrade head   # только при первом запуске / новом volume
+docker compose exec backend alembic upgrade head   # при первом запуске и после каждой новой миграции
 ```
 
 - Фронтенд (Vite dev-сервер с hot-reload): http://localhost:5173
@@ -23,14 +23,19 @@ docker compose exec backend alembic upgrade head   # только при пер�
 
 ```
 docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml exec backend alembic upgrade head   # первый запуск
+docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
 ```
+
+`alembic upgrade head` идемпотентен — выполнять его нужно при **каждом**
+деплое с новыми миграциями, не только при первом запуске (через CI/CD это
+делается автоматически, см. `.github/workflows/ci.yml`, job `deploy`; при
+ручном деплое — не забыть этот шаг).
 
 Единственная точка входа — порт 80 (сервис `frontend`): nginx раздаёт собранную
 статику React-приложения и проксирует `/api` и `/uploads` на `backend`.
 `backend` и `db` портов наружу не публикуют.
 
-## После добавления новой Alembic-миграции
+## После добавления новой Alembic-миграции (dev)
 
 ```
 docker compose exec backend alembic upgrade head

@@ -27,6 +27,9 @@ class SaleModel(Base, TenantMixin, TimestampMixin):
     client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"))
     payment_method: Mapped[PaymentMethod] = mapped_column(PaymentMethodColumn)
     discount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    # уже полученная ранее предоплата (заказ) — уменьшает total, не revenue;
+    # отдельно от discount, см. Sale.prepayment в домене
+    prepayment: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)  # снимок суммы чека
     client_op_id: Mapped[str | None] = mapped_column(String(64))
     note: Mapped[str] = mapped_column(Text, default="")

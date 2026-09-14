@@ -57,7 +57,7 @@ async def test_storefront_catalog_via_api(client, owner_headers):
     assert "margin" not in product
     assert set(product.keys()) == {
         "id", "name", "retail_price", "photo", "category_id", "in_stock",
-        "min_order_qty", "order_step_qty",
+        "min_order_qty", "order_step_qty", "sold_count",
     }
 
     response = await client.get(f"/api/storefront/{slug}", params={"query": "Скрытый"})

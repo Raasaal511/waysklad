@@ -72,6 +72,13 @@ services:
   scheduler:
     image: waysklad-backend-prod
     env_file: .env
+    environment:
+      # тот же набор, что у backend (см. комментарии там) — импорт app/
+      # тянет за собой deps/cache.py, который требует CACHE_REDIS_URL уже
+      # на старте процесса, даже если сам scheduler кеш не использует напрямую
+      RATE_LIMIT_STORAGE_URI: redis://:${REDIS_PASSWORD}@redis:6379/0
+      NOTIFICATIONS_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      CACHE_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
     command: python -m app.infrastructure.scheduler
     volumes:
       - uploads_data:/app/uploads
@@ -79,14 +86,22 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
   storefront_bot:
     image: waysklad-backend-prod
     env_file: .env
+    environment:
+      RATE_LIMIT_STORAGE_URI: redis://:${REDIS_PASSWORD}@redis:6379/0
+      NOTIFICATIONS_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      CACHE_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
     command: python -m app.infrastructure.telegram_bot.bot
     restart: unless-stopped
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
 volumes:

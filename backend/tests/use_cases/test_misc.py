@@ -32,6 +32,8 @@ from app.domain.common.exceptions import (
     NotFoundError,
 )
 from app.domain.common.money import Money
+from app.domain.common.phone import Phone
+from app.domain.customers.entities import Customer
 from app.infrastructure.db.models.storefront import StorefrontRequestModel
 
 
@@ -139,9 +141,16 @@ async def test_release_expired_storefront_reservations_frees_stale_reserve(
         ),
     )
 
+    async with make_uow() as public_uow:
+        customer = await public_uow.customers.add(
+            Customer(id=None, phone=Phone("+79991234567"))
+        )
+        await public_uow.commit()
+
     request = await CreateStorefrontRequestUseCase(db_session_factory).execute(
         CreateStorefrontRequestCommand(
             slug=tenant.slug,
+            customer_id=customer.id,
             customer_name="Клиент",
             items=[StorefrontRequestItemInput(product_id=product.id, quantity=Decimal("5"))],
         )

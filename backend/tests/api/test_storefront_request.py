@@ -1,8 +1,9 @@
 from datetime import date, timedelta
 
 
-async def test_storefront_request_full_flow_via_api(client, owner_headers):
+async def test_storefront_request_full_flow_via_api(client, owner_headers, customer_headers):
     slug = "magazin-berkat"
+    buyer_headers, buyer_phone = await customer_headers()
     await client.patch(
         "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
     )
@@ -25,12 +26,12 @@ async def test_storefront_request_full_flow_via_api(client, owner_headers):
     )
     assert response.status_code == 201, response.text
 
-    # публичная заявка — без авторизации
+    # заявка от авторизованного покупателя
     response = await client.post(
         f"/api/storefront/{slug}/requests",
+        headers=buyer_headers,
         json={
             "customer_name": "Ахмед",
-            "customer_phone": "+79280001122",
             "note": "Хочу два, если есть скидка — напишите",
             "items": [{"product_id": product["id"], "quantity": "2"}],
         },
@@ -63,11 +64,11 @@ async def test_storefront_request_full_flow_via_api(client, owner_headers):
     assert order["lines"][0]["product_id"] == product["id"]
     assert order["lines"][0]["price"] == "120.00"  # цена взята из актуального retail_price
 
-    # клиент создан по имени+телефону из заявки
+    # клиент создан по имени+телефону из заявки (телефон — из аккаунта покупателя)
     response = await client.get("/api/counterparties/clients", headers=owner_headers, params={"query": "Ахмед"})
     assert response.status_code == 200, response.text
     clients = response.json()
-    assert any(c["phone"] == "+79280001122" for c in clients)
+    assert any(c["phone"] == buyer_phone for c in clients)
 
     # повторно принять ту же заявку нельзя
     response = await client.post(
@@ -77,12 +78,12 @@ async def test_storefront_request_full_flow_via_api(client, owner_headers):
     )
     assert response.status_code == 400, response.text
 
-    # повторная заявка с тем же телефоном не плодит второго клиента
+    # повторная заявка с того же аккаунта не плодит второго клиента
     response = await client.post(
         f"/api/storefront/{slug}/requests",
+        headers=buyer_headers,
         json={
             "customer_name": "Ахмед",
-            "customer_phone": "+79280001122",
             "items": [{"product_id": product["id"], "quantity": "1"}],
         },
     )
@@ -98,13 +99,14 @@ async def test_storefront_request_full_flow_via_api(client, owner_headers):
     assert second_order["client_id"] == order["client_id"]  # тот же клиент, не дубль
 
     response = await client.get("/api/counterparties/clients", headers=owner_headers, params={"query": "Ахмед"})
-    assert sum(1 for c in response.json() if c["phone"] == "+79280001122") == 1
+    assert sum(1 for c in response.json() if c["phone"] == buyer_phone) == 1
 
 
-async def test_storefront_request_rejects_unknown_variant_via_api(client, owner_headers):
+async def test_storefront_request_rejects_unknown_variant_via_api(client, owner_headers, customer_headers):
     """variant_id в заявке должен принадлежать указанному товару — иначе
     заявка тихо приняла бы ссылку на несуществующий/чужой вариант."""
     slug = "magazin-berkat"
+    buyer_headers, _ = await customer_headers()
     await client.patch(
         "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
     )
@@ -141,6 +143,7 @@ async def test_storefront_request_rejects_unknown_variant_via_api(client, owner_
     # вариант, принадлежащий ДРУГОМУ товару — отклонено
     response = await client.post(
         f"/api/storefront/{slug}/requests",
+        headers=buyer_headers,
         json={
             "customer_name": "Покупатель",
             "items": [
@@ -153,6 +156,7 @@ async def test_storefront_request_rejects_unknown_variant_via_api(client, owner_
     # несуществующий variant_id — отклонено
     response = await client.post(
         f"/api/storefront/{slug}/requests",
+        headers=buyer_headers,
         json={
             "customer_name": "Покупатель",
             "items": [{"product_id": product_with_variant["id"], "quantity": "1", "variant_id": 999999}],
@@ -163,6 +167,7 @@ async def test_storefront_request_rejects_unknown_variant_via_api(client, owner_
     # правильный вариант этого же товара — принято
     response = await client.post(
         f"/api/storefront/{slug}/requests",
+        headers=buyer_headers,
         json={
             "customer_name": "Покупатель",
             "items": [
@@ -173,8 +178,9 @@ async def test_storefront_request_rejects_unknown_variant_via_api(client, owner_
     assert response.status_code == 201, response.text
 
 
-async def test_storefront_request_reject_via_api(client, owner_headers):
+async def test_storefront_request_reject_via_api(client, owner_headers, customer_headers):
     slug = "magazin-berkat"
+    buyer_headers, _ = await customer_headers()
     await client.patch(
         "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
     )
@@ -188,6 +194,7 @@ async def test_storefront_request_reject_via_api(client, owner_headers):
     request = (
         await client.post(
             f"/api/storefront/{slug}/requests",
+            headers=buyer_headers,
             json={"customer_name": "Тест", "items": [{"product_id": product["id"], "quantity": "1"}]},
         )
     ).json()
@@ -214,16 +221,19 @@ async def test_storefront_request_reject_via_api(client, owner_headers):
     ).json()
     response = await client.post(
         f"/api/storefront/{slug}/requests",
+        headers=buyer_headers,
         json={"customer_name": "Тест", "items": [{"product_id": hidden["id"], "quantity": "1"}]},
     )
     assert response.status_code == 400, response.text
 
 
-async def test_storefront_request_reserves_stock_via_api(client, owner_headers):
+async def test_storefront_request_reserves_stock_via_api(client, owner_headers, customer_headers):
     """Заявка сразу резервирует остаток — следующая заявка на весь оставшийся
     остаток должна увидеть недостаточность и пометить это флагом, а не тихо
     принять невозможный заказ."""
     slug = "magazin-berkat"
+    first_buyer, _ = await customer_headers()
+    second_buyer, _ = await customer_headers()
     await client.patch(
         "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
     )
@@ -250,6 +260,7 @@ async def test_storefront_request_reserves_stock_via_api(client, owner_headers):
     first = (
         await client.post(
             f"/api/storefront/{slug}/requests",
+            headers=first_buyer,
             json={"customer_name": "Первый", "items": [{"product_id": product["id"], "quantity": "5"}]},
         )
     ).json()
@@ -259,6 +270,7 @@ async def test_storefront_request_reserves_stock_via_api(client, owner_headers):
     second = (
         await client.post(
             f"/api/storefront/{slug}/requests",
+            headers=second_buyer,
             json={"customer_name": "Второй", "items": [{"product_id": product["id"], "quantity": "1"}]},
         )
     ).json()
@@ -271,8 +283,10 @@ async def test_storefront_request_reserves_stock_via_api(client, owner_headers):
     assert kinds.count("storefront_request_new") == 2
 
 
-async def test_storefront_request_accept_does_not_double_reserve_via_api(client, owner_headers):
+async def test_storefront_request_accept_does_not_double_reserve_via_api(client, owner_headers, customer_headers):
     slug = "magazin-berkat"
+    first_buyer, _ = await customer_headers()
+    second_buyer, _ = await customer_headers()
     await client.patch(
         "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
     )
@@ -297,6 +311,7 @@ async def test_storefront_request_accept_does_not_double_reserve_via_api(client,
     request = (
         await client.post(
             f"/api/storefront/{slug}/requests",
+            headers=first_buyer,
             json={"customer_name": "Клиент", "items": [{"product_id": product["id"], "quantity": "3"}]},
         )
     ).json()
@@ -315,6 +330,7 @@ async def test_storefront_request_accept_does_not_double_reserve_via_api(client,
     third = (
         await client.post(
             f"/api/storefront/{slug}/requests",
+            headers=second_buyer,
             json={"customer_name": "Третий", "items": [{"product_id": product["id"], "quantity": "1"}]},
         )
     ).json()
@@ -322,8 +338,10 @@ async def test_storefront_request_accept_does_not_double_reserve_via_api(client,
     assert third["insufficient_stock_at_request"] is True
 
 
-async def test_storefront_request_reject_releases_reservation_via_api(client, owner_headers):
+async def test_storefront_request_reject_releases_reservation_via_api(client, owner_headers, customer_headers):
     slug = "magazin-berkat"
+    first_buyer, _ = await customer_headers()
+    second_buyer, _ = await customer_headers()
     await client.patch(
         "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
     )
@@ -348,6 +366,7 @@ async def test_storefront_request_reject_releases_reservation_via_api(client, ow
     request = (
         await client.post(
             f"/api/storefront/{slug}/requests",
+            headers=first_buyer,
             json={"customer_name": "Клиент", "items": [{"product_id": product["id"], "quantity": "2"}]},
         )
     ).json()
@@ -362,14 +381,16 @@ async def test_storefront_request_reject_releases_reservation_via_api(client, ow
     after_reject = (
         await client.post(
             f"/api/storefront/{slug}/requests",
+            headers=second_buyer,
             json={"customer_name": "Второй", "items": [{"product_id": product["id"], "quantity": "2"}]},
         )
     ).json()
     assert after_reject["insufficient_stock_at_request"] is False
 
 
-async def test_storefront_chat_rest_via_api(client, owner_headers):
+async def test_storefront_chat_rest_via_api(client, owner_headers, customer_headers):
     slug = "magazin-berkat"
+    buyer_headers, _ = await customer_headers()
     await client.patch(
         "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
     )
@@ -383,6 +404,7 @@ async def test_storefront_chat_rest_via_api(client, owner_headers):
     created = (
         await client.post(
             f"/api/storefront/{slug}/requests",
+            headers=buyer_headers,
             json={"customer_name": "Ахмед", "items": [{"product_id": product["id"], "quantity": "1"}]},
         )
     ).json()
@@ -433,12 +455,13 @@ async def test_storefront_chat_rest_via_api(client, owner_headers):
     assert response.status_code in (401, 403), response.text
 
 
-async def test_storefront_chat_websocket_via_api(client, owner_headers):
+async def test_storefront_chat_websocket_via_api(client, owner_headers, customer_headers):
     from starlette.testclient import TestClient
 
     from app.main import app as fastapi_app
 
     slug = "magazin-berkat"
+    buyer_headers, _ = await customer_headers()
     await client.patch(
         "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
     )
@@ -452,6 +475,7 @@ async def test_storefront_chat_websocket_via_api(client, owner_headers):
     created = (
         await client.post(
             f"/api/storefront/{slug}/requests",
+            headers=buyer_headers,
             json={"customer_name": "Ахмед", "items": [{"product_id": product["id"], "quantity": "1"}]},
         )
     ).json()
@@ -471,8 +495,9 @@ async def test_storefront_chat_websocket_via_api(client, owner_headers):
         assert event["text"] == "Ответ владельца через WS"
 
 
-async def test_storefront_request_status_via_api(client, owner_headers):
+async def test_storefront_request_status_via_api(client, owner_headers, customer_headers):
     slug = "magazin-berkat"
+    buyer_headers, _ = await customer_headers()
     await client.patch(
         "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
     )
@@ -491,6 +516,7 @@ async def test_storefront_request_status_via_api(client, owner_headers):
     created = (
         await client.post(
             f"/api/storefront/{slug}/requests",
+            headers=buyer_headers,
             json={"customer_name": "Ахмед", "items": [{"product_id": product["id"], "quantity": "1"}]},
         )
     ).json()
@@ -518,8 +544,10 @@ async def test_storefront_request_status_via_api(client, owner_headers):
     assert response.status_code == 404, response.text
 
 
-async def test_storefront_request_spam_protection_via_api(client, owner_headers):
+async def test_storefront_request_spam_protection_via_api(client, owner_headers, customer_headers):
     slug = "magazin-berkat"
+    spammer_headers, _ = await customer_headers()
+    other_headers, _ = await customer_headers()
     await client.patch(
         "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
     )
@@ -531,53 +559,52 @@ async def test_storefront_request_spam_protection_via_api(client, owner_headers)
         )
     ).json()
 
-    phone = "+79281234567"
     for _ in range(5):
         response = await client.post(
             f"/api/storefront/{slug}/requests",
+            headers=spammer_headers,
             json={
                 "customer_name": "Спамер",
-                "customer_phone": phone,
                 "items": [{"product_id": product["id"], "quantity": "1"}],
             },
         )
         assert response.status_code == 201, response.text
 
-    # шестая необработанная заявка с того же телефона — отклонена
+    # шестая необработанная заявка с того же аккаунта — отклонена
     response = await client.post(
         f"/api/storefront/{slug}/requests",
+        headers=spammer_headers,
         json={
             "customer_name": "Спамер",
-            "customer_phone": phone,
             "items": [{"product_id": product["id"], "quantity": "1"}],
         },
     )
     assert response.status_code == 400, response.text
 
-    # другой телефон — не ограничен предыдущими заявками
+    # другой аккаунт — не ограничен предыдущими заявками
     response = await client.post(
         f"/api/storefront/{slug}/requests",
+        headers=other_headers,
         json={
             "customer_name": "Другой человек",
-            "customer_phone": "+79281234568",
             "items": [{"product_id": product["id"], "quantity": "1"}],
         },
     )
     assert response.status_code == 201, response.text
 
-    # без телефона — лимит не применяется вообще (нечем идентифицировать)
-    for _ in range(3):
-        response = await client.post(
-            f"/api/storefront/{slug}/requests",
-            json={"customer_name": "Аноним", "items": [{"product_id": product["id"], "quantity": "1"}]},
-        )
-        assert response.status_code == 201, response.text
+    # без авторизации заявку оформить нельзя вообще
+    response = await client.post(
+        f"/api/storefront/{slug}/requests",
+        json={"customer_name": "Аноним", "items": [{"product_id": product["id"], "quantity": "1"}]},
+    )
+    assert response.status_code == 401, response.text
 
 
-async def test_storefront_request_min_and_step_qty_via_api(client, owner_headers):
+async def test_storefront_request_min_and_step_qty_via_api(client, owner_headers, customer_headers):
     """Мин. количество и шаг заказа — ограничение только для заявки с витрины,
     не для обычной продажи/заказа (тех тестов эта фича не касается)."""
     slug = "magazin-berkat"
+    buyer_headers, _ = await customer_headers()
     await client.patch(
         "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
     )
@@ -607,6 +634,7 @@ async def test_storefront_request_min_and_step_qty_via_api(client, owner_headers
     # меньше минимума — отклонено
     response = await client.post(
         f"/api/storefront/{slug}/requests",
+        headers=buyer_headers,
         json={
             "customer_name": "Покупатель",
             "items": [{"product_id": product["id"], "quantity": "5"}],
@@ -617,6 +645,7 @@ async def test_storefront_request_min_and_step_qty_via_api(client, owner_headers
     # не кратно шагу от минимума — отклонено
     response = await client.post(
         f"/api/storefront/{slug}/requests",
+        headers=buyer_headers,
         json={
             "customer_name": "Покупатель",
             "items": [{"product_id": product["id"], "quantity": "15"}],
@@ -627,6 +656,7 @@ async def test_storefront_request_min_and_step_qty_via_api(client, owner_headers
     # минимум плюс шаг — принято
     response = await client.post(
         f"/api/storefront/{slug}/requests",
+        headers=buyer_headers,
         json={
             "customer_name": "Покупатель",
             "items": [{"product_id": product["id"], "quantity": "20"}],
@@ -638,6 +668,7 @@ async def test_storefront_request_min_and_step_qty_via_api(client, owner_headers
     # мин.кол-во и шаг проверяются суммарно по товару, не по каждой строке
     response = await client.post(
         f"/api/storefront/{slug}/requests",
+        headers=buyer_headers,
         json={
             "customer_name": "Покупатель",
             "items": [

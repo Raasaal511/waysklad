@@ -30,12 +30,13 @@ from app.domain.catalog.entities import Product
 from app.domain.common.money import Money
 from app.domain.common.quantity import UNITS
 from app.domain.common.phone import Phone
+from app.domain.customers.entities import Customer
 from app.domain.identity.entities import Role, Tenant, User, Warehouse
 from app.domain.identity.permissions import Actor
 from app.infrastructure.db.models.base import Base
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.files import LocalFileStorage
-from app.infrastructure.security import BcryptPasswordHasher
+from app.infrastructure.security import BcryptPasswordHasher, create_customer_access_token
 from app.main import app as fastapi_app
 from app.infrastructure.cache.redis_cache import RedisCache
 from app.infrastructure.config import settings
@@ -178,6 +179,28 @@ async def client(db_session_factory, tmp_path) -> AsyncIterator[AsyncClient]:
         yield http
     await test_cache._redis.aclose()
     fastapi_app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def customer_headers(make_uow, random_phone) -> Callable:
+    """Authorization-заголовок авторизованного покупателя витрины — заводит
+    Customer напрямую через репозиторий (минуя реальный Telegram-флоу входа,
+    который не нужен тестировать здесь) и выдаёт обычный JWT.
+
+    Возвращает фабрику (headers, phone), а не готовый dict — каждый вызов
+    заводит НОВОГО покупателя (свой телефон), чтобы тесты на антиспам/лимиты
+    по телефону не пересекались с другими вызовами внутри теста; phone нужен
+    тестам, которые проверяют, что клиент в CRM создался с этим номером."""
+
+    async def make() -> tuple[dict, str]:
+        phone = random_phone()
+        async with make_uow() as uow:
+            customer = await uow.customers.add(Customer(id=None, phone=Phone(phone)))
+            await uow.commit()
+        token = create_customer_access_token(customer.id)
+        return {"Authorization": f"Bearer {token}"}, phone
+
+    return make
 
 
 @pytest.fixture

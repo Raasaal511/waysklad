@@ -62,18 +62,17 @@ class IssueOrderUseCase:
                     )
                 )
 
-            # Предоплата уже "как бы получена" раньше — оформляем скидкой на чек
-            # выдачи, чтобы sale.total совпал с order.to_pay (доплатой), а не с
-            # полной суммой заказа. Аналитика считает выручку по сырым ценам
-            # строк, а не sale.total, поэтому полная сумма заказа всё равно
-            # честно попадёт в выручку/прибыль (см. analytics-репозиторий).
+            # Предоплата уже получена раньше — Sale.prepayment уменьшает только
+            # то, что нужно доплатить сейчас (sale.total), но не выручку:
+            # аналитика считает revenue по полным ценам строк за вычетом
+            # только discount, prepayment в неё не входит намеренно.
             sale = Sale(
                 id=None,
                 warehouse_id=order.warehouse_id,
                 seller_id=actor.id,
                 payment_method=cmd.payment_method,
                 lines=lines,
-                discount=order.prepayment,
+                prepayment=order.prepayment,
                 client_id=order.client_id,
                 cash_received=(
                     Money.of(cmd.cash_received) if cmd.cash_received is not None else None
