@@ -22,7 +22,7 @@ USER app
 
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/docs')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')" || exit 1
 
 # --proxy-headers + --forwarded-allow-ips="*" — доверяем X-Forwarded-For/X-Real-IP
 # от nginx (единственный, кто достучится до backend:8000 внутри docker-сети,
