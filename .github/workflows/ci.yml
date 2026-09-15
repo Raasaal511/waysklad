@@ -60,7 +60,7 @@ jobs:
 
       - name: Run tests
         working-directory: backend
-        run: pytest
+        run: pytest -n auto
 
   frontend-checks:
     runs-on: ubuntu-latest
