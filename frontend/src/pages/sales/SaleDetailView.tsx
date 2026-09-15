@@ -487,7 +487,7 @@ export function SaleDetailView({
                 </span>
                 <div className={detailStyles.metricBody}>
                   <strong>
-                    {formatMoney(sale.change_kept)}
+                    {formatMoney(sale.change_kept ?? 0)}
                     <span className={detailStyles.metricCurrency}> ₽</span>
                   </strong>
                   <span>Не взяли сдачу</span>
