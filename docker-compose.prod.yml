@@ -64,10 +64,36 @@ services:
     image: waysklad-frontend-prod
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - certbot_certs:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
+
+  certbot:
+    image: certbot/certbot
+    env_file: .env
+    volumes:
+      - certbot_certs:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    # certonly с --keep-until-expiring покрывает и первый выпуск (сертификата
+    # ещё нет — frontend поднялся на временном self-signed), и последующие
+    # продления (сертификат есть, но обновится только когда до истечения
+    # останется < 30 дней) — единая команда без ручного шага на сервере;
+    # nginx подхватывает обновлённый файл сам через периодический reload
+    # в frontend/docker-entrypoint.sh
+    entrypoint: >-
+      sh -c "trap exit TERM;
+      while :; do
+        certbot certonly --webroot -w /var/www/certbot
+          --non-interactive --agree-tos --keep-until-expiring
+          -d waysklad.gwensoft.ru -m $${CERTBOT_EMAIL} --quiet;
+        sleep 12h &
+        wait $${!};
+      done"
 
   scheduler:
     image: waysklad-backend-prod
@@ -108,3 +134,5 @@ volumes:
   pgdata:
   uploads_data:
   redis_data:
+  certbot_certs:
+  certbot_webroot:

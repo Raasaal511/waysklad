@@ -31,9 +31,16 @@ docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
 делается автоматически, см. `.github/workflows/ci.yml`, job `deploy`; при
 ручном деплое — не забыть этот шаг).
 
-Единственная точка входа — порт 80 (сервис `frontend`): nginx раздаёт собранную
-статику React-приложения и проксирует `/api` и `/uploads` на `backend`.
-`backend` и `db` портов наружу не публикуют.
+Точка входа — сервис `frontend`: nginx раздаёт собранную статику React-приложения
+и проксирует `/api` и `/uploads` на `backend`. `backend` и `db` портов наружу не
+публикуют.
+
+Порт 80 отдаёт только ACME-challenge и редиректит остальное на HTTPS (443).
+Сертификат Let's Encrypt получает и продлевает сервис `certbot` (нужен домен,
+уже указывающий на сервер, и `CERTBOT_EMAIL` в `.env`) — до первого успешного
+выпуска `frontend` временно поднимается на self-signed сертификате
+(`frontend/docker-entrypoint.sh`), чтобы nginx вообще стартовал и пропустил
+через себя ACME-challenge.
 
 ## После добавления новой Alembic-миграции (dev)
 
