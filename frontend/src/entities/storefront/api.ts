@@ -214,11 +214,9 @@ export function storefrontChatWsUrl(token: string): string {
 }
 
 /** Минимальное стартовое количество с учётом min/step. */
-export function initialOrderQty(min: string | null | undefined, step: string | null | undefined): number {
+export function initialOrderQty(min: string | null | undefined, _step: string | null | undefined): number {
   const minN = min != null && min !== '' ? Number(min) : 1
-  const stepN = step != null && step !== '' ? Number(step) : 1
   const base = Number.isFinite(minN) && minN > 0 ? minN : 1
-  const s = Number.isFinite(stepN) && stepN > 0 ? stepN : 1
   return base
 }
 

@@ -468,7 +468,7 @@ export function AnalyticsPage() {
             </span>
             <div className={styles.heroBody}>
               <span className={styles.heroLabel}>Невзятая сдача</span>
-              <span className={styles.heroValue}>{formatMoney(periodTotals.change_kept)} ₽</span>
+              <span className={styles.heroValue}>{formatMoney(periodTotals.change_kept ?? 0)} ₽</span>
               <span className={styles.heroSub}>осталась в кассе сверх чека</span>
             </div>
           </div>

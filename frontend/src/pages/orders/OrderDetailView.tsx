@@ -67,7 +67,6 @@ export function OrderDetailView({
   warehouses,
   stock,
   canManage,
-  onDone,
   onUpdated,
 }: {
   order: Order
