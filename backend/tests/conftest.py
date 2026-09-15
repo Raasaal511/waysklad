@@ -9,7 +9,11 @@ os.environ["RATE_LIMIT_ENABLED"] = "false"
 # SECRET_KEY (см. app/main.py) иначе не даст приложению импортироваться
 os.environ["DEBUG"] = "true"
 # CACHE_REDIS_URL обязателен (deps/cache.py падает при старте без него) —
-# локальный Redis, отдельная логическая БД, чтобы не пересекаться с dev/prod
+# локальный Redis, отдельная логическая БД, чтобы не пересекаться с dev/prod.
+# PYTEST_XDIST_WORKER на этом этапе (импорт conftest.py, до pytest_configure)
+# у xdist ещё не проставлена во всех воркерах одинаково — вычислять по ней
+# DB здесь бессмысленно, все воркеры получили бы один и тот же дефолт. Под
+# xdist DB выбирается позже, лениво, в фикстуре client (см. ниже).
 os.environ.setdefault("CACHE_REDIS_URL", "redis://localhost:6379/15")
 # фиксированные логин/пароль — тесты admin-роутера логинятся через POST /api/admin/login
 os.environ.setdefault("ADMIN_LOGIN", "test-admin")
@@ -20,7 +24,8 @@ os.environ.setdefault(
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.exc import OperationalError
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -39,13 +44,22 @@ from app.infrastructure.files import LocalFileStorage
 from app.infrastructure.security import BcryptPasswordHasher, create_customer_access_token
 from app.main import app as fastapi_app
 from app.infrastructure.cache.redis_cache import RedisCache
-from app.infrastructure.config import settings
 from app.presentation.deps.cache import get_cache
 from app.presentation.deps.notifier import get_notifier
 from app.presentation.deps.security import get_file_storage
 from app.presentation.deps.uow import get_session_factory
 
-TEST_DB_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/waysklad_test"
+_ADMIN_DB_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/postgres"
+
+
+def _worker_db_name() -> str:
+    """Своя БД на xdist-воркер (waysklad_test_gw0, ...) — иначе параллельные
+    drop_all/create_all на одной схеме гонялись бы друг с другом. Читается
+    лениво (внутри фикстуры, не на уровне модуля): на момент импорта
+    conftest.py PYTEST_XDIST_WORKER у xdist ещё не проставлена одинаково
+    во всех воркерах — см. тот же приём у _worker_redis_url ниже."""
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "")
+    return "waysklad_test" + (f"_{worker}" if worker else "")
 
 
 @pytest.fixture
@@ -58,17 +72,34 @@ def random_phone() -> Callable[[], str]:
     return make
 
 
-@pytest.fixture
-async def db_session_factory() -> AsyncIterator[async_sessionmaker]:
-    """Чистая схема waysklad_test на каждый тест; skip, если postgres недоступен."""
-    engine = create_async_engine(TEST_DB_URL, poolclass=NullPool)
+@pytest.fixture(scope="session")
+async def _test_db_ready() -> AsyncIterator[str]:
+    """Создаёт БД воркера (CREATE DATABASE не может идти внутри транзакции —
+    отдельное autocommit-соединение к postgres); skip, если PostgreSQL недоступен.
+    Возвращает имя созданной БД."""
+    db_name = _worker_db_name()
+    admin_engine = create_async_engine(_ADMIN_DB_URL, poolclass=NullPool, isolation_level="AUTOCOMMIT")
     try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-            await conn.run_sync(Base.metadata.create_all)
+        async with admin_engine.connect() as conn:
+            try:
+                await conn.execute(text(f'CREATE DATABASE "{db_name}"'))
+            except ProgrammingError:
+                pass  # уже существует с прошлого прогона
     except (OperationalError, OSError):
-        await engine.dispose()
+        await admin_engine.dispose()
         pytest.skip("локальный PostgreSQL недоступен (waysklad_test)")
+    await admin_engine.dispose()
+    yield db_name
+
+
+@pytest.fixture
+async def db_session_factory(_test_db_ready) -> AsyncIterator[async_sessionmaker]:
+    """Чистая схема на каждый тест, в БД, выделенной текущему xdist-воркеру."""
+    db_url = f"postgresql+psycopg://postgres:postgres@localhost:5432/{_test_db_ready}"
+    engine = create_async_engine(db_url, poolclass=NullPool)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
     yield async_sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     await engine.dispose()
 
@@ -160,16 +191,40 @@ def create_product(make_uow) -> Callable:
     return make
 
 
+def _worker_redis_url() -> str:
+    """Своя логическая Redis DB на xdist-воркер (PYTEST_XDIST_WORKER читается
+    здесь, лениво — на момент импорта conftest.py xdist её ещё не проставляет
+    одинаково во всех воркерах, см. комментарий у CACHE_REDIS_URL выше).
+    Без этого конкурентные тесты в разных БД делят один Redis-кеш
+    (marketplace_catalog и т.п. в cache_aside.py, admin:error_log) — один
+    воркер видит запись/закешированный результат другого."""
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "").removeprefix("gw")
+    db = 15 - (int(worker) % 16) if worker.isdigit() else 15
+    return f"redis://localhost:6379/{db}"
+
+
 @pytest.fixture
 async def client(db_session_factory, tmp_path) -> AsyncIterator[AsyncClient]:
     """HTTP-клиент FastAPI-приложения с подменённой тестовой БД и хранилищем файлов."""
+    redis_url = _worker_redis_url()
+
     # свежий RedisCache на тест: соединение привязано к event loop текущего
     # теста (pytest-asyncio создаёт новый loop на каждую функцию), общий
-    # на модуль клиент из deps/cache.py пережить это не может — тестовая БД
-    # 15 flushdb'ится тут же, так что кеш предыдущего теста не просачивается
-    test_cache = RedisCache(settings.cache_redis_url)
+    # на модуль клиент из deps/cache.py пережить это не может — своя DB
+    # flushdb'ится тут же, так что кеш предыдущего теста не просачивается
+    test_cache = RedisCache(redis_url)
     await test_cache._redis.flushdb()
     fastapi_app.dependency_overrides[get_cache] = lambda: test_cache
+
+    # admin_alerts.error_log — синглтон, созданный при импорте app.main с
+    # дефолтной DB (15) до того, как воркер узнал свой номер — переключаем
+    # его соединение на ту же DB, что и test_cache выше, на время теста
+    from app.infrastructure.observability import admin_alerts
+
+    original_error_log_redis = None
+    if admin_alerts.error_log is not None:
+        original_error_log_redis = admin_alerts.error_log._redis
+        admin_alerts.error_log._redis = test_cache._redis
 
     fastapi_app.dependency_overrides[get_session_factory] = lambda: db_session_factory
     fastapi_app.dependency_overrides[get_file_storage] = lambda: LocalFileStorage(tmp_path)
@@ -177,6 +232,8 @@ async def client(db_session_factory, tmp_path) -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=fastapi_app)
     async with AsyncClient(transport=transport, base_url="http://test") as http:
         yield http
+    if original_error_log_redis is not None:
+        admin_alerts.error_log._redis = original_error_log_redis
     await test_cache._redis.aclose()
     fastapi_app.dependency_overrides.clear()
 
