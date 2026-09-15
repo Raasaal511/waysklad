@@ -25,6 +25,7 @@ class StockDocumentMapper:
             posted_at=datetime.now(timezone.utc).replace(tzinfo=None)
             if document.posted
             else None,
+            client_op_id=document.client_op_id,
             lines=[
                 StockDocumentLineModel(
                     tenant_id=tenant_id,
@@ -52,6 +53,7 @@ class StockDocumentMapper:
             posted=model.posted,
             number=model.number,
             created_at=model.created_at,
+            client_op_id=model.client_op_id,
             lines=[
                 StockLine(
                     product_id=line.product_id,

@@ -9,11 +9,13 @@ class TenantMapper:
         return TenantModel(
             name=tenant.name,
             slug=tenant.slug,
+            storefront_enabled=tenant.storefront_enabled,
             owner_telegram_chat_id=tenant.owner_telegram_chat_id,
             summary_daily_enabled=tenant.summary_daily_enabled,
             summary_weekly_enabled=tenant.summary_weekly_enabled,
             summary_monthly_enabled=tenant.summary_monthly_enabled,
             summary_daily_hour_msk=tenant.summary_daily_hour_msk,
+            is_suspended=tenant.is_suspended,
         )
 
     @staticmethod
@@ -22,11 +24,13 @@ class TenantMapper:
             id=model.id,
             name=model.name,
             slug=model.slug,
+            storefront_enabled=model.storefront_enabled,
             owner_telegram_chat_id=model.owner_telegram_chat_id,
             summary_daily_enabled=model.summary_daily_enabled,
             summary_weekly_enabled=model.summary_weekly_enabled,
             summary_monthly_enabled=model.summary_monthly_enabled,
             summary_daily_hour_msk=model.summary_daily_hour_msk,
+            is_suspended=model.is_suspended,
         )
 
 
@@ -52,6 +56,7 @@ class UserMapper:
             password_hash=model.password_hash,
             is_active=model.is_active,
             tenant_id=model.tenant_id,
+            token_version=model.token_version,
         )
 
 
@@ -59,7 +64,11 @@ class WarehouseMapper:
     @staticmethod
     def to_orm(warehouse: Warehouse, tenant_id: int) -> WarehouseModel:
         return WarehouseModel(
-            tenant_id=tenant_id, name=warehouse.name, address=warehouse.address
+            tenant_id=tenant_id,
+            name=warehouse.name,
+            address=warehouse.address,
+            show_on_storefront=warehouse.show_on_storefront,
+            photo=warehouse.photo,
         )
 
     @staticmethod
@@ -69,4 +78,6 @@ class WarehouseMapper:
             name=model.name,
             address=model.address,
             assigned_user_ids=assigned_user_ids or [],
+            show_on_storefront=model.show_on_storefront,
+            photo=model.photo,
         )

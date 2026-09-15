@@ -1,13 +1,18 @@
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 
 
 class NotificationKind(StrEnum):
     TASK_ASSIGNED = "task_assigned"
     TASK_DONE = "task_done"
+    DEBT_ISSUED = "debt_issued"
     DEBT_DUE_SOON = "debt_due_soon"
     DEBT_OVERDUE = "debt_overdue"
+    LOW_STOCK = "low_stock"
+    STOREFRONT_MESSAGE = "storefront_message"
+    STOREFRONT_REQUEST_NEW = "storefront_request_new"
 
 
 @dataclass
@@ -22,6 +27,10 @@ class Notification:
     entity_id: int | None = None
     is_read: bool = False
     created_at: datetime | None = None
+    # снимок числового значения сущности на момент отправки (например, остаток
+    # товара для LOW_STOCK) — позволяет не слать одно и то же уведомление
+    # повторно, пока значение не улучшится
+    snapshot_value: Decimal | None = None
 
     def mark_read(self) -> None:
         self.is_read = True

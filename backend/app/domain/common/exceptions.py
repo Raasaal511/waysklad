@@ -20,3 +20,7 @@ class OverRepaymentError(DomainError):
 
 class InvalidFilterError(DomainError):
     """Недопустимое поле, оператор или сортировка в query-параметрах списка."""
+
+
+class ClientHasDebtError(DomainError):
+    """Попытка деактивировать клиента с непогашенным долгом без force=True."""

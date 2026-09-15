@@ -26,6 +26,7 @@ export interface Debt {
   id: number
   client_id: number | null
   supplier_id: number | null
+  warehouse_id: number | null
   amount: string
   repaid: string
   balance: string
@@ -39,6 +40,7 @@ export interface Debt {
   schedule: DebtInstallment[]
   repayments: DebtRepayment[]
   extensions: DebtExtension[]
+  whatsapp_reminder_link?: string | null
 }
 
 export interface DebtsSummary {
@@ -46,12 +48,19 @@ export interface DebtsSummary {
   debts: Debt[]
 }
 
-export function issueDebt(input: { client_id: number; amount: string; due_date?: string | null; note?: string }) {
+export function issueDebt(input: {
+  client_id: number
+  warehouse_id: number
+  amount: string
+  due_date?: string | null
+  note?: string
+}) {
   return api.post<Debt>('/debts', input)
 }
 
 export function issueSupplierDebt(input: {
   supplier_id: number
+  warehouse_id: number
   amount: string
   due_date?: string | null
   note?: string
@@ -119,12 +128,14 @@ export async function listClosedDebts(params: ListDebtsParams = {}) {
   return { items: data, total }
 }
 
-export function listClientDebts(clientId: number) {
-  return api.get<DebtsSummary>(`/debts/client/${clientId}`)
+export function listClientDebts(clientId: number, on?: string) {
+  const q = on ? `?on=${encodeURIComponent(on)}` : ''
+  return api.get<DebtsSummary>(`/debts/client/${clientId}${q}`)
 }
 
-export function listSupplierDebts(supplierId: number) {
-  return api.get<DebtsSummary>(`/debts/supplier/${supplierId}`)
+export function listSupplierDebts(supplierId: number, on?: string) {
+  const q = on ? `?on=${encodeURIComponent(on)}` : ''
+  return api.get<DebtsSummary>(`/debts/supplier/${supplierId}${q}`)
 }
 
 export function listDueDebts(on?: string) {
@@ -145,6 +156,7 @@ export interface DebtsOverview {
   supplier_total_balance: string
   supplier_debt_count: number
   upcoming_payments: UpcomingPayment[]
+  has_scheduled_payments: boolean
 }
 
 /** Сводка по ВСЕМ активным долгам сразу — не зависит от фильтров списка (направление/
@@ -158,4 +170,13 @@ export function createInstallment(
   schedule: { due_date: string; amount: string }[],
 ) {
   return api.post<Debt>(`/debts/${debtId}/installments`, { schedule })
+}
+
+export interface DebtReceipt {
+  text: string
+  whatsapp_link: string | null
+}
+
+export function getDebtReceipt(debtId: number) {
+  return api.get<DebtReceipt>(`/debts/${debtId}/receipt`)
 }

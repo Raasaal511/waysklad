@@ -4,10 +4,12 @@ from decimal import Decimal
 from app.domain.audit.entities import AuditEntry
 from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Product, ProductVariant
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.common.money import Money
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Actor, Permission, require
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)
@@ -30,12 +32,17 @@ class UpdateProductCommand:
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
     photo: str = ""
+    description: str = ""
+    show_on_storefront: bool = False
+    storefront_min_qty: Decimal | None = None
+    storefront_step_qty: Decimal | None = None
     variants: list[UpdateVariantInput] = field(default_factory=list)
 
 
 class UpdateProductUseCase:
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None):
         self._uow = uow
+        self._cache = cache
 
     async def execute(self, actor: Actor, cmd: UpdateProductCommand) -> Product:
         require(actor, Permission.PRODUCTS_MANAGE)
@@ -54,6 +61,10 @@ class UpdateProductUseCase:
                 if existing is not None and existing.id != cmd.product_id:
                     raise DomainError(f"Штрихкод «{value}» уже используется товаром «{existing.name}»")
 
+            for qty in (cmd.storefront_min_qty, cmd.storefront_step_qty):
+                if qty is not None and qty <= 0:
+                    raise DomainError("Мин. количество и шаг заказа на витрине должны быть больше нуля")
+
             product = Product(
                 id=cmd.product_id,
                 name=cmd.name,
@@ -65,6 +76,10 @@ class UpdateProductUseCase:
                 category_id=cmd.category_id,
                 min_stock=cmd.min_stock,
                 photo=cmd.photo,
+                description=cmd.description,
+                show_on_storefront=cmd.show_on_storefront,
+                storefront_min_qty=cmd.storefront_min_qty,
+                storefront_step_qty=cmd.storefront_step_qty,
                 variants=[
                     ProductVariant(
                         id=v.id,
@@ -80,4 +95,5 @@ class UpdateProductUseCase:
                 AuditEntry.record(actor, "product.update", product.id, name=product.name)
             )
             await uow.commit()
+            await invalidate_shop_cache(self._cache, uow)
         return product

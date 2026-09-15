@@ -1,5 +1,5 @@
 import { api } from '../../shared/api/client'
-import type { Role, User } from '../auth/api'
+import type { Role, TokenResponse, User } from '../auth/api'
 
 export function listEmployees() {
   return api.get<User[]>('/auth/employees')
@@ -25,6 +25,8 @@ export function updateEmployee(
 export interface Tenant {
   id: number
   name: string
+  slug: string | null
+  storefront_enabled: boolean
   owner_telegram_chat_id: string | null
   summary_daily_enabled: boolean
   summary_weekly_enabled: boolean
@@ -42,6 +44,7 @@ export function getShop() {
 
 export interface UpdateShopInput {
   name: string
+  storefront_enabled?: boolean
   summary_daily_enabled?: boolean
   summary_weekly_enabled?: boolean
   summary_monthly_enabled?: boolean
@@ -53,5 +56,9 @@ export function updateShop(input: UpdateShopInput) {
 }
 
 export function changePassword(input: { current_password: string; new_password: string }) {
-  return api.patch<void>('/auth/me/password', input)
+  return api.patch<TokenResponse>('/auth/me/password', input)
+}
+
+export function logoutAll() {
+  return api.post<void>('/auth/me/logout-all')
 }

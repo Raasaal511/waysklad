@@ -104,10 +104,14 @@ class WarehouseAssignmentsRequest(BaseModel):
 class WarehouseDetailsRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     address: str = ""
+    show_on_storefront: bool = False
 
     def to_command(self, warehouse_id: int) -> UpdateWarehouseDetailsCommand:
         return UpdateWarehouseDetailsCommand(
-            warehouse_id=warehouse_id, name=self.name, address=self.address
+            warehouse_id=warehouse_id,
+            name=self.name,
+            address=self.address,
+            show_on_storefront=self.show_on_storefront,
         )
 
 
@@ -132,12 +136,16 @@ class WarehouseResponse(BaseModel):
     name: str
     address: str
     assigned_user_ids: list[int]
+    show_on_storefront: bool
+    photo: str
 
     @classmethod
     def from_entity(cls, warehouse: Warehouse) -> "WarehouseResponse":
         return cls(
             id=warehouse.id, name=warehouse.name, address=warehouse.address,
             assigned_user_ids=warehouse.assigned_user_ids,
+            show_on_storefront=warehouse.show_on_storefront,
+            photo=warehouse.photo,
         )
 
 

@@ -20,11 +20,13 @@ class SaleMapper:
             client_id=sale.client_id,
             payment_method=sale.payment_method,
             discount=sale.discount.amount,
+            prepayment=sale.prepayment.amount,
             total=sale.total.amount,  # снимок суммы чека для аналитики
             client_op_id=sale.client_op_id,
             note=sale.note,
             cash_received=sale.cash_received.amount if sale.cash_received is not None else None,
             order_id=sale.order_id,
+            change_kept=sale.change_kept.amount,
             lines=[
                 SaleLineModel(
                     tenant_id=tenant_id,
@@ -46,6 +48,7 @@ class SaleMapper:
             seller_id=model.seller_id,
             payment_method=model.payment_method,
             discount=Money(model.discount),
+            prepayment=Money(model.prepayment),
             client_id=model.client_id,
             created_at=model.created_at,
             client_op_id=model.client_op_id,
@@ -53,6 +56,7 @@ class SaleMapper:
             deleted_at=model.deleted_at,
             cash_received=Money(model.cash_received) if model.cash_received is not None else None,
             order_id=model.order_id,
+            change_kept=Money(model.change_kept),
             lines=[
                 SaleLine(
                     id=line.id,
@@ -75,6 +79,7 @@ class SaleReturnMapper:
             sale_id=sale_return.sale_id,
             author_id=sale_return.author_id,
             note=sale_return.note,
+            client_op_id=sale_return.client_op_id,
             lines=[
                 SaleReturnLineModel(
                     tenant_id=tenant_id,
@@ -93,6 +98,7 @@ class SaleReturnMapper:
             author_id=model.author_id,
             note=model.note,
             created_at=model.created_at,
+            client_op_id=model.client_op_id,
             lines=[
                 SaleReturnLine(
                     id=line.id,

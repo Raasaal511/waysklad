@@ -5,6 +5,7 @@ export interface Warehouse {
   name: string
   address: string
   assigned_user_ids: number[]
+  show_on_storefront: boolean
 }
 
 export interface StockItem {
@@ -83,7 +84,10 @@ export function setWarehouseAssignments(warehouseId: number, userIds: number[]) 
   })
 }
 
-export function updateWarehouseDetails(warehouseId: number, input: { name: string; address?: string }) {
+export function updateWarehouseDetails(
+  warehouseId: number,
+  input: { name: string; address?: string; show_on_storefront?: boolean },
+) {
   return api.put<Warehouse>(`/inventory/warehouses/${warehouseId}`, input)
 }
 
@@ -93,6 +97,10 @@ export function listStock() {
 
 export function listDocuments() {
   return api.get<DocumentHistoryEntry[]>('/inventory/documents')
+}
+
+export function getDocument(id: number) {
+  return api.get<DocumentHistoryEntry>(`/inventory/documents/${id}`)
 }
 
 export type ExportFormat = 'xlsx' | 'csv' | 'pdf'
@@ -122,4 +130,21 @@ export function transferStock(input: {
   note?: string
 }) {
   return api.post<StockDocument>('/inventory/transfer', input)
+}
+
+export interface StocktakeDiscrepancy {
+  product_id: number
+  variant_id: number | null
+  expected: string
+  actual: string
+  delta: string
+}
+
+export interface StocktakeResult {
+  document: StockDocument
+  discrepancies: StocktakeDiscrepancy[]
+}
+
+export function stocktake(input: { warehouse_id: number; lines: StockLine[]; note?: string }) {
+  return api.post<StocktakeResult>('/inventory/stocktake', input)
 }

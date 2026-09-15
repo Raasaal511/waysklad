@@ -45,6 +45,7 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:8000',
         changeOrigin: true,
+        ws: true, // WebSocket-канал уведомлений (GET /api/notifications/ws)
       },
       '/uploads': {
         target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:8000',

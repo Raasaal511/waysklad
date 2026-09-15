@@ -1,17 +1,65 @@
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.application.products.apply_import import (
+    ApplyImportCommand,
+    ApplyImportResult,
+    ApplyImportRow,
+)
 from app.application.products.create_category import CreateCategoryCommand
 from app.application.products.create_product import CreateProductCommand, VariantInput
 from app.application.products.create_unit import CreateUnitCommand
+from app.application.products.generate_barcode import GenerateBarcodeResult
+from app.application.products.generate_description import (
+    GenerateProductDescriptionResult,
+)
 from app.application.products.import_excel import ImportProductsResult, RowError
+from app.application.products.import_preview import PreviewProductsResult, PreviewRow
 from app.application.products.update_product import (
     UpdateProductCommand,
     UpdateVariantInput,
 )
 from app.domain.catalog.entities import Category, Product
 from app.domain.common.quantity import Unit
+
+_ORDER_BY_ALIASES = {
+    "price_asc": "retail_price",
+    "price_desc": "-retail_price",
+    "margin_desc": "-margin",
+    "created_desc": "-created_at",
+    "created_asc": "created_at",
+    "stock_desc": "-stock",
+}
+
+
+class ProductsFilterParams(BaseModel):
+    """Query-параметры списка товаров — форма запроса; преобразование в raw_params
+    для generic filter-системы см. to_raw_params()."""
+
+    query: str = ""
+    limit: int = Field(50, le=50)
+    offset: int = Field(0, ge=0)
+    category_id: int | None = None
+    sort: str = "name"
+    in_stock_only: bool = False
+    warehouse_id: int | None = None
+
+    model_config = {"extra": "forbid"}
+
+    def to_raw_params(self) -> dict:
+        raw: dict = {
+            "limit": self.limit,
+            "offset": self.offset,
+            "order_by": _ORDER_BY_ALIASES.get(self.sort, self.sort),
+            "category_id": self.category_id,
+        }
+        if self.query.strip():
+            raw["search_text__ilike"] = self.query.strip()
+        if self.in_stock_only:
+            raw["stock__gt"] = 0
+        return raw
 
 
 class VariantCreateRequest(BaseModel):
@@ -36,6 +84,10 @@ class ProductCreateRequest(BaseModel):
     barcode: str | None = None
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
+    description: str = ""
+    show_on_storefront: bool = False
+    storefront_min_qty: Decimal | None = None
+    storefront_step_qty: Decimal | None = None
     variants: list[VariantCreateRequest] = []
     initial_stock_warehouse_id: int | None = None
     initial_stock_quantity: Decimal | None = None
@@ -50,6 +102,10 @@ class ProductCreateRequest(BaseModel):
             barcode=self.barcode,
             category_id=self.category_id,
             min_stock=self.min_stock,
+            description=self.description,
+            show_on_storefront=self.show_on_storefront,
+            storefront_min_qty=self.storefront_min_qty,
+            storefront_step_qty=self.storefront_step_qty,
             variants=[
                 VariantInput(size=v.size, color=v.color, barcode=v.barcode)
                 for v in self.variants
@@ -69,6 +125,10 @@ class ProductUpdateRequest(BaseModel):
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
     photo: str = ""
+    description: str = ""
+    show_on_storefront: bool = False
+    storefront_min_qty: Decimal | None = None
+    storefront_step_qty: Decimal | None = None
     variants: list[VariantUpdateRequest] = []
 
     def to_command(self, product_id: int) -> UpdateProductCommand:
@@ -83,6 +143,10 @@ class ProductUpdateRequest(BaseModel):
             category_id=self.category_id,
             min_stock=self.min_stock,
             photo=self.photo,
+            description=self.description,
+            show_on_storefront=self.show_on_storefront,
+            storefront_min_qty=self.storefront_min_qty,
+            storefront_step_qty=self.storefront_step_qty,
             variants=[
                 UpdateVariantInput(id=v.id, size=v.size, color=v.color, barcode=v.barcode)
                 for v in self.variants
@@ -148,6 +212,163 @@ class ImportProductsResponse(BaseModel):
         )
 
 
+class ExistingProductSnapshotResponse(BaseModel):
+    id: int
+    name: str
+    sku: str
+    barcode: str | None
+    unit_code: str
+    purchase_price: Decimal
+    retail_price: Decimal
+    category_id: int | None
+    min_stock: Decimal
+
+
+class DuplicateCandidateResponse(BaseModel):
+    matched_by: Literal["barcode", "sku", "name"]
+    product: ExistingProductSnapshotResponse
+
+
+class PreviewRowResponse(BaseModel):
+    row: int
+    name: str
+    sku: str
+    barcode: str | None
+    unit_code: str
+    category_id: int | None
+    purchase_price: Decimal | None
+    retail_price: Decimal | None
+    min_stock: Decimal
+    parse_error: str | None
+    status: Literal["no_match", "match", "ambiguous_match"]
+    candidates: list[DuplicateCandidateResponse]
+
+    @classmethod
+    def from_entity(cls, row: PreviewRow) -> "PreviewRowResponse":
+        return cls(
+            row=row.row,
+            name=row.name,
+            sku=row.sku,
+            barcode=row.barcode,
+            unit_code=row.unit_code,
+            category_id=row.category_id,
+            purchase_price=row.purchase_price,
+            retail_price=row.retail_price,
+            min_stock=row.min_stock,
+            parse_error=row.parse_error,
+            status=row.status,
+            candidates=[
+                DuplicateCandidateResponse(
+                    matched_by=c.matched_by,
+                    product=ExistingProductSnapshotResponse(
+                        id=c.product.id,
+                        name=c.product.name,
+                        sku=c.product.sku,
+                        barcode=c.product.barcode,
+                        unit_code=c.product.unit_code,
+                        purchase_price=c.product.purchase_price,
+                        retail_price=c.product.retail_price,
+                        category_id=c.product.category_id,
+                        min_stock=c.product.min_stock,
+                    ),
+                )
+                for c in row.candidates
+            ],
+        )
+
+
+class PreviewProductsResponse(BaseModel):
+    rows: list[PreviewRowResponse]
+
+    @classmethod
+    def from_result(cls, result: PreviewProductsResult) -> "PreviewProductsResponse":
+        return cls(rows=[PreviewRowResponse.from_entity(r) for r in result.rows])
+
+
+class ApplyImportRowRequest(BaseModel):
+    client_row_id: str
+    action: Literal["create", "update", "skip"]
+    name: str = ""
+    sku: str = ""
+    barcode: str | None = None
+    unit_code: str = "pcs"
+    purchase_price: Decimal = Decimal("0")
+    retail_price: Decimal = Decimal("0")
+    category_id: int | None = None
+    min_stock: Decimal = Decimal("0")
+    existing_product_id: int | None = None
+
+
+class ApplyImportRequest(BaseModel):
+    rows: list[ApplyImportRowRequest]
+
+    def to_command(self) -> ApplyImportCommand:
+        return ApplyImportCommand(
+            rows=[
+                ApplyImportRow(
+                    client_row_id=r.client_row_id,
+                    action=r.action,
+                    name=r.name,
+                    sku=r.sku,
+                    barcode=r.barcode,
+                    unit_code=r.unit_code,
+                    purchase_price=r.purchase_price,
+                    retail_price=r.retail_price,
+                    category_id=r.category_id,
+                    min_stock=r.min_stock,
+                    existing_product_id=r.existing_product_id,
+                )
+                for r in self.rows
+            ]
+        )
+
+
+class ApplyImportRowErrorResponse(BaseModel):
+    client_row_id: str
+    message: str
+
+
+class ApplyImportResponse(BaseModel):
+    created: int
+    updated: int
+    skipped: int
+    errors: list[ApplyImportRowErrorResponse]
+
+    @classmethod
+    def from_result(cls, result: ApplyImportResult) -> "ApplyImportResponse":
+        return cls(
+            created=result.created,
+            updated=result.updated,
+            skipped=result.skipped,
+            errors=[
+                ApplyImportRowErrorResponse(client_row_id=e.client_row_id, message=e.message)
+                for e in result.errors
+            ],
+        )
+
+
+class GenerateBarcodeResponse(BaseModel):
+    barcode: str
+
+    @classmethod
+    def from_result(cls, result: GenerateBarcodeResult) -> "GenerateBarcodeResponse":
+        return cls(barcode=result.barcode)
+
+
+class SetStorefrontPhotosRequest(BaseModel):
+    photos: list[str] = []
+
+
+class GenerateDescriptionResponse(BaseModel):
+    description: str
+
+    @classmethod
+    def from_result(
+        cls, result: GenerateProductDescriptionResult
+    ) -> "GenerateDescriptionResponse":
+        return cls(description=result.description)
+
+
 class VariantResponse(BaseModel):
     id: int
     size: str
@@ -167,6 +388,11 @@ class ProductResponse(BaseModel):
     category_id: int | None
     min_stock: Decimal
     photo: str
+    description: str
+    storefront_photos: list[str]
+    show_on_storefront: bool
+    storefront_min_qty: Decimal | None
+    storefront_step_qty: Decimal | None
     variants: list[VariantResponse]
 
     @classmethod
@@ -183,6 +409,11 @@ class ProductResponse(BaseModel):
             category_id=product.category_id,
             min_stock=product.min_stock,
             photo=product.photo,
+            description=product.description,
+            storefront_photos=list(product.storefront_photos),
+            show_on_storefront=product.show_on_storefront,
+            storefront_min_qty=product.storefront_min_qty,
+            storefront_step_qty=product.storefront_step_qty,
             variants=[
                 VariantResponse(
                     id=v.id,

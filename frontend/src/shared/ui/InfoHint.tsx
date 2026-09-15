@@ -14,16 +14,29 @@ export function InfoHint({ text }: { text: string }) {
   useEffect(() => {
     if (!open) return
     function place() {
-      const rect = triggerRef.current?.getBoundingClientRect()
-      if (!rect) return
+      const trigger = triggerRef.current
+      const rect = trigger?.getBoundingClientRect()
+      if (!trigger || !rect) return
       const margin = 8
       const left = Math.min(rect.left, window.innerWidth - POPOVER_WIDTH - margin)
-      setPos({ top: rect.bottom + 6, left })
+      // те же границы, что и у Select/DateInput: внутри модалки не вылезаем
+      // за её футер, снаружи — не вылезаем за низ экрана
+      const dialog = trigger.closest('[role="dialog"]')
+      const dialogRect = dialog?.getBoundingClientRect()
+      const footer = dialog?.querySelector('[class*="modal-footer"]')
+      const boundary = footer ? footer.getBoundingClientRect().top : (dialogRect ? dialogRect.bottom : window.innerHeight)
+      const popoverHeight = popoverRef.current?.offsetHeight ?? 0
+      const top = Math.max(margin, Math.min(rect.bottom + 6, boundary - popoverHeight - margin))
+      setPos({ top, left })
     }
     place()
+    // при первом открытии попап ещё не смонтирован — его высота (popoverHeight)
+    // равна 0, пересчитываем ещё раз сразу после монтирования
+    const raf = requestAnimationFrame(place)
     window.addEventListener('resize', place)
     window.addEventListener('scroll', place, true)
     return () => {
+      cancelAnimationFrame(raf)
       window.removeEventListener('resize', place)
       window.removeEventListener('scroll', place, true)
     }

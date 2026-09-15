@@ -17,6 +17,12 @@ class ITaskRepository(Protocol):
         иначе — только где актор назначен исполнителем или является автором."""
         ...
 
-    async def list_completed(self, participant_id: int | None = None) -> list[Task]:
-        """Выполненные задачи — история, новые сначала."""
+    async def list_completed(
+        self, participant_id: int | None = None, limit: int = 50, offset: int = 0
+    ) -> tuple[list[Task], int]:
+        """Выполненные задачи — история, новые сначала. Возвращает (страница, общее количество)."""
+        ...
+
+    async def list_by_client(self, client_id: int) -> list[Task]:
+        """Все задачи (любого статуса), привязанные к клиенту — для ленты событий клиента."""
         ...

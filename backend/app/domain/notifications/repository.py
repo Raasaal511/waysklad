@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 from typing import Protocol
 
 from app.domain.notifications.entities import Notification, NotificationKind
@@ -23,4 +24,12 @@ class INotificationRepository(Protocol):
     ) -> bool:
         """Было ли уже отправлено такое уведомление в этот день — защита от
         повторной рассылки одного и того же долга при ежедневном перезапуске."""
+        ...
+
+    async def last_snapshot_value(
+        self, user_id: int, kind: NotificationKind, entity_id: int
+    ) -> Decimal | None:
+        """snapshot_value последнего (любой давности) уведомления этой сущности —
+        защита от ежедневного повтора LOW_STOCK, пока остаток не подрастёт.
+        None, если такого уведомления ещё не было."""
         ...

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 from enum import Enum
 
@@ -55,6 +55,7 @@ class Debt:
     id: int | None
     amount: Money
     issued_at: date
+    warehouse_id: int
     client_id: int | None = None
     supplier_id: int | None = None
     due_date: date | None = None  # «обещал вернуть до…»
@@ -143,3 +144,22 @@ def total_balance(debts: list[Debt]) -> Money:
     for debt in debts:
         total = total + debt.balance
     return total
+
+
+def snapshot_as_of(debts: list[Debt], as_of: date) -> list[Debt]:
+    """Срез долгов на дату сверки: долги, выданные позже as_of, не показываем;
+    у остальных считаем repaid/balance/status только по погашениям и продлениям
+    до as_of включительно — repaid/balance пересчитаются сами (вычисляемые
+    property от self.repayments)."""
+    result = []
+    for debt in debts:
+        if debt.issued_at > as_of:
+            continue
+        result.append(
+            replace(
+                debt,
+                repayments=[r for r in debt.repayments if r.on <= as_of],
+                extensions=[e for e in debt.extensions if e.created_at <= as_of],
+            )
+        )
+    return result

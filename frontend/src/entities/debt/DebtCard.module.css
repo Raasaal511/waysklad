@@ -119,6 +119,12 @@
   gap: 8px;
 }
 
+/* На странице долга секции без тяжёлой «карточной» тени — только рамка. */
+.debt-section-card {
+  box-shadow: none;
+  border-color: var(--border);
+}
+
 /* Сабмит формы внутри модалки — по размеру текста, а не на всю ширину. */
 .debt-detail-form {
   align-items: flex-start;

@@ -17,6 +17,7 @@ class SqlAlchemyOrderRepository(SqlAlchemyRepository, IOrderRepository):
         self._session.add(model)
         await self._session.flush()
         order.id = model.id
+        order.number = number
         return order
 
     async def save(self, order: Order) -> Order:
@@ -61,31 +62,52 @@ class SqlAlchemyOrderRepository(SqlAlchemyRepository, IOrderRepository):
             raise NotFoundError(f"Заказ {order_id} не найден")
         return OrderMapper.to_entity(model, await self._line_units(model))
 
-    async def list_active(self) -> list[Order]:
+    async def list_active(self, warehouse_ids: list[int] | None = None) -> list[Order]:
+        conditions = [
+            OrderModel.tenant_id == self._tenant,
+            OrderModel.status.not_in(_COMPLETED),
+        ]
+        if warehouse_ids is not None:
+            conditions.append(OrderModel.warehouse_id.in_(warehouse_ids))
         models = (
             await self._session.execute(
                 select(OrderModel)
-                .where(
-                    OrderModel.tenant_id == self._tenant,
-                    OrderModel.status.not_in(_COMPLETED),
-                )
+                .where(*conditions)
                 .order_by(OrderModel.due_date.nulls_last(), OrderModel.id)
             )
         ).scalars().all()
-        return [OrderMapper.to_entity(m, await self._line_units(m)) for m in models]
+        return await self._to_entities(models)
 
-    async def list_completed(self) -> list[Order]:
+    async def list_completed(self, warehouse_ids: list[int] | None = None) -> list[Order]:
+        conditions = [
+            OrderModel.tenant_id == self._tenant,
+            OrderModel.status.in_(_COMPLETED),
+        ]
+        if warehouse_ids is not None:
+            conditions.append(OrderModel.warehouse_id.in_(warehouse_ids))
         models = (
             await self._session.execute(
                 select(OrderModel)
-                .where(
-                    OrderModel.tenant_id == self._tenant,
-                    OrderModel.status.in_(_COMPLETED),
-                )
+                .where(*conditions)
                 .order_by(OrderModel.created_at.desc())
             )
         ).scalars().all()
-        return [OrderMapper.to_entity(m, await self._line_units(m)) for m in models]
+        return await self._to_entities(models)
+
+    async def list_by_client(self, client_id: int) -> list[Order]:
+        models = (
+            await self._session.execute(
+                select(OrderModel)
+                .where(OrderModel.tenant_id == self._tenant, OrderModel.client_id == client_id)
+                .order_by(OrderModel.created_at.desc())
+            )
+        ).scalars().all()
+        return await self._to_entities(models)
 
     async def _line_units(self, model: OrderModel):
         return await self._product_unit_by_id({line.product_id for line in model.lines})
+
+    async def _to_entities(self, models: list[OrderModel]) -> list[Order]:
+        product_ids = {line.product_id for m in models for line in m.lines}
+        units_by_product = await self._product_unit_by_id(product_ids)
+        return [OrderMapper.to_entity(m, units_by_product) for m in models]

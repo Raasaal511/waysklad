@@ -12,6 +12,10 @@ from app.infrastructure.db.repositories.counterparties import (
     SqlAlchemyClientRepository,
     SqlAlchemySupplierRepository,
 )
+from app.infrastructure.db.repositories.customers import (
+    SqlAlchemyCustomerLoginLinkRepository,
+    SqlAlchemyCustomerRepository,
+)
 from app.infrastructure.db.repositories.debts import SqlAlchemyDebtRepository
 from app.infrastructure.db.repositories.identity import (
     SqlAlchemyTenantRepository,
@@ -22,11 +26,16 @@ from app.infrastructure.db.repositories.inventory import (
     SqlAlchemyStockDocumentRepository,
     SqlAlchemyStockRepository,
 )
+from app.infrastructure.db.repositories.marketplace import SqlAlchemyMarketplaceProductRepository
 from app.infrastructure.db.repositories.notifications import SqlAlchemyNotificationRepository
 from app.infrastructure.db.repositories.orders import SqlAlchemyOrderRepository
 from app.infrastructure.db.repositories.sales import (
     SqlAlchemySaleRepository,
     SqlAlchemySaleReturnRepository,
+)
+from app.infrastructure.db.repositories.storefront import (
+    SqlAlchemyStorefrontMessageRepository,
+    SqlAlchemyStorefrontRequestRepository,
 )
 from app.infrastructure.db.repositories.tasks import SqlAlchemyTaskRepository
 from app.infrastructure.db.session import SessionLocal
@@ -53,16 +62,21 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.categories = SqlAlchemyCategoryRepository(self)
         self.clients = SqlAlchemyClientRepository(self)
         self.suppliers = SqlAlchemySupplierRepository(self)
+        self.customers = SqlAlchemyCustomerRepository(self)
+        self.customer_login_links = SqlAlchemyCustomerLoginLinkRepository(self)
         self.stock = SqlAlchemyStockRepository(self)
         self.stock_documents = SqlAlchemyStockDocumentRepository(self)
         self.sales = SqlAlchemySaleRepository(self)
         self.sale_returns = SqlAlchemySaleReturnRepository(self)
         self.debts = SqlAlchemyDebtRepository(self)
         self.orders = SqlAlchemyOrderRepository(self)
+        self.storefront_requests = SqlAlchemyStorefrontRequestRepository(self)
+        self.storefront_messages = SqlAlchemyStorefrontMessageRepository(self)
         self.tasks = SqlAlchemyTaskRepository(self)
         self.notifications = SqlAlchemyNotificationRepository(self)
         self.audit = SqlAlchemyAuditRepository(self)
         self.analytics = SqlAlchemyAnalyticsRepository(self)
+        self.marketplace_products = SqlAlchemyMarketplaceProductRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:

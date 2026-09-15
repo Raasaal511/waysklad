@@ -13,6 +13,7 @@ class DebtMapper:
     def to_orm(debt: Debt, tenant_id: int) -> DebtModel:
         return DebtModel(
             tenant_id=tenant_id,
+            warehouse_id=debt.warehouse_id,
             client_id=debt.client_id,
             supplier_id=debt.supplier_id,
             sale_id=debt.sale_id,
@@ -54,6 +55,7 @@ class DebtMapper:
     def to_entity(model: DebtModel) -> Debt:
         return Debt(
             id=model.id,
+            warehouse_id=model.warehouse_id,
             client_id=model.client_id,
             supplier_id=model.supplier_id,
             amount=Money(model.amount),

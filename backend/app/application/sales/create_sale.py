@@ -2,15 +2,19 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
+from app.application.debts.notify import notify_debt_issued
 from app.domain.audit.entities import AuditEntry
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError, InsufficientStockError
 from app.domain.common.money import Money
+from app.domain.common.notifier import INotifier
 from app.domain.common.quantity import Quantity
 from app.domain.common.uow import IUnitOfWork
 from app.domain.debts.entities import Debt, total_balance
 from app.domain.identity.permissions import Actor, Permission, require, require_warehouse
 from app.domain.sales.entities import Sale, SaleLine
 from app.domain.sales.payment import PaymentMethod
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)
@@ -29,6 +33,7 @@ class CreateSaleCommand:
     discount: Decimal = Decimal("0")
     client_id: int | None = None
     cash_received: Decimal | None = None  # для расчёта сдачи
+    change_kept: Decimal = Decimal("0")  # клиент не забрал (часть) сдачи
     client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
     debt_due_date: date | None = None  # «долг до» — обязателен при payment_method=CREDIT
 
@@ -42,8 +47,10 @@ class CreateSaleResult:
 class CreateSaleUseCase:
     """Экран быстрой продажи: скан → количество → скидка → способ оплаты → готово."""
 
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None, notifier: INotifier | None = None):
         self._uow = uow
+        self._cache = cache
+        self._notifier = notifier
 
     async def execute(self, actor: Actor, cmd: CreateSaleCommand) -> CreateSaleResult:
         require(actor, Permission.SALES_CREATE)
@@ -81,6 +88,7 @@ class CreateSaleUseCase:
                 client_id=cmd.client_id,
                 client_op_id=cmd.client_op_id,
                 cash_received=Money.of(cmd.cash_received) if cmd.cash_received is not None else None,
+                change_kept=Money.of(cmd.change_kept),
             )
             sale.validate()
 
@@ -103,10 +111,13 @@ class CreateSaleUseCase:
                 await self._check_debt_limit(uow, sale)
 
             await uow.sales.add(sale)
+            if sale.client_id is not None:
+                await uow.clients.link_to_warehouse(sale.client_id, sale.warehouse_id)
 
             if sale.payment_method is PaymentMethod.CREDIT:
                 debt = Debt(
                     id=None,
+                    warehouse_id=sale.warehouse_id,
                     client_id=sale.client_id,
                     amount=sale.total,
                     issued_at=date.today(),
@@ -114,7 +125,8 @@ class CreateSaleUseCase:
                     sale_id=sale.id,
                 )
                 debt.validate()
-                await uow.debts.add(debt)
+                debt = await uow.debts.add(debt)
+                await notify_debt_issued(uow, self._notifier, debt)
 
             change = (
                 sale.change_for(Money.of(cmd.cash_received))
@@ -130,6 +142,7 @@ class CreateSaleUseCase:
                 )
             )
             await uow.commit()
+            await invalidate_shop_cache(self._cache, uow)
             return CreateSaleResult(sale=sale, change=change)
 
     @staticmethod

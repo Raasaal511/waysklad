@@ -44,6 +44,7 @@ export function updateClient(
     city?: string
     debt_limit?: string | null
     is_active: boolean
+    force?: boolean
   },
 ) {
   return api.patch<Client>(`/counterparties/clients/${clientId}`, input)
@@ -55,4 +56,37 @@ export function listSuppliers() {
 
 export function createSupplier(input: { name: string; contact?: string; note?: string }) {
   return api.post<Supplier>('/counterparties/suppliers', input)
+}
+
+export interface ClientSummary {
+  client: Client
+  debt_balance: string
+  active_orders_count: number
+  open_tasks_count: number
+}
+
+export type ClientTimelineEventType =
+  | 'sale'
+  | 'order_created'
+  | 'order_status'
+  | 'debt_issued'
+  | 'debt_repaid'
+  | 'debt_extended'
+  | 'task'
+
+export interface ClientTimelineEvent {
+  type: ClientTimelineEventType
+  occurred_at: string
+  entity_id: number
+  title: string
+  amount: string | null
+  status: string | null
+}
+
+export function getClient(clientId: number) {
+  return api.get<ClientSummary>(`/counterparties/clients/${clientId}`)
+}
+
+export function getClientTimeline(clientId: number) {
+  return api.get<ClientTimelineEvent[]>(`/counterparties/clients/${clientId}/timeline`)
 }

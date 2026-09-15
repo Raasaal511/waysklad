@@ -3,12 +3,14 @@ from datetime import date
 
 from app.application.inventory.common import LineInput, build_lines, require_warehouse_access
 from app.domain.audit.entities import AuditEntry
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.common.money import Money
 from app.domain.common.uow import IUnitOfWork
 from app.domain.debts.entities import Debt
 from app.domain.identity.permissions import Actor, Permission, require
 from app.domain.inventory.entities import StockDocType, StockDocument
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)
@@ -18,11 +20,13 @@ class ReceiveGoodsCommand:
     note: str = ""
     supplier_id: int | None = None  # если указан — приёмка считается долгом поставщику
     debt_due_date: date | None = None  # «долг до», обязателен при supplier_id
+    client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
 
 
 class ReceiveGoodsUseCase:
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None):
         self._uow = uow
+        self._cache = cache
 
     async def execute(self, actor: Actor, cmd: ReceiveGoodsCommand) -> StockDocument:
         require(actor, Permission.STOCK_RECEIVE)
@@ -30,6 +34,11 @@ class ReceiveGoodsUseCase:
             raise DomainError("Для приёмки в долг нужно указать срок «Долг до»")
 
         async with self._uow as uow:
+            if cmd.client_op_id is not None:
+                existing = await uow.stock_documents.get_by_client_op_id(cmd.client_op_id)
+                if existing is not None:
+                    return existing
+
             await require_warehouse_access(uow, actor, cmd.warehouse_id)
             lines = await build_lines(uow, cmd.lines)
             document = StockDocument(
@@ -40,13 +49,30 @@ class ReceiveGoodsUseCase:
                 lines=lines,
                 supplier_id=cmd.supplier_id,
                 note=cmd.note,
+                client_op_id=cmd.client_op_id,
             )
             document.post()
             await uow.stock_documents.add(document)
+            if cmd.supplier_id is not None:
+                await uow.suppliers.link_to_warehouse(cmd.supplier_id, cmd.warehouse_id)
             for line in document.lines:
                 await uow.stock.change(
                     line.product_id, cmd.warehouse_id, line.quantity.value, line.variant_id
                 )
+
+            # закупочная цена товара = цена последней приёмки (по строкам этого
+            # документа, в порядке их следования) — иначе маржа/прибыль в
+            # аналитике продолжает считаться по устаревшей цене, пока владелец
+            # не поправит её вручную в карточке товара
+            last_cost_by_product: dict[int, Money] = {}
+            for line in document.lines:
+                if line.cost is not None:
+                    last_cost_by_product[line.product_id] = line.cost
+            for product_id, cost in last_cost_by_product.items():
+                product = await uow.products.get(product_id)
+                if product.purchase_price != cost:
+                    product.purchase_price = cost
+                    await uow.products.save(product)
 
             if cmd.supplier_id is not None:
                 total = Money.zero()
@@ -57,6 +83,7 @@ class ReceiveGoodsUseCase:
                     supplier = await uow.suppliers.get(cmd.supplier_id)
                     debt = Debt(
                         id=None,
+                        warehouse_id=cmd.warehouse_id,
                         supplier_id=supplier.id,
                         amount=total,
                         issued_at=date.today(),
@@ -74,4 +101,5 @@ class ReceiveGoodsUseCase:
                 )
             )
             await uow.commit()
+            await invalidate_shop_cache(self._cache, uow)
             return document

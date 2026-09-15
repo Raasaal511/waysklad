@@ -21,6 +21,8 @@ export interface Sale {
   total: string
   change: string | null
   cash_received: string | null
+  /** Сколько из сдачи клиент не забрал; на старых ответах может отсутствовать. */
+  change_kept?: string
   client_id: number | null
   created_at: string
   note: string
@@ -33,6 +35,7 @@ export interface ListSalesParams {
   limit?: number
   offset?: number
   clientId?: number | null
+  productId?: number | null
   warehouseId?: number | null
   paymentMethod?: PaymentMethod | 'all'
   dateFrom?: string | null
@@ -45,6 +48,7 @@ export async function listSales(params: ListSalesParams = {}) {
   if (params.limit != null) search.set('limit', String(params.limit))
   if (params.offset != null) search.set('offset', String(params.offset))
   if (params.clientId != null) search.set('client_id', String(params.clientId))
+  if (params.productId != null) search.set('product_id', String(params.productId))
   if (params.warehouseId != null) search.set('warehouse_id', String(params.warehouseId))
   if (params.paymentMethod && params.paymentMethod !== 'all') search.set('payment_method', params.paymentMethod)
   if (params.dateFrom) search.set('date_from', params.dateFrom)
@@ -115,6 +119,7 @@ export function createSale(input: {
   discount?: string
   client_id?: number | null
   cash_received?: string | null
+  change_kept?: string | null
   debt_due_date?: string | null
 }) {
   return api.post<Sale>('/sales', input)
@@ -162,6 +167,8 @@ export interface OfflineSaleInput {
   discount?: string
   client_id?: number | null
   cash_received?: string | null
+  change_kept?: string | null
+  debt_due_date?: string | null
 }
 
 export interface AppliedOfflineSale {

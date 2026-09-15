@@ -1,5 +1,22 @@
+import os
 import random
 from typing import AsyncIterator, Callable
+
+# до импорта app.main — тесты логинятся многократно в одном сценарии,
+# и лимит /auth/login иначе рвёт их посреди прогона
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+# тестовое окружение намеренно не хранит секретов — стартовая проверка
+# SECRET_KEY (см. app/main.py) иначе не даст приложению импортироваться
+os.environ["DEBUG"] = "true"
+# CACHE_REDIS_URL обязателен (deps/cache.py падает при старте без него) —
+# локальный Redis, отдельная логическая БД, чтобы не пересекаться с dev/prod
+os.environ.setdefault("CACHE_REDIS_URL", "redis://localhost:6379/15")
+# фиксированные логин/пароль — тесты admin-роутера логинятся через POST /api/admin/login
+os.environ.setdefault("ADMIN_LOGIN", "test-admin")
+os.environ.setdefault(
+    "ADMIN_PASSWORD_HASH",
+    "$2b$12$hVd0LRFO6SZp0qzOTV3pAOxTeF0fB18uj/us6lvrgGHJxvaQL4d/W",  # "test-admin-password"
+)
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -13,13 +30,17 @@ from app.domain.catalog.entities import Product
 from app.domain.common.money import Money
 from app.domain.common.quantity import UNITS
 from app.domain.common.phone import Phone
+from app.domain.customers.entities import Customer
 from app.domain.identity.entities import Role, Tenant, User, Warehouse
 from app.domain.identity.permissions import Actor
 from app.infrastructure.db.models.base import Base
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.files import LocalFileStorage
-from app.infrastructure.security import BcryptPasswordHasher
+from app.infrastructure.security import BcryptPasswordHasher, create_customer_access_token
 from app.main import app as fastapi_app
+from app.infrastructure.cache.redis_cache import RedisCache
+from app.infrastructure.config import settings
+from app.presentation.deps.cache import get_cache
 from app.presentation.deps.notifier import get_notifier
 from app.presentation.deps.security import get_file_storage
 from app.presentation.deps.uow import get_session_factory
@@ -142,13 +163,44 @@ def create_product(make_uow) -> Callable:
 @pytest.fixture
 async def client(db_session_factory, tmp_path) -> AsyncIterator[AsyncClient]:
     """HTTP-клиент FastAPI-приложения с подменённой тестовой БД и хранилищем файлов."""
+    # свежий RedisCache на тест: соединение привязано к event loop текущего
+    # теста (pytest-asyncio создаёт новый loop на каждую функцию), общий
+    # на модуль клиент из deps/cache.py пережить это не может — тестовая БД
+    # 15 flushdb'ится тут же, так что кеш предыдущего теста не просачивается
+    test_cache = RedisCache(settings.cache_redis_url)
+    await test_cache._redis.flushdb()
+    fastapi_app.dependency_overrides[get_cache] = lambda: test_cache
+
     fastapi_app.dependency_overrides[get_session_factory] = lambda: db_session_factory
     fastapi_app.dependency_overrides[get_file_storage] = lambda: LocalFileStorage(tmp_path)
     fastapi_app.dependency_overrides[get_notifier] = lambda: None  # без реальных HTTP-запросов в Telegram
     transport = ASGITransport(app=fastapi_app)
     async with AsyncClient(transport=transport, base_url="http://test") as http:
         yield http
+    await test_cache._redis.aclose()
     fastapi_app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def customer_headers(make_uow, random_phone) -> Callable:
+    """Authorization-заголовок авторизованного покупателя витрины — заводит
+    Customer напрямую через репозиторий (минуя реальный Telegram-флоу входа,
+    который не нужен тестировать здесь) и выдаёт обычный JWT.
+
+    Возвращает фабрику (headers, phone), а не готовый dict — каждый вызов
+    заводит НОВОГО покупателя (свой телефон), чтобы тесты на антиспам/лимиты
+    по телефону не пересекались с другими вызовами внутри теста; phone нужен
+    тестам, которые проверяют, что клиент в CRM создался с этим номером."""
+
+    async def make() -> tuple[dict, str]:
+        phone = random_phone()
+        async with make_uow() as uow:
+            customer = await uow.customers.add(Customer(id=None, phone=Phone(phone)))
+            await uow.commit()
+        token = create_customer_access_token(customer.id)
+        return {"Authorization": f"Bearer {token}"}, phone
+
+    return make
 
 
 @pytest.fixture

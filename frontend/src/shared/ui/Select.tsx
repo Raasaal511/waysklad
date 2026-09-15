@@ -6,6 +6,8 @@ import layoutStyles from './Layout.module.css'
 export interface SelectOption {
   value: string
   label: string
+  /** Текст для поиска/точного совпадения; по умолчанию = label */
+  searchText?: string
   disabled?: boolean
 }
 
@@ -46,16 +48,32 @@ export function Select({
       const trigger = triggerRef.current
       if (!trigger) return
       const rect = trigger.getBoundingClientRect()
-      setMenuStyle({
-        top: rect.bottom + 4,
-        left: rect.left,
-        width: rect.width,
-      })
+      // триггер полностью ушёл за пределы окна (проскроллили мимо) — закрываем список,
+      // а не тащим его вникуда за кнопкой
+      if (rect.bottom < 0 || rect.top > window.innerHeight) {
+        setOpen(false)
+        return
+      }
+      const margin = 8
+      // размер списка фиксирован (задан в CSS, не сжимаем и не переворачиваем) —
+      // если снизу не хватает места в границах модалки, поднимаем список выше,
+      // чтобы он целиком поместился над футером
+      const dialog = trigger.closest('[role="dialog"]')
+      const dialogRect = dialog?.getBoundingClientRect()
+      const footer = dialog?.querySelector('[class*="modal-footer"]')
+      const boundary = footer ? footer.getBoundingClientRect().top : (dialogRect ? dialogRect.bottom : window.innerHeight)
+      const menuHeight = menuRef.current?.offsetHeight ?? 0
+      const top = Math.max(margin, Math.min(rect.bottom + 4, boundary - menuHeight - margin))
+      setMenuStyle({ top, left: rect.left, width: rect.width })
     }
     updatePosition()
+    // после первого прохода список ещё не был в DOM, и его реальная высота не
+    // учтена (menuHeight=0) — пересчитываем на следующем кадре, когда он уже отрендерен
+    const raf = requestAnimationFrame(updatePosition)
     window.addEventListener('resize', updatePosition)
     window.addEventListener('scroll', updatePosition, true)
     return () => {
+      cancelAnimationFrame(raf)
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }

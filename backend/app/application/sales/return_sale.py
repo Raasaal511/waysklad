@@ -3,6 +3,7 @@ from datetime import date
 from decimal import Decimal
 
 from app.domain.audit.entities import AuditEntry
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.common.money import Money
 from app.domain.common.quantity import Quantity
@@ -10,6 +11,7 @@ from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Actor, Permission, require, require_warehouse
 from app.domain.sales.entities import Sale, SaleReturn, SaleReturnLine
 from app.domain.sales.payment import PaymentMethod
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)
@@ -23,6 +25,7 @@ class ReturnSaleCommand:
     sale_id: int
     items: list[ReturnItemInput]
     note: str = ""
+    client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
 
 
 @dataclass(frozen=True)
@@ -32,13 +35,19 @@ class ReturnSaleResult:
 
 
 class ReturnSaleUseCase:
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None):
         self._uow = uow
+        self._cache = cache
 
     async def execute(self, actor: Actor, cmd: ReturnSaleCommand) -> ReturnSaleResult:
         require(actor, Permission.SALES_RETURN)
 
         async with self._uow as uow:
+            if cmd.client_op_id is not None:
+                existing = await uow.sale_returns.get_by_client_op_id(cmd.client_op_id)
+                if existing is not None:
+                    return ReturnSaleResult(sale_return=existing, refund=Money.zero())
+
             sale = await uow.sales.get(cmd.sale_id)
             require_warehouse(actor, sale.warehouse_id)
             lines_by_id = {line.id: line for line in sale.lines}
@@ -67,7 +76,8 @@ class ReturnSaleUseCase:
                 refund = refund + sale_line.price * item.quantity
 
             sale_return = SaleReturn(
-                id=None, sale_id=sale.id, author_id=actor.id, lines=return_lines, note=cmd.note
+                id=None, sale_id=sale.id, author_id=actor.id, lines=return_lines, note=cmd.note,
+                client_op_id=cmd.client_op_id,
             )
             sale_return.validate()
 
@@ -90,6 +100,7 @@ class ReturnSaleUseCase:
                 )
             )
             await uow.commit()
+            await invalidate_shop_cache(self._cache, uow)
             return ReturnSaleResult(sale_return=sale_return, refund=refund)
 
     @staticmethod

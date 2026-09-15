@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { IconEye, IconEyeOff } from '@tabler/icons-react'
 import { login, registerShop } from '../../entities/auth/api'
 import { ApiError } from '../../shared/api/client'
@@ -15,6 +15,8 @@ type Mode = 'login' | 'register'
 export function LoginPage() {
   const auth = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const suspended = searchParams.get('reason') === 'suspended'
   // ThemeProvider уже применил на <html> сохранённые mode/accent (или дефолт light/green,
   // если на устройстве ещё никто не входил) — здесь просто читаем то же значение для логотипа
   const { mode: themeMode } = useTheme()
@@ -28,7 +30,9 @@ export function LoginPage() {
   const [shopName, setShopName] = useState('')
   const [ownerName, setOwnerName] = useState('')
 
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(
+    suspended ? 'Магазин заблокирован. Доступ временно ограничен.' : null,
+  )
   const [loading, setLoading] = useState(false)
 
   function switchMode(next: Mode) {
@@ -45,7 +49,11 @@ export function LoginPage() {
       auth.login(result, remember)
       navigate('/')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось войти')
+      if (err instanceof ApiError && err.status === 403) {
+        setError(err.message || 'Магазин заблокирован. Доступ временно ограничен.')
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Не удалось войти')
+      }
     } finally {
       setLoading(false)
     }
@@ -148,7 +156,9 @@ export function LoginPage() {
                     tabIndex={mode === 'login' ? 0 : -1}
                     aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                   >
-                    {showPassword ? <IconEyeOff size={18} stroke={1.8} /> : <IconEye size={18} stroke={1.8} />}
+                    <span key={showPassword ? 'off' : 'on'} className={styles['auth-password-toggle-icon']}>
+                      {showPassword ? <IconEyeOff size={18} stroke={1.8} /> : <IconEye size={18} stroke={1.8} />}
+                    </span>
                   </button>
                 </div>
               </label>
@@ -221,7 +231,9 @@ export function LoginPage() {
                     tabIndex={mode === 'register' ? 0 : -1}
                     aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                   >
-                    {showPassword ? <IconEyeOff size={18} stroke={1.8} /> : <IconEye size={18} stroke={1.8} />}
+                    <span key={showPassword ? 'off' : 'on'} className={styles['auth-password-toggle-icon']}>
+                      {showPassword ? <IconEyeOff size={18} stroke={1.8} /> : <IconEye size={18} stroke={1.8} />}
+                    </span>
                   </button>
                 </div>
               </label>

@@ -6,16 +6,6 @@
   flex-wrap: wrap;
 }
 
-.periodTabs {
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  align-self: flex-start;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius-sm) + 4px);
-}
-
 .periodNav {
   display: inline-flex;
   align-items: center;
@@ -168,33 +158,6 @@
   border-radius: calc(var(--radius-sm) + 4px);
 }
 
-.pillTab,
-.pillTabActive {
-  padding: 7px 14px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 14px;
-  font-weight: 500;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.pillTab:hover {
-  color: var(--text);
-  background: var(--bg-muted);
-}
-
-.pillTabActive {
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-}
-
-.pillTabActive:hover {
-  background: var(--accent-hover);
-}
-
 .sectionHeading {
   display: flex;
   align-items: center;
@@ -213,7 +176,17 @@
 .detailItem {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+}
+
+.detailItemHead .detailValue {
+  font-size: 15px;
+}
+
+.detailDivider {
+  align-self: stretch;
+  width: 1px;
+  background: var(--border);
 }
 
 .detailLabel {
@@ -232,29 +205,4 @@
 
 .marginCell {
   display: flex;
-}
-
-.marginBadge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.marginBadgeLow {
-  background: var(--danger-bg);
-  color: var(--danger);
-}
-
-.marginBadgeMid {
-  background: var(--warning-bg);
-  color: var(--warning);
-}
-
-.marginBadgeHigh {
-  background: var(--accent-soft);
-  color: var(--accent);
 }

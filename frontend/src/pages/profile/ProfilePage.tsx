@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { connectTelegram, getShop, updateShop, changePassword } from '../../entities/profile/api'
+import { connectTelegram, updateShop, changePassword, logoutAll } from '../../entities/profile/api'
 import type { Role } from '../../entities/auth/api'
 import type { Tenant, UpdateShopInput } from '../../entities/profile/api'
 import { ApiError } from '../../shared/api/client'
@@ -9,6 +9,7 @@ import { useTheme, type AccentColor } from '../../app/ThemeContext'
 import { useShop } from '../../app/ShopContext'
 import { useCatalog } from '../../app/CatalogContext'
 import { Modal } from '../../shared/ui/Modal'
+import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { IconCheck, IconBuildingWarehouse, IconChevronRight, IconPencil } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
@@ -61,69 +62,103 @@ export function ProfilePage() {
 }
 
 function PersonalizationTab() {
-  const { setShopName } = useShop()
-  const [shop, setShop] = useState<Tenant | null>(null)
-  const [name, setName] = useState('')
-  const [loading, setLoading] = useState(true)
+  const { shop, setShop, setShopName } = useShop()
+  const [name, setName] = useState(shop?.name ?? '')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
+  // shop грузится один раз в ShopProvider при старте приложения — если эта
+  // вкладка открылась раньше, чем ответ пришёл, просто ждём его, не запуская
+  // свой собственный запрос
   useEffect(() => {
-    getShop()
-      .then((s) => {
-        setShop(s)
-        setName(s.name)
-      })
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Не удалось загрузить магазин'))
-      .finally(() => setLoading(false))
-  }, [])
+    if (shop) setName(shop.name)
+  }, [shop])
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setSaved(false)
-    setSaving(true)
-    try {
-      const updated = await updateShop({ name })
-      setShop(updated)
-      setShopName(updated.name)
-      setSaved(true)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось сохранить')
-    } finally {
-      setSaving(false)
-    }
-  }
+  // Автосохранение с debounce вместо кнопки "Сохранить" — не шлём запрос на
+  // каждую нажатую клавишу, ждём паузу в наборе, как в поиске по товарам.
+  useEffect(() => {
+    if (!shop) return
+    const trimmed = name.trim()
+    if (trimmed === shop.name) return
+    if (!trimmed) return
+    const timer = setTimeout(async () => {
+      setError(null)
+      setSaved(false)
+      setSaving(true)
+      try {
+        const updated = await updateShop({ name: trimmed })
+        setShop(updated)
+        setShopName(updated.name)
+        setSaved(true)
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'Не удалось сохранить')
+      } finally {
+        setSaving(false)
+      }
+    }, 600)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, shop?.name])
 
-  if (loading) return <p className={layoutStyles.textMuted}>Загрузка…</p>
+  useEffect(() => {
+    if (!saved) return
+    const timer = setTimeout(() => setSaved(false), 2500)
+    return () => clearTimeout(timer)
+  }, [saved])
+
+  if (!shop) return <p className={layoutStyles.textMuted}>Загрузка…</p>
 
   return (
     <div className={layoutStyles.stack}>
       <ThemeSettings />
 
-      <form
-        className={[layoutStyles.form, layoutStyles.card, layoutStyles.cardFull].join(' ')}
-        onSubmit={handleSubmit}
-      >
+      <div className={[layoutStyles.stack, layoutStyles.card, layoutStyles.cardFull].join(' ')}>
         <div>
           <h3>Название магазина</h3>
           <p className={layoutStyles.textMuted}>Видно вам и сотрудникам в шапке интерфейса.</p>
         </div>
-        <label className={layoutStyles.field}>
+        <label className={[layoutStyles.field, styles.shopNameField].join(' ')}>
           Название
           <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} />
         </label>
-        {error && <p className={layoutStyles.error}>{error}</p>}
-        {saved && !error && (
-          <p className={layoutStyles.row} style={{ gap: 6 }}>
-            <IconCheck size={16} stroke={1.8} className={styles.iconAccent} /> Сохранено
-          </p>
+        <div className={styles.shopNameStatus}>
+          {saving && <span className={layoutStyles.textMuted}>Сохранение…</span>}
+          {!saving && saved && !error && (
+            <span className={layoutStyles.row} style={{ gap: 6 }}>
+              <IconCheck size={16} stroke={1.8} className={styles.iconAccent} /> Сохранено
+            </span>
+          )}
+          {error && <span className={layoutStyles.textDanger}>{error}</span>}
+        </div>
+      </div>
+
+      <StorefrontSettings shop={shop} />
+    </div>
+  )
+}
+
+function StorefrontSettings({ shop }: { shop: Tenant }) {
+  const storeUrl = shop.slug ? `${window.location.origin}/store/${shop.slug}` : null
+
+  return (
+    <div className={[layoutStyles.stack, layoutStyles.card, layoutStyles.cardFull].join(' ')}>
+      <div>
+        <h3>Публичная витрина</h3>
+        <p className={layoutStyles.textMuted}>
+          Включение, товары и заявки — в отдельном разделе меню.
+        </p>
+      </div>
+      <div className={layoutStyles.row} style={{ gap: 8, flexWrap: 'wrap' }}>
+        <Link to="/storefront">
+          <Button>Открыть раздел «Витрина»</Button>
+        </Link>
+        {shop.storefront_enabled && storeUrl && (
+          <a href={storeUrl} target="_blank" rel="noreferrer" className={styles.storefrontLink}>
+            {storeUrl}
+          </a>
         )}
-        <Button type="submit" disabled={saving || !shop}>
-          {saving ? 'Сохранение…' : 'Сохранить'}
-        </Button>
-      </form>
+      </div>
     </div>
   )
 }
@@ -188,8 +223,18 @@ function ThemeSettings() {
 }
 
 function AccountTab() {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const [showPasswordForm, setShowPasswordForm] = useState(false)
+  const [showLogoutAllConfirm, setShowLogoutAllConfirm] = useState(false)
+
+  async function handleLogoutAll() {
+    try {
+      await logoutAll()
+    } finally {
+      // токен этого устройства тоже отозван запросом выше — выходим и локально
+      logout()
+    }
+  }
 
   return (
     <div className={layoutStyles.stack}>
@@ -205,12 +250,34 @@ function AccountTab() {
             Сменить пароль
           </Button>
         </div>
+        <div className={[layoutStyles.row, layoutStyles.between].join(' ')}>
+          <div className={layoutStyles.stack} style={{ gap: 2 }}>
+            <span className={layoutStyles.textMuted}>Завершить все сессии</span>
+            <span className={layoutStyles.textMuted}>
+              Выйти на всех устройствах, включая текущее
+            </span>
+          </div>
+          <Button variant="secondary" onClick={() => setShowLogoutAllConfirm(true)}>
+            Выйти везде
+          </Button>
+        </div>
       </div>
 
       {showPasswordForm && (
         <Modal title="Сменить пароль" onClose={() => setShowPasswordForm(false)}>
           <ChangePasswordForm onDone={() => setShowPasswordForm(false)} />
         </Modal>
+      )}
+
+      {showLogoutAllConfirm && (
+        <ConfirmDialog
+          title="Выйти на всех устройствах?"
+          message="Все сессии, включая текущую, будут завершены — понадобится войти заново."
+          confirmLabel="Выйти везде"
+          danger
+          onConfirm={handleLogoutAll}
+          onClose={() => setShowLogoutAllConfirm(false)}
+        />
       )}
 
       <MyWarehouses />
@@ -272,19 +339,9 @@ function ConnectionsTab() {
 }
 
 function TelegramSettings() {
-  const [shop, setShop] = useState<Tenant | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { shop, setShop, refreshShop } = useShop()
   const [showForm, setShowForm] = useState(false)
-
-  function load() {
-    setLoading(true)
-    getShop()
-      .then(setShop)
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(load, [])
+  const loading = shop === null
 
   const connectedChatId = shop?.owner_telegram_chat_id ?? null
 
@@ -300,7 +357,7 @@ function TelegramSettings() {
           </p>
         </div>
         {!loading && (
-          <span className={`${layoutStyles.badge} ${connectedChatId ? layoutStyles.accent : ''}`}>
+          <span className={`badge${connectedChatId ? ' accent' : ''}`}>
             {connectedChatId ? 'Подключено' : 'Не подключено'}
           </span>
         )}
@@ -336,7 +393,7 @@ function TelegramSettings() {
           <TelegramConnectForm
             onDone={() => {
               setShowForm(false)
-              load()
+              refreshShop()
             }}
           />
         </Modal>
@@ -480,6 +537,7 @@ function TelegramConnectForm({ onDone }: { onDone: () => void }) {
 }
 
 function ChangePasswordForm({ onDone }: { onDone: () => void }) {
+  const { login } = useAuth()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -495,7 +553,10 @@ function ChangePasswordForm({ onDone }: { onDone: () => void }) {
     }
     setSaving(true)
     try {
-      await changePassword({ current_password: currentPassword, new_password: newPassword })
+      // смена пароля отзывает прежний токен (token_version) — сохраняем
+      // новый, иначе следующий же запрос разлогинит пользователя
+      const result = await changePassword({ current_password: currentPassword, new_password: newPassword })
+      login(result)
       onDone()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось сменить пароль')

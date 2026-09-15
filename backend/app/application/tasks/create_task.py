@@ -23,6 +23,7 @@ class CreateTaskCommand:
     product_id: int | None = None
     warehouse_id: int | None = None
     quantity: Decimal | None = None
+    client_id: int | None = None  # привязка к клиенту (CRM)
 
 
 class CreateTaskUseCase:
@@ -46,6 +47,9 @@ class CreateTaskUseCase:
                 if cmd.quantity is not None:
                     quantity = Quantity(cmd.quantity, product.unit)
 
+            if cmd.client_id is not None:
+                await uow.clients.get(cmd.client_id)  # проверка существования + tenant
+
             task = await uow.tasks.add(
                 Task(
                     id=None,
@@ -58,6 +62,7 @@ class CreateTaskUseCase:
                     product_id=cmd.product_id,
                     warehouse_id=cmd.warehouse_id,
                     quantity=quantity,
+                    client_id=cmd.client_id,
                 )
             )
             await uow.audit.add(

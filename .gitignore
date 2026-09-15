@@ -1,4 +1,4 @@
-README.md
+/README.md
 
 docs/
 
@@ -81,6 +81,9 @@ lerna-debug.log*
 
 # --- Backups ---
 backups/
+
+# --- Redis dump (локальный dev) ---
+dump.rdb
 
 # --- Uploads (фото товаров) ---
 backend/uploads/

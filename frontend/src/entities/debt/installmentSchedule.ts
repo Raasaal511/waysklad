@@ -14,6 +14,30 @@ export function addPeriod(date: Date, period: InstallmentPeriod, i: number): Dat
   return result
 }
 
+const MIN_PARTS = 2
+// Технический потолок против зацикливания при абсурдных вводах — не бизнес-лимit,
+// реальные графики (например год раз в неделю = 52 платежа) должны в него помещаться.
+const MAX_PARTS = 60
+
+// Сколько платежей с выбранной периодичностью уложится между первым платежом
+// и сроком «Долг до» — чтобы график заканчивался примерно к дедлайну, а не
+// растягивался/схлопывался относительно него.
+export function estimatePartsCount(
+  firstDate: string,
+  dueDate: string,
+  period: InstallmentPeriod,
+): number {
+  const first = new Date(firstDate)
+  const due = new Date(dueDate)
+  if (Number.isNaN(first.getTime()) || Number.isNaN(due.getTime()) || due <= first) return MIN_PARTS
+
+  let count = 1
+  while (count < MAX_PARTS && addPeriod(first, period, count) <= due) {
+    count += 1
+  }
+  return Math.min(Math.max(count, MIN_PARTS), MAX_PARTS)
+}
+
 // Делим сумму на равные копеечные доли без потери суммы — последний платёж
 // забирает остаток от деления, чтобы сумма графика сходилась с исходной день в
 // день (backend строго проверяет total == сумма, копейка мимо — отказ).

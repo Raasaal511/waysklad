@@ -2,9 +2,10 @@ import { createContext, useCallback, useContext, useRef, useState, type ReactNod
 import { listWarehouses, listStock, type Warehouse, type StockItem } from '../entities/inventory/api'
 import { listAllProducts, listUnits, listCategories, type Product, type Unit, type Category } from '../entities/product/api'
 import { listEmployees } from '../entities/profile/api'
+import { listSuppliers, type Supplier } from '../entities/counterparty/api'
 import type { User } from '../entities/auth/api'
 
-type CatalogKey = 'products' | 'warehouses' | 'units' | 'categories' | 'stock' | 'employees'
+type CatalogKey = 'products' | 'warehouses' | 'units' | 'categories' | 'stock' | 'employees' | 'suppliers'
 
 interface CatalogState {
   products: Product[]
@@ -13,6 +14,7 @@ interface CatalogState {
   categories: Category[]
   stock: StockItem[]
   employees: User[]
+  suppliers: Supplier[]
 }
 
 interface CatalogContextValue extends CatalogState {
@@ -22,6 +24,7 @@ interface CatalogContextValue extends CatalogState {
   ensureCategories: () => Promise<Category[]>
   ensureStock: () => Promise<StockItem[]>
   ensureEmployees: () => Promise<User[]>
+  ensureSuppliers: () => Promise<Supplier[]>
   refresh: (keys?: CatalogKey[]) => Promise<void>
 }
 
@@ -34,6 +37,7 @@ const LOADERS: Record<CatalogKey, () => Promise<unknown>> = {
   categories: () => listCategories(),
   stock: () => listStock(),
   employees: () => listEmployees(),
+  suppliers: () => listSuppliers(),
 }
 
 export function CatalogProvider({ children }: { children: ReactNode }) {
@@ -44,6 +48,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     categories: [],
     stock: [],
     employees: [],
+    suppliers: [],
   })
   const stateRef = useRef(state)
   stateRef.current = state
@@ -82,6 +87,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     ensureCategories: () => ensure('categories'),
     ensureStock: () => ensure('stock'),
     ensureEmployees: () => ensure('employees'),
+    ensureSuppliers: () => ensure('suppliers'),
     refresh,
   }
 

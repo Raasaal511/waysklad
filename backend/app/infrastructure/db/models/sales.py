@@ -27,12 +27,16 @@ class SaleModel(Base, TenantMixin, TimestampMixin):
     client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"))
     payment_method: Mapped[PaymentMethod] = mapped_column(PaymentMethodColumn)
     discount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    # уже полученная ранее предоплата (заказ) — уменьшает total, не revenue;
+    # отдельно от discount, см. Sale.prepayment в домене
+    prepayment: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)  # снимок суммы чека
     client_op_id: Mapped[str | None] = mapped_column(String(64))
     note: Mapped[str] = mapped_column(Text, default="")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     cash_received: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), default=None)
     order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"))
+    change_kept: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)  # клиент не забрал сдачу
 
     lines: Mapped[list["SaleLineModel"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"
@@ -53,11 +57,16 @@ class SaleLineModel(Base, TenantMixin):
 
 class SaleReturnModel(Base, TenantMixin, TimestampMixin):
     __tablename__ = "sale_returns"
+    __table_args__ = (
+        # идемпотентность офлайн-очереди: повторная отправка не создаст дубль
+        UniqueConstraint("tenant_id", "client_op_id"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     sale_id: Mapped[int] = mapped_column(ForeignKey("sales.id"))
     author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     note: Mapped[str] = mapped_column(Text, default="")
+    client_op_id: Mapped[str | None] = mapped_column(String(64))
 
     lines: Mapped[list["SaleReturnLineModel"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"

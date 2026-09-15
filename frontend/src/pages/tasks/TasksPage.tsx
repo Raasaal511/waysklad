@@ -12,6 +12,7 @@ import {
   type TaskStatus,
   type TaskHistoryEntry,
 } from '../../entities/task/api'
+import { searchClients, type Client } from '../../entities/counterparty/api'
 import { receiveGoods, type Warehouse, type StockItem } from '../../entities/inventory/api'
 import type { Product, Unit } from '../../entities/product/api'
 import { useCatalog } from '../../app/CatalogContext'
@@ -25,6 +26,8 @@ import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
 import { DateInput } from '../../shared/ui/DateInput'
 import { HistoryDisclosure } from '../../shared/ui/HistoryDisclosure'
+import kanban from '../../shared/ui/KanbanBoard.module.css'
+import { Avatar } from '../../shared/ui/Avatar'
 import {
   IconPlus,
   IconClock,
@@ -38,6 +41,7 @@ import {
   IconClipboardCheck,
   IconX,
   IconUserQuestion,
+  IconUser,
   type Icon as TablerIcon,
 } from '@tabler/icons-react'
 import layoutStyles from '../../shared/ui/Layout.module.css'
@@ -76,7 +80,8 @@ function formatTaskHistoryDetail(entry: TaskHistoryEntry): string | null {
   return null
 }
 
-const BOARD_STATUSES: TaskStatus[] = ['new', 'in_progress']
+const BOARD_STATUSES: TaskStatus[] = ['new', 'in_progress', 'done']
+const BOARD_DONE_PAGE_SIZE = 20
 
 const STATUS_ACCENT: Record<TaskStatus, string> = {
   new: 'var(--board-new)',
@@ -88,6 +93,7 @@ type Tab = 'active' | 'completed'
 type ViewMode = 'board' | 'table' | 'list' | 'calendar'
 
 const VIEW_MODE_KEY = 'tasks_view_mode'
+const TAB_KEY = 'tasks_tab'
 
 const VIEW_MODE_OPTIONS: { mode: ViewMode; label: string; icon: TablerIcon }[] = [
   { mode: 'board', label: 'Доска', icon: IconLayoutKanban },
@@ -135,11 +141,6 @@ function isOverdue(dueDate: string) {
   return new Date(dueDate) < today
 }
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/)
-  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase()
-}
-
 export function TasksPage() {
   const { user } = useAuth()
   const canAssignOthers = user?.role === 'owner' || user?.role === 'manager'
@@ -159,10 +160,15 @@ export function TasksPage() {
   } = useCatalog()
   const [activeTasks, setActiveTasks] = useState<Task[]>([])
   const [completedTasks, setCompletedTasks] = useState<Task[]>([])
+  const [boardDoneTasks, setBoardDoneTasks] = useState<Task[]>([])
+  const [boardDoneTotal, setBoardDoneTotal] = useState(0)
+  const [boardDoneLoadingMore, setBoardDoneLoadingMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [tab, setTab] = useState<Tab>('active')
+  const [tab, setTab] = useState<Tab>(
+    () => (localStorage.getItem(TAB_KEY) === 'completed' ? 'completed' : 'active'),
+  )
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem(VIEW_MODE_KEY)
     return isViewMode(saved) ? saved : 'board'
@@ -172,10 +178,15 @@ export function TasksPage() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [doneToast, setDoneToast] = useState<string | null>(null)
   const [completing, setCompleting] = useState<number | null>(null)
+  const [moving, setMoving] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     localStorage.setItem(VIEW_MODE_KEY, viewMode)
   }, [viewMode])
+
+  useEffect(() => {
+    localStorage.setItem(TAB_KEY, tab)
+  }, [tab])
 
   useEffect(() => {
     if (!doneToast) return
@@ -188,7 +199,7 @@ export function TasksPage() {
     try {
       const [active, completed] = await Promise.all([
         listActiveTasks(),
-        listCompletedTasks(),
+        listCompletedTasks({ limit: 200 }),
         canAssignOthers ? ensureEmployees() : Promise.resolve<User[]>([]),
         ensureProducts(),
         ensureWarehouses(),
@@ -196,11 +207,29 @@ export function TasksPage() {
         ensureStock(),
       ])
       setActiveTasks(active)
-      setCompletedTasks(completed)
+      setCompletedTasks(completed.items)
+      // BOARD_DONE_PAGE_SIZE (20) заведомо меньше лимита выше (200) — первая
+      // страница «доски» это просто срез уже загруженного, без второго запроса
+      setBoardDoneTasks(completed.items.slice(0, BOARD_DONE_PAGE_SIZE))
+      setBoardDoneTotal(completed.total)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось загрузить задачи')
     } finally {
       if (!silent) setLoading(false)
+    }
+  }
+
+  async function loadMoreBoardDone() {
+    if (boardDoneLoadingMore) return
+    setBoardDoneLoadingMore(true)
+    try {
+      const page = await listCompletedTasks({ limit: BOARD_DONE_PAGE_SIZE, offset: boardDoneTasks.length })
+      setBoardDoneTasks((prev) => [...prev, ...page.items])
+      setBoardDoneTotal(page.total)
+    } catch {
+      // тихая ошибка — пользователь может повторить нажатие «Показать ещё»
+    } finally {
+      setBoardDoneLoadingMore(false)
     }
   }
 
@@ -211,11 +240,27 @@ export function TasksPage() {
 
   async function moveTo(task: Task, newStatus: TaskStatus) {
     if (task.status === newStatus) return
+    if (moving.has(task.id)) return
+    setMoving((prev) => new Set(prev).add(task.id))
     try {
-      await changeTaskStatus(task.id, newStatus)
-      load(true)
+      const updated = await changeTaskStatus(task.id, newStatus)
+      // "done" — отдельный пагинированный список (total + "показать ещё"),
+      // трогать его локально небезопасно (собьётся offset пагинации) —
+      // только тут перезагружаем оба списка целиком. Обычное перемещение
+      // между активными колонками — просто замена карточки на месте.
+      if (task.status === 'done' || newStatus === 'done') {
+        load(true)
+      } else {
+        setActiveTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)))
+      }
     } catch {
       load(true)
+    } finally {
+      setMoving((prev) => {
+        const next = new Set(prev)
+        next.delete(task.id)
+        return next
+      })
     }
   }
 
@@ -354,7 +399,9 @@ export function TasksPage() {
       {error && <p className={layoutStyles.error}>{error}</p>}
       {loading ? (
         <p className={layoutStyles.textMuted}>Загрузка…</p>
-      ) : tab === 'active' && viewMode === 'table' ? (
+      ) : (
+      <div key={`${tab}-${viewMode}`} className={styles.viewContent}>
+      {tab === 'active' && viewMode === 'table' ? (
         <TasksTableView tasks={activeTasks} onSelect={setSelectedTask} />
       ) : tab === 'active' && viewMode === 'list' ? (
         activeTasks.length === 0 ? (
@@ -369,64 +416,66 @@ export function TasksPage() {
       ) : tab === 'active' && viewMode === 'calendar' ? (
         <TasksCalendarView tasks={activeTasks} onSelect={setSelectedTask} />
       ) : tab === 'active' ? (
-        <div className={styles.board} style={{ '--board-cols': BOARD_STATUSES.length } as CSSProperties}>
+        <div className={kanban.board} style={{ '--board-cols': BOARD_STATUSES.length } as CSSProperties}>
           {BOARD_STATUSES.map((status) => {
-            const columnTasks = activeTasks.filter((t) => t.status === status)
+            const columnTasks = status === 'done' ? boardDoneTasks : activeTasks.filter((t) => t.status === status)
+            const columnCount = status === 'done' ? boardDoneTotal : columnTasks.length
             return (
               <div
                 key={status}
-                className={`${styles.boardColumn}${dragOverStatus === status ? ` ${styles.boardColumnOver}` : ''}`}
+                className={`${kanban.column}${dragOverStatus === status ? ` ${kanban.columnOver}` : ''}`}
                 style={{ '--col-accent': STATUS_ACCENT[status] } as CSSProperties}
                 onDragOver={(e) => handleColumnDragOver(e, status)}
                 onDragLeave={() => setDragOverStatus((s) => (s === status ? null : s))}
                 onDrop={(e) => handleColumnDrop(e, status)}
               >
-                <div className={styles.boardColumnHead}>
-                  <span className={styles.boardDot} />
+                <div className={kanban.columnHead}>
+                  <span className={kanban.dot} />
                   <span>{STATUS_LABELS[status]}</span>
-                  <span className={styles.boardColumnCount}>{columnTasks.length}</span>
+                  <span className={kanban.columnCount}>{columnCount}</span>
                 </div>
-                <div className={styles.boardColumnBody}>
+                <div className={kanban.columnBody}>
                   {columnTasks.length === 0 ? (
                     status === 'new' ? (
                       <button
                         type="button"
-                        className={`${styles.boardEmpty} ${styles.boardEmptyAction}`}
+                        className={`${kanban.empty} ${kanban.emptyAction}`}
                         onClick={() => setShowForm(true)}
                       >
                         <IconPlus size={16} stroke={1.8} /> Создать задачу
                       </button>
                     ) : (
-                      <div className={styles.boardEmpty}>Пусто</div>
+                      <div className={kanban.empty}>Пусто</div>
                     )
                   ) : (
                     columnTasks.map((t) => {
                       const overdue = t.due_date != null && isOverdue(t.due_date)
+                      const draggableCard = status !== 'done'
                       return (
                         <div
                           key={t.id}
-                          className={`${styles.boardCard}${draggedId === t.id ? ` ${styles.boardCardDragging}` : ''}`}
-                          draggable
-                          onDragStart={() => handleDragStart(t)}
-                          onDragEnd={handleDragEnd}
+                          className={`${kanban.card}${draggedId === t.id ? ` ${kanban.cardDragging}` : ''}`}
+                          draggable={draggableCard}
+                          onDragStart={draggableCard ? () => handleDragStart(t) : undefined}
+                          onDragEnd={draggableCard ? handleDragEnd : undefined}
                           onClick={() => setSelectedTask(t)}
                         >
-                          <span className={styles.boardCardAccent} />
-                          <div className={styles.boardCardHead}>
-                            <span className={styles.boardCardNumber}>
+                          <span className={kanban.cardAccent} />
+                          <div className={kanban.cardHead}>
+                            <span className={kanban.cardNumber}>
                               №{t.number ?? t.id}
                             </span>
                             {t.type === 'restock' && (
-                              <span className={`${layoutStyles.badge} ${layoutStyles.accent}`}>
+                              <span className="badge accent">
                                 <IconTruck size={12} stroke={1.8} /> Дозаказ ×{formatQuantity(t.quantity ?? '1')}
                               </span>
                             )}
                           </div>
-                          <strong className={styles.boardCardClient}>{t.title}</strong>
-                          <div className={styles.boardCardFooter}>
+                          <strong className={kanban.cardTitle}>{t.title}</strong>
+                          <div className={kanban.cardFooter}>
                             {t.due_date ? (
                               <span
-                                className={`${styles.boardCardDue}${overdue ? ` ${styles.boardCardDueOverdue}` : ''}`}
+                                className={`${kanban.cardDue}${overdue ? ` ${kanban.cardDueOverdue}` : ''}`}
                               >
                                 <IconClock size={13} stroke={1.8} /> {formatDueDate(t.due_date)}
                               </span>
@@ -435,24 +484,28 @@ export function TasksPage() {
                             )}
                             <div className={styles.boardCardPeople}>
                               {t.created_by_name && (
-                                <span
-                                  className={`${styles.boardCardAvatar} ${styles.boardCardAvatarMuted}`}
-                                  title={`Создал: ${t.created_by_name}`}
-                                >
-                                  {initials(t.created_by_name)}
-                                </span>
+                                <Avatar name={t.created_by_name} variant="muted" title={`Создал: ${t.created_by_name}`} />
                               )}
-                              <span
-                                className={styles.boardCardAvatar}
+                              <Avatar
+                                name={t.assigned_user_name}
+                                icon={<IconUserQuestion size={13} stroke={1.8} />}
                                 title={t.assigned_user_name ? `Назначено: ${t.assigned_user_name}` : 'Не назначено'}
-                              >
-                                {t.assigned_user_name ? initials(t.assigned_user_name) : <IconUserQuestion size={13} stroke={1.8} />}
-                              </span>
+                              />
                             </div>
                           </div>
                         </div>
                       )
                     })
+                  )}
+                  {status === 'done' && boardDoneTasks.length < boardDoneTotal && (
+                    <button
+                      type="button"
+                      className={kanban.loadMore}
+                      onClick={loadMoreBoardDone}
+                      disabled={boardDoneLoadingMore}
+                    >
+                      {boardDoneLoadingMore ? 'Загрузка…' : `Показать ещё (${boardDoneTotal - boardDoneTasks.length})`}
+                    </button>
                   )}
                 </div>
               </div>
@@ -476,23 +529,19 @@ export function TasksPage() {
               </div>
               <div className={styles.boardCardPeople}>
                 {t.created_by_name && (
-                  <span
-                    className={`${styles.boardCardAvatar} ${styles.boardCardAvatarMuted}`}
-                    title={`Создал: ${t.created_by_name}`}
-                  >
-                    {initials(t.created_by_name)}
-                  </span>
+                  <Avatar name={t.created_by_name} variant="muted" title={`Создал: ${t.created_by_name}`} />
                 )}
-                <span
-                  className={styles.boardCardAvatar}
+                <Avatar
+                  name={t.assigned_user_name}
+                  icon={<IconUserQuestion size={13} stroke={1.8} />}
                   title={t.assigned_user_name ? `Назначено: ${t.assigned_user_name}` : 'Не назначено'}
-                >
-                  {t.assigned_user_name ? initials(t.assigned_user_name) : <IconUserQuestion size={13} stroke={1.8} />}
-                </span>
+                />
               </div>
             </div>
           ))}
         </div>
+      )}
+      </div>
       )}
     </div>
   )
@@ -548,14 +597,14 @@ function TasksTableView({ tasks, onSelect }: { tasks: Task[]; onSelect: (task: T
               <span>
                 {t.title}
                 {t.type === 'restock' && (
-                  <span className={`${layoutStyles.badge} ${layoutStyles.accent}`} style={{ marginLeft: 6 }}>
+                  <span className="badge accent" style={{ marginLeft: 6 }}>
                     <IconTruck size={12} stroke={1.8} /> Дозаказ ×{formatQuantity(t.quantity ?? '1')}
                   </span>
                 )}
               </span>
               <span className={layoutStyles.textMuted}>{t.assigned_user_name ?? '—'}</span>
               <span className={layoutStyles.textMuted}>{t.created_by_name ?? '—'}</span>
-              <span className={layoutStyles.badge}>{STATUS_LABELS[t.status]}</span>
+              <span className="badge">{STATUS_LABELS[t.status]}</span>
               <span className={overdue ? styles.boardCardDueOverdue : layoutStyles.textMuted}>
                 {t.due_date ? formatDueDate(t.due_date) : '—'}
               </span>
@@ -586,7 +635,7 @@ function TaskListRow({
           <strong>№{task.number ?? task.id}</strong>
           <span>{task.title}</span>
           {task.type === 'restock' && (
-            <span className={`${layoutStyles.badge} ${layoutStyles.accent}`}>
+            <span className="badge accent">
               <IconTruck size={12} stroke={1.8} /> Дозаказ ×{formatQuantity(task.quantity ?? '1')}
             </span>
           )}
@@ -600,19 +649,13 @@ function TaskListRow({
       <div className={layoutStyles.row} style={{ gap: 10 }}>
         <div className={styles.boardCardPeople}>
           {task.created_by_name && (
-            <span
-              className={`${styles.boardCardAvatar} ${styles.boardCardAvatarMuted}`}
-              title={`Создал: ${task.created_by_name}`}
-            >
-              {initials(task.created_by_name)}
-            </span>
+            <Avatar name={task.created_by_name} variant="muted" title={`Создал: ${task.created_by_name}`} />
           )}
-          <span
-            className={styles.boardCardAvatar}
+          <Avatar
+            name={task.assigned_user_name}
+            icon={<IconUserQuestion size={13} stroke={1.8} />}
             title={task.assigned_user_name ? `Назначено: ${task.assigned_user_name}` : 'Не назначено'}
-          >
-            {task.assigned_user_name ? initials(task.assigned_user_name) : <IconUserQuestion size={13} stroke={1.8} />}
-          </span>
+          />
         </div>
         {next && (
           <Button
@@ -735,19 +778,13 @@ function TasksCalendarView({ tasks, onSelect }: { tasks: Task[]; onSelect: (task
                 </div>
                 <div className={styles.boardCardPeople}>
                   {t.created_by_name && (
-                    <span
-                      className={`${styles.boardCardAvatar} ${styles.boardCardAvatarMuted}`}
-                      title={`Создал: ${t.created_by_name}`}
-                    >
-                      {initials(t.created_by_name)}
-                    </span>
+                    <Avatar name={t.created_by_name} variant="muted" title={`Создал: ${t.created_by_name}`} />
                   )}
-                  <span
-                    className={styles.boardCardAvatar}
+                  <Avatar
+                    name={t.assigned_user_name}
+                    icon={<IconUserQuestion size={13} stroke={1.8} />}
                     title={t.assigned_user_name ? `Назначено: ${t.assigned_user_name}` : 'Не назначено'}
-                  >
-                    {t.assigned_user_name ? initials(t.assigned_user_name) : <IconUserQuestion size={13} stroke={1.8} />}
-                  </span>
+                  />
                 </div>
               </div>
             ))}
@@ -806,9 +843,9 @@ function TaskDetail({
     <div className={layoutStyles.stack}>
       <div className={`${layoutStyles.row} ${layoutStyles.between} ${layoutStyles.wrap}`} style={{ gap: 8 }}>
         <div className={`${layoutStyles.row} ${layoutStyles.wrap}`} style={{ gap: 6 }}>
-          <span className={`${layoutStyles.badge} ${layoutStyles.accent}`}>{STATUS_LABELS[task.status]}</span>
+          <span className="badge accent">{STATUS_LABELS[task.status]}</span>
           {task.type === 'restock' && (
-            <span className={layoutStyles.badge}>
+            <span className="badge">
               <IconTruck size={12} stroke={1.8} /> Дозаказ
             </span>
           )}
@@ -827,9 +864,7 @@ function TaskDetail({
       )}
       <div className={styles.metaGrid}>
         <div className={styles.personCard}>
-          <span className={`${styles.boardCardAvatar} ${styles.personCardAvatar}`}>
-            {task.assigned_user_name ? initials(task.assigned_user_name) : <IconUserQuestion size={16} stroke={1.8} />}
-          </span>
+          <Avatar name={task.assigned_user_name} size="md" icon={<IconUserQuestion size={16} stroke={1.8} />} />
           <span className={styles.personCardBody}>
             <span className={layoutStyles.fieldLabel}>Исполнитель</span>
             <Select
@@ -916,11 +951,19 @@ function NewTaskForm({
   const [note, setNote] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [assignedUserId, setAssignedUserId] = useState<number | null>(user?.id ?? null)
+  const [clientId, setClientId] = useState<number | null>(null)
+  const [clients, setClients] = useState<Client[]>([])
   const [productId, setProductId] = useState<number | null>(null)
   const [warehouseId, setWarehouseId] = useState<number | null>(warehouses[0]?.id ?? null)
   const [quantity, setQuantity] = useState('1')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    searchClients('')
+      .then(setClients)
+      .catch(() => {})
+  }, [])
 
   const assigneeOptions = user
     ? [
@@ -931,6 +974,10 @@ function NewTaskForm({
 
   const productOptions = products.map((p) => ({ value: String(p.id), label: p.name }))
   const warehouseOptions = warehouses.map((w) => ({ value: String(w.id), label: w.name }))
+  const clientOptions = [
+    { value: '', label: 'Без клиента' },
+    ...clients.map((c) => ({ value: String(c.id), label: c.name })),
+  ]
 
   const selectedProduct = productId != null ? products.find((p) => p.id === productId) ?? null : null
   const unitName = (code: string) => units.find((u) => u.code === code)?.name ?? code
@@ -962,6 +1009,7 @@ function NewTaskForm({
           assigned_user_id: assignedUserId,
           note,
           due_date: dueDate || null,
+          client_id: clientId,
         })
       } else {
         await createTask({
@@ -969,6 +1017,7 @@ function NewTaskForm({
           assigned_user_id: assignedUserId,
           note,
           due_date: dueDate || null,
+          client_id: clientId,
         })
       }
       onDone()
@@ -981,14 +1030,6 @@ function NewTaskForm({
 
   return (
     <form className={layoutStyles.form} onSubmit={handleSubmit}>
-      <label className={layoutStyles.field}>
-        Тип задачи
-        <Select
-          value={type}
-          onChange={(v) => setType(v as TaskType)}
-          options={TASK_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-        />
-      </label>
       {type === 'restock' ? (
         <>
           <label className={layoutStyles.field}>
@@ -1040,24 +1081,56 @@ function NewTaskForm({
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Позвонить поставщику" autoFocus />
         </label>
       )}
-      {canAssignOthers && (
-        <label className={layoutStyles.field}>
-          Исполнитель
-          <Select
-            value={assignedUserId != null ? String(assignedUserId) : ''}
-            onChange={(v) => setAssignedUserId(Number(v))}
-            options={assigneeOptions}
-          />
-        </label>
-      )}
-      <label className={layoutStyles.field}>
-        Срок
-        <DateInput value={dueDate} onChange={setDueDate} />
-      </label>
       <label className={layoutStyles.field}>
         Заметка
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="детали…" />
+        <textarea
+          className={styles.taskFormNote}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="детали…"
+          rows={5}
+        />
       </label>
+      <label className={layoutStyles.field}>
+        Клиент
+        <Select
+          value={clientId != null ? String(clientId) : ''}
+          onChange={(v) => setClientId(v ? Number(v) : null)}
+          options={clientOptions}
+        />
+      </label>
+      <div className={styles.taskFormMetaRow}>
+        <label className={layoutStyles.field}>
+          Тип задачи
+          <div className={styles.taskFormIconField}>
+            <IconClipboardCheck size={16} stroke={1.8} className={styles.taskFormIconFieldIcon} />
+            <Select
+              className={styles.taskFormIconFieldControl}
+              value={type}
+              onChange={(v) => setType(v as TaskType)}
+              options={TASK_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+            />
+          </div>
+        </label>
+        {canAssignOthers && (
+          <label className={layoutStyles.field}>
+            Исполнитель
+            <div className={styles.taskFormIconField}>
+              <IconUser size={16} stroke={1.8} className={styles.taskFormIconFieldIcon} />
+              <Select
+                className={styles.taskFormIconFieldControl}
+                value={assignedUserId != null ? String(assignedUserId) : ''}
+                onChange={(v) => setAssignedUserId(Number(v))}
+                options={assigneeOptions}
+              />
+            </div>
+          </label>
+        )}
+        <label className={layoutStyles.field}>
+          Срок
+          <DateInput value={dueDate} onChange={setDueDate} />
+        </label>
+      </div>
       {error && <p className={layoutStyles.error}>{error}</p>}
       <Button
         type="submit"

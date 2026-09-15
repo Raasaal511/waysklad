@@ -1,4 +1,5 @@
 from datetime import date, datetime, time, timezone
+from decimal import Decimal
 
 from sqlalchemy import func, select, update
 
@@ -78,6 +79,22 @@ class SqlAlchemyNotificationRepository(SqlAlchemyRepository, INotificationReposi
             NotificationModel.created_at <= day_end,
         )
         return (await self._session.execute(stmt)).scalar_one() > 0
+
+    async def last_snapshot_value(
+        self, user_id: int, kind: NotificationKind, entity_id: int
+    ) -> Decimal | None:
+        stmt = (
+            select(NotificationModel.snapshot_value)
+            .where(
+                NotificationModel.tenant_id == self._tenant,
+                NotificationModel.user_id == user_id,
+                NotificationModel.kind == kind,
+                NotificationModel.entity_id == entity_id,
+            )
+            .order_by(NotificationModel.id.desc())
+            .limit(1)
+        )
+        return (await self._session.execute(stmt)).scalar_one_or_none()
 
     async def _get_model(self, notification_id: int) -> NotificationModel:
         model = (

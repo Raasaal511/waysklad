@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { Link } from 'react-router-dom'
-import { listDocuments, exportDocuments, type DocumentHistoryEntry, type ExportFormat } from '../../entities/inventory/api'
+import { Link, useSearchParams } from 'react-router-dom'
+import { listDocuments, getDocument, exportDocuments, type DocumentHistoryEntry, type ExportFormat } from '../../entities/inventory/api'
 import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
 import { useCatalog } from '../../app/CatalogContext'
@@ -8,6 +8,7 @@ import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
 import { DropdownMenu } from '../../shared/ui/DropdownMenu'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
+import { PillTabs } from '../../shared/ui/PillTabs'
 import { formatQuantity, formatMoney } from '../../shared/lib/format'
 import { IconChevronLeft, IconDownload, IconChevronDown } from '@tabler/icons-react'
 import layoutStyles from '../../shared/ui/Layout.module.css'
@@ -82,6 +83,7 @@ function documentTotal(doc: DocumentHistoryEntry): number | null {
 export function MovementHistoryPage() {
   const { user } = useAuth()
   const canSeeEmployees = user?.role === 'owner' || user?.role === 'manager'
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const { warehouses, products, units, employees, ensureWarehouses, ensureProducts, ensureUnits, ensureEmployees } =
     useCatalog()
@@ -116,6 +118,31 @@ export function MovementHistoryPage() {
 
   useEffect(() => {
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ?open=id — точечная загрузка документа (из уведомления/ссылки)
+  useEffect(() => {
+    const openId = searchParams.get('open')
+    if (!openId) return
+    const id = Number(openId)
+    if (!Number.isFinite(id)) return
+    getDocument(id)
+      .then((doc) => {
+        setDocuments((prev) => (prev.some((d) => d.id === doc.id) ? prev : [doc, ...prev]))
+        setExpandedId(doc.id)
+      })
+      .catch(() => {})
+      .finally(() => {
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('open')
+            return next
+          },
+          { replace: true },
+        )
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -176,19 +203,12 @@ export function MovementHistoryPage() {
       </div>
       {exportError && <p className={layoutStyles.error}>{exportError}</p>}
 
-      <div className={styles['period-tabs']}>
-        {(Object.keys(PERIOD_LABELS) as PeriodFilter[]).map((p) => (
-          <button
-            key={p}
-            type="button"
-            translate="no"
-            className={period === p ? styles.pillTabActive : styles.pillTab}
-            onClick={() => setPeriod(p)}
-          >
-            {PERIOD_LABELS[p]}
-          </button>
-        ))}
-      </div>
+      <PillTabs
+        value={period}
+        options={Object.keys(PERIOD_LABELS) as PeriodFilter[]}
+        labels={PERIOD_LABELS}
+        onChange={setPeriod}
+      />
 
       <div className={[layoutStyles.row, layoutStyles.wrap].join(' ')} style={{ gap: 14, alignItems: 'end' }}>
         {warehouses.length > 1 && (
@@ -267,7 +287,7 @@ export function MovementHistoryPage() {
                 >
                   <div className={layoutStyles.stack} style={{ gap: 4, flex: 1 }}>
                     <div className={[layoutStyles.row, layoutStyles.wrap].join(' ')} style={{ gap: 8 }}>
-                      <span className={[layoutStyles.badge, layoutStyles.accent].join(' ')}>
+                      <span className="badge accent">
                         {MODE_LABELS[doc.type]}
                       </span>
                       <span className={layoutStyles.textMuted}>№{doc.number}</span>

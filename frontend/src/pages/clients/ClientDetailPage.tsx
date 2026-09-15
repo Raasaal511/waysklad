@@ -16,17 +16,19 @@ import {
   IconCalendarRepeat,
   IconPencil,
 } from '@tabler/icons-react'
-import { searchClients, updateClient, type Client } from '../../entities/counterparty/api'
+import { searchClients, updateClient, getClient, getClientTimeline, type Client, type ClientTimelineEvent, type ClientSummary } from '../../entities/counterparty/api'
 import { listClientDebts, type Debt } from '../../entities/debt/api'
 import { DebtCard } from '../../entities/debt/DebtCard'
 import { listSales, getSale, type Sale } from '../../entities/sale/api'
-import { listDocuments, type DocumentHistoryEntry } from '../../entities/inventory/api'
+import { getDocument, type DocumentHistoryEntry } from '../../entities/inventory/api'
 import { useCatalog } from '../../app/CatalogContext'
 import { ApiError } from '../../shared/api/client'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Modal } from '../../shared/ui/Modal'
+import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
+import { DateInput } from '../../shared/ui/DateInput'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
 import { daysOverdue, pluralDays } from '../../entities/debt/dueDate'
@@ -110,8 +112,10 @@ export function ClientDetailPage() {
   const { products: debtProducts, units: debtUnits, ensureProducts, ensureUnits } = useCatalog()
 
   const [client, setClient] = useState<Client | null>(null)
+  const [summary, setSummary] = useState<ClientSummary | null>(null)
   const [debts, setDebts] = useState<Debt[] | null>(null)
   const [sales, setSales] = useState<Sale[] | null>(null)
+  const [timeline, setTimeline] = useState<ClientTimelineEvent[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<'debts' | 'sales' | 'history'>('debts')
@@ -120,11 +124,8 @@ export function ClientDetailPage() {
   const [debtSale, setDebtSale] = useState<Sale | null>(null)
   const [debtReceipt, setDebtReceipt] = useState<DocumentHistoryEntry | null>(null)
   const [debtLoading, setDebtLoading] = useState(false)
-
-  async function loadClient() {
-    const clients = await searchClients('', true)
-    setClient(clients.find((c) => c.id === clientId) ?? null)
-  }
+  const [debtsAsOf, setDebtsAsOf] = useState('')
+  const [debtsBalance, setDebtsBalance] = useState<string | null>(null)
 
   async function openDebt(debtId: number) {
     setOpenDebtId(debtId)
@@ -136,9 +137,13 @@ export function ClientDetailPage() {
         setDebtSale(s)
         setDebtReceipt(null)
       } else if (target?.receipt_document_id != null) {
-        const [documents] = await Promise.all([listDocuments(), ensureProducts(), ensureUnits()])
+        const [doc] = await Promise.all([
+          getDocument(target.receipt_document_id),
+          ensureProducts(),
+          ensureUnits(),
+        ])
         setDebtSale(null)
-        setDebtReceipt(documents.find((doc) => doc.id === target.receipt_document_id) ?? null)
+        setDebtReceipt(doc)
       } else {
         setDebtSale(null)
         setDebtReceipt(null)
@@ -149,8 +154,15 @@ export function ClientDetailPage() {
   }
 
   async function reloadOpenDebt() {
-    const debtsSummary = await listClientDebts(clientId)
+    const debtsSummary = await listClientDebts(clientId, debtsAsOf || undefined)
     setDebts(debtsSummary.debts)
+    setDebtsBalance(debtsSummary.total_balance)
+  }
+
+  async function reloadDebts(on?: string) {
+    const debtsSummary = await listClientDebts(clientId, on || undefined)
+    setDebts(debtsSummary.debts)
+    setDebtsBalance(debtsSummary.total_balance)
   }
 
   useEffect(() => {
@@ -158,17 +170,43 @@ export function ClientDetailPage() {
     async function load() {
       setLoading(true)
       try {
-        const [clients, debtsSummary, salesResult] = await Promise.all([
-          searchClients('', true),
+        const [summaryData, debtsSummary, salesResult, timelineData] = await Promise.all([
+          getClient(clientId),
           listClientDebts(clientId),
           listSales({ clientId, limit: 200 }),
+          getClientTimeline(clientId),
         ])
         if (cancelled) return
-        setClient(clients.find((c) => c.id === clientId) ?? null)
+        setSummary(summaryData)
+        setClient(summaryData.client)
         setDebts(debtsSummary.debts)
+        setDebtsBalance(debtsSummary.total_balance)
         setSales(salesResult.items)
+        setTimeline(timelineData)
       } catch (err) {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : 'Не удалось загрузить клиента')
+        if (!cancelled) {
+          // fallback: старый путь через поиск, если summary недоступен
+          try {
+            const [clients, debtsSummary, salesResult] = await Promise.all([
+              searchClients('', true),
+              listClientDebts(clientId),
+              listSales({ clientId, limit: 200 }),
+            ])
+            if (cancelled) return
+            setClient(clients.find((c) => c.id === clientId) ?? null)
+            setDebts(debtsSummary.debts)
+            setDebtsBalance(debtsSummary.total_balance)
+            setSales(salesResult.items)
+          } catch (fallbackErr) {
+            setError(
+              fallbackErr instanceof ApiError
+                ? fallbackErr.message
+                : err instanceof ApiError
+                  ? err.message
+                  : 'Не удалось загрузить клиента',
+            )
+          }
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -182,8 +220,11 @@ export function ClientDetailPage() {
   const activeDebts = useMemo(() => (debts ?? []).filter((d) => !d.is_closed), [debts])
   const closedDebts = useMemo(() => (debts ?? []).filter((d) => d.is_closed), [debts])
   const totalBalance = useMemo(
-    () => activeDebts.reduce((sum, d) => sum + Number(d.balance), 0),
-    [activeDebts],
+    () =>
+      summary
+        ? Number(summary.debt_balance)
+        : activeDebts.reduce((sum, d) => sum + Number(d.balance), 0),
+    [summary, activeDebts],
   )
   const totalPurchased = useMemo(
     () => (sales ?? []).reduce((sum, s) => sum + Number(s.total), 0),
@@ -191,39 +232,6 @@ export function ClientDetailPage() {
   )
   const reputation = useMemo(() => computeReputation(debts ?? []), [debts])
   const ReputationIcon = REPUTATION_ICON[reputation.level]
-
-  // Единая лента событий клиента — долги (выдача/оплата/продление) и продажи,
-  // слитые из уже загруженных данных и отсортированные по времени. Отдельного
-  // бэкенд-эндпоинта для этого нет: всё собирается из debts.repayments/extensions
-  // (они уже приходят вместе с долгом) и списка продаж.
-  type HistoryEvent = {
-    at: string
-    kind: 'issue' | 'repay' | 'extend' | 'sale'
-    amount?: string
-    note?: string
-    debtId?: number
-    saleId?: number
-  }
-  const history = useMemo(() => {
-    const events: HistoryEvent[] = []
-    for (const d of debts ?? []) {
-      events.push({ at: d.issued_at, kind: 'issue', amount: d.amount, debtId: d.id })
-      for (const r of d.repayments)
-        events.push({ at: r.on, kind: 'repay', amount: r.amount, note: r.note, debtId: d.id })
-      for (const e of d.extensions)
-        events.push({
-          at: e.created_at,
-          kind: 'extend',
-          note: e.old_due_date
-            ? `${formatDate(e.old_due_date)} → ${formatDate(e.new_due_date)}${e.reason ? ` — ${e.reason}` : ''}`
-            : `новый срок ${formatDate(e.new_due_date)}${e.reason ? ` — ${e.reason}` : ''}`,
-          debtId: d.id,
-        })
-    }
-    for (const s of sales ?? [])
-      events.push({ at: s.created_at, kind: 'sale', amount: s.total, saleId: s.id })
-    return events.sort((a, b) => b.at.localeCompare(a.at))
-  }, [debts, sales])
 
   if (!loading && !client) {
     return (
@@ -253,7 +261,7 @@ export function ClientDetailPage() {
             <div className={styles['client-detail-heading']}>
               <div className={layoutStyles.row} style={{ gap: 6 }}>
                 <h2>{client.name}</h2>
-                {!client.is_active && <span className={layoutStyles.badge}>Неактивен</span>}
+                {!client.is_active && <span className="badge">Неактивен</span>}
                 <IconButton
                   variant="muted"
                   tooltip="Изменить клиента"
@@ -314,14 +322,36 @@ export function ClientDetailPage() {
                 <span>Долгов закрыто</span>
               </div>
             </div>
+            {summary && (
+              <>
+                <div className={styles['client-metric']}>
+                  <span className={styles['client-metric-icon']}>
+                    <IconCalendarRepeat size={16} stroke={1.8} />
+                  </span>
+                  <div className={styles['client-metric-body']}>
+                    <strong>{summary.active_orders_count}</strong>
+                    <span>Активных заказов</span>
+                  </div>
+                </div>
+                <div className={styles['client-metric']}>
+                  <span className={styles['client-metric-icon']}>
+                    <IconShieldCheck size={16} stroke={1.8} />
+                  </span>
+                  <div className={styles['client-metric-body']}>
+                    <strong>{summary.open_tasks_count}</strong>
+                    <span>Открытых задач</span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="sale-period-tabs">
             <Button variant="secondary" active={tab === 'debts'} onClick={() => setTab('debts')}>
-              Долги{debts ? ` ${debts.length}` : ''}
+              Долги{debts && debts.length > 0 && <span className={layoutStyles.countBadge}>{debts.length}</span>}
             </Button>
             <Button variant="secondary" active={tab === 'sales'} onClick={() => setTab('sales')}>
-              Покупки{sales ? ` ${sales.length}` : ''}
+              Покупки{sales && sales.length > 0 && <span className={layoutStyles.countBadge}>{sales.length}</span>}
             </Button>
             <Button variant="secondary" active={tab === 'history'} onClick={() => setTab('history')}>
               История
@@ -337,6 +367,34 @@ export function ClientDetailPage() {
               <p className={layoutStyles.textMuted}>Долгов пока нет</p>
             ) : (
               <div className={layoutStyles.stack} style={{ gap: 16 }}>
+                <div className={layoutStyles.row} style={{ gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <label className={layoutStyles.field} style={{ margin: 0, minWidth: 180 }}>
+                    Сверка на дату
+                    <DateInput
+                      value={debtsAsOf}
+                      onChange={(v) => {
+                        setDebtsAsOf(v)
+                        reloadDebts(v).catch(() => {})
+                      }}
+                    />
+                  </label>
+                  {debtsAsOf && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setDebtsAsOf('')
+                        reloadDebts().catch(() => {})
+                      }}
+                    >
+                      Сейчас
+                    </Button>
+                  )}
+                  {debtsBalance != null && (
+                    <span className={layoutStyles.textMuted}>
+                      Баланс{debtsAsOf ? ` на ${debtsAsOf}` : ''}: {formatMoney(debtsBalance)} ₽
+                    </span>
+                  )}
+                </div>
                 <div className={debtsStyles['debt-closed-group']}>
                   <div className={debtsStyles['debt-closed-group-head']}>
                     Текущие долги{activeDebts.length > 0 ? ` · ${activeDebts.length}` : ''}
@@ -393,16 +451,23 @@ export function ClientDetailPage() {
             ))}
 
           {tab === 'history' &&
-            (debts === null || sales === null ? (
+            (timeline === null ? (
               <p className={layoutStyles.textMuted}>Загрузка…</p>
-            ) : history.length === 0 ? (
+            ) : timeline.length === 0 ? (
               <p className={layoutStyles.textMuted}>Событий пока нет</p>
             ) : (
               <div className={styles['client-history-list']}>
-                {history.map((ev, i) => {
+                {timeline.map((ev, i) => {
                   const Icon =
-                    ev.kind === 'sale' ? IconReceipt2 : ev.kind === 'repay' ? IconCash : IconCalendarRepeat
-                  const clickable = ev.debtId != null || ev.saleId != null
+                    ev.type === 'sale'
+                      ? IconReceipt2
+                      : ev.type === 'debt_repaid'
+                        ? IconCash
+                        : ev.type === 'task'
+                          ? IconShieldCheck
+                          : IconCalendarRepeat
+                  const debtClickable =
+                    ev.type === 'debt_issued' || ev.type === 'debt_repaid' || ev.type === 'debt_extended'
                   const content = (
                     <>
                       <span className={styles['client-history-icon']}>
@@ -410,27 +475,21 @@ export function ClientDetailPage() {
                       </span>
                       <div className={styles['client-history-body']}>
                         <span>
-                          {ev.kind === 'issue' && <>Выдан долг на {formatMoney(ev.amount ?? '0')} ₽</>}
-                          {ev.kind === 'repay' && (
-                            <>
-                              Оплата долга {formatMoney(ev.amount ?? '0')} ₽{ev.note ? ` — ${ev.note}` : ''}
-                            </>
-                          )}
-                          {ev.kind === 'extend' && <>Продление срока — {ev.note}</>}
-                          {ev.kind === 'sale' && <>Покупка на {formatMoney(ev.amount ?? '0')} ₽</>}
+                          {ev.title}
+                          {ev.amount != null && <> · {formatMoney(ev.amount)} ₽</>}
                         </span>
-                        <span className={layoutStyles.textMuted}>{formatDate(ev.at)}</span>
+                        <span className={layoutStyles.textMuted}>{formatDateTime(ev.occurred_at)}</span>
                       </div>
-                      {clickable && (
+                      {(debtClickable || ev.type === 'sale') && (
                         <IconChevronRight size={16} stroke={1.8} className={layoutStyles.dataRowChevron} />
                       )}
                     </>
                   )
-                  if (ev.saleId != null) {
+                  if (ev.type === 'sale') {
                     return (
                       <Link
-                        key={i}
-                        to={`/?openSale=${ev.saleId}`}
+                        key={`${ev.type}-${ev.entity_id}-${i}`}
+                        to={`/sales/${ev.entity_id}`}
                         className={`${styles['client-history-row']} ${styles['client-history-row-link']}`}
                       >
                         {content}
@@ -439,14 +498,16 @@ export function ClientDetailPage() {
                   }
                   return (
                     <div
-                      key={i}
+                      key={`${ev.type}-${ev.entity_id}-${i}`}
                       className={[
                         styles['client-history-row'],
-                        clickable && styles['client-history-row-link'],
-                      ].filter(Boolean).join(' ')}
-                      role={clickable ? 'button' : undefined}
-                      tabIndex={clickable ? 0 : undefined}
-                      onClick={clickable ? () => openDebt(ev.debtId!) : undefined}
+                        debtClickable && styles['client-history-row-link'],
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      role={debtClickable ? 'button' : undefined}
+                      tabIndex={debtClickable ? 0 : undefined}
+                      onClick={debtClickable ? () => openDebt(ev.entity_id) : undefined}
                     >
                       {content}
                     </div>
@@ -488,9 +549,9 @@ export function ClientDetailPage() {
         <Modal title="Изменить клиента" onClose={() => setShowEdit(false)}>
           <EditClientForm
             client={client}
-            onDone={() => {
+            onDone={(updated) => {
               setShowEdit(false)
-              loadClient()
+              setClient(updated)
             }}
           />
         </Modal>
@@ -499,7 +560,7 @@ export function ClientDetailPage() {
   )
 }
 
-function EditClientForm({ client, onDone }: { client: Client; onDone: () => void }) {
+function EditClientForm({ client, onDone }: { client: Client; onDone: (updated: Client) => void }) {
   const [name, setName] = useState(client.name)
   const [phone, setPhone] = useState(client.phone)
   const [city, setCity] = useState(client.city)
@@ -507,62 +568,91 @@ function EditClientForm({ client, onDone }: { client: Client; onDone: () => void
   const [isActive, setIsActive] = useState(client.is_active)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [forceMessage, setForceMessage] = useState<string | null>(null)
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
+  async function save(force = false) {
     setError(null)
     setSaving(true)
     try {
-      await updateClient(client.id, {
+      const updated = await updateClient(client.id, {
         name,
         phone,
         city,
         debt_limit: debtLimit || null,
         is_active: isActive,
+        ...(force ? { force: true } : {}),
       })
-      onDone()
+      setForceMessage(null)
+      onDone(updated)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось сохранить клиента')
+      if (
+        err instanceof ApiError &&
+        err.status === 400 &&
+        client.is_active &&
+        !isActive &&
+        !force
+      ) {
+        setForceMessage(err.message)
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Не удалось сохранить клиента')
+      }
     } finally {
       setSaving(false)
     }
   }
 
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    await save(false)
+  }
+
   return (
-    <form className={layoutStyles.form} onSubmit={handleSubmit}>
-      <label className={layoutStyles.field}>
-        Имя
-        <input value={name} onChange={(e) => setName(e.target.value)} required />
-      </label>
-      <label className={layoutStyles.field}>
-        Телефон
-        <PhoneInput value={phone} onChange={setPhone} />
-      </label>
-      <label className={layoutStyles.field}>
-        Город
-        <input value={city} onChange={(e) => setCity(e.target.value)} />
-      </label>
-      <label className={layoutStyles.field}>
-        Лимит долга
-        <input
-          type="text"
-          inputMode="decimal"
-          value={debtLimit}
-          onChange={(e) => {
-            const normalized = normalizeDecimalInput(e.target.value)
-            if (normalized !== null) setDebtLimit(normalized)
-          }}
+    <>
+      <form className={layoutStyles.form} onSubmit={handleSubmit}>
+        <label className={layoutStyles.field}>
+          Имя
+          <input value={name} onChange={(e) => setName(e.target.value)} required />
+        </label>
+        <label className={layoutStyles.field}>
+          Телефон
+          <PhoneInput value={phone} onChange={setPhone} />
+        </label>
+        <label className={layoutStyles.field}>
+          Город
+          <input value={city} onChange={(e) => setCity(e.target.value)} />
+        </label>
+        <label className={layoutStyles.field}>
+          Лимит долга
+          <input
+            type="text"
+            inputMode="decimal"
+            value={debtLimit}
+            onChange={(e) => {
+              const normalized = normalizeDecimalInput(e.target.value)
+              if (normalized !== null) setDebtLimit(normalized)
+            }}
+          />
+        </label>
+        <label className={layoutStyles.row} style={{ gap: 8 }}>
+          <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+          Активен
+        </label>
+        {error && <p className={layoutStyles.error}>{error}</p>}
+        <Button type="submit" disabled={saving}>
+          {saving ? 'Сохранение…' : 'Сохранить'}
+        </Button>
+      </form>
+      {forceMessage && (
+        <ConfirmDialog
+          title="Деактивировать клиента?"
+          message={forceMessage}
+          confirmLabel="Деактивировать"
+          danger
+          onConfirm={() => save(true)}
+          onClose={() => setForceMessage(null)}
         />
-      </label>
-      <label className={layoutStyles.row} style={{ gap: 8 }}>
-        <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-        Активен
-      </label>
-      {error && <p className={layoutStyles.error}>{error}</p>}
-      <Button type="submit" disabled={saving}>
-        {saving ? 'Сохранение…' : 'Сохранить'}
-      </Button>
-    </form>
+      )}
+    </>
   )
 }
 

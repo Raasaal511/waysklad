@@ -38,6 +38,7 @@ class StockDocument:
     posted: bool = False
     number: int | None = None  # заполняется репозиторием при add()/чтении, не при создании
     created_at: datetime | None = None
+    client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
 
     def post(self) -> None:
         if self.posted:

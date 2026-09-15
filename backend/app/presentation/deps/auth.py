@@ -25,20 +25,48 @@ class CurrentUser:
     role: Role
 
 
-def get_current_user(
+async def _resolve_current_user(token: str, factory: SessionFactoryDep) -> CurrentUser:
+    try:
+        payload = decode_access_token(token)
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Недействительный токен")
+    user_id = int(payload["sub"])
+    tenant_id = payload["tenant_id"]
+    # token_version отсутствует в токенах, выданных до этой проверки — считаем их
+    # версией 0, чтобы не разлогинить всех разом при выкатке
+    token_version = payload.get("tv", 0)
+    uow = SqlAlchemyUnitOfWork(tenant_id, session_factory=factory)
+    async with uow:
+        current_version = await uow.users.get_token_version(user_id)
+        tenant = await uow.tenants.get(tenant_id)
+    if current_version is None or current_version != token_version:
+        raise HTTPException(status_code=401, detail="Сессия завершена, войдите снова")
+    if tenant.is_suspended:
+        # блокировка платформой действует немедленно на уже выданные токены —
+        # не ждать истечения access_token_expire_minutes (до 30 дней)
+        raise HTTPException(status_code=403, detail="Магазин заблокирован")
+    return CurrentUser(
+        id=user_id,
+        tenant_id=tenant_id,
+        role=Role(payload["role"]),
+    )
+
+
+async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    factory: SessionFactoryDep,
 ) -> CurrentUser:
     if credentials is None:
         raise HTTPException(status_code=401, detail="Требуется авторизация")
-    try:
-        payload = decode_access_token(credentials.credentials)
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Недействительный токен")
-    return CurrentUser(
-        id=int(payload["sub"]),
-        tenant_id=payload["tenant_id"],
-        role=Role(payload["role"]),
-    )
+    return await _resolve_current_user(credentials.credentials, factory)
+
+
+async def get_current_user_ws(token: str, factory: SessionFactoryDep) -> CurrentUser:
+    """Для WebSocket-хендшейка: браузер не может выставить кастомный заголовок
+    Authorization при открытии сокета — токен передаётся query-параметром
+    (?token=...). HTTPException(401) FastAPI сам превращает в закрытие
+    хендшейка с кодом 403, что и требуется для непройденной авторизации."""
+    return await _resolve_current_user(token, factory)
 
 
 async def get_actor(

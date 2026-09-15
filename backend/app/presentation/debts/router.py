@@ -3,14 +3,19 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
 
+from app.application.debts.list_debts import ListDebtsCommand
+from app.domain.debts.receipt import render_debt_message
 from app.domain.identity.permissions import Permission
+from app.domain.sales.receipt import build_whatsapp_link
 from app.presentation.audit.schemas import AuditEntryResponse
 from app.presentation.debts.schemas import (
     CreateInstallmentRequest,
+    DebtReceiptResponse,
     DebtResponse,
     DebtsFilterParams,
     DebtsOverviewResponse,
     DebtsSummaryResponse,
+    DueDebtResponse,
     ExtendDebtRequest,
     IssueDebtRequest,
     IssueSupplierDebtRequest,
@@ -20,10 +25,17 @@ from app.presentation.deps import (
     ActorDep,
     CreateInstallmentDep,
     ExtendDebtDep,
+    GetDebtDep,
+    GetDebtHistoryDep,
+    GetDebtReceiptDataDep,
+    GetDebtsOverviewDep,
     IssueDebtDep,
     IssueSupplierDebtDep,
+    ListClientDebtsDep,
+    ListDebtsDep,
+    ListDueDebtsDep,
+    ListSupplierDebtsDep,
     RepayDebtDep,
-    UowDep,
 )
 from app.presentation.deps.auth import require_permission
 
@@ -47,66 +59,83 @@ async def issue_supplier_debt(
 
 @router.get("", dependencies=[_view])
 async def list_active_debts(
-    response: Response, uow: UowDep, params: Annotated[DebtsFilterParams, Depends()],
+    response: Response,
+    actor: ActorDep,
+    use_case: ListDebtsDep,
+    params: Annotated[DebtsFilterParams, Depends()],
 ) -> list[DebtResponse]:
-    async with uow:
-        raw_params = {**params.to_raw_params(), "balance__gt": 0, "order_by": params.order_by or "-severity"}
-        debts, total = await uow.debts.list_filtered(raw_params)
-        response.headers["X-Total-Count"] = str(total)
-        return [DebtResponse.from_entity(d) for d in debts]
+    cmd = ListDebtsCommand(
+        raw_params=params.to_raw_params(), balance_filter="gt", default_order_by="-severity"
+    )
+    result = await use_case.execute(actor, cmd)
+    response.headers["X-Total-Count"] = str(result.total)
+    return [DebtResponse.from_entity(d) for d in result.debts]
 
 
 @router.get("/closed", dependencies=[_view])
 async def list_closed_debts(
-    response: Response, uow: UowDep, params: Annotated[DebtsFilterParams, Depends()],
+    response: Response,
+    actor: ActorDep,
+    use_case: ListDebtsDep,
+    params: Annotated[DebtsFilterParams, Depends()],
 ) -> list[DebtResponse]:
-    async with uow:
-        raw_params = {**params.to_raw_params(), "balance__lte": 0, "order_by": params.order_by or "-issued_at"}
-        debts, total = await uow.debts.list_filtered(raw_params)
-        response.headers["X-Total-Count"] = str(total)
-        return [DebtResponse.from_entity(d) for d in debts]
+    cmd = ListDebtsCommand(
+        raw_params=params.to_raw_params(), balance_filter="lte", default_order_by="-issued_at"
+    )
+    result = await use_case.execute(actor, cmd)
+    response.headers["X-Total-Count"] = str(result.total)
+    return [DebtResponse.from_entity(d) for d in result.debts]
 
 
 @router.get("/overview", dependencies=[_view])
-async def get_debts_overview(uow: UowDep) -> DebtsOverviewResponse:
-    async with uow:
-        debts = await uow.debts.list_active()
-        clients = await uow.clients.search("", include_inactive=True)
-        suppliers = await uow.suppliers.list()
-        counterparty_name = {("client", c.id): c.name for c in clients}
-        counterparty_name.update({("supplier", s.id): s.name for s in suppliers})
-        return DebtsOverviewResponse.from_active_debts(debts, counterparty_name)
+async def get_debts_overview(actor: ActorDep, use_case: GetDebtsOverviewDep) -> DebtsOverviewResponse:
+    debts, counterparty_name = await use_case.execute(actor)
+    return DebtsOverviewResponse.from_active_debts(debts, counterparty_name)
 
 
 @router.get("/due", dependencies=[_view])
-async def list_due_debts(uow: UowDep, on: date | None = None) -> list[DebtResponse]:
-    async with uow:
-        return [DebtResponse.from_entity(d) for d in await uow.debts.list_due(on or date.today())]
+async def list_due_debts(
+    actor: ActorDep, use_case: ListDueDebtsDep, on: date | None = None
+) -> list[DueDebtResponse]:
+    items = await use_case.execute(actor, on)
+    return [DueDebtResponse.from_item(item) for item in items]
 
 
 @router.get("/client/{client_id}", dependencies=[_view])
-async def list_client_debts(client_id: int, uow: UowDep) -> DebtsSummaryResponse:
-    async with uow:
-        return DebtsSummaryResponse.from_debts(await uow.debts.list_by_client(client_id))
+async def list_client_debts(
+    client_id: int, actor: ActorDep, use_case: ListClientDebtsDep, on: date | None = None
+) -> DebtsSummaryResponse:
+    debts = await use_case.execute(actor, client_id, on)
+    return DebtsSummaryResponse.from_debts(debts)
 
 
 @router.get("/supplier/{supplier_id}", dependencies=[_view])
-async def list_supplier_debts(supplier_id: int, uow: UowDep) -> DebtsSummaryResponse:
-    async with uow:
-        return DebtsSummaryResponse.from_debts(await uow.debts.list_by_supplier(supplier_id))
+async def list_supplier_debts(
+    supplier_id: int, actor: ActorDep, use_case: ListSupplierDebtsDep, on: date | None = None
+) -> DebtsSummaryResponse:
+    debts = await use_case.execute(actor, supplier_id, on)
+    return DebtsSummaryResponse.from_debts(debts)
 
 
 @router.get("/{debt_id}", dependencies=[_view])
-async def get_debt(debt_id: int, uow: UowDep) -> DebtResponse:
-    async with uow:
-        return DebtResponse.from_entity(await uow.debts.get(debt_id))
+async def get_debt(debt_id: int, actor: ActorDep, use_case: GetDebtDep) -> DebtResponse:
+    return DebtResponse.from_entity(await use_case.execute(actor, debt_id))
 
 
 @router.get("/{debt_id}/history", dependencies=[_view])
-async def get_debt_history(debt_id: int, uow: UowDep) -> list[AuditEntryResponse]:
-    async with uow:
-        entries = await uow.audit.list_by_entity("debt", debt_id)
-        return [AuditEntryResponse.from_entity(e) for e in entries]
+async def get_debt_history(
+    debt_id: int, actor: ActorDep, use_case: GetDebtHistoryDep
+) -> list[AuditEntryResponse]:
+    entries = await use_case.execute(actor, debt_id)
+    return [AuditEntryResponse.from_entity(e) for e in entries]
+
+
+@router.get("/{debt_id}/receipt", dependencies=[_view])
+async def get_debt_receipt(debt_id: int, use_case: GetDebtReceiptDataDep) -> DebtReceiptResponse:
+    data = await use_case.execute(debt_id)
+    text = render_debt_message(data.tenant.name, data.debt, data.client.name)
+    phone = data.client.whatsapp or data.client.phone
+    return DebtReceiptResponse(text=text, whatsapp_link=build_whatsapp_link(phone, text) if phone else None)
 
 
 @router.post("/{debt_id}/repayments")

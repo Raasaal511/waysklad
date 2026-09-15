@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 
 from app.domain.common.exceptions import NotFoundError
 from app.domain.common.quantity import Unit
@@ -64,6 +64,7 @@ class SqlAlchemySaleRepository(SqlAlchemyRepository, ISaleRepository):
         limit: int = 50,
         offset: int = 0,
         client_id: int | None = None,
+        product_id: int | None = None,
         warehouse_id: int | None = None,
         warehouse_ids: list[int] | None = None,
         payment_method: PaymentMethod | None = None,
@@ -74,6 +75,13 @@ class SqlAlchemySaleRepository(SqlAlchemyRepository, ISaleRepository):
         conditions = [SaleModel.tenant_id == self._tenant, SaleModel.deleted_at.is_(None)]
         if client_id is not None:
             conditions.append(SaleModel.client_id == client_id)
+        if product_id is not None:
+            conditions.append(
+                exists().where(
+                    SaleLineModel.sale_id == SaleModel.id,
+                    SaleLineModel.product_id == product_id,
+                )
+            )
         if warehouse_id is not None:
             conditions.append(SaleModel.warehouse_id == warehouse_id)
         if warehouse_ids is not None:
@@ -169,6 +177,21 @@ class SqlAlchemySaleReturnRepository(SqlAlchemyRepository, ISaleReturnRepository
         sale_line_ids = {line.sale_line_id for model in models for line in model.lines}
         units = await self._units_by_sale_line(sale_line_ids)
         return [SaleReturnMapper.to_entity(m, units) for m in models]
+
+    async def get_by_client_op_id(self, client_op_id: str) -> SaleReturn | None:
+        model = (
+            await self._session.execute(
+                select(SaleReturnModel).where(
+                    SaleReturnModel.tenant_id == self._tenant,
+                    SaleReturnModel.client_op_id == client_op_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            return None
+        sale_line_ids = {line.sale_line_id for line in model.lines}
+        units = await self._units_by_sale_line(sale_line_ids)
+        return SaleReturnMapper.to_entity(model, units)
 
     async def _units_by_sale_line(self, sale_line_ids: set[int]):
         if not sale_line_ids:

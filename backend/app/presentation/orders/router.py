@@ -7,8 +7,11 @@ from app.presentation.deps import (
     CancelOrderDep,
     ChangeOrderStatusDep,
     CreateOrderDep,
+    GetOrderDep,
+    GetOrderHistoryDep,
     IssueOrderDep,
-    UowDep,
+    ListActiveOrdersDep,
+    ListCompletedOrdersDep,
     UpdateOrderDep,
 )
 from app.presentation.deps.auth import require_permission
@@ -62,25 +65,27 @@ async def issue_order(
 
 
 @router.get("", dependencies=[_view])
-async def list_active_orders(uow: UowDep) -> list[OrderResponse]:
-    async with uow:
-        return [OrderResponse.from_entity(o) for o in await uow.orders.list_active()]
+async def list_active_orders(actor: ActorDep, use_case: ListActiveOrdersDep) -> list[OrderResponse]:
+    orders = await use_case.execute(actor)
+    return [OrderResponse.from_entity(o) for o in orders]
 
 
 @router.get("/completed", dependencies=[_view])
-async def list_completed_orders(uow: UowDep) -> list[OrderResponse]:
-    async with uow:
-        return [OrderResponse.from_entity(o) for o in await uow.orders.list_completed()]
+async def list_completed_orders(
+    actor: ActorDep, use_case: ListCompletedOrdersDep
+) -> list[OrderResponse]:
+    orders = await use_case.execute(actor)
+    return [OrderResponse.from_entity(o) for o in orders]
 
 
 @router.get("/{order_id}", dependencies=[_view])
-async def get_order(order_id: int, uow: UowDep) -> OrderResponse:
-    async with uow:
-        return OrderResponse.from_entity(await uow.orders.get(order_id))
+async def get_order(order_id: int, actor: ActorDep, use_case: GetOrderDep) -> OrderResponse:
+    return OrderResponse.from_entity(await use_case.execute(actor, order_id))
 
 
 @router.get("/{order_id}/history", dependencies=[_view])
-async def get_order_history(order_id: int, uow: UowDep) -> list[AuditEntryResponse]:
-    async with uow:
-        entries = await uow.audit.list_by_entity("order", order_id)
-        return [AuditEntryResponse.from_entity(e) for e in entries]
+async def get_order_history(
+    order_id: int, actor: ActorDep, use_case: GetOrderHistoryDep
+) -> list[AuditEntryResponse]:
+    entries = await use_case.execute(actor, order_id)
+    return [AuditEntryResponse.from_entity(e) for e in entries]

@@ -1,42 +1,67 @@
-from fastapi import APIRouter, Response, UploadFile
+from typing import Annotated
 
+from fastapi import APIRouter, Depends, Response, UploadFile
+
+from app.application.products.add_storefront_photo import AddStorefrontPhotoCommand
+from app.application.products.delete_product import DeleteProductCommand
+from app.application.products.generate_description import (
+    GenerateProductDescriptionCommand,
+)
 from app.application.products.import_excel import ImportProductsCommand
+from app.application.products.import_preview import PreviewProductsCommand
+from app.application.products.search_products import SearchProductsCommand
 from app.application.products.set_product_photo import SetProductPhotoCommand
+from app.application.products.set_storefront_photos import SetStorefrontPhotosCommand
 from app.domain.catalog.barcode import Barcode
-from app.domain.catalog.entities import Product
-from app.infrastructure.products_export import (
+from app.infrastructure.export.products_export import (
     render_products_csv,
     render_products_pdf,
     render_products_xlsx,
 )
 from app.presentation.deps import (
     ActorDep,
+    AddStorefrontPhotoDep,
+    ApplyImportProductsDep,
     CreateCategoryDep,
     CreateProductDep,
     CreateUnitDep,
+    DeleteProductDep,
+    GenerateBarcodeDep,
+    GenerateProductDescriptionDep,
+    GetProductByBarcodeDep,
+    GetProductDep,
+    GetProductHistoryDep,
+    GetProductsExportDataDep,
     ImportProductsDep,
+    ListCategoriesDep,
+    ListUnitsDep,
+    PreviewImportProductsDep,
+    SearchProductsDep,
     SetProductPhotoDep,
+    SetStorefrontPhotosDep,
     ShowPurchaseDep,
-    UowDep,
     UpdateProductDep,
 )
 from app.presentation.audit.schemas import AuditEntryResponse
 from app.presentation.products.schemas import (
+    ApplyImportRequest,
+    ApplyImportResponse,
     CategoryCreateRequest,
     CategoryResponse,
+    GenerateBarcodeResponse,
+    GenerateDescriptionResponse,
     ImportProductsResponse,
+    PreviewProductsResponse,
     ProductCreateRequest,
     ProductResponse,
+    ProductsFilterParams,
     ProductUpdateRequest,
+    SetStorefrontPhotosRequest,
     UnitCreateRequest,
     UnitResponse,
 )
 
 router = APIRouter(prefix="/products", tags=["products"])
-
-
-def _maybe(product: Product | None, show_purchase: bool) -> ProductResponse | None:
-    return ProductResponse.from_entity(product, show_purchase) if product else None
 
 
 async def _photo_command(product_id: int, file: UploadFile) -> SetProductPhotoCommand:
@@ -49,13 +74,10 @@ async def _import_command(file: UploadFile) -> ImportProductsCommand:
     return ImportProductsCommand(await file.read(), file_format=file_format)
 
 
-async def _load_export_data(uow: UowDep) -> tuple[list[Product], dict[int, str], str]:
-    async with uow:
-        products = await uow.products.search_all()
-        categories = await uow.categories.list()
-        tenant = await uow.tenants.get(uow.tenant_id)
-        category_names = {c.id: c.name for c in categories}
-        return products, category_names, tenant.name
+async def _preview_command(file: UploadFile) -> PreviewProductsCommand:
+    filename = (file.filename or "").lower()
+    file_format = "csv" if filename.endswith(".csv") else "xlsx"
+    return PreviewProductsCommand(await file.read(), file_format=file_format)
 
 
 @router.post("", status_code=201)
@@ -81,6 +103,11 @@ async def update_product(
     return ProductResponse.from_entity(product, show_purchase)
 
 
+@router.delete("/{product_id}", status_code=204)
+async def delete_product(product_id: int, actor: ActorDep, use_case: DeleteProductDep) -> None:
+    await use_case.execute(actor, DeleteProductCommand(product_id))
+
+
 @router.post("/{product_id}/photo", status_code=201)
 async def set_product_photo(
     product_id: int,
@@ -93,12 +120,70 @@ async def set_product_photo(
     return ProductResponse.from_entity(product, show_purchase)
 
 
+@router.post("/{product_id}/storefront-photos", status_code=201)
+async def add_storefront_photo(
+    product_id: int,
+    actor: ActorDep,
+    file: UploadFile,
+    show_purchase: ShowPurchaseDep,
+    use_case: AddStorefrontPhotoDep,
+) -> ProductResponse:
+    command = AddStorefrontPhotoCommand(product_id, file.filename or "photo.jpg", await file.read())
+    product = await use_case.execute(actor, command)
+    return ProductResponse.from_entity(product, show_purchase)
+
+
+@router.put("/{product_id}/storefront-photos")
+async def set_storefront_photos(
+    product_id: int,
+    body: SetStorefrontPhotosRequest,
+    actor: ActorDep,
+    show_purchase: ShowPurchaseDep,
+    use_case: SetStorefrontPhotosDep,
+) -> ProductResponse:
+    command = SetStorefrontPhotosCommand(product_id, body.photos)
+    product = await use_case.execute(actor, command)
+    return ProductResponse.from_entity(product, show_purchase)
+
+
+@router.post("/{product_id}/description/generate")
+async def generate_product_description(
+    product_id: int, actor: ActorDep, use_case: GenerateProductDescriptionDep
+) -> GenerateDescriptionResponse:
+    result = await use_case.execute(actor, GenerateProductDescriptionCommand(product_id))
+    return GenerateDescriptionResponse.from_result(result)
+
+
+@router.post("/barcode/generate")
+async def generate_barcode(
+    actor: ActorDep, use_case: GenerateBarcodeDep
+) -> GenerateBarcodeResponse:
+    result = await use_case.execute(actor)
+    return GenerateBarcodeResponse.from_result(result)
+
+
 @router.post("/import", status_code=201)
 async def import_products(
     actor: ActorDep, file: UploadFile, use_case: ImportProductsDep
 ) -> ImportProductsResponse:
     result = await use_case.execute(actor, await _import_command(file))
     return ImportProductsResponse.from_result(result)
+
+
+@router.post("/import/preview")
+async def preview_import_products(
+    actor: ActorDep, file: UploadFile, use_case: PreviewImportProductsDep
+) -> PreviewProductsResponse:
+    result = await use_case.execute(actor, await _preview_command(file))
+    return PreviewProductsResponse.from_result(result)
+
+
+@router.post("/import/apply", status_code=201)
+async def apply_import_products(
+    body: ApplyImportRequest, actor: ActorDep, use_case: ApplyImportProductsDep
+) -> ApplyImportResponse:
+    result = await use_case.execute(actor, body.to_command())
+    return ApplyImportResponse.from_result(result)
 
 
 @router.post("/units", status_code=201)
@@ -109,9 +194,8 @@ async def create_unit(
 
 
 @router.get("/units")
-async def list_units(uow: UowDep) -> list[UnitResponse]:
-    async with uow:
-        return [UnitResponse.from_entity(u) for u in await uow.units.list()]
+async def list_units(use_case: ListUnitsDep) -> list[UnitResponse]:
+    return [UnitResponse.from_entity(u) for u in await use_case.execute()]
 
 
 @router.post("/categories", status_code=201)
@@ -122,34 +206,28 @@ async def create_category(
 
 
 @router.get("/categories")
-async def list_categories(uow: UowDep) -> list[CategoryResponse]:
-    async with uow:
-        return [CategoryResponse.from_entity(c) for c in await uow.categories.list()]
+async def list_categories(use_case: ListCategoriesDep) -> list[CategoryResponse]:
+    return [CategoryResponse.from_entity(c) for c in await use_case.execute()]
 
 
 @router.get("")
 async def search_products(
     response: Response,
-    uow: UowDep,
+    use_case: SearchProductsDep,
     show_purchase: ShowPurchaseDep,
-    query: str = "",
-    limit: int = 50,
-    offset: int = 0,
-    category_id: int | None = None,
-    sort: str = "name",
+    params: Annotated[ProductsFilterParams, Depends()],
 ) -> list[ProductResponse]:
-    async with uow:
-        products, total = await uow.products.search(
-            query, limit=limit, offset=offset, category_id=category_id, sort=sort
-        )
-        response.headers["X-Total-Count"] = str(total)
-        return [ProductResponse.from_entity(p, show_purchase) for p in products]
+    result = await use_case.execute(
+        SearchProductsCommand(raw_params=params.to_raw_params(), warehouse_id=params.warehouse_id)
+    )
+    response.headers["X-Total-Count"] = str(result.total)
+    return [ProductResponse.from_entity(p, show_purchase) for p in result.products]
 
 
 @router.get("/export.xlsx")
-async def export_products_xlsx(uow: UowDep, show_purchase: ShowPurchaseDep) -> Response:
-    products, category_names, _ = await _load_export_data(uow)
-    content = render_products_xlsx(products, category_names, show_purchase)
+async def export_products_xlsx(use_case: GetProductsExportDataDep, show_purchase: ShowPurchaseDep) -> Response:
+    data = await use_case.execute()
+    content = render_products_xlsx(data.products, data.category_names, show_purchase)
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -158,9 +236,9 @@ async def export_products_xlsx(uow: UowDep, show_purchase: ShowPurchaseDep) -> R
 
 
 @router.get("/export.csv")
-async def export_products_csv(uow: UowDep, show_purchase: ShowPurchaseDep) -> Response:
-    products, category_names, _ = await _load_export_data(uow)
-    content = render_products_csv(products, category_names, show_purchase)
+async def export_products_csv(use_case: GetProductsExportDataDep, show_purchase: ShowPurchaseDep) -> Response:
+    data = await use_case.execute()
+    content = render_products_csv(data.products, data.category_names, show_purchase)
     return Response(
         content=content,
         media_type="text/csv",
@@ -169,9 +247,9 @@ async def export_products_csv(uow: UowDep, show_purchase: ShowPurchaseDep) -> Re
 
 
 @router.get("/export.pdf")
-async def export_products_pdf(uow: UowDep, show_purchase: ShowPurchaseDep) -> Response:
-    products, category_names, shop_name = await _load_export_data(uow)
-    content = render_products_pdf(shop_name, products, category_names, show_purchase)
+async def export_products_pdf(use_case: GetProductsExportDataDep, show_purchase: ShowPurchaseDep) -> Response:
+    data = await use_case.execute()
+    content = render_products_pdf(data.shop_name, data.products, data.category_names, show_purchase)
     return Response(
         content=content,
         media_type="application/pdf",
@@ -181,24 +259,22 @@ async def export_products_pdf(uow: UowDep, show_purchase: ShowPurchaseDep) -> Re
 
 @router.get("/barcode/{barcode}")
 async def get_by_barcode(
-    barcode: str, uow: UowDep, show_purchase: ShowPurchaseDep
+    barcode: str, use_case: GetProductByBarcodeDep, show_purchase: ShowPurchaseDep
 ) -> ProductResponse | None:
-    async with uow:
-        return _maybe(await uow.products.get_by_barcode(Barcode(barcode)), show_purchase)
+    product = await use_case.execute(Barcode(barcode))
+    return ProductResponse.from_entity(product, show_purchase) if product else None
 
 
 @router.get("/{product_id}")
 async def get_product(
-    product_id: int, uow: UowDep, show_purchase: ShowPurchaseDep
+    product_id: int, use_case: GetProductDep, show_purchase: ShowPurchaseDep
 ) -> ProductResponse:
-    async with uow:
-        return ProductResponse.from_entity(
-            await uow.products.get(product_id), show_purchase
-        )
+    return ProductResponse.from_entity(await use_case.execute(product_id), show_purchase)
 
 
 @router.get("/{product_id}/history")
-async def get_product_history(product_id: int, uow: UowDep) -> list[AuditEntryResponse]:
-    async with uow:
-        entries = await uow.audit.list_by_entity("product", product_id)
-        return [AuditEntryResponse.from_entity(e) for e in entries]
+async def get_product_history(
+    product_id: int, use_case: GetProductHistoryDep
+) -> list[AuditEntryResponse]:
+    entries = await use_case.execute(product_id)
+    return [AuditEntryResponse.from_entity(e) for e in entries]

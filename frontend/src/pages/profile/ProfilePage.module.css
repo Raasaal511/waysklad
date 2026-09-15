@@ -1,6 +1,26 @@
-.iconAccent {
+.storefrontLink {
   color: var(--accent);
-  flex-shrink: 0;
+  word-break: break-all;
+  font-size: 14px;
+}
+
+.shopNameField {
+  max-width: 360px;
+}
+
+.shopNameStatus {
+  min-height: 18px;
+  font-size: 13px;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .telegramSteps {

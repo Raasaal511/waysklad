@@ -23,3 +23,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Временные Playwright-скрипты для визуальной проверки UI-багов
+.playwright-probe/

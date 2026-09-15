@@ -17,6 +17,7 @@ class ISaleRepository(Protocol):
         limit: int = 50,
         offset: int = 0,
         client_id: int | None = None,
+        product_id: int | None = None,
         warehouse_id: int | None = None,
         warehouse_ids: list[int] | None = None,
         payment_method: PaymentMethod | None = None,
@@ -43,3 +44,4 @@ class ISaleRepository(Protocol):
 class ISaleReturnRepository(Protocol):
     async def add(self, sale_return: SaleReturn) -> SaleReturn: ...
     async def list_by_sale(self, sale_id: int) -> list[SaleReturn]: ...
+    async def get_by_client_op_id(self, client_op_id: str) -> SaleReturn | None: ...

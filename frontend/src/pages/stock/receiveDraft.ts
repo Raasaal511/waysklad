@@ -1,4 +1,4 @@
-const RECEIVE_DRAFT_KEY = 'waysklad:receive-draft'
+import { scopedKey } from '../../shared/lib/scopedStorage'
 
 export interface ReceiveDraft {
   warehouseId: number
@@ -10,7 +10,7 @@ export interface ReceiveDraft {
 
 export function loadReceiveDraft(): ReceiveDraft | null {
   try {
-    const raw = localStorage.getItem(RECEIVE_DRAFT_KEY)
+    const raw = localStorage.getItem(scopedKey('receive-draft'))
     return raw ? (JSON.parse(raw) as ReceiveDraft) : null
   } catch {
     return null
@@ -19,7 +19,7 @@ export function loadReceiveDraft(): ReceiveDraft | null {
 
 export function saveReceiveDraft(draft: ReceiveDraft): void {
   try {
-    localStorage.setItem(RECEIVE_DRAFT_KEY, JSON.stringify(draft))
+    localStorage.setItem(scopedKey('receive-draft'), JSON.stringify(draft))
   } catch {
     // приватный режим/квота — черновик просто не переживёт переход, не критично
   }
@@ -27,7 +27,7 @@ export function saveReceiveDraft(draft: ReceiveDraft): void {
 
 export function clearReceiveDraft(): void {
   try {
-    localStorage.removeItem(RECEIVE_DRAFT_KEY)
+    localStorage.removeItem(scopedKey('receive-draft'))
   } catch {
     // ignore
   }

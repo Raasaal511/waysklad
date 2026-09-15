@@ -1,5 +1,5 @@
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, SmallInteger, String
+from sqlalchemy import ForeignKey, Integer, SmallInteger, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domain.identity.entities import Role
@@ -17,11 +17,13 @@ class TenantModel(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     slug: Mapped[str | None] = mapped_column(String(120), unique=True, index=True)
+    storefront_enabled: Mapped[bool] = mapped_column(default=False)
     owner_telegram_chat_id: Mapped[str | None] = mapped_column(String(32))  # для сводок бота
     summary_daily_enabled: Mapped[bool] = mapped_column(default=True)
     summary_weekly_enabled: Mapped[bool] = mapped_column(default=False)
     summary_monthly_enabled: Mapped[bool] = mapped_column(default=False)
     summary_daily_hour_msk: Mapped[int] = mapped_column(SmallInteger, default=20)
+    is_suspended: Mapped[bool] = mapped_column(default=False)
 
 
 class WarehouseModel(Base, TenantMixin, TimestampMixin):
@@ -30,6 +32,8 @@ class WarehouseModel(Base, TenantMixin, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     address: Mapped[str] = mapped_column(String(300), default="")
+    show_on_storefront: Mapped[bool] = mapped_column(default=False)
+    photo: Mapped[str] = mapped_column(String(500), default="")
 
 
 class UserModel(Base, TenantMixin, TimestampMixin):
@@ -41,6 +45,9 @@ class UserModel(Base, TenantMixin, TimestampMixin):
     password_hash: Mapped[str] = mapped_column(String(200))
     role: Mapped[Role] = mapped_column(RoleColumn, default=Role.SELLER)
     is_active: Mapped[bool] = mapped_column(default=True)
+    # Инкрементируется при смене пароля/принудительном разлогине — токены,
+    # выданные с прежним значением, перестают проходить проверку (см. get_current_user).
+    token_version: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class WarehouseAssignmentModel(Base):

@@ -7,9 +7,11 @@ from app.application.inventory.common import (
     require_warehouse_access,
 )
 from app.domain.audit.entities import AuditEntry
+from app.domain.common.cache import ICache
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Actor, Permission, require
 from app.domain.inventory.entities import StockDocType, StockDocument
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)
@@ -21,8 +23,9 @@ class TransferCommand:
 
 
 class TransferUseCase:
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None):
         self._uow = uow
+        self._cache = cache
 
     async def execute(self, actor: Actor, cmd: TransferCommand) -> StockDocument:
         require(actor, Permission.STOCK_TRANSFER)
@@ -53,4 +56,5 @@ class TransferUseCase:
                 )
             )
             await uow.commit()
+            await invalidate_shop_cache(self._cache, uow)
             return document

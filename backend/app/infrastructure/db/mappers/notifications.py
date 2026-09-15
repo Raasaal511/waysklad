@@ -12,6 +12,7 @@ class NotificationMapper:
             text=notification.text,
             link=notification.link,
             entity_id=notification.entity_id,
+            snapshot_value=notification.snapshot_value,
             is_read=notification.is_read,
         )
 
@@ -24,6 +25,7 @@ class NotificationMapper:
             text=model.text,
             link=model.link,
             entity_id=model.entity_id,
+            snapshot_value=model.snapshot_value,
             is_read=model.is_read,
             created_at=model.created_at,
         )

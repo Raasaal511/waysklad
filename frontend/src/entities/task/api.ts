@@ -18,6 +18,7 @@ export interface Task {
   product_id: number | null
   warehouse_id: number | null
   quantity: string | null
+  client_id: number | null
   created_at: string | null
   completed_at: string | null
 }
@@ -42,14 +43,20 @@ export interface TaskCreateInput {
   product_id?: number | null
   warehouse_id?: number | null
   quantity?: string | null
+  client_id?: number | null
 }
 
 export function listActiveTasks() {
   return api.get<Task[]>('/tasks')
 }
 
-export function listCompletedTasks() {
-  return api.get<Task[]>('/tasks/completed')
+export async function listCompletedTasks(params: { limit?: number; offset?: number } = {}) {
+  const search = new URLSearchParams()
+  if (params.limit != null) search.set('limit', String(params.limit))
+  if (params.offset != null) search.set('offset', String(params.offset))
+  const qs = search.toString()
+  const { data, total } = await api.getWithTotal<Task[]>(`/tasks/completed${qs ? `?${qs}` : ''}`)
+  return { items: data, total }
 }
 
 export function getTask(id: number) {
@@ -68,6 +75,7 @@ export interface TaskUpdateInput {
   assigned_user_id?: number | null
   due_date?: string | null
   note?: string
+  client_id?: number | null
 }
 
 export function updateTask(id: number, input: TaskUpdateInput) {

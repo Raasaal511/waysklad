@@ -12,6 +12,10 @@ if TYPE_CHECKING:
         IUnitRepository,
     )
     from app.domain.counterparties.repository import IClientRepository, ISupplierRepository
+    from app.domain.customers.repository import (
+        ICustomerLoginLinkRepository,
+        ICustomerRepository,
+    )
     from app.domain.debts.repository import IDebtRepository
     from app.domain.identity.repository import (
         ITenantRepository,
@@ -19,9 +23,14 @@ if TYPE_CHECKING:
         IWarehouseRepository,
     )
     from app.domain.inventory.repository import IStockDocumentRepository, IStockRepository
+    from app.domain.marketplace.repository import IMarketplaceProductRepository
     from app.domain.notifications.repository import INotificationRepository
     from app.domain.orders.repository import IOrderRepository
     from app.domain.sales.repository import ISaleRepository, ISaleReturnRepository
+    from app.domain.storefront.repository import (
+        IStorefrontMessageRepository,
+        IStorefrontRequestRepository,
+    )
     from app.domain.tasks.repository import ITaskRepository
 
 
@@ -43,16 +52,21 @@ class IUnitOfWork(ABC):
     categories: ICategoryRepository
     clients: IClientRepository
     suppliers: ISupplierRepository
+    customers: ICustomerRepository
+    customer_login_links: ICustomerLoginLinkRepository
     stock: IStockRepository
     stock_documents: IStockDocumentRepository
     sales: ISaleRepository
     sale_returns: ISaleReturnRepository
     debts: IDebtRepository
     orders: IOrderRepository
+    storefront_requests: IStorefrontRequestRepository
+    storefront_messages: IStorefrontMessageRepository
     tasks: ITaskRepository
     notifications: INotificationRepository
     audit: IAuditRepository
     analytics: IAnalyticsRepository
+    marketplace_products: IMarketplaceProductRepository
 
     async def __aenter__(self) -> IUnitOfWork:
         return self

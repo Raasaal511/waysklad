@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import JSON, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.db.models.base import Base, TenantMixin, TimestampMixin
@@ -43,7 +43,12 @@ class ProductModel(Base, TenantMixin, TimestampMixin):
     retail_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     min_stock: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=0)  # порог «заканчивается»
     photo: Mapped[str] = mapped_column(String(500), default="")
+    description: Mapped[str] = mapped_column(Text, default="")
+    storefront_photos: Mapped[list[str]] = mapped_column(JSON, default=list)
     is_active: Mapped[bool] = mapped_column(default=True)
+    show_on_storefront: Mapped[bool] = mapped_column(default=False)
+    storefront_min_qty: Mapped[Decimal | None] = mapped_column(Numeric(14, 3))
+    storefront_step_qty: Mapped[Decimal | None] = mapped_column(Numeric(14, 3))
 
     variants: Mapped[list["ProductVariantModel"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"

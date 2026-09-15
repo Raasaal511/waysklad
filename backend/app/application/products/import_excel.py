@@ -9,9 +9,11 @@ import openpyxl
 
 from app.application.products.create_product import CreateProductCommand, CreateProductUseCase
 from app.domain.audit.entities import AuditEntry
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Actor, Permission, require
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 
 # порядок колонок после заголовка (первая строка пропускается):
 # Название | Артикул | Штрихкод | Ед. изм. | Закупочная цена | Розничная цена | Мин. остаток
@@ -39,13 +41,14 @@ class ImportProductsResult:
 
 
 class ImportProductsUseCase:
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None):
         self._uow = uow
+        self._cache = cache
 
     async def execute(self, actor: Actor, cmd: ImportProductsCommand) -> ImportProductsResult:
         require(actor, Permission.PRODUCTS_MANAGE)
 
-        create_product = CreateProductUseCase(self._uow)
+        create_product = CreateProductUseCase(self._uow, self._cache)
         created = 0
         errors: list[RowError] = []
         rows = (
@@ -67,6 +70,7 @@ class ImportProductsUseCase:
                 )
             )
             await uow.commit()
+            await invalidate_shop_cache(self._cache, uow)
         return ImportProductsResult(created=created, errors=errors)
 
     @staticmethod

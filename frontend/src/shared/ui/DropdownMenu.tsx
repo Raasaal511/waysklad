@@ -29,10 +29,18 @@ export function DropdownMenu({ trigger, items, align = 'left' }: DropdownMenuPro
       if (!trigger) return
       const rect = trigger.getBoundingClientRect()
       const menuWidth = menu?.offsetWidth ?? 0
-      setMenuStyle({
-        top: rect.bottom + 4,
-        left: align === 'right' ? rect.right - menuWidth : rect.left,
-      })
+      const menuHeight = menu?.offsetHeight ?? 0
+      const margin = 8
+      // те же границы, что и у Select/DateInput: внутри модалки не вылезаем
+      // за её футер, снаружи — не вылезаем за экран
+      const dialog = trigger.closest('[role="dialog"]')
+      const dialogRect = dialog?.getBoundingClientRect()
+      const footer = dialog?.querySelector('[class*="modal-footer"]')
+      const boundary = footer ? footer.getBoundingClientRect().top : (dialogRect ? dialogRect.bottom : window.innerHeight)
+      const top = Math.max(margin, Math.min(rect.bottom + 4, boundary - menuHeight - margin))
+      const rawLeft = align === 'right' ? rect.right - menuWidth : rect.left
+      const left = Math.max(margin, Math.min(rawLeft, window.innerWidth - menuWidth - margin))
+      setMenuStyle({ top, left })
     }
     // При первом открытии портал с меню ещё не смонтирован в этом же эффекте
     // (menuRef.current === null), поэтому ширина неизвестна — пересчитываем

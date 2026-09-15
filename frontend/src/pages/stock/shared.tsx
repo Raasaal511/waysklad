@@ -4,11 +4,11 @@ import {
   receiveGoods,
   writeOff,
   transferStock,
+  stocktake,
   type StockItem,
   type Warehouse,
 } from '../../entities/inventory/api'
 import { getByBarcode, type Category, type Product, type Unit } from '../../entities/product/api'
-import { listSuppliers, type Supplier } from '../../entities/counterparty/api'
 import type { User } from '../../entities/auth/api'
 import { ApiError } from '../../shared/api/client'
 import { useAuth } from '../../app/AuthContext'
@@ -29,6 +29,7 @@ import {
   IconArrowBarToDown,
   IconArrowBarUp,
   IconArrowsRightLeft,
+  IconClipboardCheck,
   IconSearch,
   type Icon,
 } from '@tabler/icons-react'
@@ -38,18 +39,20 @@ const BarcodeScanner = lazy(() =>
   import('../../entities/barcode/BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })),
 )
 
-export type MovementMode = 'receive' | 'write_off' | 'transfer'
+export type MovementMode = 'receive' | 'write_off' | 'transfer' | 'stocktake'
 
 export const MODE_LABELS: Record<MovementMode, string> = {
   receive: 'Приёмка',
   write_off: 'Списание',
   transfer: 'Перемещение',
+  stocktake: 'Инвентаризация',
 }
 
 export const MODE_ICONS: Record<MovementMode, Icon> = {
   receive: IconArrowBarToDown,
   write_off: IconArrowBarUp,
   transfer: IconArrowsRightLeft,
+  stocktake: IconClipboardCheck,
 }
 
 /** Ответственным за склад может быть только владелец или кладовщик (storekeeper) — так же проверяется на бэкенде. */
@@ -111,14 +114,8 @@ export function AssignedUsersField({
   )
 }
 
-export function NewWarehouseForm({
-  onCreated,
-  defaultName = '',
-}: {
-  onCreated: () => void
-  defaultName?: string
-}) {
-  const [name, setName] = useState(defaultName)
+export function NewWarehouseForm({ onCreated }: { onCreated: () => void }) {
+  const [name, setName] = useState('')
   const [address, setAddress] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -141,7 +138,13 @@ export function NewWarehouseForm({
     <form className={layoutStyles.form} onSubmit={handleSubmit}>
       <label className={layoutStyles.field}>
         Название склада
-        <input value={name} onChange={(e) => setName(e.target.value)} required />
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Например, Склад на Кадырова"
+          autoFocus
+          required
+        />
       </label>
       <label className={layoutStyles.field}>
         Адрес
@@ -216,13 +219,13 @@ export function MovementForm({
   const [scanError, setScanError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const { suppliers, ensureSuppliers } = useCatalog()
   const [withDebt, setWithDebt] = useState(false)
   const [supplierId, setSupplierId] = useState<number | null>(null)
   const [debtDueDate, setDebtDueDate] = useState('')
 
   useEffect(() => {
-    if (mode === 'receive') listSuppliers().then(setSuppliers).catch(() => {})
+    if (mode === 'receive') ensureSuppliers().catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
 
@@ -236,12 +239,18 @@ export function MovementForm({
 
   // Для списания/перемещения нельзя увести больше, чем реально есть на складе-источнике;
   // приёмка ничем не ограничена — товар только поступает.
-  const stockLimited = mode !== 'receive'
-  const movementColumns = mode === 'receive' ? '45% 30% 17% 8%' : '70% 22% 8%'
+  // Инвентаризация: вводим фактический остаток (может быть больше учёта).
+  const stockLimited = mode === 'write_off' || mode === 'transfer'
+  const isStocktake = mode === 'stocktake'
+  const movementColumns = mode === 'receive' ? '45% 30% 17% 8%' : isStocktake ? '55% 20% 17% 8%' : '70% 22% 8%'
   const stockFor = (productId: number) =>
     warehouseId == null
       ? null
       : Number(stock.find((s) => s.product_id === productId && s.warehouse_id === warehouseId)?.available ?? '0')
+  const quantityOnHand = (productId: number) =>
+    warehouseId == null
+      ? null
+      : Number(stock.find((s) => s.product_id === productId && s.warehouse_id === warehouseId)?.quantity ?? '0')
   const reservedFor = (productId: number) =>
     warehouseId == null
       ? 0
@@ -261,10 +270,13 @@ export function MovementForm({
     }
     if (stockLimited) {
       list = list.filter((p) => (stockFor(p.id) ?? 0) > 0)
+    } else if (isStocktake) {
+      // На инвентаризации показываем товары, которые уже есть на этом складе
+      list = list.filter((p) => (quantityOnHand(p.id) ?? 0) > 0 || (reservedFor(p.id) ?? 0) > 0)
     }
     return list
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, categoryId, debouncedQuery, stockLimited, warehouseId, stock])
+  }, [products, categoryId, debouncedQuery, stockLimited, isStocktake, warehouseId, stock])
 
   function addLine(product: Product) {
     const max = stockLimited ? stockFor(product.id) : null
@@ -273,14 +285,17 @@ export function MovementForm({
     setLines((prev) => {
       const existing = prev.find((l) => l.product.id === product.id)
       if (existing) {
+        if (isStocktake) return prev
         const current = Number(existing.quantity)
         if (max !== null && current >= max) return prev
         const next = clamp(max !== null ? Math.min(current + 1, max) : current + 1)
         return prev.map((l) => (l.product.id === product.id ? { ...l, quantity: String(next) } : l))
       }
       if (max !== null && max <= 0) return prev
-      const initial = clamp(max !== null ? Math.min(1, max) : 1)
-      if (initial <= 0) return prev
+      const initial = isStocktake
+        ? clamp(quantityOnHand(product.id) ?? 0)
+        : clamp(max !== null ? Math.min(1, max) : 1)
+      if (!isStocktake && initial <= 0) return prev
       return [...prev, { product, quantity: String(initial), cost: product.purchase_price ?? '' }]
     })
   }
@@ -347,6 +362,8 @@ export function MovementForm({
         })
       } else if (mode === 'write_off') {
         await writeOff({ warehouse_id: warehouseId, lines: payloadLines })
+      } else if (mode === 'stocktake') {
+        await stocktake({ warehouse_id: warehouseId, lines: payloadLines })
       } else {
         if (!toWarehouseId) return
         await transferStock({ warehouse_id: warehouseId, to_warehouse_id: toWarehouseId, lines: payloadLines })
@@ -471,6 +488,7 @@ export function MovementForm({
                       <>
                         {formatQuantity(inLineQty)}
                         <IconButton
+                          variant="neutral"
                           className="product-tile-remove"
                           onClick={(e) => {
                             e.stopPropagation()
@@ -478,7 +496,7 @@ export function MovementForm({
                           }}
                           aria-label="Убрать из списка"
                         >
-                          <IconTrash size={10} stroke={1.8} />
+                          <IconTrash size={10} stroke={2} />
                         </IconButton>
                       </>
                     ) : (
@@ -509,14 +527,18 @@ export function MovementForm({
           <div className="table-wrap cart-table-wrap">
             <div className="cart-table-head" style={{ gridTemplateColumns: movementColumns }}>
               <span>Товар</span>
-              <span>Кол-во</span>
+              <span>{isStocktake ? 'Факт' : 'Кол-во'}</span>
               {mode === 'receive' && <span>Закуп. цена</span>}
+              {isStocktake && <span>Учёт</span>}
               <span />
             </div>
             <div>
               {lines.map((line) => {
                 const available = stockFor(line.product.id)
+                const onHand = quantityOnHand(line.product.id)
                 const overStock = stockLimited && available !== null && Number(line.quantity || 0) > available
+                const delta =
+                  isStocktake && onHand !== null ? Number(line.quantity || 0) - onHand : null
                 return (
                   <div
                     key={line.product.id}
@@ -525,9 +547,15 @@ export function MovementForm({
                   >
                     <div className="cart-table-name">
                       <div>{line.product.name}</div>
-                      {available !== null && (
+                      {available !== null && !isStocktake && (
                         <div className="cart-table-stock">
                           Остаток: {formatQuantity(available)} {unitName(line.product.unit_code)}
+                        </div>
+                      )}
+                      {isStocktake && delta !== null && delta !== 0 && (
+                        <div className="cart-table-stock">
+                          Расхождение: {delta > 0 ? '+' : ''}
+                          {formatQuantity(String(delta))}
                         </div>
                       )}
                     </div>
@@ -544,7 +572,15 @@ export function MovementForm({
                           <IconButton
                             variant="muted"
                             className="cart-qty-step"
-                            onClick={() => addLine(line.product)}
+                            onClick={() =>
+                              isStocktake
+                                ? updateLine(
+                                    line.product.id,
+                                    'quantity',
+                                    String(Math.max(0, Number(line.quantity) + 1)),
+                                  )
+                                : addLine(line.product)
+                            }
                             aria-label="Увеличить количество"
                           >
                             <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-up" />
@@ -565,6 +601,11 @@ export function MovementForm({
                         <div className="cart-table-warning">больше остатка ({formatQuantity(available)})</div>
                       )}
                     </div>
+                    {isStocktake && (
+                      <div className="cart-table-stock">
+                        {onHand !== null ? formatQuantity(String(onHand)) : '—'}
+                      </div>
+                    )}
                     {mode === 'receive' && (
                       <div className="cart-table-price-cell">
                         <input

@@ -7,6 +7,7 @@ import {
   getStockValue,
   getRevenueTimeline,
   getPeriodTotals,
+  getMissedSales,
   type Dashboard,
   type ProductSales,
   type CategoryProfit,
@@ -15,10 +16,12 @@ import {
   type TimelinePoint,
   type TimelineBucket,
   type PeriodTotals,
+  type MissedSaleItem,
 } from '../../entities/analytics/api'
 import { ApiError } from '../../shared/api/client'
 import { formatQuantity, formatMoney } from '../../shared/lib/format'
 import { BarChart, type BarChartPoint } from '../../shared/ui/BarChart'
+import { PillTabs } from '../../shared/ui/PillTabs'
 import {
   IconReportMoney,
   IconTrendingUp,
@@ -29,6 +32,8 @@ import {
   IconChartBar,
   IconPackageOff,
   IconReceipt,
+  IconCoinOff,
+  IconShoppingBagX,
 } from '@tabler/icons-react'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './AnalyticsPage.module.css'
@@ -36,8 +41,12 @@ import styles from './AnalyticsPage.module.css'
 const TOP_PRODUCTS_COLUMNS = '2fr 1fr 1fr 1fr 1fr'
 const CATEGORY_PROFIT_COLUMNS = '1.6fr 1fr 1fr 1fr 1fr'
 const DEAD_STOCK_COLUMNS = '2fr 1fr 1fr 1fr'
+const MISSED_SALES_COLUMNS = '2fr 1fr 1fr'
 
 type PeriodKey = 'month' | 'quarter' | 'year'
+
+const PERIOD_FILTER_KEY = 'analytics_period_filter'
+const PERIOD_VALUES: PeriodKey[] = ['month', 'quarter', 'year']
 
 const PERIOD_LABELS: Record<PeriodKey, string> = {
   month: 'Месяц',
@@ -49,6 +58,15 @@ const PERIOD_BUCKET: Record<PeriodKey, TimelineBucket> = {
   month: 'day',
   quarter: 'week',
   year: 'month',
+}
+
+type MetricKey = 'revenue' | 'profit'
+
+const METRIC_OPTIONS: MetricKey[] = ['revenue', 'profit']
+
+const METRIC_LABELS: Record<MetricKey, string> = {
+  revenue: 'Выручка',
+  profit: 'Прибыль',
 }
 
 /** Календарные границы периода, содержащего anchor (не скользящее окно —
@@ -217,9 +235,19 @@ export function AnalyticsPage() {
   const [stockValue, setStockValue] = useState<StockValue | null>(null)
   const [timeline, setTimeline] = useState<TimelinePoint[]>([])
   const [prevTotals, setPrevTotals] = useState<PeriodTotals | null>(null)
-  const [period, setPeriod] = useState<PeriodKey>('year')
+  const [periodTotals, setPeriodTotals] = useState<PeriodTotals | null>(null)
+  const [missedSales, setMissedSales] = useState<MissedSaleItem[]>([])
+  // Предпочтение устройства, не аккаунта — переживает обновление страницы.
+  const [period, setPeriod] = useState<PeriodKey>(() => {
+    const saved = localStorage.getItem(PERIOD_FILTER_KEY)
+    return saved && (PERIOD_VALUES as string[]).includes(saved) ? (saved as PeriodKey) : 'year'
+  })
+
+  useEffect(() => {
+    localStorage.setItem(PERIOD_FILTER_KEY, period)
+  }, [period])
   const [anchor, setAnchor] = useState(() => new Date())
-  const [metric, setMetric] = useState<'revenue' | 'profit'>('revenue')
+  const [metric, setMetric] = useState<MetricKey>('revenue')
   const [loading, setLoading] = useState(true)
   const [periodLoading, setPeriodLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -265,12 +293,16 @@ export function AnalyticsPage() {
       getCategoryProfit(range),
       getRevenueTimeline({ ...range, bucket }),
       getPeriodTotals(prevRange),
+      getPeriodTotals(range),
+      getMissedSales(range),
     ])
-      .then(([t, cp, tl, prev]) => {
+      .then(([t, cp, tl, prev, current, missed]) => {
         setTopProducts(t)
         setCategoryProfit(cp)
         setTimeline(tl)
         setPrevTotals(prev)
+        setPeriodTotals(current)
+        setMissedSales(missed)
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Не удалось загрузить аналитику'))
       .finally(() => setPeriodLoading(false))
@@ -313,10 +345,11 @@ export function AnalyticsPage() {
       ),
       detail: (
         <>
-          <div className={styles.detailItem}>
+          <div className={[styles.detailItem, styles.detailItemHead].join(' ')}>
             <span className={styles.detailLabel}>{formatBucketFull(p.bucket_start, bucket)}</span>
             <span className={styles.detailValue}>{p.sales_count} продаж</span>
           </div>
+          <div className={styles.detailDivider} />
           <div className={styles.detailItem}>
             <span className={styles.detailLabel}>Выручка</span>
             <span className={styles.detailValue}>{formatMoney(revenue)} ₽</span>
@@ -345,18 +378,12 @@ export function AnalyticsPage() {
       <h2>Аналитика</h2>
 
       <div className={styles.periodRow}>
-        <div className={styles.periodTabs}>
-          {(Object.keys(PERIOD_LABELS) as PeriodKey[]).map((key) => (
-            <button
-              key={key}
-              type="button"
-              className={period === key ? styles.pillTabActive : styles.pillTab}
-              onClick={() => changePeriod(key)}
-            >
-              {PERIOD_LABELS[key]}
-            </button>
-          ))}
-        </div>
+        <PillTabs
+          value={period}
+          options={Object.keys(PERIOD_LABELS) as PeriodKey[]}
+          labels={PERIOD_LABELS}
+          onChange={changePeriod}
+        />
         <div className={styles.periodNav}>
           <button
             type="button"
@@ -434,6 +461,18 @@ export function AnalyticsPage() {
             </div>
           </div>
         )}
+        {periodTotals && Number(periodTotals.change_kept ?? 0) > 0 && (
+          <div className={styles.heroCard}>
+            <span className={styles.heroIcon}>
+              <IconCoinOff size={22} stroke={1.7} />
+            </span>
+            <div className={styles.heroBody}>
+              <span className={styles.heroLabel}>Невзятая сдача</span>
+              <span className={styles.heroValue}>{formatMoney(periodTotals.change_kept)} ₽</span>
+              <span className={styles.heroSub}>осталась в кассе сверх чека</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className={layoutStyles.stack}>
@@ -442,22 +481,13 @@ export function AnalyticsPage() {
             <IconChartBar size={17} stroke={1.8} className={styles.sectionHeadingIcon} />
             <h3>Динамика</h3>
           </div>
-          <div className={styles.metricTabs}>
-            <button
-              type="button"
-              className={metric === 'revenue' ? styles.pillTabActive : styles.pillTab}
-              onClick={() => setMetric('revenue')}
-            >
-              Выручка
-            </button>
-            <button
-              type="button"
-              className={metric === 'profit' ? styles.pillTabActive : styles.pillTab}
-              onClick={() => setMetric('profit')}
-            >
-              Прибыль
-            </button>
-          </div>
+          <PillTabs
+            className={styles.metricTabs}
+            value={metric}
+            options={METRIC_OPTIONS}
+            labels={METRIC_LABELS}
+            onChange={setMetric}
+          />
         </div>
         <p className={styles.chartHint}>
           Группировка {BUCKET_HINT[bucket]} · нажмите на столбец, чтобы посмотреть детали
@@ -551,7 +581,7 @@ export function AnalyticsPage() {
                     <span>{formatMoney(c.profit)} ₽</span>
                     <span className={styles.marginCell}>
                       {catMargin != null ? (
-                        <span className={marginBadgeClass(catMargin, styles)}>{catMargin.toFixed(1)}%</span>
+                        <span className={marginBadgeClass(catMargin)}>{catMargin.toFixed(1)}%</span>
                       ) : (
                         '—'
                       )}
@@ -610,12 +640,51 @@ export function AnalyticsPage() {
           </div>
         )}
       </div>
+
+      <div className={layoutStyles.stack}>
+        <div className={styles.sectionHeading}>
+          <IconShoppingBagX size={17} stroke={1.8} className={styles.sectionHeadingIcon} />
+          <h3>Упущенные продажи с витрины</h3>
+        </div>
+        <p className={styles.chartHint}>
+          Заявки, где покупатель просил товар, а остатка не хватило
+        </p>
+        {missedSales.length === 0 ? (
+          <p className={layoutStyles.textMuted}>За период таких заявок нет</p>
+        ) : (
+          <div className={layoutStyles.dataTable}>
+            <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: MISSED_SALES_COLUMNS }}>
+              <span>Товар</span>
+              <span>Заявок</span>
+              <span>Просили</span>
+            </div>
+            <div className={layoutStyles.dataTableBody}>
+              {missedSales.map((m, i) => (
+                <div
+                  key={m.product_id}
+                  className={`${layoutStyles.dataRow} sale-history-row-in`}
+                  style={
+                    {
+                      gridTemplateColumns: MISSED_SALES_COLUMNS,
+                      '--row-delay': `${Math.min(i, 12) * 25}ms`,
+                    } as CSSProperties
+                  }
+                >
+                  <span className={layoutStyles.dataRowName}>{m.product_name}</span>
+                  <span>{m.requests_count}</span>
+                  <span>{formatQuantity(m.quantity_requested)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-function marginBadgeClass(margin: number, s: typeof styles): string {
-  if (margin < 15) return `${s.marginBadge} ${s.marginBadgeLow}`
-  if (margin < 30) return `${s.marginBadge} ${s.marginBadgeMid}`
-  return `${s.marginBadge} ${s.marginBadgeHigh}`
+function marginBadgeClass(margin: number): string {
+  if (margin < 15) return 'badge pill danger'
+  if (margin < 30) return 'badge pill warning'
+  return 'badge pill accent'
 }

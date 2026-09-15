@@ -7,7 +7,7 @@ const quantityFormatter = new Intl.NumberFormat('ru-RU', {
 export function formatQuantity(value: string | number): string {
   const num = Number(value)
   if (!Number.isFinite(num)) return String(value)
-  return quantityFormatter.format(num)
+  return quantityFormatter.format(num).replace(/\u00A0/g, '\u202F')
 }
 
 const moneyFormatter = new Intl.NumberFormat('ru-RU', {
@@ -15,11 +15,12 @@ const moneyFormatter = new Intl.NumberFormat('ru-RU', {
   maximumFractionDigits: 2,
 })
 
-/** Суммы на бэкенде хранятся как Decimal(14,2): "82200.00". Убирает лишние .00, добавляет разделители разрядов. */
+/* Суммы: фиксируем минимум 2 знака только если есть копейки; разрядность через тонкий пробел уже даёт ru-RU.
+   Дополнительно нормализуем узкий неразрывный пробел для стабильного вида. */
 export function formatMoney(value: string | number): string {
   const num = Number(value)
   if (!Number.isFinite(num)) return String(value)
-  return moneyFormatter.format(num)
+  return moneyFormatter.format(num).replace(/\u00A0/g, '\u202F')
 }
 
 /**
@@ -75,4 +76,13 @@ export function pluralizeSales(count: number): string {
   if (mod10 === 1 && mod100 !== 11) return 'продажа'
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'продажи'
   return 'продаж'
+}
+
+/** Склонение "товар/товара/товаров" по числу. */
+export function pluralizeGoods(count: number): string {
+  const mod10 = count % 10
+  const mod100 = count % 100
+  if (mod10 === 1 && mod100 !== 11) return 'товару'
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'товарам'
+  return 'товарам'
 }

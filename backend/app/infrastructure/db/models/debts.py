@@ -19,6 +19,7 @@ class DebtModel(Base, TenantMixin, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"))
     client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), index=True)
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), index=True)
     sale_id: Mapped[int | None] = mapped_column(ForeignKey("sales.id"))  # долг из продажи

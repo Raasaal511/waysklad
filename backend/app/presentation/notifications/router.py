@@ -1,28 +1,49 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.presentation.deps import (
     ActorDep,
+    ListNotificationsDep,
     MarkAllNotificationsReadDep,
     MarkNotificationReadDep,
-    UowDep,
+    SessionFactoryDep,
 )
+from app.presentation.deps.auth import get_current_user_ws
 from app.presentation.notifications.schemas import (
     MarkAllReadResponse,
     NotificationListResponse,
     NotificationResponse,
 )
+from app.infrastructure.notifications.ws_broadcast import broadcaster, user_channel
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
+@router.websocket("/ws")
+async def notifications_ws(websocket: WebSocket, token: str, factory: SessionFactoryDep) -> None:
+    """Push-канал взамен периодического опроса GET /notifications. Браузер не
+    может выставить заголовок Authorization при открытии сокета — токен
+    передаётся query-параметром (?token=...)."""
+    user = await get_current_user_ws(token, factory)
+    channel = user_channel(user.id)
+    await websocket.accept()
+    broadcaster.registry.add(channel, websocket)
+    try:
+        while True:
+            # клиент ничего не обязан присылать — просто держим соединение
+            # открытым и ждём either новое сообщение (игнорируем), либо разрыв
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        broadcaster.registry.remove(channel, websocket)
+
+
 @router.get("")
-async def list_notifications(actor: ActorDep, uow: UowDep) -> NotificationListResponse:
-    async with uow:
-        items = await uow.notifications.list_for_user(actor.id)
-        unread = await uow.notifications.unread_count(actor.id)
-        return NotificationListResponse(
-            items=[NotificationResponse.from_entity(n) for n in items], unread=unread
-        )
+async def list_notifications(actor: ActorDep, use_case: ListNotificationsDep) -> NotificationListResponse:
+    result = await use_case.execute(actor)
+    return NotificationListResponse(
+        items=[NotificationResponse.from_entity(n) for n in result.items], unread=result.unread
+    )
 
 
 @router.post("/{notification_id}/read")

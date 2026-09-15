@@ -50,13 +50,19 @@ def _counterparty_name_expr():
     """Имя клиента либо поставщика — ровно один из client_id/supplier_id заполнен."""
     client_name = (
         select(ClientModel.name)
-        .where(ClientModel.id == DebtModel.client_id)
+        .where(
+            ClientModel.id == DebtModel.client_id,
+            ClientModel.tenant_id == DebtModel.tenant_id,
+        )
         .correlate(DebtModel)
         .scalar_subquery()
     )
     supplier_name = (
         select(SupplierModel.name)
-        .where(SupplierModel.id == DebtModel.supplier_id)
+        .where(
+            SupplierModel.id == DebtModel.supplier_id,
+            SupplierModel.tenant_id == DebtModel.tenant_id,
+        )
         .correlate(DebtModel)
         .scalar_subquery()
     )
@@ -74,6 +80,7 @@ class DebtFilterFactory(BaseQueryFilterFactory[DebtModel]):
         return {
             "client_id": FieldSpec(DebtModel.client_id, NUMERIC_OPS | {Operator.IS_NULL}),
             "supplier_id": FieldSpec(DebtModel.supplier_id, NUMERIC_OPS | {Operator.IS_NULL}),
+            "warehouse_id": FieldSpec(DebtModel.warehouse_id, NUMERIC_OPS),
             "status": FieldSpec(status_expr, frozenset({Operator.EQ, Operator.IN})),
             "balance": FieldSpec(balance_expr, NUMERIC_OPS),
             "due_date": FieldSpec(DebtModel.due_date, DATE_OPS),

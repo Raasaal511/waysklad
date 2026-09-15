@@ -5,12 +5,14 @@ from app.application.inventory.common import require_warehouse_access
 from app.domain.audit.entities import AuditEntry
 from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Product, ProductVariant
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.common.money import Money
 from app.domain.common.quantity import Quantity
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.permissions import Actor, Permission, require
 from app.domain.inventory.entities import StockDocType, StockDocument, StockLine
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)
@@ -30,14 +32,19 @@ class CreateProductCommand:
     barcode: str | None = None
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
+    description: str = ""
+    show_on_storefront: bool = False
+    storefront_min_qty: Decimal | None = None
+    storefront_step_qty: Decimal | None = None
     variants: list[VariantInput] = field(default_factory=list)
     initial_stock_warehouse_id: int | None = None
     initial_stock_quantity: Decimal | None = None
 
 
 class CreateProductUseCase:
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None):
         self._uow = uow
+        self._cache = cache
 
     async def execute(self, actor: Actor, cmd: CreateProductCommand) -> Product:
         require(actor, Permission.PRODUCTS_MANAGE)
@@ -66,6 +73,10 @@ class CreateProductUseCase:
                 if existing is not None:
                     raise DomainError(f"Штрихкод «{value}» уже используется товаром «{existing.name}»")
 
+            for qty in (cmd.storefront_min_qty, cmd.storefront_step_qty):
+                if qty is not None and qty <= 0:
+                    raise DomainError("Мин. количество и шаг заказа на витрине должны быть больше нуля")
+
             product = Product(
                 id=None,
                 name=cmd.name,
@@ -76,6 +87,10 @@ class CreateProductUseCase:
                 barcode=Barcode(cmd.barcode) if cmd.barcode else None,
                 category_id=cmd.category_id,
                 min_stock=cmd.min_stock,
+                description=cmd.description,
+                show_on_storefront=cmd.show_on_storefront,
+                storefront_min_qty=cmd.storefront_min_qty,
+                storefront_step_qty=cmd.storefront_step_qty,
                 variants=[
                     ProductVariant(
                         id=None,
@@ -118,4 +133,5 @@ class CreateProductUseCase:
                 )
 
             await uow.commit()
+            await invalidate_shop_cache(self._cache, uow)
         return product

@@ -26,6 +26,11 @@ export interface Product {
   category_id: number | null
   min_stock: string
   photo: string
+  description: string
+  storefront_photos: string[]
+  show_on_storefront: boolean
+  storefront_min_qty: string | null
+  storefront_step_qty: string | null
   variants: Variant[]
 }
 
@@ -52,9 +57,64 @@ export interface ProductHistoryEntry {
   created_at: string
 }
 
-export interface ImportProductsResult {
+export type ImportMatchStatus = 'no_match' | 'match' | 'ambiguous_match'
+export type ImportAction = 'create' | 'update' | 'skip'
+
+export interface ExistingProductSnapshot {
+  id: number
+  name: string
+  sku: string
+  barcode: string | null
+  unit_code: string
+  purchase_price: string
+  retail_price: string
+  category_id: number | null
+  min_stock: string
+}
+
+export interface DuplicateCandidate {
+  matched_by: 'barcode' | 'sku' | 'name'
+  product: ExistingProductSnapshot
+}
+
+export interface PreviewRow {
+  row: number
+  name: string
+  sku: string
+  barcode: string | null
+  unit_code: string
+  category_id: number | null
+  purchase_price: string | null
+  retail_price: string | null
+  min_stock: string
+  parse_error: string | null
+  status: ImportMatchStatus
+  candidates: DuplicateCandidate[]
+}
+
+export interface PreviewProductsResult {
+  rows: PreviewRow[]
+}
+
+export interface ApplyImportRow {
+  client_row_id: string
+  action: ImportAction
+  name: string
+  sku: string
+  barcode: string | null
+  unit_code: string
+  purchase_price: string
+  retail_price: string
+  category_id: number | null
+  min_stock: string
+  existing_product_id: number | null
+}
+
+export interface ApplyImportResult {
   created: number
-  errors: { row: number; message: string }[]
+  updated: number
+  skipped: number
+  errors: { client_row_id: string; message: string }[]
 }
 
 interface ProductInput {
@@ -66,6 +126,10 @@ interface ProductInput {
   barcode?: string | null
   category_id?: number | null
   min_stock?: string
+  description?: string
+  show_on_storefront?: boolean
+  storefront_min_qty?: string | null
+  storefront_step_qty?: string | null
   variants?: VariantInput[]
   initial_stock_warehouse_id?: number | null
   initial_stock_quantity?: string | null
@@ -84,7 +148,9 @@ export interface ListProductsParams {
   limit?: number
   offset?: number
   categoryId?: number | null
-  sort?: 'name' | 'price_asc' | 'price_desc' | 'margin_desc' | 'created_desc' | 'created_asc'
+  sort?: 'name' | 'price_asc' | 'price_desc' | 'margin_desc' | 'created_desc' | 'created_asc' | 'stock_desc'
+  inStockOnly?: boolean
+  warehouseId?: number | null
 }
 
 export async function listProducts(params: ListProductsParams = {}) {
@@ -94,19 +160,39 @@ export async function listProducts(params: ListProductsParams = {}) {
   if (params.offset != null) search.set('offset', String(params.offset))
   if (params.categoryId != null) search.set('category_id', String(params.categoryId))
   if (params.sort) search.set('sort', params.sort)
+  if (params.inStockOnly) search.set('in_stock_only', 'true')
+  if (params.warehouseId != null) search.set('warehouse_id', String(params.warehouseId))
   const qs = search.toString()
   const { data, total } = await api.getWithTotal<Product[]>(`/products${qs ? `?${qs}` : ''}`)
   return { items: data, total }
 }
 
-/** Весь каталог целиком (без пагинации) — для форм выбора товара: продажа, заказ, приёмка. */
+const ALL_PRODUCTS_PAGE_SIZE = 50
+
+/** Весь каталог целиком (постранично, лимит на бэкенде — 50) — для форм выбора товара: продажа, заказ, приёмка. */
 export async function listAllProducts(query = '', categoryId?: number | null) {
-  const { items } = await listProducts({ query, limit: 1000, categoryId })
-  return items
+  const all: Product[] = []
+  let offset = 0
+  while (true) {
+    const { items, total } = await listProducts({
+      query,
+      categoryId,
+      limit: ALL_PRODUCTS_PAGE_SIZE,
+      offset,
+    })
+    all.push(...items)
+    offset += items.length
+    if (items.length < ALL_PRODUCTS_PAGE_SIZE || offset >= total) break
+  }
+  return all
 }
 
 export function createProduct(input: ProductInput) {
   return api.post<Product>('/products', input)
+}
+
+export function getProduct(id: number) {
+  return api.get<Product>(`/products/${id}`)
 }
 
 export function listUnits() {
@@ -125,16 +211,42 @@ export function updateProduct(id: number, input: ProductInput & { photo?: string
   return api.put<Product>(`/products/${id}`, input)
 }
 
+export function deleteProduct(id: number) {
+  return api.delete<void>(`/products/${id}`)
+}
+
+export function generateBarcode() {
+  return api.post<{ barcode: string }>('/products/barcode/generate')
+}
+
 export function setProductPhoto(productId: number, file: File) {
   const form = new FormData()
   form.append('file', file)
   return api.postForm<Product>(`/products/${productId}/photo`, form)
 }
 
-export function importProducts(file: File) {
+export function generateProductDescription(productId: number) {
+  return api.post<{ description: string }>(`/products/${productId}/description/generate`)
+}
+
+export function addStorefrontPhoto(productId: number, file: File) {
   const form = new FormData()
   form.append('file', file)
-  return api.postForm<ImportProductsResult>('/products/import', form)
+  return api.postForm<Product>(`/products/${productId}/storefront-photos`, form)
+}
+
+export function setStorefrontPhotos(productId: number, photos: string[]) {
+  return api.put<Product>(`/products/${productId}/storefront-photos`, { photos })
+}
+
+export function previewImport(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return api.postForm<PreviewProductsResult>('/products/import/preview', form)
+}
+
+export function applyImport(rows: ApplyImportRow[]) {
+  return api.post<ApplyImportResult>('/products/import/apply', { rows })
 }
 
 export function getProductHistory(productId: number) {
