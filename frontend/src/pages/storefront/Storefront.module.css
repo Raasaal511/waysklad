@@ -532,6 +532,20 @@
   border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
 }
 
+.soldBadge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 88%, #000);
+  color: #fff;
+  letter-spacing: 0.01em;
+}
+
 .outBadge {
   position: static;
   display: inline-flex;
@@ -553,6 +567,24 @@
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.productChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.soldChip {
+  display: inline-flex;
+  width: fit-content;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text-muted);
 }
 
 .emptyState {
@@ -1088,4 +1120,122 @@
 
 .chatForm input {
   flex: 1;
+}
+
+.productGallery {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 840px) {
+  .productGallery {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .galleryThumbs {
+    flex-direction: column;
+    width: 72px;
+    max-height: min(520px, 70vw);
+    overflow-y: auto;
+  }
+}
+
+.galleryThumbs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.galleryThumb,
+.galleryThumbActive {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  background: var(--bg-muted);
+  cursor: pointer;
+}
+
+.galleryThumbActive {
+  border-color: var(--accent);
+}
+
+.galleryThumb img,
+.galleryThumbActive img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.heroImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.descriptionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.descriptionBlock p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.myOrdersList {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.myOrderCard {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface, var(--bg));
+}
+
+.myOrderHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.myOrderStatus {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+}
+
+.myOrderStatus[data-status='accepted'] {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+.myOrderStatus[data-status='rejected'] {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: var(--danger);
 }

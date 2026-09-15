@@ -5,6 +5,7 @@ export type NotificationKind =
   | 'task_done'
   | 'debt_due_soon'
   | 'debt_overdue'
+  | 'debt_issued'
   | 'low_stock'
   | 'storefront_message'
   | 'storefront_request_new'

@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
 
 from app.application.storefront.get_product import GetStorefrontProductCommand
 from app.application.storefront.get_request_status import GetStorefrontRequestStatusCommand
@@ -30,6 +31,7 @@ from app.presentation.deps import (
 from app.presentation.deps.auth import require_permission
 from app.presentation.deps.customer_auth import CurrentCustomerDep
 from app.presentation.orders.schemas import OrderResponse
+from app.presentation.storefront.og import absolute_asset_url, public_origin, render_og_html
 from app.presentation.storefront.schemas import (
     AcceptStorefrontRequestRequest,
     CreateStorefrontRequestRequest,
@@ -73,6 +75,56 @@ async def get_storefront_product(
     if result is None:
         raise HTTPException(status_code=404, detail="Товар не найден")
     return StorefrontProductPageResponse.from_result(result)
+
+
+@router.get("/{slug}/og", response_class=HTMLResponse)
+@limiter.limit("300/minute")
+async def get_storefront_catalog_og(
+    request: Request, slug: str, session_factory: SessionFactoryDep
+) -> HTMLResponse:
+    """OG-превью каталога для ботов соцсетей (см. nginx User-Agent map)."""
+    async with SqlAlchemyUnitOfWork(None, session_factory=session_factory) as public_uow:
+        tenant = await public_uow.tenants.get_by_slug(slug)
+    if tenant is None or not tenant.storefront_enabled or tenant.is_suspended:
+        raise HTTPException(status_code=404, detail="Витрина не найдена")
+    origin = public_origin(request)
+    canonical = f"{origin}/store/{slug}"
+    return render_og_html(
+        title=tenant.name,
+        description=f"Каталог магазина «{tenant.name}» на WaySklad",
+        canonical_url=canonical,
+        site_name="WaySklad",
+    )
+
+
+@router.get("/{slug}/products/{product_id}/og", response_class=HTMLResponse)
+@limiter.limit("300/minute")
+async def get_storefront_product_og(
+    request: Request, slug: str, product_id: int, use_case: GetStorefrontProductDep
+) -> HTMLResponse:
+    """OG-превью карточки товара для ботов соцсетей."""
+    result = await use_case.execute(GetStorefrontProductCommand(slug=slug, product_id=product_id))
+    if result is None:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+    origin = public_origin(request)
+    canonical = f"{origin}/store/{slug}/products/{product_id}"
+    product = result.product
+    price = format(product.retail_price.amount, "f").rstrip("0").rstrip(".")
+    description = (product.description or "").strip() or f"{price} ₽ · {result.shop_name}"
+    if len(description) > 200:
+        description = description[:197].rstrip() + "…"
+    photo = (
+        product.storefront_photos[0]
+        if product.storefront_photos
+        else product.photo
+    )
+    return render_og_html(
+        title=f"{product.name} · {result.shop_name}",
+        description=description,
+        canonical_url=canonical,
+        image_url=absolute_asset_url(origin, photo),
+        site_name=result.shop_name,
+    )
 
 
 @router.post("/{slug}/requests", status_code=201)

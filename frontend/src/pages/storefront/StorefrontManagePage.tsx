@@ -234,6 +234,8 @@ function ProductsTab() {
 
   const onCount = products.filter((p) => p.show_on_storefront).length
 
+  const offCount = products.length - onCount
+
   async function toggleProduct(product: Product) {
     setBusyId(product.id)
     setError(null)
@@ -282,22 +284,27 @@ function ProductsTab() {
             placeholder="Поиск по названию, артикулу…"
           />
         </label>
-        <div className={layoutStyles.row} style={{ gap: 6 }}>
+        <div className={styles.filterTabs} role="tablist" aria-label="Фильтр витрины">
           {(
             [
-              ['all', `Все · ${products.length}`],
-              ['on', `На витрине · ${onCount}`],
-              ['off', 'Скрыты'],
+              ['all', 'Все', products.length],
+              ['on', 'На витрине', onCount],
+              ['off', 'Скрыты', offCount],
             ] as const
-          ).map(([id, label]) => (
-            <Button
+          ).map(([id, label, count]) => (
+            <button
               key={id}
-              variant="secondary"
-              active={filter === id}
+              type="button"
+              role="tab"
+              aria-selected={filter === id}
+              className={[styles.filterTab, filter === id && styles.filterTabActive]
+                .filter(Boolean)
+                .join(' ')}
               onClick={() => setFilter(id)}
             >
-              {label}
-            </Button>
+              <span>{label}</span>
+              <span className={styles.filterCount}>{count}</span>
+            </button>
           ))}
         </div>
       </div>
@@ -308,35 +315,49 @@ function ProductsTab() {
       ) : visible.length === 0 ? (
         <p className={layoutStyles.textMuted}>Нет товаров по фильтру</p>
       ) : (
-        <div className={styles.productList}>
-          {visible.map((p) => (
-            <div key={p.id} className={styles.productRow}>
-              <ProductPhoto src={p.photo} size={36} />
-              <div className={styles.productMeta}>
-                <strong>{p.name}</strong>
-                <span className={layoutStyles.textMuted}>
-                  {formatMoney(p.retail_price)} ₽
-                  {p.sku ? ` · ${p.sku}` : ''}
-                </span>
-              </div>
-              <button
-                type="button"
-                className={p.show_on_storefront ? styles.toggleOn : styles.toggleOff}
-                disabled={busyId === p.id}
-                onClick={() => toggleProduct(p)}
+        <div className={styles.productGrid}>
+          {visible.map((p) => {
+            const onShowcase = p.show_on_storefront
+            return (
+              <div
+                key={p.id}
+                className={[styles.productCard, onShowcase && styles.productCardOn]
+                  .filter(Boolean)
+                  .join(' ')}
               >
-                {p.show_on_storefront ? (
-                  <>
-                    <IconEye size={16} stroke={1.8} /> На витрине
-                  </>
-                ) : (
-                  <>
-                    <IconEyeOff size={16} stroke={1.8} /> Скрыт
-                  </>
-                )}
-              </button>
-            </div>
-          ))}
+                <div className={styles.productCardPhoto}>
+                  <ProductPhoto src={p.photo} size={160} />
+                </div>
+                <div className={styles.productMeta}>
+                  <strong className={styles.productName}>{p.name}</strong>
+                  <div className={styles.productDetails}>
+                    <span className={styles.productPrice}>
+                      {formatMoney(p.retail_price)}
+                      <span className={styles.productCurrency}>₽</span>
+                    </span>
+                    {p.sku && <span className={styles.productSku}>арт. {p.sku}</span>}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={onShowcase ? styles.toggleOn : styles.toggleOff}
+                  disabled={busyId === p.id}
+                  onClick={() => toggleProduct(p)}
+                  aria-pressed={onShowcase}
+                >
+                  {onShowcase ? (
+                    <>
+                      <IconEye size={16} stroke={1.8} /> На витрине
+                    </>
+                  ) : (
+                    <>
+                      <IconEyeOff size={16} stroke={1.8} /> Скрыт
+                    </>
+                  )}
+                </button>
+              </div>
+            )
+          })}
         </div>
       )}
       {!loading && total > products.length && (

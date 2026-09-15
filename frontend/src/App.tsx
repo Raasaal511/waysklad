@@ -28,6 +28,7 @@ import { StorefrontCatalogPage } from './pages/storefront/StorefrontCatalogPage'
 import { StorefrontProductPage } from './pages/storefront/StorefrontProductPage'
 import { StorefrontCartPage } from './pages/storefront/StorefrontCartPage'
 import { StorefrontRequestPage } from './pages/storefront/StorefrontRequestPage'
+import { StorefrontMyOrdersPage } from './pages/storefront/StorefrontMyOrdersPage'
 import { MarketplacePage } from './pages/marketplace/MarketplacePage'
 import { TasksPage } from './pages/tasks/TasksPage'
 import { DebtsPage } from './pages/debts/DebtsPage'
@@ -38,6 +39,7 @@ import { ClientDetailPage } from './pages/clients/ClientDetailPage'
 import { AnalyticsPage } from './pages/analytics/AnalyticsPage'
 import { ProfilePage } from './pages/profile/ProfilePage'
 import { EmployeesPage } from './pages/employees/EmployeesPage'
+import { AdminPage } from './pages/admin/AdminPage'
 
 export function App() {
   return (
@@ -46,11 +48,13 @@ export function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/admin/*" element={<AdminPage />} />
             <Route path="/marketplace" element={<MarketplacePage />} />
             <Route path="/store/:slug" element={<StorefrontCatalogPage />} />
             <Route path="/store/:slug/products/:productId" element={<StorefrontProductPage />} />
             <Route path="/store/:slug/cart" element={<StorefrontCartPage />} />
             <Route path="/store/:slug/request" element={<StorefrontRequestPage />} />
+            <Route path="/store/:slug/my-orders" element={<StorefrontMyOrdersPage />} />
             <Route
               element={
                 <RequireAuth>

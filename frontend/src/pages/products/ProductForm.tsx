@@ -13,6 +13,10 @@ import {
   createUnit,
   createCategory,
   setProductPhoto,
+  generateBarcode,
+  generateProductDescription,
+  addStorefrontPhoto,
+  setStorefrontPhotos,
   type Product,
   type Unit,
   type Category,
@@ -33,10 +37,13 @@ import {
   IconAlertTriangle,
   IconShoppingBag,
   IconCheck,
+  IconWand,
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
 import { CreatableSelect } from '../../shared/ui/CreatableSelect'
+import type { SelectOption } from '../../shared/ui/Select'
+import { InfoHint } from '../../shared/ui/InfoHint'
 import { isBarcodeScannerSupported } from '../../entities/barcode/barcodeSupport'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
 import layoutStyles from '../../shared/ui/Layout.module.css'
@@ -59,8 +66,8 @@ export function generateSku(name: string): string {
   return prefix ? `${prefix}-${digits}` : String(digits)
 }
 
-export function categoryOptions(categories: Category[]): { value: string; label: string }[] {
-  const result: { value: string; label: string }[] = []
+export function categoryOptions(categories: Category[]): SelectOption[] {
+  const result: SelectOption[] = []
   const visited = new Set<number>()
 
   function addChildren(parentId: number | null, depth: number) {
@@ -183,6 +190,7 @@ export function ProductForm({
   const [name, setName] = useState(product?.name ?? '')
   const [sku, setSku] = useState(product?.sku || (product ? '' : generateSku('')))
   const [barcode, setBarcode] = useState(product?.barcode ?? '')
+  const [generatingBarcode, setGeneratingBarcode] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [unitCode, setUnitCode] = useState(product?.unit_code ?? 'pcs')
   const isFractional = (code: string) => units.find((u) => u.code === code)?.fractional ?? false
@@ -213,8 +221,18 @@ export function ProductForm({
   const [showOnStorefront, setShowOnStorefront] = useState(product?.show_on_storefront ?? false)
   const [storefrontMinQty, setStorefrontMinQty] = useState(product?.storefront_min_qty ?? '')
   const [storefrontStepQty, setStorefrontStepQty] = useState(product?.storefront_step_qty ?? '')
+  const [description, setDescription] = useState(product?.description ?? '')
+  const [storefrontPhotos, setStorefrontPhotosState] = useState<string[]>(
+    product?.storefront_photos ?? [],
+  )
+  const [generatingDescription, setGeneratingDescription] = useState(false)
+  const [galleryBusy, setGalleryBusy] = useState(false)
+  const [dragPhotoIndex, setDragPhotoIndex] = useState<number | null>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  const savedProductId = product?.id ?? createdProduct?.id
 
   useEffect(() => {
     if (!product && initialStockWarehouseId == null && warehouses[0]) {
@@ -244,6 +262,91 @@ export function ProductForm({
     setPhotoError(null)
     setPhotoPreview(null)
     if (photoInputRef.current) photoInputRef.current.value = ''
+  }
+
+  async function handleGenerateBarcode() {
+    setGeneratingBarcode(true)
+    setError(null)
+    try {
+      const { barcode: next } = await generateBarcode()
+      setBarcode(next)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось сгенерировать штрихкод')
+    } finally {
+      setGeneratingBarcode(false)
+    }
+  }
+
+  async function handleGenerateDescription() {
+    if (!savedProductId) return
+    setGeneratingDescription(true)
+    setError(null)
+    try {
+      const result = await generateProductDescription(savedProductId)
+      setDescription(result.description)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось сгенерировать описание')
+    } finally {
+      setGeneratingDescription(false)
+    }
+  }
+
+  async function handleAddGalleryFiles(files: FileList | null) {
+    if (!savedProductId || !files?.length) return
+    setGalleryBusy(true)
+    setError(null)
+    try {
+      let next = storefrontPhotos
+      for (const file of Array.from(files)) {
+        if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+          setError('Неподдерживаемый формат. JPG, PNG, WEBP или GIF.')
+          continue
+        }
+        const updated = await addStorefrontPhoto(savedProductId, file)
+        next = updated.storefront_photos ?? []
+        setStorefrontPhotosState(next)
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось загрузить фото витрины')
+    } finally {
+      setGalleryBusy(false)
+      if (galleryInputRef.current) galleryInputRef.current.value = ''
+    }
+  }
+
+  async function persistGallery(photos: string[]) {
+    if (!savedProductId) return
+    setGalleryBusy(true)
+    setError(null)
+    try {
+      const updated = await setStorefrontPhotos(savedProductId, photos)
+      setStorefrontPhotosState(updated.storefront_photos ?? photos)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось обновить галерею')
+    } finally {
+      setGalleryBusy(false)
+    }
+  }
+
+  async function removeGalleryPhoto(url: string) {
+    await persistGallery(storefrontPhotos.filter((p) => p !== url))
+  }
+
+  function onGalleryDragStart(index: number) {
+    setDragPhotoIndex(index)
+  }
+
+  async function onGalleryDrop(index: number) {
+    if (dragPhotoIndex == null || dragPhotoIndex === index) {
+      setDragPhotoIndex(null)
+      return
+    }
+    const next = [...storefrontPhotos]
+    const [moved] = next.splice(dragPhotoIndex, 1)
+    next.splice(index, 0, moved)
+    setDragPhotoIndex(null)
+    setStorefrontPhotosState(next)
+    await persistGallery(next)
   }
 
   function addVariant() {
@@ -311,6 +414,7 @@ export function ProductForm({
         retail_price: retailPrice || '0',
         min_stock: minStock || '0',
         category_id: categoryId,
+        description,
         show_on_storefront: showOnStorefront,
         storefront_min_qty: storefrontMinQty || null,
         storefront_step_qty: storefrontStepQty || null,
@@ -405,7 +509,7 @@ export function ProductForm({
                       handleRemovePhoto()
                     }}
                   >
-                    <IconX size={14} stroke={1.8} />
+                    <IconX size={18} stroke={2.4} />
                   </button>
                 </div>
               </>
@@ -486,6 +590,16 @@ export function ProductForm({
                   onChange={(e) => setBarcode(e.target.value)}
                   placeholder="Штрихкод"
                 />
+                <IconButton
+                  type="button"
+                  variant="muted"
+                  onClick={handleGenerateBarcode}
+                  disabled={generatingBarcode}
+                  aria-label="Сгенерировать штрихкод"
+                  tooltip="Сгенерировать"
+                >
+                  <IconWand size={15} stroke={1.8} />
+                </IconButton>
                 {isBarcodeScannerSupported() && (
                   <IconButton
                     type="button"
@@ -560,7 +674,7 @@ export function ProductForm({
           </div>
 
           <label className={detail.metric}>
-            <span className={detail.metricIcon}>
+            <span className={`${detail.metricIcon} ${detail.metricIconWarn}`}>
               <IconAlertTriangle size={18} stroke={1.8} />
             </span>
             <span className={detail.metricBody}>
@@ -575,8 +689,15 @@ export function ProductForm({
                 }}
                 onBlur={() => setMinStock((v) => clampToUnit(v, unitCode))}
                 placeholder="0"
+                aria-describedby="min-stock-hint"
               />
-              <span>Мин. остаток, {unitLabel}</span>
+              <span className={styles.metricLabelWithHint}>
+                Порог предупреждения
+                <InfoHint text={`Когда остаток станет меньше этого значения, товар подсветится как заканчивающийся. Единица: ${unitLabel}.`} />
+              </span>
+              <span id="min-stock-hint" className={styles.metricHint}>
+                Ниже этого числа — предупреждение о низком остатке
+              </span>
             </span>
           </label>
 
@@ -601,6 +722,88 @@ export function ProductForm({
                 <span>Начальный остаток</span>
               </span>
             </label>
+          )}
+        </section>
+
+        <section className={`${detail.section} ${detail.reveal}`} style={{ '--reveal-delay': '110ms' } as CSSProperties}>
+          <div className={styles.sectionHead}>
+            <h3 className={detail.sectionTitle}>Описание для витрины</h3>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleGenerateDescription}
+              disabled={!savedProductId || generatingDescription || saving}
+            >
+              <IconWand size={14} stroke={1.8} />
+              {generatingDescription ? 'Генерация…' : 'Сгенерировать через ИИ'}
+            </Button>
+          </div>
+          {!savedProductId && (
+            <p className={styles.fieldHint}>
+              Сначала сохраните товар — затем можно сгенерировать описание и добавить фото витрины.
+            </p>
+          )}
+          <textarea
+            className={styles.descriptionInput}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={4}
+            maxLength={4000}
+            placeholder="Текст для карточки на витрине"
+          />
+        </section>
+
+        <section className={`${detail.section} ${detail.reveal}`} style={{ '--reveal-delay': '120ms' } as CSSProperties}>
+          <div className={styles.sectionHead}>
+            <h3 className={detail.sectionTitle}>Фото для витрины</h3>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => galleryInputRef.current?.click()}
+              disabled={!savedProductId || galleryBusy || saving}
+            >
+              <IconPhoto size={14} stroke={1.8} /> Добавить
+            </Button>
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
+              hidden
+              onChange={(e) => handleAddGalleryFiles(e.target.files)}
+            />
+          </div>
+          {!savedProductId ? (
+            <p className={layoutStyles.textMuted}>Доступно после первого сохранения товара</p>
+          ) : storefrontPhotos.length === 0 ? (
+            <p className={layoutStyles.textMuted}>Пока пусто — галерея не связана со складским фото</p>
+          ) : (
+            <div className={styles.galleryGrid}>
+              {storefrontPhotos.map((url, index) => (
+                <div
+                  key={url}
+                  className={styles.galleryItem}
+                  draggable={!galleryBusy}
+                  onDragStart={() => onGalleryDragStart(index)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => onGalleryDrop(index)}
+                >
+                  <img src={url} alt="" />
+                  <button
+                    type="button"
+                    className={styles.galleryRemove}
+                    onClick={() => removeGalleryPhoto(url)}
+                    disabled={galleryBusy}
+                    aria-label="Удалить фото"
+                  >
+                    <IconX size={14} stroke={2} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {storefrontPhotos.length > 1 && (
+            <p className={styles.fieldHint}>Перетащите миниатюры, чтобы изменить порядок</p>
           )}
         </section>
 
@@ -634,7 +837,10 @@ export function ProductForm({
           {showOnStorefront && (
             <div className={detail.metaGrid}>
               <label className={detail.metaItem}>
-                <span className={layoutStyles.textMuted}>Мин. заказ</span>
+                <span className={styles.fieldLabelWithHint}>
+                  <span className={layoutStyles.textMuted}>Минимум для покупки</span>
+                  <InfoHint text="Покупатель на витрине не сможет заказать меньше этого количества. Например, минимум 2 — нельзя взять 1 штуку." />
+                </span>
                 <input
                   className={styles.plainInput}
                   type="text"
@@ -646,9 +852,13 @@ export function ProductForm({
                   }}
                   placeholder="без ограничения"
                 />
+                <span className={styles.fieldHint}>Сколько минимум можно взять в одном заказе</span>
               </label>
               <label className={detail.metaItem}>
-                <span className={layoutStyles.textMuted}>Шаг заказа</span>
+                <span className={styles.fieldLabelWithHint}>
+                  <span className={layoutStyles.textMuted}>Прибавка кнопками + / −</span>
+                  <InfoHint text="На сколько меняется количество, когда покупатель нажимает + или − на витрине. Например, 0.5 — можно выбрать 0.5, 1, 1.5…" />
+                </span>
                 <input
                   className={styles.plainInput}
                   type="text"
@@ -660,6 +870,7 @@ export function ProductForm({
                   }}
                   placeholder="1"
                 />
+                <span className={styles.fieldHint}>Шаг изменения количества на витрине</span>
               </label>
             </div>
           )}

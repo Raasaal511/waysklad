@@ -4,6 +4,8 @@ export interface PeriodTotals {
   sales_count: number
   revenue: string
   profit: string
+  /** Сумма невзятой сдачи за период; может отсутствовать на старых бэкендах. */
+  change_kept?: string
 }
 
 export interface Dashboard {
@@ -96,6 +98,17 @@ export function getRevenueTimeline(params: AnalyticsPeriodParams & { bucket?: Ti
 
 export function getDeadStock() {
   return api.get<DeadStockItem[]>('/analytics/dead-stock')
+}
+
+export interface MissedSaleItem {
+  product_id: number
+  product_name: string
+  requests_count: number
+  quantity_requested: string
+}
+
+export function getMissedSales(params: AnalyticsPeriodParams = {}) {
+  return api.get<MissedSaleItem[]>(`/analytics/missed-sales${periodQuery(params)}`)
 }
 
 export function getStockValue() {

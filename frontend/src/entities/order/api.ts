@@ -81,7 +81,12 @@ export function cancelOrder(id: number, reason?: string) {
 
 export function issueOrder(
   id: number,
-  input: { payment_method: PaymentMethod; cash_received?: string | null; debt_due_date?: string | null }
+  input: {
+    payment_method: PaymentMethod
+    cash_received?: string | null
+    change_kept?: string | null
+    debt_due_date?: string | null
+  },
 ) {
   return api.post<IssueOrderResult>(`/orders/${id}/issue`, input)
 }

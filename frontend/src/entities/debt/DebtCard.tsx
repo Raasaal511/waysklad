@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { repayDebt, extendDebt, createInstallment, getDebtHistory, type Debt, type DebtHistoryEntry } from './api'
+import { repayDebt, extendDebt, createInstallment, getDebtHistory, getDebtReceipt, type Debt, type DebtHistoryEntry } from './api'
 import type { Client, Supplier } from '../counterparty/api'
 import type { Sale } from '../sale/api'
 import type { DocumentHistoryEntry } from '../inventory/api'
@@ -25,6 +25,7 @@ import {
   IconClockExclamation,
   IconCalendarPlus,
   IconCalendarRepeat as IconInstallment,
+  IconBrandWhatsapp,
   type Icon as TablerIcon,
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
@@ -218,11 +219,30 @@ export function DebtCard({
   const [showRepay, setShowRepay] = useState(false)
   const [showExtend, setShowExtend] = useState(false)
   const [showInstallment, setShowInstallment] = useState(false)
+  const [sendingWhatsapp, setSendingWhatsapp] = useState(false)
+  const [whatsappError, setWhatsappError] = useState<string | null>(null)
 
   const counterpartyName = (d: Debt) =>
     d.client_id
       ? clients.find((c) => c.id === d.client_id)?.name ?? `Клиент #${d.client_id}`
       : suppliers.find((s) => s.id === d.supplier_id)?.name ?? `Поставщик #${d.supplier_id}`
+
+  async function handleSendWhatsapp() {
+    setWhatsappError(null)
+    setSendingWhatsapp(true)
+    try {
+      const receipt = await getDebtReceipt(debt.id)
+      if (receipt.whatsapp_link) {
+        window.open(receipt.whatsapp_link, '_blank', 'noopener,noreferrer')
+      } else {
+        setWhatsappError('У клиента не указан телефон/WhatsApp')
+      }
+    } catch (err) {
+      setWhatsappError(err instanceof ApiError ? err.message : 'Не удалось получить сообщение')
+    } finally {
+      setSendingWhatsapp(false)
+    }
+  }
 
   const unitName = (productId: number) => {
     const code = products.find((p) => p.id === productId)?.unit_code
@@ -309,8 +329,25 @@ export function DebtCard({
             <IconCalendarRepeat size={15} stroke={1.8} />{' '}
             {debt.schedule.length === 0 ? 'Рассрочка' : 'Пересобрать график'}
           </Button>
+          {debt.client_id != null && (
+            <Button variant="secondary" onClick={handleSendWhatsapp} disabled={sendingWhatsapp}>
+              <IconBrandWhatsapp size={15} stroke={1.8} />
+              {sendingWhatsapp ? 'Открываем…' : 'В WhatsApp'}
+            </Button>
+          )}
         </div>
       )}
+
+      {debt.is_closed && debt.client_id != null && (
+        <div className={styles['debt-detail-actions']}>
+          <Button variant="secondary" onClick={handleSendWhatsapp} disabled={sendingWhatsapp}>
+            <IconBrandWhatsapp size={15} stroke={1.8} />
+            {sendingWhatsapp ? 'Открываем…' : 'В WhatsApp'}
+          </Button>
+        </div>
+      )}
+
+      {whatsappError && <p className={layoutStyles.error}>{whatsappError}</p>}
 
       {sale && sale.lines.length > 0 && (
         <div
