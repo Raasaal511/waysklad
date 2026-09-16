@@ -2,6 +2,7 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+from app.domain.common.exceptions import DomainError
 from app.domain.common.phone import Phone
 
 LOGIN_LINK_TTL = timedelta(minutes=10)
@@ -15,10 +16,19 @@ class Customer:
 
     id: int | None
     phone: Phone
+    # необязательное — заполняется покупателем один раз в профиле, подставляется
+    # автоматически в новые заявки вместо ручного ввода имени каждый раз
+    name: str = ""
     telegram_chat_id: str = ""
     # инкрементируется при отзыве всех токенов (logout-all) — тот же паттерн,
     # что и у User.token_version
     token_version: int = 0
+
+    def update_name(self, name: str) -> None:
+        name = name.strip()
+        if not name:
+            raise DomainError("Укажите имя")
+        self.name = name
 
 
 @dataclass

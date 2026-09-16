@@ -32,8 +32,10 @@ from app.application.counterparties.list_suppliers import ListSuppliersUseCase
 from app.application.counterparties.search_clients import SearchClientsUseCase
 from app.application.counterparties.update_client import UpdateClientUseCase
 from app.application.customers.get_login_status import GetCustomerLoginStatusUseCase
+from app.application.customers.get_profile import GetCustomerProfileUseCase
 from app.application.customers.list_my_requests import ListMyStorefrontRequestsUseCase
 from app.application.customers.request_login_link import RequestCustomerLoginLinkUseCase
+from app.application.customers.update_profile import UpdateCustomerProfileUseCase
 from app.application.debts.create_installment import CreateInstallmentUseCase
 from app.application.debts.extend_debt import ExtendDebtUseCase
 from app.application.debts.get_debt import GetDebtUseCase
@@ -180,6 +182,14 @@ def get_request_customer_login_link(uow: PublicUowDep) -> RequestCustomerLoginLi
 
 def get_customer_login_status(uow: PublicUowDep) -> GetCustomerLoginStatusUseCase:
     return GetCustomerLoginStatusUseCase(uow)
+
+
+def get_customer_profile(factory: SessionFactoryDep) -> GetCustomerProfileUseCase:
+    return GetCustomerProfileUseCase(factory)
+
+
+def get_update_customer_profile(factory: SessionFactoryDep) -> UpdateCustomerProfileUseCase:
+    return UpdateCustomerProfileUseCase(factory)
 
 
 def get_login(uow: PublicUowDep, hasher: HasherDep) -> LoginUseCase:
@@ -402,6 +412,10 @@ RequestCustomerLoginLinkDep = Annotated[
 ]
 GetCustomerLoginStatusDep = Annotated[
     GetCustomerLoginStatusUseCase, Depends(get_customer_login_status)
+]
+GetCustomerProfileDep = Annotated[GetCustomerProfileUseCase, Depends(get_customer_profile)]
+UpdateCustomerProfileDep = Annotated[
+    UpdateCustomerProfileUseCase, Depends(get_update_customer_profile)
 ]
 LoginDep = Annotated[LoginUseCase, Depends(get_login)]
 CreateEmployeeDep = Annotated[CreateEmployeeUseCase, Depends(get_create_employee)]

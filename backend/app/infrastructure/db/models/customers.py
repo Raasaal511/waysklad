@@ -14,6 +14,7 @@ class CustomerModel(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     phone: Mapped[str] = mapped_column(String(20), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(200), default="")
     telegram_chat_id: Mapped[str] = mapped_column(String(32), default="")
     token_version: Mapped[int] = mapped_column(Integer, default=0)
 
