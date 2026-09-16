@@ -173,6 +173,40 @@ function AdminStatusPanel({ logout }: { logout: () => void }) {
         value={String(status.online_now)}
         note={status.online_now_note}
       />
+      <GaugeCard label="CPU" percent={status.cpu_percent} />
+      <GaugeCard
+        label="Память"
+        percent={status.memory_percent}
+        note={`${formatMb(status.memory_used_mb)} / ${formatMb(status.memory_total_mb)}`}
+      />
+    </div>
+  )
+}
+
+function formatMb(mb: number): string {
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} ГБ` : `${mb} МБ`
+}
+
+function gaugeLevel(percent: number): 'ok' | 'warn' | 'danger' {
+  if (percent >= 90) return 'danger'
+  if (percent >= 70) return 'warn'
+  return 'ok'
+}
+
+function GaugeCard({ label, percent, note }: { label: string; percent: number; note?: string }) {
+  const level = gaugeLevel(percent)
+  return (
+    <div className={styles.gaugeCard}>
+      <span className={styles.cardLabel}>{label}</span>
+      <strong className={level === 'danger' ? styles.bad : undefined}>{percent.toFixed(0)}%</strong>
+      <div className={styles.gaugeTrack}>
+        <div
+          className={styles.gaugeFill}
+          data-level={level}
+          style={{ width: `${Math.min(Math.max(percent, 0), 100)}%` }}
+        />
+      </div>
+      {note && <span className={styles.note}>{note}</span>}
     </div>
   )
 }
@@ -396,17 +430,25 @@ function AdminErrorsPanel({ logout }: { logout: () => void }) {
     <ul className={styles.errorList}>
       {errors.map((e, i) => (
         <li key={`${e.timestamp}-${i}`} className={styles.errorItem}>
-          <div className={styles.errorMeta}>
-            <time>{formatDateTime(e.timestamp)}</time>
-            <code>
-              {e.method} {e.path}
-            </code>
-          </div>
-          <strong>
-            {e.error_type}: {e.message}
-          </strong>
+          <time className={styles.errorTime}>{formatLogTime(e.timestamp)}</time>
+          <span className={styles.errorMethod}>{e.method}</span>
+          <span className={styles.errorLine} title={`${e.path} — ${e.message}`}>
+            <span className={styles.errorPath}>{e.path}</span>
+            {' — '}
+            <span className={styles.errorMessage}>{e.message}</span>
+          </span>
         </li>
       ))}
     </ul>
   )
+}
+
+function formatLogTime(value: string): string {
+  return new Date(value).toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
 }

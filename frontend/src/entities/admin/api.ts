@@ -33,6 +33,10 @@ export interface AdminStatus {
   active_tenants: number
   online_now: number
   online_now_note: string
+  cpu_percent: number
+  memory_percent: number
+  memory_used_mb: number
+  memory_total_mb: number
 }
 
 export function getAdminStatus() {

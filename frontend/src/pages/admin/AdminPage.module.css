@@ -148,6 +148,34 @@
   line-height: 1.35;
 }
 
+.gaugeCard {
+  composes: card;
+  gap: 10px;
+}
+
+.gaugeTrack {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+
+.gaugeFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.4s ease, background-color 0.4s ease;
+}
+
+.gaugeFill[data-level='warn'] {
+  background: #d9a441;
+}
+
+.gaugeFill[data-level='danger'] {
+  background: var(--danger);
+}
+
 .tableWrap {
   overflow-x: auto;
   border: 1px solid var(--border);
@@ -248,25 +276,62 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
 }
 
 .errorItem {
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  display: grid;
+  grid-template-columns: 130px 60px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
   background: var(--surface, var(--bg));
 }
 
-.errorMeta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
+.errorItem:last-child {
+  border-bottom: none;
 }
 
-.errorMeta code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+.errorItem:nth-child(even) {
+  background: var(--bg-muted);
+}
+
+.errorTime {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.errorMethod {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.errorLine {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.errorLine:hover {
+  white-space: normal;
+  overflow: visible;
+}
+
+.errorPath {
+  color: var(--text);
+}
+
+.errorType {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.errorMessage {
+  color: var(--text-muted);
 }
