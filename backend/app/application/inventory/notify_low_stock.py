@@ -16,22 +16,34 @@ from app.domain.identity.entities import Role
 from app.domain.notifications.entities import NotificationKind
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 
+# роли, чьи алерты фильтруются по назначенным складам — тот же список, что
+# у _WAREHOUSE_SCOPED_ROLES в presentation/deps/auth.py (здесь нет HTTP-контекста,
+# чтобы переиспользовать сам Actor/get_actor)
+_WAREHOUSE_SCOPED_ROLES = (Role.MANAGER,)
+
 
 async def _notify_tenant(uow: SqlAlchemyUnitOfWork, notifier: INotifier) -> None:
     from app.application.tasks.notify import notify_user
 
     sale_period_from = datetime.now() - timedelta(days=SALE_PERIOD_DAYS)
-    recommendations = await uow.analytics.restock_recommendations(sale_period_from)
-    if not recommendations:
-        return
 
     recipients = [u for u in await uow.users.list_by_tenant() if u.role in (Role.OWNER, Role.MANAGER)]
     if not recipients:
         return
 
-    for item in recommendations:
-        text = f"Заканчивается «{item.product_name}»: остаток {item.quantity} (порог {item.min_stock})"
-        for user in recipients:
+    for user in recipients:
+        # OWNER видит все склады (warehouse_ids=None — без фильтра, как у
+        # not-scoped Actor); MANAGER — только назначенные ему, тот же принцип,
+        # что у GetRestockRecommendationsUseCase/get_actor для HTTP-запросов
+        warehouse_ids = None
+        if user.role in _WAREHOUSE_SCOPED_ROLES:
+            warehouse_ids = [w.id for w in await uow.warehouses.list_for_user(user.id)]
+            if not warehouse_ids:
+                continue  # manager без назначенных складов — нечего проверять
+
+        recommendations = await uow.analytics.restock_recommendations(sale_period_from, warehouse_ids)
+        for item in recommendations:
+            text = f"Заканчивается «{item.product_name}»: остаток {item.quantity} (порог {item.min_stock})"
             # повтор только если остаток вырос с прошлого уведомления (пытались
             # пополнить) — иначе не спамим одним и тем же каждые 15 минут/день,
             # пока товар не появится на складе
