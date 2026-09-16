@@ -51,6 +51,9 @@ class MarketplaceProductResponse(BaseModel):
     order_step_qty: Decimal | None
     shop_slug: str
     shop_name: str
+    sold_count: Decimal
+    average_rating: float
+    reviews_count: int
 
     @classmethod
     def from_row(cls, row: MarketplaceProductRow) -> "MarketplaceProductResponse":
@@ -65,6 +68,9 @@ class MarketplaceProductResponse(BaseModel):
             order_step_qty=row.order_step_qty,
             shop_slug=row.shop_slug,
             shop_name=row.shop_name,
+            sold_count=row.sold_count,
+            average_rating=row.rating.average_rating,
+            reviews_count=row.rating.reviews_count,
         )
 
 

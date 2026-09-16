@@ -1,6 +1,9 @@
 """Общий каталог платформы (/api/marketplace/products) — витрина сразу всех
 магазинов, в отличие от /api/storefront/{slug} (один магазин)."""
 
+from datetime import date, timedelta
+from decimal import Decimal
+
 
 async def _register_shop(client, random_phone, shop_name: str, storefront_enabled: bool = True):
     response = await client.post(
@@ -93,6 +96,7 @@ async def test_marketplace_lists_products_from_multiple_shops(client, random_pho
     assert set(by_id[product_a["id"]].keys()) == {
         "id", "name", "retail_price", "photo", "category_name", "in_stock",
         "min_order_qty", "order_step_qty", "shop_slug", "shop_name",
+        "sold_count", "average_rating", "reviews_count",
     }
 
 
@@ -221,3 +225,67 @@ async def test_marketplace_no_shops_returns_empty(client):
     response = await client.get("/api/marketplace/products")
     assert response.status_code == 200, response.text
     assert response.json() == {"products": [], "total": 0}
+
+
+async def test_marketplace_shows_sold_count_and_rating(client, random_phone, customer_headers):
+    """Кросс-tenant агрегаты (sold_count/rating) считаются по конкретному
+    товару, не перетекают между магазинами — товар без продаж/отзывов у
+    другого продавца остаётся с нулями."""
+    headers_a, slug_a, wh_a = await _register_shop(client, random_phone, "Магазин с отзывом")
+    headers_b, slug_b, wh_b = await _register_shop(client, random_phone, "Магазин без отзывов")
+
+    product_a = await _add_product(client, headers_a, wh_a, "Товар с историей", "100")
+    product_b = await _add_product(client, headers_b, wh_b, "Товар без истории", "50")
+
+    buyer_headers, _ = await customer_headers()
+    response = await client.post(
+        f"/api/storefront/{slug_a}/requests",
+        headers=buyer_headers,
+        json={"customer_name": "Ахмед", "items": [{"product_id": product_a["id"], "quantity": "1"}]},
+    )
+    assert response.status_code == 201, response.text
+    request_id = response.json()["id"]
+
+    due = (date.today() + timedelta(days=3)).isoformat()
+    response = await client.post(
+        f"/api/storefront/requests/{request_id}/accept",
+        headers=headers_a,
+        json={"warehouse_id": wh_a, "due_date": due},
+    )
+    assert response.status_code == 200, response.text
+    order_id = response.json()["id"]
+
+    # sold_count считается по Sale, не по Order — нужно провести заказ до выдачи
+    for status in ("in_progress", "ready"):
+        response = await client.patch(
+            f"/api/orders/{order_id}/status", headers=headers_a, json={"new_status": status}
+        )
+        assert response.status_code == 200, response.text
+    response = await client.post(
+        f"/api/orders/{order_id}/issue", headers=headers_a, json={"payment_method": "cash"}
+    )
+    assert response.status_code == 200, response.text
+
+    response = await client.post(
+        "/api/reviews",
+        headers=buyer_headers,
+        json={
+            "storefront_request_id": request_id,
+            "product_id": product_a["id"],
+            "rating": 4,
+            "text": "Хороший товар",
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    response = await client.get("/api/marketplace/products")
+    assert response.status_code == 200, response.text
+    by_id = {p["id"]: p for p in response.json()["products"]}
+
+    assert Decimal(by_id[product_a["id"]]["sold_count"]) == 1
+    assert by_id[product_a["id"]]["average_rating"] == 4.0
+    assert by_id[product_a["id"]]["reviews_count"] == 1
+
+    assert Decimal(by_id[product_b["id"]]["sold_count"]) == 0
+    assert by_id[product_b["id"]]["average_rating"] == 0.0
+    assert by_id[product_b["id"]]["reviews_count"] == 0

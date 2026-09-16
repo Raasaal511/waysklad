@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Protocol
 
+from app.domain.reviews.repository import ProductRatingAggregate
+
 
 @dataclass(frozen=True)
 class MarketplaceProductRow:
@@ -21,6 +23,8 @@ class MarketplaceProductRow:
     shop_slug: str
     shop_name: str
     sku: str
+    sold_count: Decimal = Decimal("0")
+    rating: ProductRatingAggregate = ProductRatingAggregate(average_rating=0.0, reviews_count=0)
 
     def to_dict(self) -> dict:
         return {
@@ -37,6 +41,9 @@ class MarketplaceProductRow:
             "shop_slug": self.shop_slug,
             "shop_name": self.shop_name,
             "sku": self.sku,
+            "sold_count": str(self.sold_count),
+            "average_rating": self.rating.average_rating,
+            "reviews_count": self.rating.reviews_count,
         }
 
     @classmethod
@@ -55,6 +62,11 @@ class MarketplaceProductRow:
             shop_slug=d["shop_slug"],
             shop_name=d["shop_name"],
             sku=d["sku"],
+            sold_count=Decimal(d.get("sold_count", "0")),
+            rating=ProductRatingAggregate(
+                average_rating=d.get("average_rating", 0.0),
+                reviews_count=d.get("reviews_count", 0),
+            ),
         )
 
 
@@ -82,3 +94,15 @@ class IMarketplaceProductRepository(Protocol):
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[MarketplaceProductRow], int]: ...
+
+    async def sold_count_by_products(self, product_ids: list[int]) -> dict[int, Decimal]:
+        """Кросс-tenant агрегат — product_id глобально уникален (общий serial PK
+        таблицы products), поэтому фильтр по списку id не утекает данные чужого
+        tenant без явного tenant_id (тот же принцип, что get_by_token у заявок)."""
+        ...
+
+    async def rating_by_products(
+        self, product_ids: list[int]
+    ) -> dict[int, ProductRatingAggregate]:
+        """Кросс-tenant аналог IReviewRepository.rating_by_products — только видимые отзывы."""
+        ...
