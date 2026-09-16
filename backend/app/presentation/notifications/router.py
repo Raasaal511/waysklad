@@ -26,7 +26,7 @@ async def notifications_ws(websocket: WebSocket, token: str, factory: SessionFac
     user = await get_current_user_ws(token, factory)
     channel = user_channel(user.id)
     await websocket.accept()
-    broadcaster.registry.add(channel, websocket)
+    await broadcaster.track_connect(channel, websocket)
     try:
         while True:
             # клиент ничего не обязан присылать — просто держим соединение
@@ -35,7 +35,7 @@ async def notifications_ws(websocket: WebSocket, token: str, factory: SessionFac
     except WebSocketDisconnect:
         pass
     finally:
-        broadcaster.registry.remove(channel, websocket)
+        await broadcaster.track_disconnect(channel, websocket)
 
 
 @router.get("")

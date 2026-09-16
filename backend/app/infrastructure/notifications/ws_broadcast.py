@@ -24,6 +24,7 @@ from app.infrastructure.observability.logging import get_logger
 
 _logger = get_logger("app.ws")
 _PUBSUB_PREFIX = "ws_channel:"
+_ONLINE_COUNTER_KEY = "ws:online_now"
 
 
 def user_channel(user_id: int) -> str:
@@ -114,6 +115,40 @@ class Broadcaster:
                 _logger.exception("Redis publish не удался — событие потеряно для других воркеров")
         # без Redis (dev) или как fallback — доставляем хотя бы локально в этом процессе
         await self.registry.send_local(channel, payload)
+
+    async def track_connect(self, channel: str, ws: WebSocket) -> None:
+        """Регистрирует сокет локально (доставка всегда идёт через локальный
+        registry этого воркера) и инкрементирует общий Redis-счётчик — без
+        него online_now в admin-статусе видел бы только воркер, обслуживший
+        HTTP-запрос статуса, не сумму по всем --workers N."""
+        self.registry.add(channel, ws)
+        if self._redis is not None:
+            try:
+                await self._redis.incr(_ONLINE_COUNTER_KEY)
+            except Exception:
+                _logger.exception("Redis incr(online_now) не удался")
+
+    async def track_disconnect(self, channel: str, ws: WebSocket) -> None:
+        self.registry.remove(channel, ws)
+        if self._redis is not None:
+            try:
+                await self._redis.decr(_ONLINE_COUNTER_KEY)
+            except Exception:
+                _logger.exception("Redis decr(online_now) не удался")
+
+    async def online_now(self) -> int:
+        """Сумма подключений по всем воркерам через общий Redis-счётчик —
+        точнее, чем ConnectionRegistry.count_connections() (только этот
+        процесс). Без Redis (dev, один процесс) — просто локальный счётчик,
+        оба значения совпадают в этом режиме."""
+        if self._redis is None:
+            return self.registry.count_connections()
+        try:
+            raw = await self._redis.get(_ONLINE_COUNTER_KEY)
+            return max(int(raw), 0) if raw is not None else 0
+        except Exception:
+            _logger.exception("Redis get(online_now) не удался")
+            return self.registry.count_connections()
 
 
 broadcaster = Broadcaster()
