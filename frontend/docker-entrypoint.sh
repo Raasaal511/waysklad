@@ -6,8 +6,9 @@ CERT_DIR="/etc/letsencrypt/live/waysklad.gwensoft.ru"
 # nginx с конфигом на 443 не стартует, если файлов сертификата ещё нет
 # (домен только что поднят, certbot ни разу не отработал) — кладём временный
 # self-signed, чтобы nginx поднялся и certbot смог пройти HTTP-01 challenge
-# через него же. После первого успешного выпуска certbot подменит файлы
-# в этом volume и сделает reload — self-signed больше не понадобится.
+# через него же. certbot-сервис (см. docker-compose.prod.yml) сам чистит эту
+# директорию перед первой попыткой certonly — она не в штатном формате
+# certbot (нет archive/), и он откажется сохранить туда настоящий сертификат.
 if [ ! -f "$CERT_DIR/fullchain.pem" ]; then
     echo "Сертификат не найден, генерирую временный self-signed для старта nginx..."
     mkdir -p "$CERT_DIR"
