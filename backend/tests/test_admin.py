@@ -63,6 +63,10 @@ async def test_admin_status_with_valid_token(client):
     assert isinstance(body["active_users"], int)
     assert isinstance(body["active_tenants"], int)
     assert isinstance(body["online_now"], int)
+    assert isinstance(body["cpu_percent"], (int, float))
+    assert isinstance(body["memory_percent"], (int, float))
+    assert body["memory_used_mb"] > 0
+    assert body["memory_total_mb"] >= body["memory_used_mb"]
 
 
 async def test_admin_error_logs_requires_token(client):

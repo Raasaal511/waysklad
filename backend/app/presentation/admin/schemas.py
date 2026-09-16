@@ -82,7 +82,14 @@ class ServerStatusResponse(BaseModel):
     active_users: int
     active_tenants: int
     online_now: int
-    online_now_note: str = "только этот воркер, не вся платформа"
+    # с NOTIFICATIONS_REDIS_URL (прод, --workers N) — сумма по всем воркерам
+    # через общий счётчик; без него (dev, один процесс) — фактически то же
+    # самое, но формально видит только текущий процесс
+    online_now_note: str = "сумма по всем воркерам платформы"
+    cpu_percent: float
+    memory_percent: float
+    memory_used_mb: int
+    memory_total_mb: int
 
     @classmethod
     def from_result(cls, result: ServerStatusResult) -> "ServerStatusResponse":
@@ -92,6 +99,10 @@ class ServerStatusResponse(BaseModel):
             active_users=result.active_users,
             active_tenants=result.active_tenants,
             online_now=result.online_now,
+            cpu_percent=result.cpu_percent,
+            memory_percent=result.memory_percent,
+            memory_used_mb=result.memory_used_mb,
+            memory_total_mb=result.memory_total_mb,
         )
 
 

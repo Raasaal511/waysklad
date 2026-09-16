@@ -53,8 +53,9 @@ async def admin_login(request: Request, body: AdminLoginRequest) -> AdminTokenRe
 
 @router.get("/status")
 async def admin_status(factory: SessionFactoryDep, cache: CacheDep) -> ServerStatusResponse:
-    # online_now — мгновенный и бесплатный (len() по памяти этого воркера),
-    # не кешируем вместе с db_connected/active_users (те требуют SQL-запроса)
+    # online_now — сумма по всем --workers N через общий Redis-счётчик (см.
+    # Broadcaster.online_now), не кешируем вместе с db_connected/active_users
+    # (те требуют SQL-запроса, online_now должен быть мгновенным)
     cached_result = await cached(
         cache,
         "admin:status",
@@ -64,7 +65,7 @@ async def admin_status(factory: SessionFactoryDep, cache: CacheDep) -> ServerSta
         from_json=lambda d: ServerStatusResult(**d),
     )
     result = dataclasses.replace(
-        cached_result, online_now=broadcaster.registry.count_connections()
+        cached_result, online_now=await broadcaster.online_now()
     )
     return ServerStatusResponse.from_result(result)
 
