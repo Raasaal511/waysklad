@@ -78,6 +78,13 @@ class IMarketplaceProductRepository(Protocol):
         """Склады с show_on_storefront=True среди переданных tenant — для расчёта наличия."""
         ...
 
+    async def find_tenant_by_product(self, product_id: int) -> int | None:
+        """tenant_id владельца товара — единственный способ узнать, в чей
+        tenant-scoped UoW открывать сессию дальше, когда вызывающий знает
+        только глобально уникальный product_id, без shop_slug (карточка
+        товара маркетплейса, GET /marketplace/products/{id})."""
+        ...
+
     async def list_products(
         self,
         visible_tenant_ids: list[int],

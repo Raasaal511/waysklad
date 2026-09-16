@@ -356,3 +356,56 @@ async def test_marketplace_min_rating_filter(client, random_phone, customer_head
     assert high_rated["id"] in ids
     assert low_rated["id"] in ids
     assert no_reviews["id"] not in ids
+
+
+async def test_marketplace_product_detail_via_api(client, random_phone, customer_headers):
+    """GET /marketplace/products/{id} — карточка одного товара по глобально
+    уникальному id, без shop_slug в запросе (в отличие от storefront)."""
+    headers_a, slug_a, wh_a = await _register_shop(client, random_phone, "Магазин детальной карточки")
+    product = await _add_product(
+        client, headers_a, wh_a, "Товар с карточкой", "150",
+        description="Хороший товар", sku="ABC-1",
+    )
+
+    response = await client.get(f"/api/marketplace/products/{product['id']}")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["shop_slug"] == slug_a
+    assert body["shop_name"] == "Магазин детальной карточки"
+    assert body["product"]["id"] == product["id"]
+    assert body["product"]["name"] == "Товар с карточкой"
+    assert body["product"]["sku"] == "ABC-1"
+    assert body["product"]["description"] == "Хороший товар"
+    assert body["product"]["in_stock"] is True
+    assert "purchase_price" not in body["product"]  # закупочная цена не отдаётся публично
+
+    # неизвестный id -> 404, не утечка "существует, но..."
+    response = await client.get("/api/marketplace/products/999999")
+    assert response.status_code == 404, response.text
+
+
+async def test_marketplace_product_detail_hidden_from_storefront(client, random_phone):
+    """Товар с show_on_storefront=False недоступен через карточку маркетплейса,
+    даже если знать его id напрямую — тот же принцип, что у одиночной витрины."""
+    headers_a, slug_a, wh_a = await _register_shop(client, random_phone, "Магазин со скрытым товаром")
+    response = await client.post(
+        "/api/products",
+        headers=headers_a,
+        json={"name": "Скрытый", "purchase_price": "10", "retail_price": "50", "show_on_storefront": False},
+    )
+    hidden_product = response.json()
+
+    response = await client.get(f"/api/marketplace/products/{hidden_product['id']}")
+    assert response.status_code == 404, response.text
+
+
+async def test_marketplace_product_detail_suspended_shop(client, random_phone):
+    """Магазин с выключенной витриной (storefront_enabled=False) не отдаёт
+    карточку товара через маркетплейс, даже если товар видим на витрине."""
+    headers_a, slug_a, wh_a = await _register_shop(
+        client, random_phone, "Магазин без витрины", storefront_enabled=False
+    )
+    product = await _add_product(client, headers_a, wh_a, "Товар", "100")
+
+    response = await client.get(f"/api/marketplace/products/{product['id']}")
+    assert response.status_code == 404, response.text

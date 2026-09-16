@@ -2,11 +2,13 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
+from app.application.marketplace.get_product import MarketplaceProductResult
 from app.application.marketplace.list_products import (
     ListMarketplaceProductsCommand,
     ListMarketplaceProductsResult,
 )
 from app.domain.marketplace.repository import MarketplaceProductRow
+from app.presentation.storefront.schemas import StorefrontProductDetailResponse
 
 
 class MarketplaceCatalogParams(BaseModel):
@@ -85,4 +87,25 @@ class MarketplaceCatalogResponse(BaseModel):
         return cls(
             products=[MarketplaceProductResponse.from_row(p) for p in result.products],
             total=result.total,
+        )
+
+
+class MarketplaceProductPageResponse(BaseModel):
+    """Карточка одного товара из общего каталога платформы — та же модель
+    товара, что у одиночной витрины (StorefrontProductDetailResponse), плюс
+    shop_slug/shop_name, т.к. вызывающий не знал tenant заранее (в отличие
+    от storefront, где slug уже был в URL)."""
+
+    shop_slug: str
+    shop_name: str
+    product: StorefrontProductDetailResponse
+
+    @classmethod
+    def from_result(cls, result: MarketplaceProductResult) -> "MarketplaceProductPageResponse":
+        return cls(
+            shop_slug=result.shop_slug,
+            shop_name=result.shop_name,
+            product=StorefrontProductDetailResponse.from_entity(
+                result.product, result.in_stock, result.sold_count, result.rating
+            ),
         )

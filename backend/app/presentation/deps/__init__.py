@@ -63,6 +63,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     GetDebtsOverviewDep,
     GetDocumentDep,
     GetDocumentExportDataDep,
+    GetMarketplaceProductDep,
     GetMissedSalesDep,
     GetOrderDep,
     GetOrderHistoryDep,

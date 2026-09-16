@@ -66,6 +66,13 @@ class SqlAlchemyMarketplaceProductRepository(IMarketplaceProductRepository):
         ).scalars().all()
         return list(rows)
 
+    async def find_tenant_by_product(self, product_id: int) -> int | None:
+        return (
+            await self._session.execute(
+                select(ProductModel.tenant_id).where(ProductModel.id == product_id)
+            )
+        ).scalar_one_or_none()
+
     async def list_products(
         self,
         visible_tenant_ids,
