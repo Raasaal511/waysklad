@@ -4,10 +4,12 @@ from decimal import Decimal
 from app.domain.catalog.entities import Product
 from app.domain.common.cache import ICache
 from app.domain.common.exceptions import NotFoundError
+from app.domain.reviews.repository import ProductRatingAggregate
 from app.infrastructure.cache.cache_aside import cached_use_case
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 
 _CACHE_TTL_SECONDS = 20
+_EMPTY_RATING = ProductRatingAggregate(average_rating=0.0, reviews_count=0)
 
 
 @dataclass(frozen=True)
@@ -22,6 +24,7 @@ class StorefrontProductResult:
     product: Product
     in_stock: bool
     sold_count: Decimal
+    rating: ProductRatingAggregate
 
     def to_json(self) -> dict:
         return {
@@ -29,15 +32,21 @@ class StorefrontProductResult:
             "product": self.product.to_dict(),
             "in_stock": self.in_stock,
             "sold_count": str(self.sold_count),
+            "rating": {
+                "average_rating": self.rating.average_rating,
+                "reviews_count": self.rating.reviews_count,
+            },
         }
 
     @classmethod
     def from_json(cls, d: dict) -> "StorefrontProductResult":
+        rating_d = d.get("rating")
         return cls(
             shop_name=d["shop_name"],
             product=Product.from_dict(d["product"]),
             in_stock=d["in_stock"],
             sold_count=Decimal(d.get("sold_count", "0")),
+            rating=ProductRatingAggregate(**rating_d) if rating_d else _EMPTY_RATING,
         )
 
 
@@ -69,13 +78,19 @@ class GetStorefrontProductUseCase:
                 return None
             stock_items = await uow.stock.list_all()
             sold_counts = await uow.analytics.sold_count_by_products([product.id])
+            ratings = await uow.reviews.rating_by_products([product.id])
 
         in_stock = any(
             item.product_id == product.id and item.quantity > 0 for item in stock_items
         )
         sold_count = sold_counts.get(product.id, Decimal("0"))
+        rating = ratings.get(product.id, _EMPTY_RATING)
         return StorefrontProductResult(
-            shop_name=tenant.name, product=product, in_stock=in_stock, sold_count=sold_count
+            shop_name=tenant.name,
+            product=product,
+            in_stock=in_stock,
+            sold_count=sold_count,
+            rating=rating,
         )
 
     execute = cached_use_case(

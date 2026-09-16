@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from app.domain.marketplace.repository import IMarketplaceProductRepository
     from app.domain.notifications.repository import INotificationRepository
     from app.domain.orders.repository import IOrderRepository
+    from app.domain.reviews.repository import IReviewRepository
     from app.domain.sales.repository import ISaleRepository, ISaleReturnRepository
     from app.domain.storefront.repository import (
         IStorefrontMessageRepository,
@@ -62,6 +63,7 @@ class IUnitOfWork(ABC):
     orders: IOrderRepository
     storefront_requests: IStorefrontRequestRepository
     storefront_messages: IStorefrontMessageRepository
+    reviews: IReviewRepository
     tasks: ITaskRepository
     notifications: INotificationRepository
     audit: IAuditRepository

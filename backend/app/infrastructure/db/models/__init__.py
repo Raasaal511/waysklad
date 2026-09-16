@@ -9,6 +9,7 @@ from app.infrastructure.db.models import (  # noqa: F401
     inventory,
     notifications,
     orders,
+    reviews,
     sales,
     storefront,
     tasks,

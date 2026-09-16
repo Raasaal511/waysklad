@@ -22,7 +22,10 @@ from app.application.storefront.send_message import (
 )
 from app.domain.catalog.entities import Product
 from app.domain.orders.entities import Order
+from app.domain.reviews.repository import ProductRatingAggregate
 from app.domain.storefront.entities import StorefrontMessage, StorefrontRequest
+
+_EMPTY_RATING = ProductRatingAggregate(average_rating=0.0, reviews_count=0)
 
 
 class StorefrontCatalogParams(BaseModel):
@@ -85,10 +88,16 @@ class StorefrontProductResponse(BaseModel):
     min_order_qty: Decimal | None
     order_step_qty: Decimal | None
     sold_count: Decimal
+    average_rating: float
+    reviews_count: int
 
     @classmethod
     def from_entity(
-        cls, product: Product, in_stock: bool, sold_count: Decimal = Decimal("0")
+        cls,
+        product: Product,
+        in_stock: bool,
+        sold_count: Decimal = Decimal("0"),
+        rating: ProductRatingAggregate = _EMPTY_RATING,
     ) -> "StorefrontProductResponse":
         return cls(
             id=product.id,
@@ -100,6 +109,8 @@ class StorefrontProductResponse(BaseModel):
             min_order_qty=product.storefront_min_qty,
             order_step_qty=product.storefront_step_qty,
             sold_count=sold_count,
+            average_rating=rating.average_rating,
+            reviews_count=rating.reviews_count,
         )
 
 
@@ -127,6 +138,7 @@ class StorefrontCatalogResponse(BaseModel):
                     p,
                     p.id in result.in_stock_product_ids,
                     result.sold_count_by_product_id.get(p.id, Decimal("0")),
+                    result.rating_by_product_id.get(p.id, _EMPTY_RATING),
                 )
                 for p in result.products
             ],
@@ -158,9 +170,13 @@ class StorefrontProductDetailResponse(StorefrontProductResponse):
 
     @classmethod
     def from_entity(
-        cls, product: Product, in_stock: bool, sold_count: Decimal = Decimal("0")
+        cls,
+        product: Product,
+        in_stock: bool,
+        sold_count: Decimal = Decimal("0"),
+        rating: ProductRatingAggregate = _EMPTY_RATING,
     ) -> "StorefrontProductDetailResponse":
-        base = StorefrontProductResponse.from_entity(product, in_stock, sold_count)
+        base = StorefrontProductResponse.from_entity(product, in_stock, sold_count, rating)
         return cls(
             **base.model_dump(),
             sku=product.sku,
@@ -182,7 +198,7 @@ class StorefrontProductPageResponse(BaseModel):
         return cls(
             shop_name=result.shop_name,
             product=StorefrontProductDetailResponse.from_entity(
-                result.product, result.in_stock, result.sold_count
+                result.product, result.in_stock, result.sold_count, result.rating
             ),
         )
 
