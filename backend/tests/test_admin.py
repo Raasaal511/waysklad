@@ -96,6 +96,28 @@ async def test_admin_error_logs_records_unhandled_error(client):
     assert latest["message"] == "что-то сломалось"
 
 
+async def test_admin_error_logs_hide_sql_details(client):
+    """SQL-ошибки (ProgrammingError и т.п.) не должны утекать в лог с текстом
+    запроса/параметров — только человеческое сообщение без деталей схемы БД."""
+    from sqlalchemy.exc import ProgrammingError
+
+    exc = ProgrammingError(
+        "SELECT users.token_version FROM users WHERE users.id = %(id_1)s",
+        {"id_1": 3, "tenant_id_1": 3},
+        Exception("relation \"users\" does not exist"),
+    )
+    await report_unhandled_error("GET", "/api/test/sql-boom", exc)
+
+    headers = await _admin_headers(client)
+    response = await client.get("/api/admin/error-logs", headers=headers)
+    errors = response.json()["errors"]
+    latest = errors[0]
+    assert latest["path"] == "/api/test/sql-boom"
+    assert latest["message"] == "Ошибка базы данных"
+    assert "SELECT" not in latest["message"]
+    assert "id_1" not in latest["message"]
+
+
 async def test_admin_list_and_suspend_tenant(client, random_phone):
     register = await client.post(
         "/api/auth/register",
