@@ -5,6 +5,14 @@
 
 ---
 
+## 2026-09-16 — Фильтр каталога «от N звёзд» (min_rating)
+
+Новый query-параметр `?min_rating=1..5` в `GET /api/storefront/{slug}` и
+`GET /api/marketplace/products` — фильтрует по `average_rating`. Полное
+описание — `storefront_extras.md` п.8 и `marketplace.md`.
+
+---
+
 ## 2026-09-16 — Готовые иллюстрации лежат в frontend/public/illustrations/
 
 7 PNG с прозрачным фоном (4 empty state, 404/403/telegram-confirm сцены) уже
