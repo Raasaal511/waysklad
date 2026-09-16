@@ -228,6 +228,125 @@
   gap: 10px;
 }
 
+.historyCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface, var(--bg));
+}
+
+.historyHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.historyLegend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.legendDot[data-series='memory'] {
+  background: var(--warning);
+  margin-left: 10px;
+}
+
+.historyChart {
+  width: 100%;
+  height: 80px;
+  display: block;
+}
+
+.historyLineCpu {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.historyLineMemory {
+  stroke: var(--warning);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+.sectionTitle {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.recentList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.recentItem {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface, var(--bg));
+  font-size: 13px;
+}
+
+.recentItem:last-child {
+  border-bottom: none;
+}
+
+.recentItem:nth-child(even) {
+  background: var(--bg-muted);
+}
+
+.recentName {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recentSlug {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.recentTime {
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-size: 12px;
+}
+
 .healthPill {
   display: flex;
   align-items: center;
@@ -260,36 +379,111 @@
   color: var(--danger);
 }
 
-.tableWrap {
-  overflow-x: auto;
+.tenantsLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.tenantsToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.searchInput {
+  flex: 1 1 240px;
+  min-width: 200px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.filterTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filterTab {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filterTab[data-active='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tenantGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.tenantCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
   border: 1px solid var(--border);
   border-radius: 14px;
+  background: var(--surface, var(--bg));
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.2s ease, transform 0.2s ease;
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
+.tenantCard:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
 }
 
-.table th,
-.table td {
-  padding: 12px 14px;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
+.tenantCardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.table th {
+.tenantCardHead strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+}
+
+.tenantSlug {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.tenantCardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
   font-size: 12px;
   color: var(--text-muted);
-  font-weight: 600;
-  background: var(--bg-muted);
 }
 
-.table a {
-  color: var(--accent);
-  font-weight: 600;
-  text-decoration: none;
+.tenantDim {
+  opacity: 0.6;
 }
 
 .badgeOk,
@@ -400,11 +594,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.errorLine:hover {
-  white-space: normal;
-  overflow: visible;
 }
 
 .errorPath {

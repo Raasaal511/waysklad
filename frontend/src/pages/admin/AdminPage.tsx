@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import {
   adminLogin,
@@ -12,6 +12,7 @@ import {
   suspendAdminTenant,
   unsuspendAdminTenant,
   type AdminErrorLog,
+  type AdminMetricsPoint,
   type AdminStatus,
   type AdminTenantDetail,
   type AdminTenantListItem,
@@ -171,7 +172,27 @@ function AdminStatusPanel({ logout }: { logout: () => void }) {
           percent={status.memory_percent}
           note={`${formatMb(status.memory_used_mb)} из ${formatMb(status.memory_total_mb)}`}
         />
+        <GaugeCard
+          label="Диск"
+          percent={status.disk_percent}
+          note={`${status.disk_used_gb} ГБ из ${status.disk_total_gb} ГБ`}
+        />
       </section>
+
+      {status.history.length > 1 && (
+        <section className={styles.historyCard}>
+          <div className={styles.historyHead}>
+            <span className={styles.cardLabel}>Нагрузка за последний час</span>
+            <div className={styles.historyLegend}>
+              <span className={styles.legendDot} data-series="cpu" />
+              CPU
+              <span className={styles.legendDot} data-series="memory" />
+              Память
+            </div>
+          </div>
+          <HistoryChart points={status.history} />
+        </section>
+      )}
 
       <section className={styles.pillRow}>
         <HealthPill label="База данных" ok={status.db_connected} />
@@ -187,7 +208,58 @@ function AdminStatusPanel({ logout }: { logout: () => void }) {
           note={status.online_now_note}
         />
       </section>
+
+      {status.recent_tenants.length > 0 && (
+        <section>
+          <h3 className={styles.sectionTitle}>Недавно зарегистрированные магазины</h3>
+          <ul className={styles.recentList}>
+            {status.recent_tenants.map((t) => (
+              <li key={t.id} className={styles.recentItem}>
+                <Link to={`/admin/tenants/${t.id}`} className={styles.recentName}>
+                  {t.name}
+                </Link>
+                <span className={styles.recentSlug}>{t.slug ?? '—'}</span>
+                <time className={styles.recentTime}>{formatDateTime(t.created_at)}</time>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
+  )
+}
+
+function HistoryChart({ points }: { points: AdminMetricsPoint[] }) {
+  const width = 600
+  const height = 80
+  const pad = 4
+
+  function toPath(values: number[]): string {
+    if (values.length < 2) return ''
+    const step = (width - pad * 2) / (values.length - 1)
+    return values
+      .map((v, i) => {
+        const x = pad + i * step
+        const y = height - pad - (Math.min(Math.max(v, 0), 100) / 100) * (height - pad * 2)
+        return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+      })
+      .join(' ')
+  }
+
+  const cpuPath = toPath(points.map((p) => p.cpu_percent))
+  const memPath = toPath(points.map((p) => p.memory_percent))
+
+  return (
+    <svg
+      className={styles.historyChart}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      role="img"
+      aria-label="График нагрузки CPU и памяти за последний час"
+    >
+      <path d={memPath} className={styles.historyLineMemory} fill="none" />
+      <path d={cpuPath} className={styles.historyLineCpu} fill="none" />
+    </svg>
   )
 }
 
@@ -251,10 +323,14 @@ function StatusCard({
   )
 }
 
+type TenantStatusFilter = 'all' | 'active' | 'suspended'
+
 function AdminTenantsPanel({ logout }: { logout: () => void }) {
   const [tenants, setTenants] = useState<AdminTenantListItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<TenantStatusFilter>('all')
 
   useEffect(() => {
     let cancelled = false
@@ -277,39 +353,83 @@ function AdminTenantsPanel({ logout }: { logout: () => void }) {
   if (loading) return <p className={layoutStyles.textMuted}>Загрузка…</p>
   if (error) return <p className={layoutStyles.error}>{error}</p>
 
+  const normalizedQuery = query.trim().toLowerCase()
+  const filtered = tenants.filter((t) => {
+    if (statusFilter === 'active' && t.is_suspended) return false
+    if (statusFilter === 'suspended' && !t.is_suspended) return false
+    if (!normalizedQuery) return true
+    return (
+      t.name.toLowerCase().includes(normalizedQuery) ||
+      (t.slug ?? '').toLowerCase().includes(normalizedQuery)
+    )
+  })
+
   return (
-    <div className={styles.tableWrap}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Название</th>
-            <th>Slug</th>
-            <th>Витрина</th>
-            <th>Статус</th>
-            <th>Создан</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tenants.map((t) => (
-            <tr key={t.id}>
-              <td>{t.id}</td>
-              <td>
-                <Link to={`/admin/tenants/${t.id}`}>{t.name}</Link>
-              </td>
-              <td>{t.slug ?? '—'}</td>
-              <td>{t.storefront_enabled ? 'да' : 'нет'}</td>
-              <td>
+    <div className={styles.tenantsLayout}>
+      <div className={styles.tenantsToolbar}>
+        <input
+          type="search"
+          className={styles.searchInput}
+          placeholder="Поиск по названию или slug…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <div className={styles.filterTabs}>
+          <FilterTab active={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>
+            Все · {tenants.length}
+          </FilterTab>
+          <FilterTab active={statusFilter === 'active'} onClick={() => setStatusFilter('active')}>
+            Активные · {tenants.filter((t) => !t.is_suspended).length}
+          </FilterTab>
+          <FilterTab
+            active={statusFilter === 'suspended'}
+            onClick={() => setStatusFilter('suspended')}
+          >
+            Заблокированные · {tenants.filter((t) => t.is_suspended).length}
+          </FilterTab>
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className={layoutStyles.textMuted}>Ничего не найдено</p>
+      ) : (
+        <div className={styles.tenantGrid}>
+          {filtered.map((t) => (
+            <Link key={t.id} to={`/admin/tenants/${t.id}`} className={styles.tenantCard}>
+              <div className={styles.tenantCardHead}>
+                <strong>{t.name}</strong>
                 <span className={t.is_suspended ? styles.badgeDanger : styles.badgeOk}>
                   {t.is_suspended ? 'заблокирован' : 'активен'}
                 </span>
-              </td>
-              <td>{formatDateTime(t.created_at)}</td>
-            </tr>
+              </div>
+              <span className={styles.tenantSlug}>{t.slug ? `/store/${t.slug}` : 'без slug'}</span>
+              <div className={styles.tenantCardFoot}>
+                <span className={t.storefront_enabled ? undefined : styles.tenantDim}>
+                  {t.storefront_enabled ? 'Витрина включена' : 'Витрина выключена'}
+                </span>
+                <time>{formatDateTime(t.created_at)}</time>
+              </div>
+            </Link>
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
     </div>
+  )
+}
+
+function FilterTab({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button type="button" className={styles.filterTab} data-active={active} onClick={onClick}>
+      {children}
+    </button>
   )
 }
 
@@ -452,7 +572,7 @@ function AdminErrorsPanel({ logout }: { logout: () => void }) {
         <li key={`${e.timestamp}-${i}`} className={styles.errorItem}>
           <time className={styles.errorTime}>{formatLogTime(e.timestamp)}</time>
           <span className={styles.errorMethod}>{e.method}</span>
-          <span className={styles.errorLine} title={`${e.path} — ${e.message}`}>
+          <span className={styles.errorLine}>
             <span className={styles.errorPath}>{e.path}</span>
             {' — '}
             <span className={styles.errorMessage}>{e.message}</span>
