@@ -163,22 +163,40 @@ function AdminStatusPanel({ logout }: { logout: () => void }) {
   if (!status) return <p className={layoutStyles.textMuted}>Загрузка…</p>
 
   return (
-    <div className={styles.grid}>
-      <StatusCard label="БД" value={status.db_connected ? 'OK' : 'Нет'} ok={status.db_connected} />
-      <StatusCard label="Redis" value={status.redis_connected ? 'OK' : 'Нет'} ok={status.redis_connected} />
-      <StatusCard label="Пользователи" value={String(status.active_users)} />
-      <StatusCard label="Магазины" value={String(status.active_tenants)} />
-      <StatusCard
-        label="Онлайн сейчас"
-        value={String(status.online_now)}
-        note={status.online_now_note}
-      />
-      <GaugeCard label="CPU" percent={status.cpu_percent} />
-      <GaugeCard
-        label="Память"
-        percent={status.memory_percent}
-        note={`${formatMb(status.memory_used_mb)} / ${formatMb(status.memory_total_mb)}`}
-      />
+    <div className={styles.statusLayout}>
+      <section className={styles.gaugeRow}>
+        <GaugeCard label="Процессор" percent={status.cpu_percent} />
+        <GaugeCard
+          label="Память"
+          percent={status.memory_percent}
+          note={`${formatMb(status.memory_used_mb)} из ${formatMb(status.memory_total_mb)}`}
+        />
+      </section>
+
+      <section className={styles.pillRow}>
+        <HealthPill label="База данных" ok={status.db_connected} />
+        <HealthPill label="Redis" ok={status.redis_connected} />
+      </section>
+
+      <section className={styles.grid}>
+        <StatusCard label="Пользователи" value={String(status.active_users)} />
+        <StatusCard label="Магазины" value={String(status.active_tenants)} />
+        <StatusCard
+          label="Онлайн сейчас"
+          value={String(status.online_now)}
+          note={status.online_now_note}
+        />
+      </section>
+    </div>
+  )
+}
+
+function HealthPill({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <div className={styles.healthPill} data-ok={ok}>
+      <span className={styles.healthDot} />
+      <span>{label}</span>
+      <strong>{ok ? 'в норме' : 'недоступен'}</strong>
     </div>
   )
 }
@@ -196,9 +214,11 @@ function gaugeLevel(percent: number): 'ok' | 'warn' | 'danger' {
 function GaugeCard({ label, percent, note }: { label: string; percent: number; note?: string }) {
   const level = gaugeLevel(percent)
   return (
-    <div className={styles.gaugeCard}>
-      <span className={styles.cardLabel}>{label}</span>
-      <strong className={level === 'danger' ? styles.bad : undefined}>{percent.toFixed(0)}%</strong>
+    <div className={styles.gaugeCard} data-level={level}>
+      <div className={styles.gaugeHead}>
+        <span className={styles.cardLabel}>{label}</span>
+        <span className={styles.gaugeValue}>{percent.toFixed(0)}%</span>
+      </div>
       <div className={styles.gaugeTrack}>
         <div
           className={styles.gaugeFill}

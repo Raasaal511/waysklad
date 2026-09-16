@@ -148,9 +148,55 @@
   line-height: 1.35;
 }
 
+.statusLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.gaugeRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
 .gaugeCard {
-  composes: card;
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface, var(--bg));
+}
+
+.gaugeCard[data-level='warn'] {
+  border-color: color-mix(in srgb, var(--warning) 40%, var(--border));
+}
+
+.gaugeCard[data-level='danger'] {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.gaugeHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.gaugeValue {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.gaugeCard[data-level='warn'] .gaugeValue {
+  color: var(--warning);
+}
+
+.gaugeCard[data-level='danger'] .gaugeValue {
+  color: var(--danger);
 }
 
 .gaugeTrack {
@@ -169,11 +215,49 @@
 }
 
 .gaugeFill[data-level='warn'] {
-  background: #d9a441;
+  background: var(--warning);
 }
 
 .gaugeFill[data-level='danger'] {
   background: var(--danger);
+}
+
+.pillRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.healthPill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface, var(--bg));
+  font-size: 13px;
+}
+
+.healthPill strong {
+  font-weight: 600;
+}
+
+.healthDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.healthPill[data-ok='false'] .healthDot {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 20%, transparent);
+}
+
+.healthPill[data-ok='false'] strong {
+  color: var(--danger);
 }
 
 .tableWrap {
