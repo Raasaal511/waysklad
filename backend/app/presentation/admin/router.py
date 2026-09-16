@@ -3,7 +3,12 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.application.admin.get_server_status import ServerStatusResult, get_server_status
+from app.application.admin.get_server_status import (
+    MetricsPoint,
+    RecentTenant,
+    ServerStatusResult,
+    get_server_status,
+)
 from app.application.admin.get_tenant_detail import get_tenant_detail
 from app.application.admin.list_tenants import list_tenants
 from app.application.admin.set_tenant_suspended import set_tenant_suspended
@@ -56,13 +61,19 @@ async def admin_status(factory: SessionFactoryDep, cache: CacheDep) -> ServerSta
     # online_now — сумма по всем --workers N через общий Redis-счётчик (см.
     # Broadcaster.online_now), не кешируем вместе с db_connected/active_users
     # (те требуют SQL-запроса, online_now должен быть мгновенным)
+    def _from_json(d: dict) -> ServerStatusResult:
+        d = dict(d)
+        d["recent_tenants"] = [RecentTenant(**t) for t in d["recent_tenants"]]
+        d["history"] = [MetricsPoint(**p) for p in d["history"]]
+        return ServerStatusResult(**d)
+
     cached_result = await cached(
         cache,
         "admin:status",
         _STATUS_CACHE_TTL_SECONDS,
         lambda: get_server_status(factory, cache, online_now=0),
         to_json=lambda r: asdict(r),
-        from_json=lambda d: ServerStatusResult(**d),
+        from_json=_from_json,
     )
     result = dataclasses.replace(
         cached_result, online_now=await broadcaster.online_now()

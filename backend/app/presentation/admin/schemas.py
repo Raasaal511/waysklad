@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from app.application.admin.get_server_status import ServerStatusResult
+from app.application.admin.get_server_status import MetricsPoint, RecentTenant, ServerStatusResult
 from app.application.admin.get_tenant_detail import TenantDetail
 from app.application.admin.list_tenants import TenantListItem
 
@@ -76,6 +76,27 @@ class TenantDetailResponse(BaseModel):
         )
 
 
+class RecentTenantResponse(BaseModel):
+    id: int
+    name: str
+    slug: str | None
+    created_at: str
+
+    @classmethod
+    def from_entity(cls, tenant: RecentTenant) -> "RecentTenantResponse":
+        return cls(id=tenant.id, name=tenant.name, slug=tenant.slug, created_at=tenant.created_at)
+
+
+class MetricsPointResponse(BaseModel):
+    ts: int
+    cpu_percent: float
+    memory_percent: float
+
+    @classmethod
+    def from_entity(cls, point: MetricsPoint) -> "MetricsPointResponse":
+        return cls(ts=point.ts, cpu_percent=point.cpu_percent, memory_percent=point.memory_percent)
+
+
 class ServerStatusResponse(BaseModel):
     db_connected: bool
     redis_connected: bool
@@ -90,6 +111,11 @@ class ServerStatusResponse(BaseModel):
     memory_percent: float
     memory_used_mb: int
     memory_total_mb: int
+    disk_percent: float
+    disk_used_gb: float
+    disk_total_gb: float
+    recent_tenants: list[RecentTenantResponse]
+    history: list[MetricsPointResponse]
 
     @classmethod
     def from_result(cls, result: ServerStatusResult) -> "ServerStatusResponse":
@@ -103,6 +129,11 @@ class ServerStatusResponse(BaseModel):
             memory_percent=result.memory_percent,
             memory_used_mb=result.memory_used_mb,
             memory_total_mb=result.memory_total_mb,
+            disk_percent=result.disk_percent,
+            disk_used_gb=result.disk_used_gb,
+            disk_total_gb=result.disk_total_gb,
+            recent_tenants=[RecentTenantResponse.from_entity(t) for t in result.recent_tenants],
+            history=[MetricsPointResponse.from_entity(p) for p in result.history],
         )
 
 

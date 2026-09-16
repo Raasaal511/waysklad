@@ -67,6 +67,13 @@ async def test_admin_status_with_valid_token(client):
     assert isinstance(body["memory_percent"], (int, float))
     assert body["memory_used_mb"] > 0
     assert body["memory_total_mb"] >= body["memory_used_mb"]
+    assert isinstance(body["disk_percent"], (int, float))
+    assert body["disk_total_gb"] >= body["disk_used_gb"] > 0
+    assert isinstance(body["recent_tenants"], list)
+    assert isinstance(body["history"], list)
+    if body["history"]:
+        point = body["history"][0]
+        assert set(point.keys()) == {"ts", "cpu_percent", "memory_percent"}
 
 
 async def test_admin_error_logs_requires_token(client):
@@ -116,6 +123,25 @@ async def test_admin_error_logs_hide_sql_details(client):
     assert latest["message"] == "Ошибка базы данных"
     assert "SELECT" not in latest["message"]
     assert "id_1" not in latest["message"]
+
+
+async def test_admin_status_shows_recent_tenant(client, random_phone):
+    register = await client.post(
+        "/api/auth/register",
+        json={
+            "shop_name": "Магазин для недавних",
+            "owner_name": "Владелец",
+            "phone": random_phone(),
+            "password": "secret123",
+        },
+    )
+    assert register.status_code == 201, register.text
+
+    headers = await _admin_headers(client)
+    response = await client.get("/api/admin/status", headers=headers)
+    assert response.status_code == 200, response.text
+    names = [t["name"] for t in response.json()["recent_tenants"]]
+    assert "Магазин для недавних" in names
 
 
 async def test_admin_list_and_suspend_tenant(client, random_phone):
