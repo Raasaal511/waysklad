@@ -85,9 +85,15 @@ services:
     # останется < 30 дней) — единая команда без ручного шага на сервере;
     # nginx подхватывает обновлённый файл сам через периодический reload
     # в frontend/docker-entrypoint.sh
+    #
+    # Перед certonly чистим live/<domain>/, если она не в штатном формате
+    # certbot (нет archive/<domain>/ рядом) — это self-signed-бутстрап того
+    # же frontend/docker-entrypoint.sh, а не сертификат от certbot; certbot
+    # откажется сохранить туда новый ("live directory exists") без этой чистки.
     entrypoint: >-
       sh -c "trap exit TERM;
       while :; do
+        [ -d /etc/letsencrypt/live/waysklad.gwensoft.ru ] && [ ! -d /etc/letsencrypt/archive/waysklad.gwensoft.ru ] && rm -rf /etc/letsencrypt/live/waysklad.gwensoft.ru /etc/letsencrypt/renewal/waysklad.gwensoft.ru.conf;
         certbot certonly --webroot -w /var/www/certbot --non-interactive --agree-tos --keep-until-expiring -d waysklad.gwensoft.ru -m $${CERTBOT_EMAIL} --quiet;
         sleep 12h &
         wait $${!};
