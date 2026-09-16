@@ -29,6 +29,7 @@ from app.infrastructure.db.repositories.inventory import (
 from app.infrastructure.db.repositories.marketplace import SqlAlchemyMarketplaceProductRepository
 from app.infrastructure.db.repositories.notifications import SqlAlchemyNotificationRepository
 from app.infrastructure.db.repositories.orders import SqlAlchemyOrderRepository
+from app.infrastructure.db.repositories.reviews import SqlAlchemyReviewRepository
 from app.infrastructure.db.repositories.sales import (
     SqlAlchemySaleRepository,
     SqlAlchemySaleReturnRepository,
@@ -72,6 +73,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.orders = SqlAlchemyOrderRepository(self)
         self.storefront_requests = SqlAlchemyStorefrontRequestRepository(self)
         self.storefront_messages = SqlAlchemyStorefrontMessageRepository(self)
+        self.reviews = SqlAlchemyReviewRepository(self)
         self.tasks = SqlAlchemyTaskRepository(self)
         self.notifications = SqlAlchemyNotificationRepository(self)
         self.audit = SqlAlchemyAuditRepository(self)

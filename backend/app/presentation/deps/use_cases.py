@@ -32,8 +32,10 @@ from app.application.counterparties.list_suppliers import ListSuppliersUseCase
 from app.application.counterparties.search_clients import SearchClientsUseCase
 from app.application.counterparties.update_client import UpdateClientUseCase
 from app.application.customers.get_login_status import GetCustomerLoginStatusUseCase
+from app.application.customers.get_profile import GetCustomerProfileUseCase
 from app.application.customers.list_my_requests import ListMyStorefrontRequestsUseCase
 from app.application.customers.request_login_link import RequestCustomerLoginLinkUseCase
+from app.application.customers.update_profile import UpdateCustomerProfileUseCase
 from app.application.debts.create_installment import CreateInstallmentUseCase
 from app.application.debts.extend_debt import ExtendDebtUseCase
 from app.application.debts.get_debt import GetDebtUseCase
@@ -66,6 +68,7 @@ from app.application.inventory.update_warehouse_details import (
     UpdateWarehouseDetailsUseCase,
 )
 from app.application.inventory.write_off import WriteOffUseCase
+from app.application.marketplace.get_product import GetMarketplaceProductUseCase
 from app.application.marketplace.list_products import ListMarketplaceProductsUseCase
 from app.application.notifications.list_notifications import ListNotificationsUseCase
 from app.application.notifications.mark_read import (
@@ -87,9 +90,6 @@ from app.application.products.create_product import CreateProductUseCase
 from app.application.products.create_unit import CreateUnitUseCase
 from app.application.products.delete_product import DeleteProductUseCase
 from app.application.products.generate_barcode import GenerateBarcodeUseCase
-from app.application.products.generate_description import (
-    GenerateProductDescriptionUseCase,
-)
 from app.application.products.get_export_data import GetProductsExportDataUseCase
 from app.application.products.get_product import GetProductUseCase
 from app.application.products.get_product_by_barcode import GetProductByBarcodeUseCase
@@ -105,6 +105,10 @@ from app.application.products.update_product import UpdateProductUseCase
 from app.application.sales.create_sale import CreateSaleUseCase
 from app.application.sales.delete_sale import DeleteSaleUseCase
 from app.application.sales.edit_sale import EditSaleUseCase
+from app.application.reviews.create_review import CreateReviewUseCase
+from app.application.reviews.list_product_reviews import ListProductReviewsUseCase
+from app.application.reviews.list_reviews_for_owner import ListReviewsForOwnerUseCase
+from app.application.reviews.set_review_hidden import SetReviewHiddenUseCase
 from app.application.sales.get_receipt_data import GetReceiptDataUseCase
 from app.application.sales.get_sale import GetSaleUseCase
 from app.application.sales.get_sale_history import GetSaleHistoryUseCase
@@ -136,7 +140,6 @@ from app.application.tasks.list_tasks import ListActiveTasksUseCase, ListComplet
 from app.application.tasks.update_task import UpdateTaskUseCase
 from app.application.tasks.create_task import CreateTaskUseCase
 from app.presentation.deps.cache import CacheDep
-from app.presentation.deps.description_generator import DescriptionGeneratorDep
 from app.presentation.deps.notifier import NotifierDep
 from app.presentation.deps.security import FileStorageDep, HasherDep
 from app.presentation.deps.session import SessionFactoryDep
@@ -180,6 +183,14 @@ def get_request_customer_login_link(uow: PublicUowDep) -> RequestCustomerLoginLi
 
 def get_customer_login_status(uow: PublicUowDep) -> GetCustomerLoginStatusUseCase:
     return GetCustomerLoginStatusUseCase(uow)
+
+
+def get_customer_profile(factory: SessionFactoryDep) -> GetCustomerProfileUseCase:
+    return GetCustomerProfileUseCase(factory)
+
+
+def get_update_customer_profile(factory: SessionFactoryDep) -> UpdateCustomerProfileUseCase:
+    return UpdateCustomerProfileUseCase(factory)
 
 
 def get_login(uow: PublicUowDep, hasher: HasherDep) -> LoginUseCase:
@@ -227,12 +238,6 @@ get_create_unit = _with_uow(CreateUnitUseCase)
 get_create_category = _with_uow_and_cache(CreateCategoryUseCase)
 get_import_products = _with_uow_and_cache(ImportProductsUseCase)
 get_preview_import_products = _with_uow(PreviewProductsUseCase)
-
-
-def get_generate_product_description(
-    uow: UowDep, generator: DescriptionGeneratorDep
-) -> GenerateProductDescriptionUseCase:
-    return GenerateProductDescriptionUseCase(uow, generator)
 
 
 get_generate_barcode = _with_uow(GenerateBarcodeUseCase)
@@ -332,6 +337,12 @@ def get_list_marketplace_products(
     return ListMarketplaceProductsUseCase(factory, cache)
 
 
+def get_marketplace_product(
+    factory: SessionFactoryDep, cache: CacheDep
+) -> GetMarketplaceProductUseCase:
+    return GetMarketplaceProductUseCase(factory, cache)
+
+
 def get_storefront_product(
     factory: SessionFactoryDep, cache: CacheDep
 ) -> GetStorefrontProductUseCase:
@@ -372,6 +383,18 @@ def get_send_storefront_message(
     return SendStorefrontMessageUseCase(factory, notifier)
 
 
+def get_create_review(factory: SessionFactoryDep) -> CreateReviewUseCase:
+    return CreateReviewUseCase(factory)
+
+
+def get_list_product_reviews(factory: SessionFactoryDep) -> ListProductReviewsUseCase:
+    return ListProductReviewsUseCase(factory)
+
+
+get_list_reviews_for_owner = _with_uow(ListReviewsForOwnerUseCase)
+get_set_review_hidden = _with_uow(SetReviewHiddenUseCase)
+
+
 def get_create_task(uow: UowDep, notifier: NotifierDep) -> CreateTaskUseCase:
     return CreateTaskUseCase(uow, notifier)
 
@@ -397,6 +420,10 @@ RequestCustomerLoginLinkDep = Annotated[
 GetCustomerLoginStatusDep = Annotated[
     GetCustomerLoginStatusUseCase, Depends(get_customer_login_status)
 ]
+GetCustomerProfileDep = Annotated[GetCustomerProfileUseCase, Depends(get_customer_profile)]
+UpdateCustomerProfileDep = Annotated[
+    UpdateCustomerProfileUseCase, Depends(get_update_customer_profile)
+]
 LoginDep = Annotated[LoginUseCase, Depends(get_login)]
 CreateEmployeeDep = Annotated[CreateEmployeeUseCase, Depends(get_create_employee)]
 UpdateEmployeeDep = Annotated[UpdateEmployeeUseCase, Depends(get_update_employee)]
@@ -409,9 +436,6 @@ CreateUnitDep = Annotated[CreateUnitUseCase, Depends(get_create_unit)]
 CreateCategoryDep = Annotated[CreateCategoryUseCase, Depends(get_create_category)]
 ImportProductsDep = Annotated[ImportProductsUseCase, Depends(get_import_products)]
 PreviewImportProductsDep = Annotated[PreviewProductsUseCase, Depends(get_preview_import_products)]
-GenerateProductDescriptionDep = Annotated[
-    GenerateProductDescriptionUseCase, Depends(get_generate_product_description)
-]
 GenerateBarcodeDep = Annotated[GenerateBarcodeUseCase, Depends(get_generate_barcode)]
 ApplyImportProductsDep = Annotated[ApplyProductImportUseCase, Depends(get_apply_import_products)]
 ListUnitsDep = Annotated[ListUnitsUseCase, Depends(get_list_units)]
@@ -528,6 +552,9 @@ GetStorefrontCatalogDep = Annotated[
 ListMarketplaceProductsDep = Annotated[
     ListMarketplaceProductsUseCase, Depends(get_list_marketplace_products)
 ]
+GetMarketplaceProductDep = Annotated[
+    GetMarketplaceProductUseCase, Depends(get_marketplace_product)
+]
 GetStorefrontProductDep = Annotated[
     GetStorefrontProductUseCase, Depends(get_storefront_product)
 ]
@@ -564,4 +591,10 @@ ListStaffStorefrontMessagesDep = Annotated[
 SendStaffStorefrontMessageDep = Annotated[
     SendStaffStorefrontMessageUseCase, Depends(get_send_staff_storefront_message)
 ]
+CreateReviewDep = Annotated[CreateReviewUseCase, Depends(get_create_review)]
+ListProductReviewsDep = Annotated[ListProductReviewsUseCase, Depends(get_list_product_reviews)]
+ListReviewsForOwnerDep = Annotated[
+    ListReviewsForOwnerUseCase, Depends(get_list_reviews_for_owner)
+]
+SetReviewHiddenDep = Annotated[SetReviewHiddenUseCase, Depends(get_set_review_hidden)]
  

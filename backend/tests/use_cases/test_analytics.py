@@ -301,6 +301,97 @@ async def test_notify_low_stock(
     assert len(notifications_after_restock) == len(notifications) + 1
 
 
+async def test_notify_low_stock_scoped_by_manager_warehouse(
+    make_uow, registered_shop, warehouse_id, create_product, hasher, monkeypatch
+):
+    """Manager с ограниченным доступом к складу должен получать LOW_STOCK
+    только по товарам на СВОЁМ складе, не по всему tenant'у — тот же принцип,
+    что у GetRestockRecommendationsUseCase для обычных HTTP-запросов."""
+    from app.application.inventory.notify_low_stock import _run_async
+    from app.application.auth.create_employee import CreateEmployeeCommand, CreateEmployeeUseCase
+    from app.application.inventory.create_warehouse import CreateWarehouseCommand, CreateWarehouseUseCase
+
+    tenant_id, _, owner = registered_shop
+
+    other_warehouse = await CreateWarehouseUseCase(make_uow(tenant_id)).execute(
+        owner, CreateWarehouseCommand(name="Второй склад")
+    )
+
+    own_product = await create_product(
+        tenant_id, name="На своём складе", purchase_price=Money.of("100"),
+        retail_price=Money.of("200"), min_stock=Decimal("5"),
+    )
+    foreign_product = await create_product(
+        tenant_id, name="На чужом складе", purchase_price=Money.of("100"),
+        retail_price=Money.of("200"), min_stock=Decimal("5"),
+    )
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=own_product.id, quantity=Decimal("5"), cost=Decimal("10"))],
+        ),
+    )
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=other_warehouse.id,
+            lines=[LineInput(product_id=foreign_product.id, quantity=Decimal("5"), cost=Decimal("10"))],
+        ),
+    )
+    # оба товара продавались — проходят фильтр «раскупают», отличаются только складом
+    await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=own_product.id, quantity=Decimal("1"), price=Decimal("200"))],
+        ),
+    )
+    await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=other_warehouse.id,
+            payment_method=PaymentMethod.CASH,
+            items=[SaleItemInput(product_id=foreign_product.id, quantity=Decimal("1"), price=Decimal("200"))],
+        ),
+    )
+
+    manager = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
+        owner,
+        CreateEmployeeCommand(
+            name="Управляющий", phone="+79280009911", password="secret123",
+            role=Role.MANAGER, warehouse_ids=[warehouse_id],
+        ),
+    )
+
+    monkeypatch.setattr(
+        "app.application.inventory.notify_low_stock.SqlAlchemyUnitOfWork",
+        lambda tid: make_uow(tid) if tid is not None else make_uow(None),
+    )
+
+    class FakeNotifier:
+        def send(self, chat_id: str, text: str) -> None:
+            pass
+
+    await _run_async(FakeNotifier())
+
+    async with make_uow(tenant_id) as uow:
+        owner_notifications = await uow.notifications.list_for_user(owner.id)
+        manager_notifications = await uow.notifications.list_for_user(manager.id)
+
+    owner_texts = [n.text for n in owner_notifications]
+    manager_texts = [n.text for n in manager_notifications]
+
+    # owner видит оба склада целиком
+    assert any("На своём складе" in t for t in owner_texts)
+    assert any("На чужом складе" in t for t in owner_texts)
+
+    # manager видит только свой склад — товар с чужого склада не должен просочиться
+    assert any("На своём складе" in t for t in manager_texts)
+    assert not any("На чужом складе" in t for t in manager_texts)
+
+
 async def test_create_sale_is_idempotent_by_client_op_id(
     make_uow, registered_shop, warehouse_id, create_product
 ):

@@ -26,6 +26,19 @@ export function adminLogin(login: string, password: string) {
   })
 }
 
+export interface AdminRecentTenant {
+  id: number
+  name: string
+  slug: string | null
+  created_at: string
+}
+
+export interface AdminMetricsPoint {
+  ts: number
+  cpu_percent: number
+  memory_percent: number
+}
+
 export interface AdminStatus {
   db_connected: boolean
   redis_connected: boolean
@@ -33,6 +46,15 @@ export interface AdminStatus {
   active_tenants: number
   online_now: number
   online_now_note: string
+  cpu_percent: number
+  memory_percent: number
+  memory_used_mb: number
+  memory_total_mb: number
+  disk_percent: number
+  disk_used_gb: number
+  disk_total_gb: number
+  recent_tenants: AdminRecentTenant[]
+  history: AdminMetricsPoint[]
 }
 
 export function getAdminStatus() {

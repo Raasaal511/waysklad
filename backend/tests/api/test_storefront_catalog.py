@@ -1,3 +1,38 @@
+from datetime import date, timedelta
+
+
+async def _leave_review(client, owner_headers, buyer_headers, slug, product_id, warehouse_id, rating):
+    """Полный флоу: заявка -> accept -> issue -> отзыв — единственный способ
+    оставить отзыв (см. tests/api/test_reviews.py), нужен для тестов min_rating."""
+    response = await client.post(
+        f"/api/storefront/{slug}/requests",
+        headers=buyer_headers,
+        json={"customer_name": "Покупатель", "items": [{"product_id": product_id, "quantity": "1"}]},
+    )
+    request_id = response.json()["id"]
+    due = (date.today() + timedelta(days=3)).isoformat()
+    response = await client.post(
+        f"/api/storefront/requests/{request_id}/accept",
+        headers=owner_headers,
+        json={"warehouse_id": warehouse_id, "due_date": due},
+    )
+    order_id = response.json()["id"]
+    for status in ("in_progress", "ready"):
+        await client.patch(f"/api/orders/{order_id}/status", headers=owner_headers, json={"new_status": status})
+    await client.post(f"/api/orders/{order_id}/issue", headers=owner_headers, json={"payment_method": "cash"})
+    response = await client.post(
+        "/api/reviews",
+        headers=buyer_headers,
+        json={
+            "storefront_request_id": request_id,
+            "product_id": product_id,
+            "rating": rating,
+            "text": "Отзыв для теста фильтра",
+        },
+    )
+    assert response.status_code == 201, f"{response.status_code}: {response.text}"
+
+
 async def test_storefront_catalog_via_api(client, owner_headers):
     slug = "magazin-berkat"  # slugify("Магазин Беркат") — детерминирован, см. owner_headers
 
@@ -58,6 +93,7 @@ async def test_storefront_catalog_via_api(client, owner_headers):
     assert set(product.keys()) == {
         "id", "name", "retail_price", "photo", "category_id", "in_stock",
         "min_order_qty", "order_step_qty", "sold_count",
+        "average_rating", "reviews_count",
     }
 
     response = await client.get(f"/api/storefront/{slug}", params={"query": "Скрытый"})
@@ -422,3 +458,61 @@ async def test_storefront_catalog_variant_filter_via_api(client, owner_headers):
     ids = [p["id"] for p in response.json()["products"]]
     assert shoes_blue["id"] in ids
     assert dress_red_m["id"] not in ids
+
+
+async def test_storefront_catalog_min_rating_filter_via_api(client, owner_headers, customer_headers):
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    await client.put(
+        "/api/inventory/warehouses/1",
+        headers=owner_headers,
+        json={"name": "Основной склад", "show_on_storefront": True},
+    )
+    high_rated = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Хороший товар", "purchase_price": "10", "retail_price": "50", "show_on_storefront": True},
+        )
+    ).json()
+    low_rated = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Так себе товар", "purchase_price": "10", "retail_price": "50", "show_on_storefront": True},
+        )
+    ).json()
+    no_reviews = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Без отзывов", "purchase_price": "10", "retail_price": "50", "show_on_storefront": True},
+        )
+    ).json()
+    for product in (high_rated, low_rated, no_reviews):
+        await client.post(
+            "/api/inventory/receive",
+            headers=owner_headers,
+            json={"warehouse_id": 1, "lines": [{"product_id": product["id"], "quantity": "10", "cost": "10"}]},
+        )
+
+    buyer_headers, _ = await customer_headers()
+    await _leave_review(client, owner_headers, buyer_headers, slug, high_rated["id"], 1, rating=5)
+    buyer_headers2, _ = await customer_headers()
+    await _leave_review(client, owner_headers, buyer_headers2, slug, low_rated["id"], 1, rating=2)
+
+    # без отзывов товар НЕ проходит фильтр "от N звёзд" (NULL не >= N)
+    response = await client.get(f"/api/storefront/{slug}", params={"min_rating": 4})
+    assert response.status_code == 200, response.text
+    ids = [p["id"] for p in response.json()["products"]]
+    assert high_rated["id"] in ids
+    assert low_rated["id"] not in ids
+    assert no_reviews["id"] not in ids
+
+    response = await client.get(f"/api/storefront/{slug}", params={"min_rating": 1})
+    ids = [p["id"] for p in response.json()["products"]]
+    assert high_rated["id"] in ids
+    assert low_rated["id"] in ids
+    assert no_reviews["id"] not in ids

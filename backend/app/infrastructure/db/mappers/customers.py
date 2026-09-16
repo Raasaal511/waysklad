@@ -8,6 +8,7 @@ class CustomerMapper:
     def to_orm(customer: Customer) -> CustomerModel:
         return CustomerModel(
             phone=str(customer.phone),
+            name=customer.name,
             telegram_chat_id=customer.telegram_chat_id,
             token_version=customer.token_version,
         )
@@ -17,6 +18,7 @@ class CustomerMapper:
         return Customer(
             id=model.id,
             phone=Phone(model.phone),
+            name=model.name,
             telegram_chat_id=model.telegram_chat_id,
             token_version=model.token_version,
         )

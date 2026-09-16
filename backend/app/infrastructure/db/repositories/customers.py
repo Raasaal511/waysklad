@@ -52,6 +52,7 @@ class SqlAlchemyCustomerRepository(SqlAlchemyRepository, ICustomerRepository):
         if model is None:
             raise NotFoundError(f"Покупатель {customer.id} не найден")
         model.phone = str(customer.phone)
+        model.name = customer.name
         model.telegram_chat_id = customer.telegram_chat_id
         model.token_version = customer.token_version
         await self._session.flush()

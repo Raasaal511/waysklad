@@ -199,14 +199,14 @@ async def storefront_chat_ws(websocket: WebSocket, token: str, factory: SessionF
 
     channel = storefront_request_channel(chat_request.id)
     await websocket.accept()
-    broadcaster.registry.add(channel, websocket)
+    await broadcaster.track_connect(channel, websocket)
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
         pass
     finally:
-        broadcaster.registry.remove(channel, websocket)
+        await broadcaster.track_disconnect(channel, websocket)
 
 
 @router.get("/requests/{request_id}", dependencies=[_view])

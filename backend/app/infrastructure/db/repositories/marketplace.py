@@ -1,10 +1,15 @@
+from decimal import Decimal
+
 from sqlalchemy import false, func, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.marketplace.repository import IMarketplaceProductRepository, MarketplaceProductRow
+from app.domain.reviews.repository import ProductRatingAggregate
 from app.infrastructure.db.models.catalog import CategoryModel, ProductModel, ProductVariantModel
 from app.infrastructure.db.models.identity import TenantModel, WarehouseModel
 from app.infrastructure.db.models.inventory import StockItemModel
+from app.infrastructure.db.models.reviews import ReviewModel
+from app.infrastructure.db.models.sales import SaleLineModel, SaleModel, SaleReturnLineModel, SaleReturnModel
 
 _SORT_COLUMNS = {
     "name": ProductModel.name.asc(),
@@ -20,6 +25,20 @@ def _stock_expr(warehouse_ids: list[int]):
         .where(
             StockItemModel.product_id == ProductModel.id,
             StockItemModel.warehouse_id.in_(warehouse_ids),
+        )
+        .correlate(ProductModel)
+        .scalar_subquery()
+    )
+
+
+def _rating_expr():
+    """Средний рейтинг по видимым отзывам — NULL при их отсутствии (не 0),
+    тот же смысл, что у ProductFilterFactory._rating_expr для storefront."""
+    return (
+        select(func.avg(ReviewModel.rating))
+        .where(
+            ReviewModel.product_id == ProductModel.id,
+            ReviewModel.is_hidden.is_(False),
         )
         .correlate(ProductModel)
         .scalar_subquery()
@@ -47,6 +66,13 @@ class SqlAlchemyMarketplaceProductRepository(IMarketplaceProductRepository):
         ).scalars().all()
         return list(rows)
 
+    async def find_tenant_by_product(self, product_id: int) -> int | None:
+        return (
+            await self._session.execute(
+                select(ProductModel.tenant_id).where(ProductModel.id == product_id)
+            )
+        ).scalar_one_or_none()
+
     async def list_products(
         self,
         visible_tenant_ids,
@@ -62,6 +88,7 @@ class SqlAlchemyMarketplaceProductRepository(IMarketplaceProductRepository):
         sort: str = "name",
         limit: int = 50,
         offset: int = 0,
+        min_rating: int | None = None,
     ) -> tuple[list[MarketplaceProductRow], int]:
         if not visible_tenant_ids:
             return [], 0
@@ -96,6 +123,10 @@ class SqlAlchemyMarketplaceProductRepository(IMarketplaceProductRepository):
                 conditions.append(false())
             else:
                 conditions.append(stock_expr > 0)
+        if min_rating is not None:
+            # NULL (нет отзывов) не проходит GTE-сравнение в SQL — тот же
+            # смысл, что и у storefront-эквивалента этого фильтра
+            conditions.append(_rating_expr() >= min_rating)
 
         variant_conditions = []
         if variant_size is not None:
@@ -134,6 +165,11 @@ class SqlAlchemyMarketplaceProductRepository(IMarketplaceProductRepository):
         stmt = base.order_by(order_col).limit(limit).offset(offset)
         rows = (await self._session.execute(stmt)).all()
 
+        product_ids = [product.id for product, _, _, _ in rows]
+        sold_counts = await self.sold_count_by_products(product_ids)
+        ratings = await self.rating_by_products(product_ids)
+        _empty_rating = ProductRatingAggregate(average_rating=0.0, reviews_count=0)
+
         products: list[MarketplaceProductRow] = [
             MarketplaceProductRow(
                 product_id=product.id,
@@ -147,7 +183,60 @@ class SqlAlchemyMarketplaceProductRepository(IMarketplaceProductRepository):
                 shop_slug=tenant.slug or "",
                 shop_name=tenant.name,
                 sku=product.sku or "",
+                sold_count=sold_counts.get(product.id, Decimal("0")),
+                rating=ratings.get(product.id, _empty_rating),
             )
             for product, tenant, category_model, stock in rows
         ]
         return products, total
+
+    async def sold_count_by_products(self, product_ids: list[int]) -> dict[int, Decimal]:
+        if not product_ids:
+            return {}
+        returned = (
+            select(
+                SaleReturnLineModel.sale_line_id.label("sale_line_id"),
+                func.sum(SaleReturnLineModel.quantity).label("returned_qty"),
+            )
+            .join(SaleReturnModel, SaleReturnModel.id == SaleReturnLineModel.return_id)
+            .group_by(SaleReturnLineModel.sale_line_id)
+            .subquery()
+        )
+        effective_qty = SaleLineModel.quantity - func.coalesce(returned.c.returned_qty, 0)
+        rows = (
+            await self._session.execute(
+                select(SaleLineModel.product_id, func.sum(effective_qty))
+                .join(SaleModel, SaleModel.id == SaleLineModel.sale_id)
+                .outerjoin(returned, returned.c.sale_line_id == SaleLineModel.id)
+                .where(
+                    SaleModel.deleted_at.is_(None),
+                    SaleLineModel.product_id.in_(product_ids),
+                )
+                .group_by(SaleLineModel.product_id)
+            )
+        ).all()
+        return {pid: quantity for pid, quantity in rows}
+
+    async def rating_by_products(
+        self, product_ids: list[int]
+    ) -> dict[int, ProductRatingAggregate]:
+        if not product_ids:
+            return {}
+        rows = (
+            await self._session.execute(
+                select(
+                    ReviewModel.product_id,
+                    func.avg(ReviewModel.rating),
+                    func.count(ReviewModel.id),
+                )
+                .where(
+                    ReviewModel.product_id.in_(product_ids),
+                    ReviewModel.is_hidden.is_(False),
+                )
+                .group_by(ReviewModel.product_id)
+            )
+        ).all()
+        return {
+            product_id: ProductRatingAggregate(average_rating=float(avg), reviews_count=count)
+            for product_id, avg, count in rows
+        }

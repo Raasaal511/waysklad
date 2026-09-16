@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import {
   adminLogin,
@@ -12,6 +12,7 @@ import {
   suspendAdminTenant,
   unsuspendAdminTenant,
   type AdminErrorLog,
+  type AdminMetricsPoint,
   type AdminStatus,
   type AdminTenantDetail,
   type AdminTenantListItem,
@@ -163,16 +164,141 @@ function AdminStatusPanel({ logout }: { logout: () => void }) {
   if (!status) return <p className={layoutStyles.textMuted}>Загрузка…</p>
 
   return (
-    <div className={styles.grid}>
-      <StatusCard label="БД" value={status.db_connected ? 'OK' : 'Нет'} ok={status.db_connected} />
-      <StatusCard label="Redis" value={status.redis_connected ? 'OK' : 'Нет'} ok={status.redis_connected} />
-      <StatusCard label="Пользователи" value={String(status.active_users)} />
-      <StatusCard label="Магазины" value={String(status.active_tenants)} />
-      <StatusCard
-        label="Онлайн сейчас"
-        value={String(status.online_now)}
-        note={status.online_now_note}
-      />
+    <div className={styles.statusLayout}>
+      <section className={styles.gaugeRow}>
+        <GaugeCard label="Процессор" percent={status.cpu_percent} />
+        <GaugeCard
+          label="Память"
+          percent={status.memory_percent}
+          note={`${formatMb(status.memory_used_mb)} из ${formatMb(status.memory_total_mb)}`}
+        />
+        <GaugeCard
+          label="Диск"
+          percent={status.disk_percent}
+          note={`${status.disk_used_gb} ГБ из ${status.disk_total_gb} ГБ`}
+        />
+      </section>
+
+      {status.history.length > 1 && (
+        <section className={styles.historyCard}>
+          <div className={styles.historyHead}>
+            <span className={styles.cardLabel}>Нагрузка за последний час</span>
+            <div className={styles.historyLegend}>
+              <span className={styles.legendDot} data-series="cpu" />
+              CPU
+              <span className={styles.legendDot} data-series="memory" />
+              Память
+            </div>
+          </div>
+          <HistoryChart points={status.history} />
+        </section>
+      )}
+
+      <section className={styles.pillRow}>
+        <HealthPill label="База данных" ok={status.db_connected} />
+        <HealthPill label="Redis" ok={status.redis_connected} />
+      </section>
+
+      <section className={styles.grid}>
+        <StatusCard label="Пользователи" value={String(status.active_users)} />
+        <StatusCard label="Магазины" value={String(status.active_tenants)} />
+        <StatusCard
+          label="Онлайн сейчас"
+          value={String(status.online_now)}
+          note={status.online_now_note}
+        />
+      </section>
+
+      {status.recent_tenants.length > 0 && (
+        <section>
+          <h3 className={styles.sectionTitle}>Недавно зарегистрированные магазины</h3>
+          <ul className={styles.recentList}>
+            {status.recent_tenants.map((t) => (
+              <li key={t.id} className={styles.recentItem}>
+                <Link to={`/admin/tenants/${t.id}`} className={styles.recentName}>
+                  {t.name}
+                </Link>
+                <span className={styles.recentSlug}>{t.slug ?? '—'}</span>
+                <time className={styles.recentTime}>{formatDateTime(t.created_at)}</time>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
+  )
+}
+
+function HistoryChart({ points }: { points: AdminMetricsPoint[] }) {
+  const width = 600
+  const height = 80
+  const pad = 4
+
+  function toPath(values: number[]): string {
+    if (values.length < 2) return ''
+    const step = (width - pad * 2) / (values.length - 1)
+    return values
+      .map((v, i) => {
+        const x = pad + i * step
+        const y = height - pad - (Math.min(Math.max(v, 0), 100) / 100) * (height - pad * 2)
+        return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+      })
+      .join(' ')
+  }
+
+  const cpuPath = toPath(points.map((p) => p.cpu_percent))
+  const memPath = toPath(points.map((p) => p.memory_percent))
+
+  return (
+    <svg
+      className={styles.historyChart}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      role="img"
+      aria-label="График нагрузки CPU и памяти за последний час"
+    >
+      <path d={memPath} className={styles.historyLineMemory} fill="none" />
+      <path d={cpuPath} className={styles.historyLineCpu} fill="none" />
+    </svg>
+  )
+}
+
+function HealthPill({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <div className={styles.healthPill} data-ok={ok}>
+      <span className={styles.healthDot} />
+      <span>{label}</span>
+      <strong>{ok ? 'в норме' : 'недоступен'}</strong>
+    </div>
+  )
+}
+
+function formatMb(mb: number): string {
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} ГБ` : `${mb} МБ`
+}
+
+function gaugeLevel(percent: number): 'ok' | 'warn' | 'danger' {
+  if (percent >= 90) return 'danger'
+  if (percent >= 70) return 'warn'
+  return 'ok'
+}
+
+function GaugeCard({ label, percent, note }: { label: string; percent: number; note?: string }) {
+  const level = gaugeLevel(percent)
+  return (
+    <div className={styles.gaugeCard} data-level={level}>
+      <div className={styles.gaugeHead}>
+        <span className={styles.cardLabel}>{label}</span>
+        <span className={styles.gaugeValue}>{percent.toFixed(0)}%</span>
+      </div>
+      <div className={styles.gaugeTrack}>
+        <div
+          className={styles.gaugeFill}
+          data-level={level}
+          style={{ width: `${Math.min(Math.max(percent, 0), 100)}%` }}
+        />
+      </div>
+      {note && <span className={styles.note}>{note}</span>}
     </div>
   )
 }
@@ -197,10 +323,14 @@ function StatusCard({
   )
 }
 
+type TenantStatusFilter = 'all' | 'active' | 'suspended'
+
 function AdminTenantsPanel({ logout }: { logout: () => void }) {
   const [tenants, setTenants] = useState<AdminTenantListItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<TenantStatusFilter>('all')
 
   useEffect(() => {
     let cancelled = false
@@ -223,39 +353,83 @@ function AdminTenantsPanel({ logout }: { logout: () => void }) {
   if (loading) return <p className={layoutStyles.textMuted}>Загрузка…</p>
   if (error) return <p className={layoutStyles.error}>{error}</p>
 
+  const normalizedQuery = query.trim().toLowerCase()
+  const filtered = tenants.filter((t) => {
+    if (statusFilter === 'active' && t.is_suspended) return false
+    if (statusFilter === 'suspended' && !t.is_suspended) return false
+    if (!normalizedQuery) return true
+    return (
+      t.name.toLowerCase().includes(normalizedQuery) ||
+      (t.slug ?? '').toLowerCase().includes(normalizedQuery)
+    )
+  })
+
   return (
-    <div className={styles.tableWrap}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Название</th>
-            <th>Slug</th>
-            <th>Витрина</th>
-            <th>Статус</th>
-            <th>Создан</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tenants.map((t) => (
-            <tr key={t.id}>
-              <td>{t.id}</td>
-              <td>
-                <Link to={`/admin/tenants/${t.id}`}>{t.name}</Link>
-              </td>
-              <td>{t.slug ?? '—'}</td>
-              <td>{t.storefront_enabled ? 'да' : 'нет'}</td>
-              <td>
+    <div className={styles.tenantsLayout}>
+      <div className={styles.tenantsToolbar}>
+        <input
+          type="search"
+          className={styles.searchInput}
+          placeholder="Поиск по названию или slug…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <div className={styles.filterTabs}>
+          <FilterTab active={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>
+            Все · {tenants.length}
+          </FilterTab>
+          <FilterTab active={statusFilter === 'active'} onClick={() => setStatusFilter('active')}>
+            Активные · {tenants.filter((t) => !t.is_suspended).length}
+          </FilterTab>
+          <FilterTab
+            active={statusFilter === 'suspended'}
+            onClick={() => setStatusFilter('suspended')}
+          >
+            Заблокированные · {tenants.filter((t) => t.is_suspended).length}
+          </FilterTab>
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className={layoutStyles.textMuted}>Ничего не найдено</p>
+      ) : (
+        <div className={styles.tenantGrid}>
+          {filtered.map((t) => (
+            <Link key={t.id} to={`/admin/tenants/${t.id}`} className={styles.tenantCard}>
+              <div className={styles.tenantCardHead}>
+                <strong>{t.name}</strong>
                 <span className={t.is_suspended ? styles.badgeDanger : styles.badgeOk}>
                   {t.is_suspended ? 'заблокирован' : 'активен'}
                 </span>
-              </td>
-              <td>{formatDateTime(t.created_at)}</td>
-            </tr>
+              </div>
+              <span className={styles.tenantSlug}>{t.slug ? `/store/${t.slug}` : 'без slug'}</span>
+              <div className={styles.tenantCardFoot}>
+                <span className={t.storefront_enabled ? undefined : styles.tenantDim}>
+                  {t.storefront_enabled ? 'Витрина включена' : 'Витрина выключена'}
+                </span>
+                <time>{formatDateTime(t.created_at)}</time>
+              </div>
+            </Link>
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
     </div>
+  )
+}
+
+function FilterTab({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button type="button" className={styles.filterTab} data-active={active} onClick={onClick}>
+      {children}
+    </button>
   )
 }
 
@@ -365,48 +539,136 @@ function AdminTenantDetailPanel({ logout }: { logout: () => void }) {
   )
 }
 
+const ERROR_AUTO_REFRESH_MS = 15000
+
 function AdminErrorsPanel({ logout }: { logout: () => void }) {
   const [errors, setErrors] = useState<AdminErrorLog[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [methodFilter, setMethodFilter] = useState<string>('all')
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
-        const data = await getAdminErrorLogs(100)
-        if (!cancelled) setErrors(data.errors)
-      } catch (err) {
-        if (!cancelled) setError(handleAdminError(err, logout))
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
+  const load = useCallback(async () => {
+    try {
+      const data = await getAdminErrorLogs(200)
+      setErrors(data.errors)
+      setError(null)
+    } catch (err) {
+      setError(handleAdminError(err, logout))
+    } finally {
+      setLoading(false)
     }
   }, [logout])
 
+  useEffect(() => {
+    load()
+    const id = window.setInterval(load, ERROR_AUTO_REFRESH_MS)
+    return () => window.clearInterval(id)
+  }, [load])
+
   if (loading) return <p className={layoutStyles.textMuted}>Загрузка…</p>
   if (error) return <p className={layoutStyles.error}>{error}</p>
-  if (errors.length === 0) return <p className={layoutStyles.textMuted}>Пока нет записанных ошибок</p>
+
+  const methods = Array.from(new Set(errors.map((e) => e.method))).sort()
+  const normalizedQuery = query.trim().toLowerCase()
+  const filtered = errors.filter((e) => {
+    if (methodFilter !== 'all' && e.method !== methodFilter) return false
+    if (!normalizedQuery) return true
+    return (
+      e.path.toLowerCase().includes(normalizedQuery) ||
+      e.message.toLowerCase().includes(normalizedQuery) ||
+      e.error_type.toLowerCase().includes(normalizedQuery)
+    )
+  })
 
   return (
-    <ul className={styles.errorList}>
-      {errors.map((e, i) => (
-        <li key={`${e.timestamp}-${i}`} className={styles.errorItem}>
-          <div className={styles.errorMeta}>
-            <time>{formatDateTime(e.timestamp)}</time>
-            <code>
-              {e.method} {e.path}
-            </code>
+    <div className={styles.errorsLayout}>
+      <div className={styles.errorsToolbar}>
+        <input
+          type="search"
+          className={styles.searchInput}
+          placeholder="Поиск по пути, типу или тексту ошибки…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        {methods.length > 1 && (
+          <div className={styles.filterTabs}>
+            <FilterTab active={methodFilter === 'all'} onClick={() => setMethodFilter('all')}>
+              Все · {errors.length}
+            </FilterTab>
+            {methods.map((m) => (
+              <FilterTab key={m} active={methodFilter === m} onClick={() => setMethodFilter(m)}>
+                {m} · {errors.filter((e) => e.method === m).length}
+              </FilterTab>
+            ))}
           </div>
-          <strong>
-            {e.error_type}: {e.message}
-          </strong>
-        </li>
-      ))}
-    </ul>
+        )}
+      </div>
+
+      {errors.length === 0 ? (
+        <p className={layoutStyles.textMuted}>Пока нет записанных ошибок</p>
+      ) : filtered.length === 0 ? (
+        <p className={layoutStyles.textMuted}>Ничего не найдено</p>
+      ) : (
+        <ul className={styles.errorList}>
+          {filtered.map((e, i) => {
+            const key = `${e.timestamp}-${i}`
+            const expanded = expandedKey === key
+            return (
+              <li key={key} className={styles.errorItem} data-expanded={expanded}>
+                <button
+                  type="button"
+                  className={styles.errorRow}
+                  onClick={() => setExpandedKey(expanded ? null : key)}
+                  aria-expanded={expanded}
+                >
+                  <time className={styles.errorTime}>{formatLogTime(e.timestamp)}</time>
+                  <span className={styles.errorMethod}>{e.method}</span>
+                  <span className={styles.errorType}>{e.error_type}</span>
+                  <span className={styles.errorLine}>
+                    <span className={styles.errorPath}>{e.path}</span>
+                    {' — '}
+                    <span className={styles.errorMessage}>{e.message}</span>
+                  </span>
+                </button>
+                {expanded && (
+                  <div className={styles.errorDetail}>
+                    <div>
+                      <span className={styles.errorDetailLabel}>Время</span>
+                      <span>{new Date(e.timestamp).toLocaleString('ru-RU')}</span>
+                    </div>
+                    <div>
+                      <span className={styles.errorDetailLabel}>Запрос</span>
+                      <code>
+                        {e.method} {e.path}
+                      </code>
+                    </div>
+                    <div>
+                      <span className={styles.errorDetailLabel}>Тип</span>
+                      <span>{e.error_type}</span>
+                    </div>
+                    <div>
+                      <span className={styles.errorDetailLabel}>Сообщение</span>
+                      <span className={styles.errorDetailMessage}>{e.message}</span>
+                    </div>
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
   )
+}
+
+function formatLogTime(value: string): string {
+  return new Date(value).toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
 }

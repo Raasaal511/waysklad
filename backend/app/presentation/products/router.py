@@ -4,9 +4,6 @@ from fastapi import APIRouter, Depends, Response, UploadFile
 
 from app.application.products.add_storefront_photo import AddStorefrontPhotoCommand
 from app.application.products.delete_product import DeleteProductCommand
-from app.application.products.generate_description import (
-    GenerateProductDescriptionCommand,
-)
 from app.application.products.import_excel import ImportProductsCommand
 from app.application.products.import_preview import PreviewProductsCommand
 from app.application.products.search_products import SearchProductsCommand
@@ -27,7 +24,6 @@ from app.presentation.deps import (
     CreateUnitDep,
     DeleteProductDep,
     GenerateBarcodeDep,
-    GenerateProductDescriptionDep,
     GetProductByBarcodeDep,
     GetProductDep,
     GetProductHistoryDep,
@@ -49,7 +45,6 @@ from app.presentation.products.schemas import (
     CategoryCreateRequest,
     CategoryResponse,
     GenerateBarcodeResponse,
-    GenerateDescriptionResponse,
     ImportProductsResponse,
     PreviewProductsResponse,
     ProductCreateRequest,
@@ -144,14 +139,6 @@ async def set_storefront_photos(
     command = SetStorefrontPhotosCommand(product_id, body.photos)
     product = await use_case.execute(actor, command)
     return ProductResponse.from_entity(product, show_purchase)
-
-
-@router.post("/{product_id}/description/generate")
-async def generate_product_description(
-    product_id: int, actor: ActorDep, use_case: GenerateProductDescriptionDep
-) -> GenerateDescriptionResponse:
-    result = await use_case.execute(actor, GenerateProductDescriptionCommand(product_id))
-    return GenerateDescriptionResponse.from_result(result)
 
 
 @router.post("/barcode/generate")

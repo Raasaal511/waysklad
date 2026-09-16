@@ -1,12 +1,36 @@
 from dataclasses import dataclass
 
+import psutil
 from sqlalchemy import func, select
 
 from app.domain.common.cache import ICache
 from app.infrastructure.db.models.identity import TenantModel, UserModel
 from app.infrastructure.observability.logging import get_logger
+from app.infrastructure.observability.metrics_history import metrics_history
 
 _logger = get_logger("app.admin")
+
+# psutil.cpu_percent(interval=None) — неблокирующий, сравнивает с моментом
+# предыдущего вызова (а не спит interval секунд в event loop). Первый вызов
+# после старта процесса всегда вернёт 0.0 — это нормально, вызывающий код
+# сюда обращается периодически (кешируется на STATUS_CACHE_TTL_SECONDS в
+# роутере), поэтому реальные значения появляются со второго обращения.
+psutil.cpu_percent(interval=None)
+
+
+@dataclass(frozen=True)
+class RecentTenant:
+    id: int
+    name: str
+    slug: str | None
+    created_at: str
+
+
+@dataclass(frozen=True)
+class MetricsPoint:
+    ts: int
+    cpu_percent: float
+    memory_percent: float
 
 
 @dataclass(frozen=True)
@@ -16,6 +40,15 @@ class ServerStatusResult:
     active_users: int
     active_tenants: int
     online_now: int  # WebSocket-соединения ТОЛЬКО этого воркера, не всей платформы
+    cpu_percent: float
+    memory_percent: float
+    memory_used_mb: int
+    memory_total_mb: int
+    disk_percent: float
+    disk_used_gb: float
+    disk_total_gb: float
+    recent_tenants: list[RecentTenant]
+    history: list[MetricsPoint]
 
 
 async def get_server_status(session_factory, cache: ICache, online_now: int) -> ServerStatusResult:
@@ -40,12 +73,51 @@ async def get_server_status(session_factory, cache: ICache, online_now: int) -> 
 
     redis_connected = await _check_redis(cache)
 
+    memory = psutil.virtual_memory()
+    disk = psutil.disk_usage("/")
+
+    recent_tenants: list[RecentTenant] = []
+    try:
+        async with session_factory() as session:
+            rows = (
+                await session.execute(
+                    select(TenantModel.id, TenantModel.name, TenantModel.slug, TenantModel.created_at)
+                    .order_by(TenantModel.created_at.desc())
+                    .limit(5)
+                )
+            ).all()
+            recent_tenants = [
+                RecentTenant(id=r.id, name=r.name, slug=r.slug, created_at=r.created_at.isoformat())
+                for r in rows
+            ]
+    except Exception:
+        _logger.exception("Не удалось получить недавние магазины для admin-эндпоинта")
+
+    cpu_percent = psutil.cpu_percent(interval=None)
+
+    history: list[MetricsPoint] = []
+    if metrics_history is not None:
+        await metrics_history.record(cpu_percent, memory.percent)
+        history = [
+            MetricsPoint(ts=p["ts"], cpu_percent=p["cpu_percent"], memory_percent=p["memory_percent"])
+            for p in await metrics_history.list_recent()
+        ]
+
     return ServerStatusResult(
         db_connected=db_connected,
         redis_connected=redis_connected,
         active_users=active_users,
         active_tenants=active_tenants,
         online_now=online_now,
+        cpu_percent=cpu_percent,
+        memory_percent=memory.percent,
+        memory_used_mb=(memory.total - memory.available) // (1024 * 1024),
+        memory_total_mb=memory.total // (1024 * 1024),
+        disk_percent=disk.percent,
+        disk_used_gb=round(disk.used / (1024**3), 1),
+        disk_total_gb=round(disk.total / (1024**3), 1),
+        recent_tenants=recent_tenants,
+        history=history,
     )
 
 

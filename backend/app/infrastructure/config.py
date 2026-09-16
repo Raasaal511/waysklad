@@ -53,11 +53,6 @@ class Settings(BaseSettings):
     # Срок жизни admin-токена короче обычного (access_token_expire_minutes) —
     # привилегированный доступ ко всей платформе, риск от утечки выше.
     admin_token_expire_minutes: int = 120
-    # Пусто (дефолт) — эндпоинт генерации описания товара через ИИ отключён
-    # (DomainError при попытке вызвать). Модель — самая дешёвая в линейке
-    # Claude, достаточно для короткого описания по названию+категории.
-    anthropic_api_key: str = ""
-    anthropic_model: str = "claude-haiku-4-5"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

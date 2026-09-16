@@ -16,8 +16,34 @@ if settings.cache_redis_url:
     error_log = RedisErrorLog(settings.cache_redis_url)
 
 
+def _safe_message(exc: BaseException) -> str:
+    """Короткое сообщение без чувствительных деталей (SQL-текст с
+    параметрами запроса, соединения БД/Redis и т.п.) — уходит в лог ошибок
+    админ-панели, Telegram-алерт и Redis. Полный traceback с полными
+    деталями остаётся только в _logger.exception ниже (серверные файлы
+    логов, недоступные через веб)."""
+    # ленивый импорт — эти пакеты не всегда установлены/нужны на старте
+    try:
+        import sqlalchemy.exc as sa_exc
+        if isinstance(exc, sa_exc.SQLAlchemyError):
+            return "Ошибка базы данных"
+    except ImportError:
+        pass
+    try:
+        import redis.exceptions as redis_exc
+        if isinstance(exc, redis_exc.RedisError):
+            return "Ошибка соединения с Redis"
+    except ImportError:
+        pass
+    if isinstance(exc, (ConnectionError, TimeoutError, OSError)):
+        return "Ошибка соединения"
+    return str(exc)[:200]
+
+
 async def report_unhandled_error(method: str, path: str, exc: BaseException) -> None:
     _logger.exception("Unhandled error on %s %s", method, path, exc_info=exc)
+
+    safe_message = _safe_message(exc)
 
     if error_log is not None:
         await error_log.push(
@@ -26,7 +52,7 @@ async def report_unhandled_error(method: str, path: str, exc: BaseException) -> 
                 "method": method,
                 "path": path,
                 "error_type": type(exc).__name__,
-                "message": str(exc)[:500],
+                "message": safe_message,
             }
         )
 
@@ -35,7 +61,7 @@ async def report_unhandled_error(method: str, path: str, exc: BaseException) -> 
     text = (
         f"⚠️ Ошибка на сервере\n"
         f"{method} {path}\n"
-        f"{type(exc).__name__}: {exc}"
+        f"{type(exc).__name__}: {safe_message}"
     )
     try:
         _notifier.send(settings.admin_alert_chat_id, text[:4000])

@@ -12,9 +12,6 @@ from app.application.products.create_category import CreateCategoryCommand
 from app.application.products.create_product import CreateProductCommand, VariantInput
 from app.application.products.create_unit import CreateUnitCommand
 from app.application.products.generate_barcode import GenerateBarcodeResult
-from app.application.products.generate_description import (
-    GenerateProductDescriptionResult,
-)
 from app.application.products.import_excel import ImportProductsResult, RowError
 from app.application.products.import_preview import PreviewProductsResult, PreviewRow
 from app.application.products.update_product import (
@@ -357,16 +354,6 @@ class GenerateBarcodeResponse(BaseModel):
 
 class SetStorefrontPhotosRequest(BaseModel):
     photos: list[str] = []
-
-
-class GenerateDescriptionResponse(BaseModel):
-    description: str
-
-    @classmethod
-    def from_result(
-        cls, result: GenerateProductDescriptionResult
-    ) -> "GenerateDescriptionResponse":
-        return cls(description=result.description)
 
 
 class VariantResponse(BaseModel):

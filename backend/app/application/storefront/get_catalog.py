@@ -5,6 +5,7 @@ from app.domain.catalog.entities import Category, Product
 from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.identity.entities import Warehouse
+from app.domain.reviews.repository import ProductRatingAggregate
 from app.infrastructure.cache.cache_aside import cached_use_case
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 
@@ -34,6 +35,7 @@ class GetStorefrontCatalogCommand:
     in_stock_only: bool = False
     variant_size: str | None = None
     variant_color: str | None = None
+    min_rating: int | None = None  # 1..5 — «от N звёзд», товар без отзывов не проходит
 
 
 @dataclass(frozen=True)
@@ -52,6 +54,7 @@ class StorefrontCatalogResult:
     warehouses: list[Warehouse]  # для выбора склада на самой странице витрины
     available_sizes: list[str]  # для фильтра «Размер» — только среди видимых на витрине товаров
     available_colors: list[str]  # для фильтра «Цвет»
+    rating_by_product_id: dict[int, ProductRatingAggregate]  # только видимые отзывы
     total: int
 
     def to_json(self) -> dict:
@@ -69,6 +72,10 @@ class StorefrontCatalogResult:
             "warehouses": [w.to_dict() for w in self.warehouses],
             "available_sizes": self.available_sizes,
             "available_colors": self.available_colors,
+            "rating_by_product_id": {
+                str(pid): {"average_rating": r.average_rating, "reviews_count": r.reviews_count}
+                for pid, r in self.rating_by_product_id.items()
+            },
             "total": self.total,
         }
 
@@ -91,6 +98,12 @@ class StorefrontCatalogResult:
             warehouses=[Warehouse.from_dict(w) for w in d["warehouses"]],
             available_sizes=d["available_sizes"],
             available_colors=d["available_colors"],
+            rating_by_product_id={
+                int(pid): ProductRatingAggregate(
+                    average_rating=r["average_rating"], reviews_count=r["reviews_count"]
+                )
+                for pid, r in d.get("rating_by_product_id", {}).items()
+            },
             total=d["total"],
         )
 
@@ -148,6 +161,8 @@ class GetStorefrontCatalogUseCase:
                 raw_params["retail_price__lte"] = cmd.max_price
             if cmd.in_stock_only:
                 raw_params["stock__gt"] = 0
+            if cmd.min_rating is not None:
+                raw_params["average_rating__gte"] = cmd.min_rating
             products, total = await uow.products.list_filtered(
                 raw_params,
                 warehouse_id=warehouse_id,
@@ -160,6 +175,7 @@ class GetStorefrontCatalogUseCase:
             available_sizes, available_colors = await uow.products.list_storefront_variant_options()
             stock_items = await uow.stock.list_all()
             sold_counts = await uow.analytics.sold_count_by_products([p.id for p in products])
+            rating_by_product_id = await uow.reviews.rating_by_products([p.id for p in products])
         in_stock_ids = {
             item.product_id
             for item in stock_items
@@ -182,6 +198,7 @@ class GetStorefrontCatalogUseCase:
             warehouses=warehouses,
             available_sizes=available_sizes,
             available_colors=available_colors,
+            rating_by_product_id=rating_by_product_id,
             total=total,
         )
 
