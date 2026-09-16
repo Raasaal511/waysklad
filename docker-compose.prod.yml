@@ -49,7 +49,11 @@ services:
     # --proxy-headers/--forwarded-allow-ips — доверяем X-Forwarded-For от nginx
     # (см. frontend/nginx.conf), иначе rate_limit.py видит один и тот же IP
     # (адрес nginx) для всех клиентов и лимитирует их одним общим счётчиком.
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --proxy-headers --forwarded-allow-ips=*
+    # 2 воркера — сервер на 1 ядре (см. `nproc`), 4 давали чистый overhead
+    # памяти без выгоды от параллелизма (event loop и так держит несколько
+    # I/O-bound запросов в одном воркере); 2, а не 1, чтобы один долгий
+    # запрос (например к БД) не блокировал вообще все остальные.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips=*
     volumes:
       - uploads_data:/app/uploads
     restart: unless-stopped
