@@ -93,6 +93,7 @@ class IMarketplaceProductRepository(Protocol):
         sort: str = "name",
         limit: int = 50,
         offset: int = 0,
+        min_rating: int | None = None,
     ) -> tuple[list[MarketplaceProductRow], int]: ...
 
     async def sold_count_by_products(self, product_ids: list[int]) -> dict[int, Decimal]:

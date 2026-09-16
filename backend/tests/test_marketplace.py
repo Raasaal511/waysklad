@@ -43,6 +43,46 @@ async def _register_shop(client, random_phone, shop_name: str, storefront_enable
     return headers, slug, warehouse_id
 
 
+async def _leave_review(client, owner_headers, buyer_headers, slug, product_id, warehouse_id, rating):
+    """Полный флоу: заявка -> accept -> issue -> отзыв — единственный способ
+    оставить отзыв (см. tests/api/test_reviews.py)."""
+    response = await client.post(
+        f"/api/storefront/{slug}/requests",
+        headers=buyer_headers,
+        json={"customer_name": "Покупатель", "items": [{"product_id": product_id, "quantity": "1"}]},
+    )
+    assert response.status_code == 201, response.text
+    request_id = response.json()["id"]
+    due = (date.today() + timedelta(days=3)).isoformat()
+    response = await client.post(
+        f"/api/storefront/requests/{request_id}/accept",
+        headers=owner_headers,
+        json={"warehouse_id": warehouse_id, "due_date": due},
+    )
+    assert response.status_code == 200, response.text
+    order_id = response.json()["id"]
+    for status in ("in_progress", "ready"):
+        response = await client.patch(
+            f"/api/orders/{order_id}/status", headers=owner_headers, json={"new_status": status}
+        )
+        assert response.status_code == 200, response.text
+    response = await client.post(
+        f"/api/orders/{order_id}/issue", headers=owner_headers, json={"payment_method": "cash"}
+    )
+    assert response.status_code == 200, response.text
+    response = await client.post(
+        "/api/reviews",
+        headers=buyer_headers,
+        json={
+            "storefront_request_id": request_id,
+            "product_id": product_id,
+            "rating": rating,
+            "text": "Отзыв для теста",
+        },
+    )
+    assert response.status_code == 201, response.text
+
+
 async def _add_product(client, headers, warehouse_id, name, price, qty="10", **extra):
     response = await client.post(
         "/api/products",
@@ -289,3 +329,30 @@ async def test_marketplace_shows_sold_count_and_rating(client, random_phone, cus
     assert Decimal(by_id[product_b["id"]]["sold_count"]) == 0
     assert by_id[product_b["id"]]["average_rating"] == 0.0
     assert by_id[product_b["id"]]["reviews_count"] == 0
+
+
+async def test_marketplace_min_rating_filter(client, random_phone, customer_headers):
+    """Фильтр применяется ДО пагинации (SQL, не постфактум в Python) — товар
+    без отзывов не проходит фильтр даже min_rating=1 (NULL не >= 1 в SQL)."""
+    headers_a, slug_a, wh_a = await _register_shop(client, random_phone, "Магазин рейтингов")
+    high_rated = await _add_product(client, headers_a, wh_a, "Хороший", "100")
+    low_rated = await _add_product(client, headers_a, wh_a, "Так себе", "100")
+    no_reviews = await _add_product(client, headers_a, wh_a, "Без отзывов", "100")
+
+    buyer1, _ = await customer_headers()
+    await _leave_review(client, headers_a, buyer1, slug_a, high_rated["id"], wh_a, rating=5)
+    buyer2, _ = await customer_headers()
+    await _leave_review(client, headers_a, buyer2, slug_a, low_rated["id"], wh_a, rating=2)
+
+    response = await client.get("/api/marketplace/products", params={"min_rating": 4})
+    assert response.status_code == 200, response.text
+    ids = {p["id"] for p in response.json()["products"]}
+    assert high_rated["id"] in ids
+    assert low_rated["id"] not in ids
+    assert no_reviews["id"] not in ids
+
+    response = await client.get("/api/marketplace/products", params={"min_rating": 1})
+    ids = {p["id"] for p in response.json()["products"]}
+    assert high_rated["id"] in ids
+    assert low_rated["id"] in ids
+    assert no_reviews["id"] not in ids

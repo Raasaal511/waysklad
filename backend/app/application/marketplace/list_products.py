@@ -32,6 +32,7 @@ class ListMarketplaceProductsCommand:
     sort: str = "name"
     limit: int = 50
     offset: int = 0
+    min_rating: int | None = None  # 1..5 — «от N звёзд»
 
 
 @dataclass(frozen=True)
@@ -97,6 +98,7 @@ class ListMarketplaceProductsUseCase:
                 sort=cmd.sort,
                 limit=cmd.limit,
                 offset=cmd.offset,
+                min_rating=cmd.min_rating,
             )
         return ListMarketplaceProductsResult(products=products, total=total)
 

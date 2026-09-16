@@ -12,6 +12,7 @@ from app.infrastructure.db.filtering.field_spec import (
 from app.infrastructure.db.filtering.filter_factory import BaseQueryFilterFactory
 from app.infrastructure.db.models.catalog import ProductModel
 from app.infrastructure.db.models.inventory import StockItemModel
+from app.infrastructure.db.models.reviews import ReviewModel
 
 
 def _stock_expr(warehouse_id: int | None = None, warehouse_ids: list[int] | None = None):
@@ -25,6 +26,21 @@ def _stock_expr(warehouse_id: int | None = None, warehouse_ids: list[int] | None
     return (
         select(func.coalesce(func.sum(StockItemModel.quantity), 0))
         .where(*conditions)
+        .correlate(ProductModel)
+        .scalar_subquery()
+    )
+
+
+def _rating_expr():
+    """Средний рейтинг товара по видимым (не скрытым владельцем) отзывам —
+    NULL, если отзывов нет (не 0, чтобы GTE-фильтр не путал «нет отзывов» с
+    «средняя оценка ноль», которой не может быть — rating всегда 1..5)."""
+    return (
+        select(func.avg(ReviewModel.rating))
+        .where(
+            ReviewModel.product_id == ProductModel.id,
+            ReviewModel.is_hidden.is_(False),
+        )
         .correlate(ProductModel)
         .scalar_subquery()
     )
@@ -59,4 +75,5 @@ class ProductFilterFactory(BaseQueryFilterFactory[ProductModel]):
             "created_at": FieldSpec(ProductModel.created_at, DATE_OPS),
             "stock": FieldSpec(_stock_expr(warehouse_id, warehouse_ids), NUMERIC_OPS),
             "show_on_storefront": FieldSpec(ProductModel.show_on_storefront, BOOL_OPS),
+            "average_rating": FieldSpec(_rating_expr(), NUMERIC_OPS),
         }

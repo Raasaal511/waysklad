@@ -31,6 +31,20 @@ def _stock_expr(warehouse_ids: list[int]):
     )
 
 
+def _rating_expr():
+    """Средний рейтинг по видимым отзывам — NULL при их отсутствии (не 0),
+    тот же смысл, что у ProductFilterFactory._rating_expr для storefront."""
+    return (
+        select(func.avg(ReviewModel.rating))
+        .where(
+            ReviewModel.product_id == ProductModel.id,
+            ReviewModel.is_hidden.is_(False),
+        )
+        .correlate(ProductModel)
+        .scalar_subquery()
+    )
+
+
 class SqlAlchemyMarketplaceProductRepository(IMarketplaceProductRepository):
     """Не наследует SqlAlchemyRepository: тот привязан к одному tenant_id за раз
     (см. SqlAlchemyRepository._tenant), а общий каталог платформы принципиально
@@ -67,6 +81,7 @@ class SqlAlchemyMarketplaceProductRepository(IMarketplaceProductRepository):
         sort: str = "name",
         limit: int = 50,
         offset: int = 0,
+        min_rating: int | None = None,
     ) -> tuple[list[MarketplaceProductRow], int]:
         if not visible_tenant_ids:
             return [], 0
@@ -101,6 +116,10 @@ class SqlAlchemyMarketplaceProductRepository(IMarketplaceProductRepository):
                 conditions.append(false())
             else:
                 conditions.append(stock_expr > 0)
+        if min_rating is not None:
+            # NULL (нет отзывов) не проходит GTE-сравнение в SQL — тот же
+            # смысл, что и у storefront-эквивалента этого фильтра
+            conditions.append(_rating_expr() >= min_rating)
 
         variant_conditions = []
         if variant_size is not None:

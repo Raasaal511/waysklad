@@ -35,6 +35,7 @@ class GetStorefrontCatalogCommand:
     in_stock_only: bool = False
     variant_size: str | None = None
     variant_color: str | None = None
+    min_rating: int | None = None  # 1..5 — «от N звёзд», товар без отзывов не проходит
 
 
 @dataclass(frozen=True)
@@ -160,6 +161,8 @@ class GetStorefrontCatalogUseCase:
                 raw_params["retail_price__lte"] = cmd.max_price
             if cmd.in_stock_only:
                 raw_params["stock__gt"] = 0
+            if cmd.min_rating is not None:
+                raw_params["average_rating__gte"] = cmd.min_rating
             products, total = await uow.products.list_filtered(
                 raw_params,
                 warehouse_id=warehouse_id,

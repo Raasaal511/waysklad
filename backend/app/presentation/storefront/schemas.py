@@ -40,6 +40,7 @@ class StorefrontCatalogParams(BaseModel):
     in_stock_only: bool = False
     variant_size: str | None = None
     variant_color: str | None = None
+    min_rating: int | None = Field(None, ge=1, le=5)
 
     model_config = {"extra": "forbid"}
 
@@ -57,6 +58,7 @@ class StorefrontCatalogParams(BaseModel):
             in_stock_only=self.in_stock_only,
             variant_size=self.variant_size,
             variant_color=self.variant_color,
+            min_rating=self.min_rating,
         )
 
 

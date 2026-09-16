@@ -21,6 +21,7 @@ class MarketplaceCatalogParams(BaseModel):
     sort: str = "name"  # name, price_asc, price_desc, created_desc
     limit: int = Field(50, le=50)
     offset: int = Field(0, ge=0)
+    min_rating: int | None = Field(None, ge=1, le=5)
 
     model_config = {"extra": "forbid"}
 
@@ -37,6 +38,7 @@ class MarketplaceCatalogParams(BaseModel):
             sort=self.sort,
             limit=self.limit,
             offset=self.offset,
+            min_rating=self.min_rating,
         )
 
 
