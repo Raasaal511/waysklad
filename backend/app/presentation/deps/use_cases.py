@@ -87,9 +87,6 @@ from app.application.products.create_product import CreateProductUseCase
 from app.application.products.create_unit import CreateUnitUseCase
 from app.application.products.delete_product import DeleteProductUseCase
 from app.application.products.generate_barcode import GenerateBarcodeUseCase
-from app.application.products.generate_description import (
-    GenerateProductDescriptionUseCase,
-)
 from app.application.products.get_export_data import GetProductsExportDataUseCase
 from app.application.products.get_product import GetProductUseCase
 from app.application.products.get_product_by_barcode import GetProductByBarcodeUseCase
@@ -140,7 +137,6 @@ from app.application.tasks.list_tasks import ListActiveTasksUseCase, ListComplet
 from app.application.tasks.update_task import UpdateTaskUseCase
 from app.application.tasks.create_task import CreateTaskUseCase
 from app.presentation.deps.cache import CacheDep
-from app.presentation.deps.description_generator import DescriptionGeneratorDep
 from app.presentation.deps.notifier import NotifierDep
 from app.presentation.deps.security import FileStorageDep, HasherDep
 from app.presentation.deps.session import SessionFactoryDep
@@ -231,12 +227,6 @@ get_create_unit = _with_uow(CreateUnitUseCase)
 get_create_category = _with_uow_and_cache(CreateCategoryUseCase)
 get_import_products = _with_uow_and_cache(ImportProductsUseCase)
 get_preview_import_products = _with_uow(PreviewProductsUseCase)
-
-
-def get_generate_product_description(
-    uow: UowDep, generator: DescriptionGeneratorDep
-) -> GenerateProductDescriptionUseCase:
-    return GenerateProductDescriptionUseCase(uow, generator)
 
 
 get_generate_barcode = _with_uow(GenerateBarcodeUseCase)
@@ -425,9 +415,6 @@ CreateUnitDep = Annotated[CreateUnitUseCase, Depends(get_create_unit)]
 CreateCategoryDep = Annotated[CreateCategoryUseCase, Depends(get_create_category)]
 ImportProductsDep = Annotated[ImportProductsUseCase, Depends(get_import_products)]
 PreviewImportProductsDep = Annotated[PreviewProductsUseCase, Depends(get_preview_import_products)]
-GenerateProductDescriptionDep = Annotated[
-    GenerateProductDescriptionUseCase, Depends(get_generate_product_description)
-]
 GenerateBarcodeDep = Annotated[GenerateBarcodeUseCase, Depends(get_generate_barcode)]
 ApplyImportProductsDep = Annotated[ApplyProductImportUseCase, Depends(get_apply_import_products)]
 ListUnitsDep = Annotated[ListUnitsUseCase, Depends(get_list_units)]
