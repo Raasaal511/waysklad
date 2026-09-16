@@ -136,11 +136,11 @@ GET /api/marketplace/products?query=кроссовки&price_min=1000&price_max=
    `available_sizes`/`available_colors`/`categories` с счётчиками) — в эту
    задачу это не входило. Если понадобится — фронту стоит запросить это
    отдельной доработкой.
-4. У эндпоинта нет своей карточки товара (`GET .../products/{id}`) — только
-   список. Для перехода на детальную страницу товара используйте уже
-   существующий `GET /api/storefront/{shop_slug}/products/{id}` (см.
-   `storefront_extras.md`, п.1), передав туда `shop_slug` и `id` из строки
-   общего каталога.
+4. **Карточка товара — `GET /api/marketplace/products/{id}` (добавлено
+   2026-09-16)**, см. отдельный раздел ниже. Раньше приходилось идти через
+   `GET /api/storefront/{shop_slug}/products/{id}` — тот способ всё ещё
+   работает (не убран), но новый эндпоинт удобнее: не нужно тащить
+   `shop_slug` вместе с `id` при переходе на карточку из общей ленты.
 5. Заявку/заказ по товару из общего каталога оформляем так же, как с
    одиночной витрины — `POST /api/storefront/{shop_slug}/requests` (общий
    каталог сам заявки не создаёт, это чисто витрина списка).
@@ -149,3 +149,61 @@ GET /api/marketplace/products?query=кроссовки&price_min=1000&price_max=
    должен быть на карточке одиночной витрины (`storefront_sold_count.md`,
    `reviews.md`): скрывать бейдж при `reviews_count == 0` / `sold_count == "0"`,
    не показывать «0 отзывов»/«Продано: 0».
+
+---
+
+## `GET /api/marketplace/products/{id}` (добавлено 2026-09-16)
+
+Карточка одного товара из общего каталога платформы — по глобально
+уникальному `id` (тому же, что был в строке `products[]` списка выше), без
+`shop_slug` в запросе. Анонимный доступ, rate limit 300/минуту, как у списка.
+
+### Формат ответа — `200`
+
+```ts
+{
+  shop_slug: string,
+  shop_name: string,
+  product: {
+    id: number,
+    name: string,
+    retail_price: string,
+    photo: string,
+    category_id: number | null,
+    in_stock: boolean,
+    min_order_qty: string | null,
+    order_step_qty: string | null,
+    sold_count: string,
+    average_rating: number,
+    reviews_count: number,
+    sku: string,
+    description: string,
+    storefront_photos: string[],
+    variants: { id: number, size: string, color: string }[],
+  },
+}
+```
+
+Та же модель товара, что в `GET /api/storefront/{slug}/products/{id}` (см.
+`storefront_extras.md` п.1) — если карточка товара одиночной витрины у вас
+уже сверстана, компонент переиспользуется без изменений, меняется только
+источник данных (`shop_slug` теперь приходит в ответе, а не передаётся в URL).
+
+**`404`** в трёх случаях, без различия в тексте ошибки (не палим, какая
+именно причина — тот же принцип, что у остальной публичной витрины):
+- товара с таким `id` не существует;
+- у товара `show_on_storefront: false` (владелец скрыл с витрины);
+- магазин товара выключил витрину (`storefront_enabled: false`) или
+  заблокирован платформой (`is_suspended: true`).
+
+### На фронте
+
+1. Переход с карточки в списке маркетплейса на детальную страницу — теперь
+   достаточно одного `id`, ссылка вида `/marketplace/products/42`, не нужно
+   протаскивать `shop_slug` через роутинг.
+2. `shop_slug`/`shop_name` в ответе — для ссылки «перейти в магазин»
+   (`/store/{shop_slug}` или `?shop_slug=...` в общем каталоге, как и в
+   списке).
+3. Кешируется на backend 20 секунд (как и список) — секундная задержка
+   между изменением товара владельцем и обновлением карточки в маркетплейсе
+   нормальна, ничего специально ждать на фронте не нужно.
