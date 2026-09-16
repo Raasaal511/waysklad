@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-09-16 — Отзывы и рейтинг товара (новый домен)
+
+Новое: `POST /api/reviews` (покупатель оставляет отзыв по своей принятой
+заявке), `GET /api/storefront/{slug}/products/{id}/reviews` (публичный
+список + агрегат), `GET /api/reviews/product/{id}` и
+`POST /api/reviews/{id}/hide`/`/unhide` (модерация владельцем). Каталог
+(`GET /api/storefront/{slug}`) и карточка товара получили новые поля
+`average_rating`/`reviews_count` у каждого товара.
+
+Полное описание — **`reviews.md`**.
+
+---
+
 ## 2026-09-14 — Невзятая сдача при продаже/выдаче заказа + фикс предоплаты
 
 Новое поле `change_kept` в `POST /api/sales` и `POST /api/orders/{id}/issue` —
