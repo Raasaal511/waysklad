@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-09-16 — Маркетплейс: sold_count + рейтинг товара (догнали витрину)
+
+`GET /api/marketplace/products` получил три новых поля у каждого товара:
+`sold_count`, `average_rating`, `reviews_count` — считаются кросс-tenant, тот
+же смысл, что уже был на одиночной витрине. Полное описание — обновлённый
+`marketplace.md`.
+
+---
+
 ## 2026-09-16 — Эндпоинт генерации описания через ИИ убран
 
 `POST /api/products/{product_id}/description/generate` удалён (был описан в
