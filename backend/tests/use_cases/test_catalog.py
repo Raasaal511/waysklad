@@ -20,8 +20,17 @@ from app.application.products.set_product_photo import (
     SetProductPhotoCommand,
     SetProductPhotoUseCase,
 )
-from app.application.products.update_product import UpdateProductCommand, UpdateProductUseCase
+from app.application.products.set_variant_photo import (
+    SetVariantPhotoCommand,
+    SetVariantPhotoUseCase,
+)
+from app.application.products.update_product import (
+    UpdateProductCommand,
+    UpdateProductUseCase,
+    UpdateVariantInput,
+)
 from app.domain.catalog.barcode import Barcode
+from app.domain.catalog.entities import ProductVariant
 from app.domain.common.exceptions import (
     AccessDeniedError,
     ClientHasDebtError,
@@ -559,4 +568,69 @@ async def test_seller_cannot_set_product_photo(
         await SetProductPhotoUseCase(make_uow(tenant_id), LocalFileStorage(tmp_path)).execute(
             Actor(id=seller.id, role=seller.role),
             SetProductPhotoCommand(product.id, "photo.jpg", b"data"),
+        )
+
+
+async def test_create_product_sets_variant_price(make_uow, registered_shop):
+    tenant_id, _, owner = registered_shop
+    product = await CreateProductUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateProductCommand(
+            name="Носки", unit_code="pcs",
+            purchase_price=Decimal("50"), retail_price=Decimal("100"),
+            variants=[
+                VariantInput(size="M", price=Decimal("90")),
+                VariantInput(size="L"),
+            ],
+        ),
+    )
+    by_size = {v.size: v for v in product.variants}
+    assert by_size["M"].price == Money.of("90")
+    # цена не задана — вариант не переопределяет retail_price товара
+    assert by_size["L"].price is None
+
+
+async def test_update_product_changes_variant_price(make_uow, registered_shop, create_product):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(
+        tenant_id, name="Носки",
+        variants=[ProductVariant(id=None, size="M", price=Money.of("90"))],
+    )
+    variant_id = product.variants[0].id
+
+    updated = await UpdateProductUseCase(make_uow(tenant_id)).execute(
+        owner,
+        UpdateProductCommand(
+            product_id=product.id, name=product.name, unit_code="pcs",
+            purchase_price=Decimal("50"), retail_price=Decimal("100"),
+            variants=[UpdateVariantInput(id=variant_id, size="M", price=Decimal("80"))],
+        ),
+    )
+    assert updated.variants[0].price == Money.of("80")
+
+
+async def test_set_variant_photo_updates_variant(make_uow, registered_shop, create_product, tmp_path):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(
+        tenant_id, name="Носки", variants=[ProductVariant(id=None, size="M")]
+    )
+    variant_id = product.variants[0].id
+    storage = LocalFileStorage(tmp_path)
+
+    updated = await SetVariantPhotoUseCase(make_uow(tenant_id), storage).execute(
+        owner, SetVariantPhotoCommand(product.id, variant_id, "photo.png", _test_png_bytes())
+    )
+    variant = next(v for v in updated.variants if v.id == variant_id)
+    assert variant.photo.startswith("/uploads/") and variant.photo.endswith(".webp")
+    assert (tmp_path / variant.photo.removeprefix("/uploads/")).exists()
+
+
+async def test_set_variant_photo_rejects_unknown_variant(
+    make_uow, registered_shop, create_product, tmp_path
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Носки")
+    with pytest.raises(DomainError):
+        await SetVariantPhotoUseCase(make_uow(tenant_id), LocalFileStorage(tmp_path)).execute(
+            owner, SetVariantPhotoCommand(product.id, 999999, "photo.png", _test_png_bytes())
         )

@@ -63,6 +63,7 @@ class VariantCreateRequest(BaseModel):
     size: str = ""
     color: str = ""
     barcode: str | None = None
+    price: Decimal | None = None
 
 
 class VariantUpdateRequest(BaseModel):
@@ -70,6 +71,8 @@ class VariantUpdateRequest(BaseModel):
     size: str = ""
     color: str = ""
     barcode: str | None = None
+    photo: str = ""
+    price: Decimal | None = None
 
 
 class ProductCreateRequest(BaseModel):
@@ -104,7 +107,7 @@ class ProductCreateRequest(BaseModel):
             storefront_min_qty=self.storefront_min_qty,
             storefront_step_qty=self.storefront_step_qty,
             variants=[
-                VariantInput(size=v.size, color=v.color, barcode=v.barcode)
+                VariantInput(size=v.size, color=v.color, barcode=v.barcode, price=v.price)
                 for v in self.variants
             ],
             initial_stock_warehouse_id=self.initial_stock_warehouse_id,
@@ -145,7 +148,10 @@ class ProductUpdateRequest(BaseModel):
             storefront_min_qty=self.storefront_min_qty,
             storefront_step_qty=self.storefront_step_qty,
             variants=[
-                UpdateVariantInput(id=v.id, size=v.size, color=v.color, barcode=v.barcode)
+                UpdateVariantInput(
+                    id=v.id, size=v.size, color=v.color, barcode=v.barcode,
+                    photo=v.photo, price=v.price,
+                )
                 for v in self.variants
             ],
         )
@@ -361,6 +367,8 @@ class VariantResponse(BaseModel):
     size: str
     color: str
     barcode: str | None
+    photo: str
+    price: Decimal | None
 
 
 class ProductResponse(BaseModel):
@@ -407,6 +415,8 @@ class ProductResponse(BaseModel):
                     size=v.size,
                     color=v.color,
                     barcode=v.barcode.value if v.barcode else None,
+                    photo=v.photo,
+                    price=v.price.amount if v.price else None,
                 )
                 for v in product.variants
             ],

@@ -18,6 +18,9 @@ class UpdateVariantInput:
     size: str = ""
     color: str = ""
     barcode: str | None = None
+    photo: str = ""
+    # None — цена не переопределена, берётся retail_price товара
+    price: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -86,6 +89,8 @@ class UpdateProductUseCase:
                         size=v.size,
                         color=v.color,
                         barcode=Barcode(v.barcode) if v.barcode else None,
+                        photo=v.photo,
+                        price=Money.of(v.price) if v.price is not None else None,
                     )
                     for v in cmd.variants
                 ],

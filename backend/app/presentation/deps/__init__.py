@@ -134,6 +134,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     SetProductPhotoDep,
     SetReviewHiddenDep,
     SetStorefrontPhotosDep,
+    SetVariantPhotoDep,
     SetWarehouseAssignmentsDep,
     SetWarehousePhotoDep,
     StocktakeDep,

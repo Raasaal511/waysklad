@@ -141,6 +141,46 @@ async def test_product_photo_upload_via_api(client, owner_headers, random_phone,
     assert response.status_code == 403
 
 
+async def test_variant_price_and_photo_via_api(client, owner_headers):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={
+            "name": "Носки",
+            "purchase_price": "50",
+            "retail_price": "100",
+            "variants": [{"size": "M", "price": "90"}, {"size": "L"}],
+        },
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    by_size = {v["size"]: v for v in body["variants"]}
+    assert by_size["M"]["price"] == "90.00"
+    assert by_size["L"]["price"] is None
+    product_id = body["id"]
+    variant_id = by_size["M"]["id"]
+
+    response = await client.post(
+        f"/api/products/{product_id}/variants/{variant_id}/photo",
+        headers=owner_headers,
+        files={"file": ("photo.jpg", _test_photo_bytes(), "image/jpeg")},
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    variant = next(v for v in body["variants"] if v["id"] == variant_id)
+    assert variant["photo"].startswith("/uploads/") and variant["photo"].endswith(".webp")
+    # фото другого варианта того же товара не затронуто
+    other = next(v for v in body["variants"] if v["id"] != variant_id)
+    assert other["photo"] == ""
+
+    response = await client.post(
+        f"/api/products/{product_id}/variants/999999/photo",
+        headers=owner_headers,
+        files={"file": ("photo.jpg", _test_photo_bytes(), "image/jpeg")},
+    )
+    assert response.status_code == 400  # несуществующий вариант
+
+
 async def test_custom_unit_via_api(client, owner_headers):
     response = await client.post(
         "/api/products/units",

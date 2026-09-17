@@ -159,6 +159,8 @@ class StorefrontProductVariantResponse(BaseModel):
     id: int
     size: str
     color: str
+    photo: str
+    price: Decimal | None
 
 
 class StorefrontProductDetailResponse(StorefrontProductResponse):
@@ -185,7 +187,10 @@ class StorefrontProductDetailResponse(StorefrontProductResponse):
             description=product.description,
             storefront_photos=list(product.storefront_photos),
             variants=[
-                StorefrontProductVariantResponse(id=v.id, size=v.size, color=v.color)
+                StorefrontProductVariantResponse(
+                    id=v.id, size=v.size, color=v.color,
+                    photo=v.photo, price=v.price.amount if v.price else None,
+                )
                 for v in product.variants
             ],
         )

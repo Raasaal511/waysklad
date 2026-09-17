@@ -9,6 +9,7 @@ from app.application.products.import_preview import PreviewProductsCommand
 from app.application.products.search_products import SearchProductsCommand
 from app.application.products.set_product_photo import SetProductPhotoCommand
 from app.application.products.set_storefront_photos import SetStorefrontPhotosCommand
+from app.application.products.set_variant_photo import SetVariantPhotoCommand
 from app.domain.catalog.barcode import Barcode
 from app.infrastructure.export.products_export import (
     render_products_csv,
@@ -35,6 +36,7 @@ from app.presentation.deps import (
     SearchProductsDep,
     SetProductPhotoDep,
     SetStorefrontPhotosDep,
+    SetVariantPhotoDep,
     ShowPurchaseDep,
     UpdateProductDep,
 )
@@ -112,6 +114,22 @@ async def set_product_photo(
     use_case: SetProductPhotoDep,
 ) -> ProductResponse:
     product = await use_case.execute(actor, await _photo_command(product_id, file))
+    return ProductResponse.from_entity(product, show_purchase)
+
+
+@router.post("/{product_id}/variants/{variant_id}/photo", status_code=201)
+async def set_variant_photo(
+    product_id: int,
+    variant_id: int,
+    actor: ActorDep,
+    file: UploadFile,
+    show_purchase: ShowPurchaseDep,
+    use_case: SetVariantPhotoDep,
+) -> ProductResponse:
+    command = SetVariantPhotoCommand(
+        product_id, variant_id, file.filename or "photo.jpg", await file.read()
+    )
+    product = await use_case.execute(actor, command)
     return ProductResponse.from_entity(product, show_purchase)
 
 

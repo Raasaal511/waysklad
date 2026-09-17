@@ -20,6 +20,7 @@ class VariantInput:
     size: str = ""
     color: str = ""
     barcode: str | None = None
+    price: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -97,6 +98,7 @@ class CreateProductUseCase:
                         size=v.size,
                         color=v.color,
                         barcode=Barcode(v.barcode) if v.barcode else None,
+                        price=Money.of(v.price) if v.price is not None else None,
                     )
                     for v in cmd.variants
                 ],

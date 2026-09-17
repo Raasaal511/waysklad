@@ -100,6 +100,7 @@ from app.application.products.list_categories import ListCategoriesUseCase
 from app.application.products.list_units import ListUnitsUseCase
 from app.application.products.search_products import SearchProductsUseCase
 from app.application.products.set_product_photo import SetProductPhotoUseCase
+from app.application.products.set_variant_photo import SetVariantPhotoUseCase
 from app.application.products.set_storefront_photos import SetStorefrontPhotosUseCase
 from app.application.products.update_product import UpdateProductUseCase
 from app.application.sales.create_sale import CreateSaleUseCase
@@ -217,6 +218,12 @@ def get_set_product_photo(
     uow: UowDep, storage: FileStorageDep, cache: CacheDep
 ) -> SetProductPhotoUseCase:
     return SetProductPhotoUseCase(uow, storage, cache)
+
+
+def get_set_variant_photo(
+    uow: UowDep, storage: FileStorageDep, cache: CacheDep
+) -> SetVariantPhotoUseCase:
+    return SetVariantPhotoUseCase(uow, storage, cache)
 
 
 def get_add_storefront_photo(
@@ -448,6 +455,7 @@ GetProductsExportDataDep = Annotated[
     GetProductsExportDataUseCase, Depends(get_products_export_data)
 ]
 SetProductPhotoDep = Annotated[SetProductPhotoUseCase, Depends(get_set_product_photo)]
+SetVariantPhotoDep = Annotated[SetVariantPhotoUseCase, Depends(get_set_variant_photo)]
 AddStorefrontPhotoDep = Annotated[
     AddStorefrontPhotoUseCase, Depends(get_add_storefront_photo)
 ]
