@@ -319,27 +319,27 @@
 
 .metricInput {
   width: 100%;
-  border: 1px solid var(--border) !important;
-  background: var(--bg) !important;
-  padding: 6px 8px !important;
-  border-radius: var(--radius-sm) !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
   box-shadow: none !important;
   outline: none !important;
   font: inherit;
-  font-size: 16px !important;
+  font-size: 20px !important;
   font-weight: 700;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--text);
+  transition: color 0.15s ease;
 }
 
-.metricInput:hover {
-  border-color: var(--accent) !important;
+.metricInput::placeholder {
+  color: var(--text-muted);
+  font-weight: 700;
 }
 
 .metricInput:focus {
-  border-color: var(--accent) !important;
-  outline: 2px solid var(--accent) !important;
-  outline-offset: 1px;
+  outline: none !important;
   box-shadow: none !important;
 }
 
