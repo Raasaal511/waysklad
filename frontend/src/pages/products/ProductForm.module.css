@@ -304,8 +304,7 @@
 }
 
 .unitSelect {
-  flex: 1;
-  min-width: 120px;
+  width: 110px;
 }
 
 .metaFieldSelect {
@@ -313,24 +312,24 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  flex: 1;
-  max-width: 420px;
+  flex: 0 0 auto;
 }
 
 .metricInput {
   width: 100%;
-  border: none !important;
-  background: transparent !important;
-  padding: 0 !important;
+  border: 1px solid var(--border) !important;
+  background: var(--bg-muted) !important;
+  padding: 5px 8px !important;
+  border-radius: var(--radius-sm) !important;
   box-shadow: none !important;
   outline: none !important;
   font: inherit;
-  font-size: 20px !important;
+  font-size: 18px !important;
   font-weight: 700;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--text);
-  transition: color 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .metricInput::placeholder {
@@ -338,8 +337,16 @@
   font-weight: 700;
 }
 
+.metricInput:hover {
+  border-color: var(--accent) !important;
+  background: var(--bg) !important;
+}
+
 .metricInput:focus {
-  outline: none !important;
+  border-color: var(--accent) !important;
+  background: var(--bg) !important;
+  outline: 2px solid var(--accent-soft) !important;
+  outline-offset: 0;
   box-shadow: none !important;
 }
 
@@ -450,6 +457,105 @@
   }
 }
 
+.showcaseCard {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+  border-radius: 16px;
+  background: linear-gradient(160deg, var(--accent-soft) 0%, var(--bg) 55%);
+  border: 1px solid var(--border);
+}
+
+.showcaseHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.showcaseIcon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+}
+
+.showcaseSubtitle {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.showcaseBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.showcaseField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.showcaseFieldLabel {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.showcaseFieldLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.showcaseLocked {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  background: var(--bg-muted);
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+.showcaseLockedIcon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
+.showcaseLocked strong {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.showcaseToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
 .descriptionInput {
   width: 100%;
   min-height: 96px;
@@ -461,6 +567,17 @@
   font: inherit;
   line-height: 1.45;
   resize: vertical;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.descriptionInput:hover {
+  border-color: var(--accent);
+}
+
+.descriptionInput:focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 0;
 }
 
 .galleryGrid {

@@ -14,7 +14,6 @@ import {
   createCategory,
   setProductPhoto,
   generateBarcode,
-  generateProductDescription,
   addStorefrontPhoto,
   setStorefrontPhotos,
   type Product,
@@ -38,6 +37,8 @@ import {
   IconShoppingBag,
   IconCheck,
   IconWand,
+  IconLock,
+  IconSparkles,
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
@@ -225,7 +226,6 @@ export function ProductForm({
   const [storefrontPhotos, setStorefrontPhotosState] = useState<string[]>(
     product?.storefront_photos ?? [],
   )
-  const [generatingDescription, setGeneratingDescription] = useState(false)
   const [galleryBusy, setGalleryBusy] = useState(false)
   const [dragPhotoIndex, setDragPhotoIndex] = useState<number | null>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
@@ -274,20 +274,6 @@ export function ProductForm({
       setError(err instanceof ApiError ? err.message : 'Не удалось сгенерировать штрихкод')
     } finally {
       setGeneratingBarcode(false)
-    }
-  }
-
-  async function handleGenerateDescription() {
-    if (!savedProductId) return
-    setGeneratingDescription(true)
-    setError(null)
-    try {
-      const result = await generateProductDescription(savedProductId)
-      setDescription(result.description)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось сгенерировать описание')
-    } finally {
-      setGeneratingDescription(false)
     }
   }
 
@@ -725,86 +711,144 @@ export function ProductForm({
           )}
         </section>
 
-        <section className={`${detail.section} ${detail.reveal}`} style={{ '--reveal-delay': '110ms' } as CSSProperties}>
-          <div className={styles.sectionHead}>
-            <h3 className={detail.sectionTitle}>Описание для витрины</h3>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleGenerateDescription}
-              disabled={!savedProductId || generatingDescription || saving}
-            >
-              <IconWand size={14} stroke={1.8} />
-              {generatingDescription ? 'Генерация…' : 'Сгенерировать через ИИ'}
-            </Button>
-          </div>
-          {!savedProductId && (
-            <p className={styles.fieldHint}>
-              Сначала сохраните товар — затем можно сгенерировать описание и добавить фото витрины.
-            </p>
-          )}
-          <textarea
-            className={styles.descriptionInput}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={4}
-            maxLength={4000}
-            placeholder="Текст для карточки на витрине"
-          />
-        </section>
-
-        <section className={`${detail.section} ${detail.reveal}`} style={{ '--reveal-delay': '120ms' } as CSSProperties}>
-          <div className={styles.sectionHead}>
-            <h3 className={detail.sectionTitle}>Фото для витрины</h3>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => galleryInputRef.current?.click()}
-              disabled={!savedProductId || galleryBusy || saving}
-            >
-              <IconPhoto size={14} stroke={1.8} /> Добавить
-            </Button>
-            <input
-              ref={galleryInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              multiple
-              hidden
-              onChange={(e) => handleAddGalleryFiles(e.target.files)}
-            />
-          </div>
-          {!savedProductId ? (
-            <p className={layoutStyles.textMuted}>Доступно после первого сохранения товара</p>
-          ) : storefrontPhotos.length === 0 ? (
-            <p className={layoutStyles.textMuted}>Пока пусто — галерея не связана со складским фото</p>
-          ) : (
-            <div className={styles.galleryGrid}>
-              {storefrontPhotos.map((url, index) => (
-                <div
-                  key={url}
-                  className={styles.galleryItem}
-                  draggable={!galleryBusy}
-                  onDragStart={() => onGalleryDragStart(index)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => onGalleryDrop(index)}
-                >
-                  <img src={url} alt="" />
-                  <button
-                    type="button"
-                    className={styles.galleryRemove}
-                    onClick={() => removeGalleryPhoto(url)}
-                    disabled={galleryBusy}
-                    aria-label="Удалить фото"
-                  >
-                    <IconX size={14} stroke={2} />
-                  </button>
-                </div>
-              ))}
+        <section className={`${styles.showcaseCard} ${detail.reveal}`} style={{ '--reveal-delay': '110ms' } as CSSProperties}>
+          <div className={styles.showcaseHead}>
+            <span className={styles.showcaseIcon}>
+              <IconSparkles size={18} stroke={1.8} />
+            </span>
+            <div>
+              <h3 className={detail.sectionTitle}>Витрина</h3>
+              <p className={styles.showcaseSubtitle}>Как товар увидит покупатель в магазине</p>
             </div>
-          )}
-          {storefrontPhotos.length > 1 && (
-            <p className={styles.fieldHint}>Перетащите миниатюры, чтобы изменить порядок</p>
-          )}
+          </div>
+
+          <div className={styles.showcaseBody}>
+            <label className={styles.showcaseField}>
+              <span className={styles.showcaseFieldLabel}>Описание</span>
+              <textarea
+                className={styles.descriptionInput}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                maxLength={4000}
+                placeholder="Расскажите о товаре — это увидят покупатели на витрине"
+              />
+            </label>
+
+            <div className={styles.showcaseField}>
+              <div className={styles.showcaseFieldLabelRow}>
+                <span className={styles.showcaseFieldLabel}>Фото витрины</span>
+                {savedProductId && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => galleryInputRef.current?.click()}
+                    disabled={galleryBusy || saving}
+                  >
+                    <IconPhoto size={14} stroke={1.8} /> Добавить
+                  </Button>
+                )}
+                <input
+                  ref={galleryInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  hidden
+                  onChange={(e) => handleAddGalleryFiles(e.target.files)}
+                />
+              </div>
+
+              {!savedProductId ? (
+                <div className={styles.showcaseLocked}>
+                  <span className={styles.showcaseLockedIcon}>
+                    <IconLock size={16} stroke={1.8} />
+                  </span>
+                  <span>
+                    <strong>Сохраните товар</strong>, чтобы добавить фото витрины
+                  </span>
+                </div>
+              ) : storefrontPhotos.length === 0 ? (
+                <p className={layoutStyles.textMuted}>Пока пусто — галерея не связана со складским фото</p>
+              ) : (
+                <div className={styles.galleryGrid}>
+                  {storefrontPhotos.map((url, index) => (
+                    <div
+                      key={url}
+                      className={styles.galleryItem}
+                      draggable={!galleryBusy}
+                      onDragStart={() => onGalleryDragStart(index)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => onGalleryDrop(index)}
+                    >
+                      <img src={url} alt="" />
+                      <button
+                        type="button"
+                        className={styles.galleryRemove}
+                        onClick={() => removeGalleryPhoto(url)}
+                        disabled={galleryBusy}
+                        aria-label="Удалить фото"
+                      >
+                        <IconX size={14} stroke={2} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {storefrontPhotos.length > 1 && (
+                <p className={styles.fieldHint}>Перетащите миниатюры, чтобы изменить порядок</p>
+              )}
+            </div>
+
+            <label className={styles.showcaseToggle}>
+              <input
+                type="checkbox"
+                checked={showOnStorefront}
+                onChange={(e) => setShowOnStorefront(e.target.checked)}
+              />
+              Показывать на публичной витрине
+            </label>
+
+            {showOnStorefront && (
+              <div className={detail.metaGrid}>
+                <label className={detail.metaItem}>
+                  <span className={styles.fieldLabelWithHint}>
+                    <span className={layoutStyles.textMuted}>Минимум для покупки</span>
+                    <InfoHint text="Покупатель на витрине не сможет заказать меньше этого количества. Например, минимум 2 — нельзя взять 1 штуку." />
+                  </span>
+                  <input
+                    className={styles.plainInput}
+                    type="text"
+                    inputMode="decimal"
+                    value={storefrontMinQty}
+                    onChange={(e) => {
+                      const normalized = normalizeDecimalInput(e.target.value)
+                      if (normalized !== null) setStorefrontMinQty(normalized)
+                    }}
+                    placeholder="без ограничения"
+                  />
+                  <span className={styles.fieldHint}>Сколько минимум можно взять в одном заказе</span>
+                </label>
+                <label className={detail.metaItem}>
+                  <span className={styles.fieldLabelWithHint}>
+                    <span className={layoutStyles.textMuted}>Прибавка кнопками + / −</span>
+                    <InfoHint text="На сколько меняется количество, когда покупатель нажимает + или − на витрине. Например, 0.5 — можно выбрать 0.5, 1, 1.5…" />
+                  </span>
+                  <input
+                    className={styles.plainInput}
+                    type="text"
+                    inputMode="decimal"
+                    value={storefrontStepQty}
+                    onChange={(e) => {
+                      const normalized = normalizeDecimalInput(e.target.value)
+                      if (normalized !== null) setStorefrontStepQty(normalized)
+                    }}
+                    placeholder="1"
+                  />
+                  <span className={styles.fieldHint}>Шаг изменения количества на витрине</span>
+                </label>
+              </div>
+            )}
+          </div>
         </section>
 
         {!product && (
@@ -823,58 +867,6 @@ export function ProductForm({
             </div>
           </section>
         )}
-
-        <section className={`${detail.section} ${detail.reveal}`} style={{ '--reveal-delay': '130ms' } as CSSProperties}>
-          <h3 className={detail.sectionTitle}>Витрина</h3>
-          <label className={styles.checkboxRow}>
-            <input
-              type="checkbox"
-              checked={showOnStorefront}
-              onChange={(e) => setShowOnStorefront(e.target.checked)}
-            />
-            Показывать на публичной витрине
-          </label>
-          {showOnStorefront && (
-            <div className={detail.metaGrid}>
-              <label className={detail.metaItem}>
-                <span className={styles.fieldLabelWithHint}>
-                  <span className={layoutStyles.textMuted}>Минимум для покупки</span>
-                  <InfoHint text="Покупатель на витрине не сможет заказать меньше этого количества. Например, минимум 2 — нельзя взять 1 штуку." />
-                </span>
-                <input
-                  className={styles.plainInput}
-                  type="text"
-                  inputMode="decimal"
-                  value={storefrontMinQty}
-                  onChange={(e) => {
-                    const normalized = normalizeDecimalInput(e.target.value)
-                    if (normalized !== null) setStorefrontMinQty(normalized)
-                  }}
-                  placeholder="без ограничения"
-                />
-                <span className={styles.fieldHint}>Сколько минимум можно взять в одном заказе</span>
-              </label>
-              <label className={detail.metaItem}>
-                <span className={styles.fieldLabelWithHint}>
-                  <span className={layoutStyles.textMuted}>Прибавка кнопками + / −</span>
-                  <InfoHint text="На сколько меняется количество, когда покупатель нажимает + или − на витрине. Например, 0.5 — можно выбрать 0.5, 1, 1.5…" />
-                </span>
-                <input
-                  className={styles.plainInput}
-                  type="text"
-                  inputMode="decimal"
-                  value={storefrontStepQty}
-                  onChange={(e) => {
-                    const normalized = normalizeDecimalInput(e.target.value)
-                    if (normalized !== null) setStorefrontStepQty(normalized)
-                  }}
-                  placeholder="1"
-                />
-                <span className={styles.fieldHint}>Шаг изменения количества на витрине</span>
-              </label>
-            </div>
-          )}
-        </section>
 
         <section className={`${detail.section} ${detail.reveal}`} style={{ '--reveal-delay': '160ms' } as CSSProperties}>
           <div className={styles.sectionHead}>
