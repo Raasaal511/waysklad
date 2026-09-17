@@ -37,7 +37,6 @@ import {
   IconShoppingBag,
   IconCheck,
   IconWand,
-  IconLock,
   IconSparkles,
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
@@ -227,6 +226,7 @@ export function ProductForm({
     product?.storefront_photos ?? [],
   )
   const [galleryBusy, setGalleryBusy] = useState(false)
+  const [galleryDragActive, setGalleryDragActive] = useState(false)
   const [dragPhotoIndex, setDragPhotoIndex] = useState<number | null>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
@@ -278,7 +278,12 @@ export function ProductForm({
   }
 
   async function handleAddGalleryFiles(files: FileList | null) {
-    if (!savedProductId || !files?.length) return
+    if (!files?.length) return
+    const productId = await ensureDraftProduct()
+    if (!productId) {
+      if (galleryInputRef.current) galleryInputRef.current.value = ''
+      return
+    }
     setGalleryBusy(true)
     setError(null)
     try {
@@ -288,7 +293,7 @@ export function ProductForm({
           setError('Неподдерживаемый формат. JPG, PNG, WEBP или GIF.')
           continue
         }
-        const updated = await addStorefrontPhoto(savedProductId, file)
+        const updated = await addStorefrontPhoto(productId, file)
         next = updated.storefront_photos ?? []
         setStorefrontPhotosState(next)
       }
@@ -385,49 +390,78 @@ export function ProductForm({
     }
   }
 
+  async function persistProduct(): Promise<Product> {
+    const payload = {
+      name,
+      sku,
+      barcode: barcode || null,
+      unit_code: unitCode,
+      purchase_price: purchasePrice || '0',
+      retail_price: retailPrice || '0',
+      min_stock: minStock || '0',
+      category_id: categoryId,
+      description,
+      show_on_storefront: showOnStorefront,
+      storefront_min_qty: storefrontMinQty || null,
+      storefront_step_qty: storefrontStepQty || null,
+      variants,
+    }
+    let saved: Product
+    if (product) {
+      saved = await updateProduct(product.id, {
+        ...payload,
+        photo: photoFile ? product.photo : photoPreview || '',
+      })
+    } else if (createdProduct) {
+      saved = await updateProduct(createdProduct.id, {
+        ...payload,
+        photo: photoFile ? createdProduct.photo : photoPreview || '',
+      })
+    } else {
+      saved = await createProduct({
+        ...payload,
+        initial_stock_warehouse_id: initialStockQuantity ? initialStockWarehouseId : null,
+        initial_stock_quantity: initialStockQuantity || null,
+      })
+      setCreatedProduct(saved)
+    }
+    if (photoFile) {
+      saved = await setProductPhoto(saved.id, photoFile)
+    }
+    return saved
+  }
+
+  // Черновик товара нужен для фото витрины — оно грузится отдельным запросом
+  // по product_id, которого нет до первого сохранения. Название обязательно
+  // и на бэкенде, и в форме (required) — без него сохранить нечего.
+  async function ensureDraftProduct(): Promise<number | null> {
+    if (savedProductId) return savedProductId
+    if (!name.trim()) {
+      setError('Сначала укажите название товара — тогда можно будет добавить фото витрины')
+      return null
+    }
+    setSaving(true)
+    onSavingChange?.(true)
+    setError(null)
+    try {
+      const saved = await persistProduct()
+      return saved.id
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось сохранить товар')
+      return null
+    } finally {
+      setSaving(false)
+      onSavingChange?.(false)
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setSaving(true)
     onSavingChange?.(true)
     try {
-      const payload = {
-        name,
-        sku,
-        barcode: barcode || null,
-        unit_code: unitCode,
-        purchase_price: purchasePrice || '0',
-        retail_price: retailPrice || '0',
-        min_stock: minStock || '0',
-        category_id: categoryId,
-        description,
-        show_on_storefront: showOnStorefront,
-        storefront_min_qty: storefrontMinQty || null,
-        storefront_step_qty: storefrontStepQty || null,
-        variants,
-      }
-      let saved: Product
-      if (product) {
-        saved = await updateProduct(product.id, {
-          ...payload,
-          photo: photoFile ? product.photo : photoPreview || '',
-        })
-      } else if (createdProduct) {
-        saved = await updateProduct(createdProduct.id, {
-          ...payload,
-          photo: photoFile ? createdProduct.photo : photoPreview || '',
-        })
-      } else {
-        saved = await createProduct({
-          ...payload,
-          initial_stock_warehouse_id: initialStockQuantity ? initialStockWarehouseId : null,
-          initial_stock_quantity: initialStockQuantity || null,
-        })
-        setCreatedProduct(saved)
-      }
-      if (photoFile) {
-        saved = await setProductPhoto(saved.id, photoFile)
-      }
+      const saved = await persistProduct()
       onDone(saved)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось сохранить товар')
@@ -737,17 +771,70 @@ export function ProductForm({
 
             <div className={styles.showcaseField}>
               <div className={styles.showcaseFieldLabelRow}>
-                <span className={styles.showcaseFieldLabel}>Фото витрины</span>
-                {savedProductId && (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => galleryInputRef.current?.click()}
-                    disabled={galleryBusy || saving}
+                <span className={styles.showcaseFieldLabel}>
+                  Фото витрины
+                  {storefrontPhotos.length > 0 && (
+                    <span className={styles.galleryCount}>{storefrontPhotos.length}</span>
+                  )}
+                </span>
+              </div>
+
+              {!savedProductId && (
+                <p className={styles.fieldHint}>
+                  {name.trim()
+                    ? 'Товар сохранится автоматически при добавлении первого фото'
+                    : 'Укажите название товара выше — тогда можно будет добавить фото'}
+                </p>
+              )}
+
+              <div
+                className={[styles.galleryGrid, galleryDragActive ? styles.galleryGridActive : '']
+                  .filter(Boolean)
+                  .join(' ')}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  setGalleryDragActive(true)
+                }}
+                onDragLeave={() => setGalleryDragActive(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setGalleryDragActive(false)
+                  if (e.dataTransfer.files?.length) handleAddGalleryFiles(e.dataTransfer.files)
+                }}
+              >
+                {storefrontPhotos.map((url, index) => (
+                  <div
+                    key={url}
+                    className={styles.galleryItem}
+                    draggable={!galleryBusy}
+                    onDragStart={() => onGalleryDragStart(index)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => onGalleryDrop(index)}
                   >
-                    <IconPhoto size={14} stroke={1.8} /> Добавить
-                  </Button>
-                )}
+                    <img src={url} alt="" />
+                    <div className={styles.galleryItemOverlay}>
+                      <button
+                        type="button"
+                        className={styles.galleryRemove}
+                        onClick={() => removeGalleryPhoto(url)}
+                        disabled={galleryBusy}
+                        aria-label="Удалить фото"
+                      >
+                        <IconX size={14} stroke={2.2} />
+                      </button>
+                    </div>
+                    {index === 0 && <span className={styles.galleryMainBadge}>Главное</span>}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className={styles.galleryAddTile}
+                  onClick={() => galleryInputRef.current?.click()}
+                  disabled={galleryBusy || saving}
+                >
+                  <IconPhoto size={20} stroke={1.6} />
+                  <span>Добавить</span>
+                </button>
                 <input
                   ref={galleryInputRef}
                   type="file"
@@ -757,43 +844,6 @@ export function ProductForm({
                   onChange={(e) => handleAddGalleryFiles(e.target.files)}
                 />
               </div>
-
-              {!savedProductId ? (
-                <div className={styles.showcaseLocked}>
-                  <span className={styles.showcaseLockedIcon}>
-                    <IconLock size={16} stroke={1.8} />
-                  </span>
-                  <span>
-                    <strong>Сохраните товар</strong>, чтобы добавить фото витрины
-                  </span>
-                </div>
-              ) : storefrontPhotos.length === 0 ? (
-                <p className={layoutStyles.textMuted}>Пока пусто — галерея не связана со складским фото</p>
-              ) : (
-                <div className={styles.galleryGrid}>
-                  {storefrontPhotos.map((url, index) => (
-                    <div
-                      key={url}
-                      className={styles.galleryItem}
-                      draggable={!galleryBusy}
-                      onDragStart={() => onGalleryDragStart(index)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => onGalleryDrop(index)}
-                    >
-                      <img src={url} alt="" />
-                      <button
-                        type="button"
-                        className={styles.galleryRemove}
-                        onClick={() => removeGalleryPhoto(url)}
-                        disabled={galleryBusy}
-                        aria-label="Удалить фото"
-                      >
-                        <IconX size={14} stroke={2} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
               {storefrontPhotos.length > 1 && (
                 <p className={styles.fieldHint}>Перетащите миниатюры, чтобы изменить порядок</p>
               )}
