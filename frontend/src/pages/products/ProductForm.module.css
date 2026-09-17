@@ -20,8 +20,42 @@
   opacity: 0.72;
 }
 
-.heroEdit {
-  align-items: stretch;
+.layoutGrid {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) 1fr;
+  align-items: start;
+  gap: 16px;
+}
+
+.leftPane {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rightPane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.heroStacked {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .layoutGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .leftPane {
+    position: static;
+  }
 }
 
 .heroPhotoDrop {
@@ -213,15 +247,15 @@
 }
 
 .priceEdit {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
-  max-width: 280px;
-  padding: 6px 12px;
+  width: 100%;
+  padding: 10px 14px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  transition: border-color 0.15s ease;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .priceEdit:hover,
@@ -230,8 +264,7 @@
 }
 
 .priceEdit:focus-within {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .priceEdit input {
@@ -242,10 +275,11 @@
   box-shadow: none !important;
   outline: none !important;
   font: inherit;
-  font-size: 22px !important;
-  font-weight: 700;
+  font-size: 28px !important;
+  font-weight: 750;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
-  color: var(--text);
+  color: var(--accent);
 }
 
 .priceEdit input:focus {
@@ -254,9 +288,9 @@
 }
 
 .priceSuffix {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-muted);
+  font-size: 22px;
+  font-weight: 750;
+  color: var(--accent);
 }
 
 .metaEdit {

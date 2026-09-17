@@ -474,8 +474,10 @@ export function ProductForm({
   return (
     <form className={styles.editForm} onSubmit={handleSubmit}>
       <fieldset className={styles.formFieldset} disabled={saving}>
+      <div className={styles.layoutGrid}>
+      <div className={styles.leftPane}>
         <section
-          className={`${detail.hero} ${detail.heroWithMedia} ${styles.heroEdit} ${detail.reveal}`}
+          className={`${detail.hero} ${styles.heroStacked} ${detail.reveal}`}
           style={{ '--reveal-delay': '0ms' } as CSSProperties}
         >
           <div
@@ -658,7 +660,9 @@ export function ProductForm({
             {photoError && <p className={layoutStyles.error}>{photoError}</p>}
           </div>
         </section>
+      </div>
 
+      <div className={styles.rightPane}>
         <section
           className={`${detail.metrics} ${detail.reveal}`}
           style={{ '--reveal-delay': '60ms' } as CSSProperties}
@@ -953,12 +957,14 @@ export function ProductForm({
         </section>
 
         {error && <p className={layoutStyles.error}>{error}</p>}
+      </div>
+      </div>
 
-        <div className={styles.saveBar}>
-          <Button type="submit" disabled={saving}>
-            {saving ? 'Сохранение…' : submitLabel ?? (product ? 'Сохранить изменения' : 'Создать товар')}
-          </Button>
-        </div>
+      <div className={styles.saveBar}>
+        <Button type="submit" disabled={saving}>
+          {saving ? 'Сохранение…' : submitLabel ?? (product ? 'Сохранить изменения' : 'Создать товар')}
+        </Button>
+      </div>
       </fieldset>
 
       {showScanner && (
