@@ -226,6 +226,21 @@ export function StorefrontProductPage() {
               <ProductPhoto src="" size={56} />
             )}
             {!product.in_stock && <span className={styles.heroBadge}>Нет в наличии</span>}
+            {gallery.length > 1 && (
+              <div className={styles.galleryDots} role="tablist" aria-label="Фото">
+                {gallery.map((url, i) => (
+                  <button
+                    key={url}
+                    type="button"
+                    role="tab"
+                    aria-selected={activePhoto === i}
+                    aria-label={`Фото ${i + 1}`}
+                    className={activePhoto === i ? styles.galleryDotActive : styles.galleryDot}
+                    onClick={() => setActivePhoto(i)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
