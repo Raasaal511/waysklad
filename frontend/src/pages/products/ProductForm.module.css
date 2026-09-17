@@ -122,18 +122,104 @@
   background: transparent;
 }
 
-.metricLabelWithHint {
+.statRow {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.statCell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px;
+  border-right: 1px solid var(--border);
+}
+
+.statCell:last-child {
+  border-right: none;
+}
+
+.statLabelWithHint {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.metricHint {
-  display: block;
-  font-size: 11.5px;
-  line-height: 1.35;
+.statLabel {
+  font-size: 12.5px;
   color: var(--text-muted);
-  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statValue {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.statInput {
+  width: 100%;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  border-radius: 0 !important;
+  font: inherit;
+  font-size: 22px !important;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1.2;
+  border-bottom: 1.5px dashed transparent !important;
+  transition: border-color 0.15s ease;
+}
+
+.statCell:hover .statInput {
+  border-bottom-color: var(--border) !important;
+}
+
+.statInput:hover {
+  border-bottom-color: var(--accent) !important;
+}
+
+.statInput:focus {
+  border-bottom-color: var(--accent) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.statInput::placeholder {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .statRow {
+    flex-wrap: wrap;
+  }
+
+  .statCell {
+    flex: 1 1 50%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .statCell:nth-child(2n) {
+    border-right: none;
+  }
 }
 
 .fieldLabelWithHint {

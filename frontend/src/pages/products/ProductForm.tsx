@@ -32,10 +32,7 @@ import {
   IconPhoto,
   IconX,
   IconPackage,
-  IconCoin,
-  IconAlertTriangle,
   IconShoppingBag,
-  IconCheck,
   IconWand,
   IconSparkles,
 } from '@tabler/icons-react'
@@ -663,88 +660,63 @@ export function ProductForm({
       </div>
 
       <div className={styles.rightPane}>
-        <section
-          className={`${detail.metrics} ${detail.reveal}`}
-          style={{ '--reveal-delay': '60ms' } as CSSProperties}
-        >
-          <label className={detail.metric}>
-            <span className={detail.metricIcon}>
-              <IconCoin size={18} stroke={1.8} />
-            </span>
-            <span className={detail.metricBody}>
-              <input
-                className={styles.metricInput}
-                type="text"
-                inputMode="decimal"
-                value={purchasePrice}
-                onChange={(e) => {
-                  const normalized = normalizeDecimalInput(e.target.value)
-                  if (normalized !== null) setPurchasePrice(normalized)
-                }}
-                placeholder="0"
-              />
-              <span>Закупка, ₽</span>
-            </span>
+        <section className={`${styles.statRow} ${detail.reveal}`} style={{ '--reveal-delay': '60ms' } as CSSProperties}>
+          <label className={styles.statCell}>
+            <span className={styles.statLabel}>Закупка, ₽</span>
+            <input
+              className={styles.statInput}
+              type="text"
+              inputMode="decimal"
+              value={purchasePrice}
+              onChange={(e) => {
+                const normalized = normalizeDecimalInput(e.target.value)
+                if (normalized !== null) setPurchasePrice(normalized)
+              }}
+              placeholder="0"
+            />
           </label>
 
-          <div className={detail.metric}>
-            <span className={detail.metricIcon}>
-              <IconCheck size={18} stroke={1.8} />
+          <div className={styles.statCell}>
+            <span className={styles.statLabel}>Маржа</span>
+            <span className={styles.statValue}>
+              {liveMargin != null ? `${formatMoney(liveMargin)} ₽` : '—'}
             </span>
-            <div className={detail.metricBody}>
-              <strong>{liveMargin != null ? `${formatMoney(liveMargin)} ₽` : '—'}</strong>
-              <span>Маржа</span>
-            </div>
           </div>
 
-          <label className={detail.metric}>
-            <span className={`${detail.metricIcon} ${detail.metricIconWarn}`}>
-              <IconAlertTriangle size={18} stroke={1.8} />
+          <label className={styles.statCell}>
+            <span className={styles.statLabelWithHint}>
+              <span className={styles.statLabel}>Порог остатка</span>
+              <InfoHint text={`Когда остаток станет меньше этого значения, товар подсветится как заканчивающийся. Единица: ${unitLabel}.`} />
             </span>
-            <span className={detail.metricBody}>
-              <input
-                className={styles.metricInput}
-                type="text"
-                inputMode="decimal"
-                value={minStock}
-                onChange={(e) => {
-                  const normalized = normalizeDecimalInput(e.target.value)
-                  if (normalized !== null) setMinStock(normalized)
-                }}
-                onBlur={() => setMinStock((v) => clampToUnit(v, unitCode))}
-                placeholder="0"
-                aria-describedby="min-stock-hint"
-              />
-              <span className={styles.metricLabelWithHint}>
-                Порог предупреждения
-                <InfoHint text={`Когда остаток станет меньше этого значения, товар подсветится как заканчивающийся. Единица: ${unitLabel}.`} />
-              </span>
-              <span id="min-stock-hint" className={styles.metricHint}>
-                Ниже этого числа — предупреждение о низком остатке
-              </span>
-            </span>
+            <input
+              className={styles.statInput}
+              type="text"
+              inputMode="decimal"
+              value={minStock}
+              onChange={(e) => {
+                const normalized = normalizeDecimalInput(e.target.value)
+                if (normalized !== null) setMinStock(normalized)
+              }}
+              onBlur={() => setMinStock((v) => clampToUnit(v, unitCode))}
+              placeholder="0"
+            />
           </label>
 
           {!product && (
-            <label className={detail.metric}>
-              <span className={detail.metricIcon}>
-                <IconPackage size={18} stroke={1.8} />
-              </span>
-              <span className={detail.metricBody}>
-                <input
-                  className={styles.metricInput}
-                  type="text"
-                  inputMode="decimal"
-                  value={initialStockQuantity}
-                  onChange={(e) => {
-                    const normalized = normalizeDecimalInput(e.target.value)
-                    if (normalized !== null) setInitialStockQuantity(normalized)
-                  }}
-                  onBlur={() => setInitialStockQuantity((v) => clampToUnit(v, unitCode))}
-                  placeholder="0"
-                />
-                <span>Начальный остаток</span>
-              </span>
+            <label className={styles.statCell}>
+              <span className={styles.statLabel}>Начальный остаток</span>
+              <input
+                className={styles.statInput}
+                type="text"
+                inputMode="decimal"
+                value={initialStockQuantity}
+                onChange={(e) => {
+                  const normalized = normalizeDecimalInput(e.target.value)
+                  if (normalized !== null) setInitialStockQuantity(normalized)
+                }}
+                onBlur={() => setInitialStockQuantity((v) => clampToUnit(v, unitCode))}
+                placeholder="0"
+              />
             </label>
           )}
         </section>
