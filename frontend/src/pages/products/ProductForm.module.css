@@ -610,14 +610,11 @@
   align-items: flex-start;
   justify-content: flex-end;
   padding: 6px;
-  background: rgba(0, 0, 0, 0.28);
-  opacity: 0;
-  transition: opacity 0.15s ease;
+  pointer-events: none;
 }
 
-.galleryItem:hover .galleryItemOverlay,
-.galleryItem:focus-within .galleryItemOverlay {
-  opacity: 1;
+.galleryItemOverlay > * {
+  pointer-events: auto;
 }
 
 .galleryMainBadge {
@@ -635,6 +632,7 @@
 .galleryRemove {
   width: 24px;
   height: 24px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -645,6 +643,10 @@
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.galleryRemove svg {
+  flex-shrink: 0;
 }
 
 .galleryRemove:hover {
