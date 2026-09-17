@@ -4,3 +4,7 @@ __pycache__
 .pytest_cache
 .mypy_cache
 .ruff_cache
+# локальный .env для запуска вне Docker (localhost:5432/6379) — попав в
+# образ через COPY . ., переопределяет DATABASE_URL/REDIS_* из compose
+# env_file на localhost, который внутри контейнера не резолвится
+.env
