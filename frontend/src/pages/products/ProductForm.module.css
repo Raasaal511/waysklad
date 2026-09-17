@@ -169,7 +169,8 @@
 }
 
 .statInput {
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
   border: none !important;
   background: transparent !important;
   padding: 0 !important;
@@ -183,12 +184,9 @@
   font-variant-numeric: tabular-nums;
   color: var(--text);
   line-height: 1.2;
-  border-bottom: 1.5px dashed transparent !important;
+  cursor: text;
+  border-bottom: 1.5px dashed var(--border) !important;
   transition: border-color 0.15s ease;
-}
-
-.statCell:hover .statInput {
-  border-bottom-color: var(--border) !important;
 }
 
 .statInput:hover {
@@ -196,6 +194,7 @@
 }
 
 .statInput:focus {
+  border-bottom-style: solid !important;
   border-bottom-color: var(--accent) !important;
   outline: none !important;
   box-shadow: none !important;
