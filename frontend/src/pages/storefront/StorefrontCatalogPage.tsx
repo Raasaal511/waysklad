@@ -523,7 +523,7 @@ function ProductCard({
         onClick={onToggleFavorite}
         aria-label={favorite ? 'Убрать из избранного' : 'В избранное'}
       >
-        {favorite ? <IconHeartFilled size={18} /> : <IconHeart size={18} stroke={1.8} />}
+        {favorite ? <IconHeartFilled size={22} /> : <IconHeart size={22} stroke={1.8} />}
       </button>
     </article>
   )

@@ -220,6 +220,8 @@ export function StorefrontProductPage() {
           <div className={styles.productHero}>
             {gallery.length > 0 ? (
               <img src={gallery[Math.min(activePhoto, gallery.length - 1)]} alt="" className={styles.heroImg} />
+            ) : product.photo ? (
+              <img src={product.photo} alt="" className={styles.heroImg} />
             ) : (
               <ProductPhoto src="" size={56} />
             )}
