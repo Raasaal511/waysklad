@@ -200,6 +200,21 @@ export function StorefrontProductPage() {
       </div>
 
       <main className={styles.productPage}>
+        <div className={styles.productHeadFull}>
+          <h1>{product.name}</h1>
+          <div className={styles.productChips}>
+            {product.in_stock ? (
+              <span className={styles.inStockChip}>В наличии</span>
+            ) : (
+              <span className={styles.outBadge}>Нет в наличии</span>
+            )}
+            {Number(product.sold_count ?? 0) > 0 && (
+              <span className={styles.soldChip}>Продано {formatQuantity(product.sold_count!)}</span>
+            )}
+            {product.sku && <span className={styles.skuChip}>арт. {product.sku}</span>}
+          </div>
+        </div>
+
         <div className={styles.productGallery}>
           {gallery.length > 1 && (
             <div className={styles.galleryThumbs} role="tablist" aria-label="Фото">
@@ -245,21 +260,7 @@ export function StorefrontProductPage() {
         </div>
 
         <div className={styles.productInfo}>
-          <div className={styles.productHead}>
-            {product.sku && <span className={styles.skuChip}>арт. {product.sku}</span>}
-            <h1>{product.name}</h1>
-            <p className={styles.productPrice}>{formatMoney(product.retail_price)} ₽</p>
-            <div className={styles.productChips}>
-              {product.in_stock ? (
-                <span className={styles.inStockChip}>В наличии</span>
-              ) : (
-                <span className={styles.outBadge}>Нет в наличии</span>
-              )}
-              {Number(product.sold_count ?? 0) > 0 && (
-                <span className={styles.soldChip}>Продано {formatQuantity(product.sold_count!)}</span>
-              )}
-            </div>
-          </div>
+          <p className={styles.productPrice}>{formatMoney(product.retail_price)} ₽</p>
 
           {product.description?.trim() && (
             <div className={styles.descriptionBlock}>

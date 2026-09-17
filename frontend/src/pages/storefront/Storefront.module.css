@@ -648,12 +648,47 @@
   padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
 }
 
+.productHeadFull {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  order: 1;
+}
+
+.productHeadFull h1 {
+  margin: 0;
+  font-size: clamp(1.55rem, 3.5vw, 2.15rem);
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.productGallery {
+  order: 0;
+}
+
+.productInfo {
+  order: 2;
+}
+
 @media (min-width: 840px) {
   .productPage {
     grid-template-columns: 1.1fr 0.95fr;
     align-items: start;
-    gap: 36px;
+    gap: 20px 36px;
     padding-bottom: 56px;
+  }
+
+  .productHeadFull {
+    grid-column: 1 / -1;
+    order: 0;
+  }
+
+  .productGallery {
+    order: 1;
+  }
+
+  .productInfo {
+    order: 2;
   }
 }
 
