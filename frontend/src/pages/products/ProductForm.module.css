@@ -20,42 +20,8 @@
   opacity: 0.72;
 }
 
-.layoutGrid {
-  display: grid;
-  grid-template-columns: minmax(280px, 380px) 1fr;
-  align-items: start;
-  gap: 16px;
-}
-
-.leftPane {
-  position: sticky;
-  top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.rightPane {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-width: 0;
-}
-
-.heroStacked {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-@media (max-width: 900px) {
-  .layoutGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .leftPane {
-    position: static;
-  }
+.heroEdit {
+  align-items: stretch;
 }
 
 .heroPhotoDrop {
@@ -122,103 +88,18 @@
   background: transparent;
 }
 
-.statRow {
-  display: flex;
-  align-items: stretch;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.statCell {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-  padding: 14px 16px;
-  border-right: 1px solid var(--border);
-}
-
-.statCell:last-child {
-  border-right: none;
-}
-
-.statLabelWithHint {
+.metricLabelWithHint {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.statLabel {
-  font-size: 12.5px;
+.metricHint {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.35;
   color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.statValue {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-  line-height: 1.2;
-}
-
-.statInput {
-  width: fit-content;
-  max-width: 100%;
-  border: none !important;
-  background: transparent !important;
-  padding: 0 !important;
-  box-shadow: none !important;
-  outline: none !important;
-  border-radius: 0 !important;
-  font: inherit;
-  font-size: 22px !important;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-  line-height: 1.2;
-  cursor: text;
-  border-bottom: 1.5px dashed var(--border) !important;
-  transition: border-color 0.15s ease;
-}
-
-.statInput:hover {
-  border-bottom-color: var(--accent) !important;
-}
-
-.statInput:focus {
-  border-bottom-style: solid !important;
-  border-bottom-color: var(--accent) !important;
-  outline: none !important;
-  box-shadow: none !important;
-}
-
-.statInput::placeholder {
-  color: var(--text-muted);
-  font-weight: 700;
-}
-
-@media (max-width: 640px) {
-  .statRow {
-    flex-wrap: wrap;
-  }
-
-  .statCell {
-    flex: 1 1 50%;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .statCell:nth-child(2n) {
-    border-right: none;
-  }
+  font-weight: 400;
 }
 
 .fieldLabelWithHint {
@@ -332,15 +213,15 @@
 }
 
 .priceEdit {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  padding: 10px 14px;
+  max-width: 280px;
+  padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--accent-soft);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  transition: border-color 0.15s ease;
 }
 
 .priceEdit:hover,
@@ -349,7 +230,8 @@
 }
 
 .priceEdit:focus-within {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .priceEdit input {
@@ -360,11 +242,10 @@
   box-shadow: none !important;
   outline: none !important;
   font: inherit;
-  font-size: 28px !important;
-  font-weight: 750;
-  letter-spacing: -0.02em;
+  font-size: 22px !important;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--accent);
+  color: var(--text);
 }
 
 .priceEdit input:focus {
@@ -373,9 +254,9 @@
 }
 
 .priceSuffix {
-  font-size: 22px;
-  font-weight: 750;
-  color: var(--accent);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-muted);
 }
 
 .metaEdit {
