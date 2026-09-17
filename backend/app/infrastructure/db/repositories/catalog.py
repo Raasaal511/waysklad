@@ -114,7 +114,11 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
         model.retail_price = product.retail_price.amount
         model.min_stock = product.min_stock
         model.photo = product.photo
+        model.description = product.description
+        model.storefront_photos = list(product.storefront_photos)
         model.show_on_storefront = product.show_on_storefront
+        model.storefront_min_qty = product.storefront_min_qty
+        model.storefront_step_qty = product.storefront_step_qty
         # варианты: существующие обновляются, новые добавляются, убранные удаляются (delete-orphan)
         existing = {v.id: v for v in model.variants}
         updated = []
