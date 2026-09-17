@@ -66,3 +66,6 @@ class ProductVariantModel(Base, TenantMixin):
     size: Mapped[str] = mapped_column(String(50), default="")
     color: Mapped[str] = mapped_column(String(50), default="")
     barcode: Mapped[str | None] = mapped_column(String(32))
+    photo: Mapped[str] = mapped_column(String(500), default="")
+    # NULL — цена не переопределена, берётся retail_price товара
+    price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))

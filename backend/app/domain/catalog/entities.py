@@ -28,6 +28,9 @@ class ProductVariant:
     size: str = ""
     color: str = ""
     barcode: Barcode | None = None
+    photo: str = ""
+    # None — цена варианта не задана отдельно, берётся retail_price товара
+    price: Money | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -35,6 +38,8 @@ class ProductVariant:
             "size": self.size,
             "color": self.color,
             "barcode": self.barcode.value if self.barcode else None,
+            "photo": self.photo,
+            "price": str(self.price.amount) if self.price else None,
         }
 
     @classmethod
@@ -44,6 +49,8 @@ class ProductVariant:
             size=d["size"],
             color=d["color"],
             barcode=Barcode(d["barcode"]) if d["barcode"] else None,
+            photo=d.get("photo", ""),
+            price=Money.of(d["price"]) if d.get("price") else None,
         )
 
 

@@ -42,6 +42,8 @@ class ProductVariantMapper:
             size=variant.size,
             color=variant.color,
             barcode=variant.barcode.value if variant.barcode else None,
+            photo=variant.photo,
+            price=variant.price.amount if variant.price else None,
         )
 
     @staticmethod
@@ -51,6 +53,8 @@ class ProductVariantMapper:
             size=model.size,
             color=model.color,
             barcode=Barcode(model.barcode) if model.barcode else None,
+            photo=model.photo,
+            price=Money(model.price) if model.price is not None else None,
         )
 
 

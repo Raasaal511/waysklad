@@ -124,6 +124,8 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
                 variant_model.size = variant.size
                 variant_model.color = variant.color
                 variant_model.barcode = variant.barcode.value if variant.barcode else None
+                variant_model.photo = variant.photo
+                variant_model.price = variant.price.amount if variant.price else None
                 updated.append(variant_model)
             else:
                 updated.append(ProductVariantMapper.to_orm(variant, self._tenant))
