@@ -37,7 +37,6 @@ import {
   IconShoppingBag,
   IconCheck,
   IconWand,
-  IconSparkles,
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
@@ -747,13 +746,8 @@ export function ProductForm({
 
         <section className={`${styles.showcaseCard} ${detail.reveal}`} style={{ '--reveal-delay': '110ms' } as CSSProperties}>
           <div className={styles.showcaseHead}>
-            <span className={styles.showcaseIcon}>
-              <IconSparkles size={18} stroke={1.8} />
-            </span>
-            <div>
-              <h3 className={detail.sectionTitle}>Витрина</h3>
-              <p className={styles.showcaseSubtitle}>Как товар увидит покупатель в магазине</p>
-            </div>
+            <h3 className={detail.sectionTitle}>Витрина</h3>
+            <p className={styles.showcaseSubtitle}>Как товар увидит покупатель в магазине</p>
           </div>
 
           <div className={styles.showcaseBody}>
