@@ -174,7 +174,11 @@ class MarketplaceProductPageResponse(BaseModel):
             is_new=result.is_new,
             is_hit=result.is_hit,
             product=StorefrontProductDetailResponse.from_entity(
-                result.product, result.in_stock, result.sold_count, result.rating
+                result.product, result.in_stock, result.sold_count, result.rating,
+                shop_slug=result.shop_slug, shop_name=result.shop_name, shop_logo=result.shop_logo,
+                # рейтинг магазина целиком здесь не считается (см. MarketplaceProductResult) —
+                # у карточки маркетплейса уже есть свои shop_* поля верхнего уровня для шапки,
+                # nested product.shop заполнен консистентно по форме, но без числа отзывов магазина
             ),
         )
 

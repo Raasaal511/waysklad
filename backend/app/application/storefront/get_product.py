@@ -52,6 +52,11 @@ class StorefrontProductResult:
     sold_count: Decimal
     rating: ProductRatingAggregate
     views_90d: int
+    shop_slug: str = ""
+    shop_logo: str = ""
+    # рейтинг МАГАЗИНА (по всем товарам), не путать с rating — рейтингом
+    # именно этого товара; короткая версия для шапки карточки (промпт B2 п.3)
+    shop_rating: ProductRatingAggregate = _EMPTY_RATING
 
     def to_json(self) -> dict:
         return {
@@ -82,6 +87,12 @@ class StorefrontProductResult:
                 "average_rating": self.rating.average_rating,
                 "reviews_count": self.rating.reviews_count,
             },
+            "shop_slug": self.shop_slug,
+            "shop_logo": self.shop_logo,
+            "shop_rating": {
+                "average_rating": self.shop_rating.average_rating,
+                "reviews_count": self.shop_rating.reviews_count,
+            },
             # views_90d намеренно не кешируется по значению — просмотры не должны
             # инвалидировать кэш карточки (промпт B1 п.5), поэтому пересчитывается
             # заново при каждом обращении, даже если остальной ответ взят из кеша
@@ -91,6 +102,7 @@ class StorefrontProductResult:
     def from_json(cls, d: dict) -> "StorefrontProductResult":
         rating_d = d.get("rating")
         category_d = d.get("category")
+        shop_rating_d = d.get("shop_rating")
         return cls(
             shop_name=d["shop_name"],
             product=Product.from_dict(d["product"]),
@@ -120,6 +132,9 @@ class StorefrontProductResult:
             sold_count=Decimal(d.get("sold_count", "0")),
             rating=ProductRatingAggregate(**rating_d) if rating_d else _EMPTY_RATING,
             views_90d=0,  # пересчитывается заново после чтения из кеша, см. execute()
+            shop_slug=d.get("shop_slug", ""),
+            shop_logo=d.get("shop_logo", ""),
+            shop_rating=ProductRatingAggregate(**shop_rating_d) if shop_rating_d else _EMPTY_RATING,
         )
 
 
@@ -157,6 +172,7 @@ class GetStorefrontProductUseCase:
             stock_items = await uow.stock.list_all()
             sold_counts = await uow.analytics.sold_count_by_products([product.id])
             ratings = await uow.reviews.rating_by_products([product.id])
+            shop_rating = await uow.reviews.rating_for_shop()
             all_categories = await uow.categories.list()
 
         # остаток товара целиком — сумма по вариантам и позициям без варианта,
@@ -215,6 +231,9 @@ class GetStorefrontProductUseCase:
             sold_count=sold_count,
             rating=rating,
             views_90d=0,  # пересчитывается в execute() поверх cache-aside, см. ниже
+            shop_slug=cmd.slug,
+            shop_logo=tenant.logo,
+            shop_rating=shop_rating,
         )
 
     async def _views_90d(self, uow: SqlAlchemyUnitOfWork, product_id: int) -> int:
