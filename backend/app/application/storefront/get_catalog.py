@@ -60,6 +60,7 @@ class StorefrontCatalogResult:
     available_colors: list[str]  # для фильтра «Цвет»
     rating_by_product_id: dict[int, ProductRatingAggregate]  # только видимые отзывы
     total: int
+    min_order_total: Decimal | None = None  # Tenant.storefront_min_order_total (промпт B2 п.4)
 
     def to_json(self) -> dict:
         return {
@@ -81,6 +82,7 @@ class StorefrontCatalogResult:
                 for pid, r in self.rating_by_product_id.items()
             },
             "total": self.total,
+            "min_order_total": str(self.min_order_total) if self.min_order_total is not None else None,
         }
 
     @classmethod
@@ -109,6 +111,7 @@ class StorefrontCatalogResult:
                 for pid, r in d.get("rating_by_product_id", {}).items()
             },
             total=d["total"],
+            min_order_total=Decimal(d["min_order_total"]) if d.get("min_order_total") is not None else None,
         )
 
 
@@ -206,6 +209,7 @@ class GetStorefrontCatalogUseCase:
             available_colors=available_colors,
             rating_by_product_id=rating_by_product_id,
             total=total,
+            min_order_total=tenant.storefront_min_order_total,
         )
 
     execute = cached_use_case(
