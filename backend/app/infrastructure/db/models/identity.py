@@ -27,6 +27,7 @@ class TenantModel(Base, TimestampMixin):
     city: Mapped[str | None] = mapped_column(String(100))
     is_verified: Mapped[bool] = mapped_column(default=False)
     logo: Mapped[str] = mapped_column(String(500), default="")
+    storefront_show_stock_qty: Mapped[bool] = mapped_column(default=False)
 
 
 class WarehouseModel(Base, TenantMixin, TimestampMixin):

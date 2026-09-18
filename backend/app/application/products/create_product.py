@@ -21,6 +21,7 @@ class VariantInput:
     color: str = ""
     barcode: str | None = None
     price: Decimal | None = None
+    name: str = ""
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,7 @@ class CreateProductCommand:
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
     description: str = ""
+    warranty_text: str = ""
     show_on_storefront: bool = False
     storefront_min_qty: Decimal | None = None
     storefront_step_qty: Decimal | None = None
@@ -96,6 +98,7 @@ class CreateProductUseCase:
                 category_id=cmd.category_id,
                 min_stock=cmd.min_stock,
                 description=cmd.description,
+                warranty_text=cmd.warranty_text,
                 show_on_storefront=cmd.show_on_storefront,
                 storefront_min_qty=cmd.storefront_min_qty,
                 storefront_step_qty=cmd.storefront_step_qty,
@@ -106,6 +109,7 @@ class CreateProductUseCase:
                         color=v.color,
                         barcode=Barcode(v.barcode) if v.barcode else None,
                         price=Money.of(v.price) if v.price is not None else None,
+                        name=v.name,
                     )
                     for v in cmd.variants
                 ],

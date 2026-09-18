@@ -87,6 +87,7 @@ class ProductModel(Base, TenantMixin, TimestampMixin):
     min_stock: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=0)  # порог «заканчивается»
     photo: Mapped[str] = mapped_column(String(500), default="")
     description: Mapped[str] = mapped_column(Text, default="")
+    warranty_text: Mapped[str] = mapped_column(Text, default="")
     storefront_photos: Mapped[list[str]] = mapped_column(JSON, default=list)
     is_active: Mapped[bool] = mapped_column(default=True)
     show_on_storefront: Mapped[bool] = mapped_column(default=False)
@@ -112,3 +113,4 @@ class ProductVariantModel(Base, TenantMixin):
     photo: Mapped[str] = mapped_column(String(500), default="")
     # NULL — цена не переопределена, берётся retail_price товара
     price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    name: Mapped[str] = mapped_column(String(100), default="")

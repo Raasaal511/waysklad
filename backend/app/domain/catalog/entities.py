@@ -5,6 +5,18 @@ from app.domain.catalog.barcode import Barcode
 from app.domain.common.money import Money
 from app.domain.common.quantity import UNITS, Unit
 
+_LOW_STOCK_FALLBACK_THRESHOLD = Decimal("3")  # min_stock не задан (=0) — считаем "мало" на глаз
+
+
+def stock_level(quantity: Decimal, min_stock: Decimal) -> str:
+    """"out" | "low" | "in" — для публичной витрины (промпт B1 п.2), где точный
+    остаток обычно скрыт и покупателю показывают только уровень. "low" — остаток
+    положительный и не выше min_stock (или 3, если владелец не задал min_stock)."""
+    if quantity <= 0:
+        return "out"
+    threshold = min_stock if min_stock > 0 else _LOW_STOCK_FALLBACK_THRESHOLD
+    return "low" if quantity <= threshold else "in"
+
 
 @dataclass
 class Category:
@@ -44,6 +56,9 @@ class ProductVariant:
     photo: str = ""
     # None — цена варианта не задана отдельно, берётся retail_price товара
     price: Money | None = None
+    # своё название варианта («Aurum») — если пусто, витрина строит display_name
+    # из size/color (см. StorefrontProductVariantResponse.display_name)
+    name: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -53,6 +68,7 @@ class ProductVariant:
             "barcode": self.barcode.value if self.barcode else None,
             "photo": self.photo,
             "price": str(self.price.amount) if self.price else None,
+            "name": self.name,
         }
 
     @classmethod
@@ -64,6 +80,7 @@ class ProductVariant:
             barcode=Barcode(d["barcode"]) if d["barcode"] else None,
             photo=d.get("photo", ""),
             price=Money.of(d["price"]) if d.get("price") else None,
+            name=d.get("name", ""),  # старые записи кеша — без поля, см. промпт B1 п.5
         )
 
 
@@ -82,6 +99,7 @@ class Product:
     category_id: int | None = None
     photo: str = ""
     description: str = ""  # для карточки товара на витрине, не складская характеристика
+    warranty_text: str = ""  # «Гарантии» на витрине — тот же характер поля, что description
     # галерея для карточки товара на витрине — независима от складского photo
     # (то и другое можно загрузить и менять по отдельности)
     storefront_photos: list[str] = field(default_factory=list)
@@ -133,6 +151,7 @@ class Product:
             "category_id": self.category_id,
             "photo": self.photo,
             "description": self.description,
+            "warranty_text": self.warranty_text,
             "storefront_photos": list(self.storefront_photos),
             "min_stock": str(self.min_stock),
             "show_on_storefront": self.show_on_storefront,
@@ -161,6 +180,7 @@ class Product:
             category_id=d["category_id"],
             photo=d["photo"],
             description=d.get("description", ""),
+            warranty_text=d.get("warranty_text", ""),  # старые записи кеша — без поля
             storefront_photos=d.get("storefront_photos", []),
             min_stock=Decimal(d["min_stock"]),
             show_on_storefront=d["show_on_storefront"],

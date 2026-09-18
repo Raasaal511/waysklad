@@ -65,6 +65,7 @@ class VariantCreateRequest(BaseModel):
     color: str = ""
     barcode: str | None = None
     price: Decimal | None = None
+    name: str = Field("", max_length=100)
 
 
 class VariantUpdateRequest(BaseModel):
@@ -74,6 +75,7 @@ class VariantUpdateRequest(BaseModel):
     barcode: str | None = None
     photo: str = ""
     price: Decimal | None = None
+    name: str = Field("", max_length=100)
 
 
 class ProductCreateRequest(BaseModel):
@@ -87,6 +89,7 @@ class ProductCreateRequest(BaseModel):
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
     description: str = ""
+    warranty_text: str = Field("", max_length=5000)
     show_on_storefront: bool = False
     storefront_min_qty: Decimal | None = None
     storefront_step_qty: Decimal | None = None
@@ -106,11 +109,14 @@ class ProductCreateRequest(BaseModel):
             category_id=self.category_id,
             min_stock=self.min_stock,
             description=self.description,
+            warranty_text=self.warranty_text,
             show_on_storefront=self.show_on_storefront,
             storefront_min_qty=self.storefront_min_qty,
             storefront_step_qty=self.storefront_step_qty,
             variants=[
-                VariantInput(size=v.size, color=v.color, barcode=v.barcode, price=v.price)
+                VariantInput(
+                    size=v.size, color=v.color, barcode=v.barcode, price=v.price, name=v.name
+                )
                 for v in self.variants
             ],
             initial_stock_warehouse_id=self.initial_stock_warehouse_id,
@@ -130,6 +136,7 @@ class ProductUpdateRequest(BaseModel):
     min_stock: Decimal = Decimal("0")
     photo: str = ""
     description: str = ""
+    warranty_text: str = Field("", max_length=5000)
     show_on_storefront: bool = False
     storefront_min_qty: Decimal | None = None
     storefront_step_qty: Decimal | None = None
@@ -149,13 +156,14 @@ class ProductUpdateRequest(BaseModel):
             min_stock=self.min_stock,
             photo=self.photo,
             description=self.description,
+            warranty_text=self.warranty_text,
             show_on_storefront=self.show_on_storefront,
             storefront_min_qty=self.storefront_min_qty,
             storefront_step_qty=self.storefront_step_qty,
             variants=[
                 UpdateVariantInput(
                     id=v.id, size=v.size, color=v.color, barcode=v.barcode,
-                    photo=v.photo, price=v.price,
+                    photo=v.photo, price=v.price, name=v.name,
                 )
                 for v in self.variants
             ],
@@ -397,6 +405,7 @@ class VariantResponse(BaseModel):
     barcode: str | None
     photo: str
     price: Decimal | None
+    name: str
 
 
 class ProductResponse(BaseModel):
@@ -413,6 +422,7 @@ class ProductResponse(BaseModel):
     min_stock: Decimal
     photo: str
     description: str
+    warranty_text: str
     storefront_photos: list[str]
     show_on_storefront: bool
     storefront_min_qty: Decimal | None
@@ -437,6 +447,7 @@ class ProductResponse(BaseModel):
             min_stock=product.min_stock,
             photo=product.photo,
             description=product.description,
+            warranty_text=product.warranty_text,
             storefront_photos=list(product.storefront_photos),
             show_on_storefront=product.show_on_storefront,
             storefront_min_qty=product.storefront_min_qty,
@@ -449,6 +460,7 @@ class ProductResponse(BaseModel):
                     barcode=v.barcode.value if v.barcode else None,
                     photo=v.photo,
                     price=v.price.amount if v.price else None,
+                    name=v.name,
                 )
                 for v in product.variants
             ],

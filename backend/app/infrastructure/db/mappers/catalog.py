@@ -52,6 +52,7 @@ class ProductVariantMapper:
             barcode=variant.barcode.value if variant.barcode else None,
             photo=variant.photo,
             price=variant.price.amount if variant.price else None,
+            name=variant.name,
         )
 
     @staticmethod
@@ -63,6 +64,7 @@ class ProductVariantMapper:
             barcode=Barcode(model.barcode) if model.barcode else None,
             photo=model.photo,
             price=Money(model.price) if model.price is not None else None,
+            name=model.name,
         )
 
 
@@ -84,6 +86,7 @@ class ProductMapper:
             min_stock=product.min_stock,
             photo=product.photo,
             description=product.description,
+            warranty_text=product.warranty_text,
             storefront_photos=list(product.storefront_photos),
             show_on_storefront=product.show_on_storefront,
             storefront_min_qty=product.storefront_min_qty,
@@ -108,6 +111,7 @@ class ProductMapper:
             category_id=model.category_id,
             photo=model.photo,
             description=model.description,
+            warranty_text=model.warranty_text,
             storefront_photos=list(model.storefront_photos or []),
             min_stock=model.min_stock,
             show_on_storefront=model.show_on_storefront,

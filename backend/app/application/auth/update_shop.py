@@ -22,6 +22,7 @@ class UpdateShopCommand:
     # PATCH-принцип, что у summary_*/storefront_enabled); явного способа
     # сбросить уже выбранный город на null сейчас нет — не было в промпте
     city: str | None = None
+    storefront_show_stock_qty: bool | None = None
 
 
 class UpdateShopUseCase:
@@ -55,6 +56,8 @@ class UpdateShopUseCase:
                 tenant.storefront_enabled = cmd.storefront_enabled
             if cmd.city is not None:
                 tenant.city = cmd.city
+            if cmd.storefront_show_stock_qty is not None:
+                tenant.storefront_show_stock_qty = cmd.storefront_show_stock_qty
             tenant = await uow.tenants.save(tenant)
             await uow.audit.add(AuditEntry.record(actor, "shop.update", tenant.id))
             await uow.commit()

@@ -135,6 +135,7 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
         model.min_stock = product.min_stock
         model.photo = product.photo
         model.description = product.description
+        model.warranty_text = product.warranty_text
         model.storefront_photos = list(product.storefront_photos)
         model.show_on_storefront = product.show_on_storefront
         model.storefront_min_qty = product.storefront_min_qty
@@ -150,6 +151,7 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
                 variant_model.barcode = variant.barcode.value if variant.barcode else None
                 variant_model.photo = variant.photo
                 variant_model.price = variant.price.amount if variant.price else None
+                variant_model.name = variant.name
                 updated.append(variant_model)
             else:
                 updated.append(ProductVariantMapper.to_orm(variant, self._tenant))

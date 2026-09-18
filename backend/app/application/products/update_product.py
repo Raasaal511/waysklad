@@ -21,6 +21,7 @@ class UpdateVariantInput:
     photo: str = ""
     # None — цена не переопределена, берётся retail_price товара
     price: Decimal | None = None
+    name: str = ""
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class UpdateProductCommand:
     min_stock: Decimal = Decimal("0")
     photo: str = ""
     description: str = ""
+    warranty_text: str = ""
     show_on_storefront: bool = False
     storefront_min_qty: Decimal | None = None
     storefront_step_qty: Decimal | None = None
@@ -101,6 +103,7 @@ class UpdateProductUseCase:
                 min_stock=cmd.min_stock,
                 photo=cmd.photo,
                 description=cmd.description,
+                warranty_text=cmd.warranty_text,
                 show_on_storefront=cmd.show_on_storefront,
                 storefront_min_qty=cmd.storefront_min_qty,
                 storefront_step_qty=cmd.storefront_step_qty,
@@ -112,6 +115,7 @@ class UpdateProductUseCase:
                         barcode=Barcode(v.barcode) if v.barcode else None,
                         photo=v.photo,
                         price=Money.of(v.price) if v.price is not None else None,
+                        name=v.name,
                     )
                     for v in cmd.variants
                 ],

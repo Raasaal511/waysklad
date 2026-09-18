@@ -19,6 +19,7 @@ class TenantMapper:
             city=tenant.city,
             is_verified=tenant.is_verified,
             logo=tenant.logo,
+            storefront_show_stock_qty=tenant.storefront_show_stock_qty,
         )
 
     @staticmethod
@@ -37,6 +38,7 @@ class TenantMapper:
             city=model.city,
             is_verified=model.is_verified,
             logo=model.logo,
+            storefront_show_stock_qty=model.storefront_show_stock_qty,
         )
 
 

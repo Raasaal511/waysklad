@@ -63,6 +63,7 @@ class SqlAlchemyTenantRepository(SqlAlchemyRepository, ITenantRepository):
         model.summary_daily_hour_msk = tenant.summary_daily_hour_msk
         model.city = tenant.city
         model.logo = tenant.logo
+        model.storefront_show_stock_qty = tenant.storefront_show_stock_qty
         # is_verified намеренно не трогаем здесь — меняется только через
         # set_tenant_verified (админ), владелец через save() повлиять не может
         await self._session.flush()
