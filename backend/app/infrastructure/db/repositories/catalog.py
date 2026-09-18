@@ -53,6 +53,23 @@ class SqlAlchemyCategoryRepository(SqlAlchemyRepository, ICategoryRepository):
             raise NotFoundError(f"Категория {category_id} не найдена")
         return CategoryMapper.to_entity(model)
 
+    async def save(self, category: Category) -> Category:
+        model = (
+            await self._session.execute(
+                select(CategoryModel).where(
+                    CategoryModel.tenant_id == self._tenant,
+                    CategoryModel.id == category.id,
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            raise NotFoundError(f"Категория {category.id} не найдена")
+        model.name = category.name
+        model.parent_id = category.parent_id
+        model.platform_category_id = category.platform_category_id
+        await self._session.flush()
+        return category
+
     async def list(self) -> list[Category]:
         models = (
             await self._session.execute(
@@ -112,6 +129,9 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
         model.unit_code = product.unit.code
         model.purchase_price = product.purchase_price.amount
         model.retail_price = product.retail_price.amount
+        model.compare_at_price = (
+            product.compare_at_price.amount if product.compare_at_price is not None else None
+        )
         model.min_stock = product.min_stock
         model.photo = product.photo
         model.description = product.description

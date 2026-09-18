@@ -11,13 +11,26 @@ class Category:
     id: int | None
     name: str
     parent_id: int | None = None
+    # выбирается владельцем — привязка к общему справочнику категорий платформы
+    # (app.domain.platform.entities.PlatformCategory), None — не сопоставлена
+    platform_category_id: int | None = None
 
     def to_dict(self) -> dict:
-        return {"id": self.id, "name": self.name, "parent_id": self.parent_id}
+        return {
+            "id": self.id,
+            "name": self.name,
+            "parent_id": self.parent_id,
+            "platform_category_id": self.platform_category_id,
+        }
 
     @classmethod
     def from_dict(cls, d: dict) -> "Category":
-        return cls(id=d["id"], name=d["name"], parent_id=d["parent_id"])
+        return cls(
+            id=d["id"],
+            name=d["name"],
+            parent_id=d["parent_id"],
+            platform_category_id=d.get("platform_category_id"),
+        )
 
 
 @dataclass
@@ -61,6 +74,9 @@ class Product:
     unit: Unit
     purchase_price: Money  # закупочная — видна только владельцу
     retail_price: Money
+    # обычная розничная скидка (не оптовая) — «старая цена», зачёркнутая на витрине;
+    # None — скидки нет. Должна быть строго больше retail_price (см. UpdateProductUseCase)
+    compare_at_price: Money | None = None
     sku: str = ""
     barcode: Barcode | None = None
     category_id: int | None = None
@@ -81,6 +97,27 @@ class Product:
     def margin(self) -> Money:
         return self.retail_price - self.purchase_price
 
+    @property
+    def old_price(self) -> Money | None:
+        """Старая цена для витрины — None и когда скидки не задано, и когда
+        retail_price позже подняли выше compare_at_price (скидка считается
+        отсутствующей, но само поле в БД не трогаем, см. промпт M-B1 п.4), и
+        когда скидка есть, но меньше 3% (old_price и discount_percent всегда
+        показываются/скрываются вместе — см. discount_percent)."""
+        return self.compare_at_price if self.discount_percent is not None else None
+
+    @property
+    def discount_percent(self) -> int | None:
+        """Округление вниз, показывать только при >= 3% — иначе визуальный шум
+        от копеечной разницы, которую владелец мог выставить случайно."""
+        if self.compare_at_price is None or self.compare_at_price.amount <= self.retail_price.amount:
+            return None
+        percent = int(
+            (self.compare_at_price.amount - self.retail_price.amount)
+            / self.compare_at_price.amount * 100
+        )
+        return percent if percent >= 3 else None
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,
@@ -88,6 +125,9 @@ class Product:
             "unit_code": self.unit.code,
             "purchase_price": str(self.purchase_price.amount),
             "retail_price": str(self.retail_price.amount),
+            "compare_at_price": str(self.compare_at_price.amount)
+            if self.compare_at_price is not None
+            else None,
             "sku": self.sku,
             "barcode": self.barcode.value if self.barcode else None,
             "category_id": self.category_id,
@@ -113,6 +153,9 @@ class Product:
             unit=UNITS[d["unit_code"]],
             purchase_price=Money(Decimal(d["purchase_price"])),
             retail_price=Money(Decimal(d["retail_price"])),
+            compare_at_price=Money(Decimal(d["compare_at_price"]))
+            if d.get("compare_at_price") is not None
+            else None,
             sku=d["sku"],
             barcode=Barcode(d["barcode"]) if d["barcode"] else None,
             category_id=d["category_id"],

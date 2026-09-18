@@ -12,6 +12,7 @@ from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 class CreateCategoryCommand:
     name: str
     parent_id: int | None = None
+    platform_category_id: int | None = None
 
 
 class CreateCategoryUseCase:
@@ -23,7 +24,12 @@ class CreateCategoryUseCase:
         require(actor, Permission.PRODUCTS_MANAGE)
 
         async with self._uow as uow:
-            category = Category(id=None, name=cmd.name, parent_id=cmd.parent_id)
+            category = Category(
+                id=None,
+                name=cmd.name,
+                parent_id=cmd.parent_id,
+                platform_category_id=cmd.platform_category_id,
+            )
             await uow.categories.add(category)
             await uow.audit.add(
                 AuditEntry.record(actor, "category.create", None, name=category.name)

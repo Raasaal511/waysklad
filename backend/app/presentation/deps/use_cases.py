@@ -22,6 +22,7 @@ from app.application.auth.list_employees import ListEmployeesUseCase
 from app.application.auth.login import LoginUseCase
 from app.application.auth.logout_all import LogoutAllUseCase
 from app.application.auth.register_shop import RegisterShopUseCase
+from app.application.auth.set_shop_logo import SetShopLogoUseCase
 from app.application.auth.update_employee import UpdateEmployeeUseCase
 from app.application.auth.update_shop import UpdateShopUseCase
 from app.application.counterparties.create_client import CreateClientUseCase
@@ -69,6 +70,8 @@ from app.application.inventory.update_warehouse_details import (
 )
 from app.application.inventory.write_off import WriteOffUseCase
 from app.application.marketplace.get_product import GetMarketplaceProductUseCase
+from app.application.marketplace.list_cities import ListCitiesUseCase
+from app.application.marketplace.list_platform_categories import ListPlatformCategoriesUseCase
 from app.application.marketplace.list_products import ListMarketplaceProductsUseCase
 from app.application.notifications.list_notifications import ListNotificationsUseCase
 from app.application.notifications.mark_read import (
@@ -86,6 +89,7 @@ from app.application.orders.update_order import UpdateOrderUseCase
 from app.application.products.add_storefront_photo import AddStorefrontPhotoUseCase
 from app.application.products.apply_import import ApplyProductImportUseCase
 from app.application.products.create_category import CreateCategoryUseCase
+from app.application.products.update_category import UpdateCategoryUseCase
 from app.application.products.create_product import CreateProductUseCase
 from app.application.products.create_unit import CreateUnitUseCase
 from app.application.products.delete_product import DeleteProductUseCase
@@ -243,6 +247,7 @@ get_update_product = _with_uow_and_cache(UpdateProductUseCase)
 get_delete_product = _with_uow_and_cache(DeleteProductUseCase)
 get_create_unit = _with_uow(CreateUnitUseCase)
 get_create_category = _with_uow_and_cache(CreateCategoryUseCase)
+get_update_category = _with_uow_and_cache(UpdateCategoryUseCase)
 get_import_products = _with_uow_and_cache(ImportProductsUseCase)
 get_preview_import_products = _with_uow(PreviewProductsUseCase)
 
@@ -327,6 +332,12 @@ get_missed_sales = _with_uow(GetMissedSalesUseCase)
 get_apply_offline_sales = _with_uow_and_cache(ApplyOfflineSalesUseCase)
 get_connect_telegram = _with_uow(ConnectTelegramUseCase)
 get_update_shop = _with_uow_and_cache(UpdateShopUseCase)
+
+
+def get_set_shop_logo(
+    uow: UowDep, storage: FileStorageDep, cache: CacheDep
+) -> SetShopLogoUseCase:
+    return SetShopLogoUseCase(uow, storage, cache)
 get_mark_notification_read = _with_uow(MarkNotificationReadUseCase)
 get_mark_all_notifications_read = _with_uow(MarkAllNotificationsReadUseCase)
 get_list_notifications = _with_uow(ListNotificationsUseCase)
@@ -348,6 +359,16 @@ def get_marketplace_product(
     factory: SessionFactoryDep, cache: CacheDep
 ) -> GetMarketplaceProductUseCase:
     return GetMarketplaceProductUseCase(factory, cache)
+
+
+def get_list_platform_categories(
+    factory: SessionFactoryDep, cache: CacheDep
+) -> ListPlatformCategoriesUseCase:
+    return ListPlatformCategoriesUseCase(factory, cache)
+
+
+def get_list_cities(factory: SessionFactoryDep, cache: CacheDep) -> ListCitiesUseCase:
+    return ListCitiesUseCase(factory, cache)
 
 
 def get_storefront_product(
@@ -441,6 +462,7 @@ UpdateProductDep = Annotated[UpdateProductUseCase, Depends(get_update_product)]
 DeleteProductDep = Annotated[DeleteProductUseCase, Depends(get_delete_product)]
 CreateUnitDep = Annotated[CreateUnitUseCase, Depends(get_create_unit)]
 CreateCategoryDep = Annotated[CreateCategoryUseCase, Depends(get_create_category)]
+UpdateCategoryDep = Annotated[UpdateCategoryUseCase, Depends(get_update_category)]
 ImportProductsDep = Annotated[ImportProductsUseCase, Depends(get_import_products)]
 PreviewImportProductsDep = Annotated[PreviewProductsUseCase, Depends(get_preview_import_products)]
 GenerateBarcodeDep = Annotated[GenerateBarcodeUseCase, Depends(get_generate_barcode)]
@@ -538,6 +560,7 @@ ApplyOfflineSalesDep = Annotated[
 ]
 ConnectTelegramDep = Annotated[ConnectTelegramUseCase, Depends(get_connect_telegram)]
 UpdateShopDep = Annotated[UpdateShopUseCase, Depends(get_update_shop)]
+SetShopLogoDep = Annotated[SetShopLogoUseCase, Depends(get_set_shop_logo)]
 ChangePasswordDep = Annotated[ChangePasswordUseCase, Depends(get_change_password)]
 LogoutAllDep = Annotated[LogoutAllUseCase, Depends(get_logout_all)]
 CreateTaskDep = Annotated[CreateTaskUseCase, Depends(get_create_task)]
@@ -563,6 +586,10 @@ ListMarketplaceProductsDep = Annotated[
 GetMarketplaceProductDep = Annotated[
     GetMarketplaceProductUseCase, Depends(get_marketplace_product)
 ]
+ListPlatformCategoriesDep = Annotated[
+    ListPlatformCategoriesUseCase, Depends(get_list_platform_categories)
+]
+ListCitiesDep = Annotated[ListCitiesUseCase, Depends(get_list_cities)]
 GetStorefrontProductDep = Annotated[
     GetStorefrontProductUseCase, Depends(get_storefront_product)
 ]

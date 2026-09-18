@@ -38,6 +38,7 @@ from app.presentation.deps import (
     SetStorefrontPhotosDep,
     SetVariantPhotoDep,
     ShowPurchaseDep,
+    UpdateCategoryDep,
     UpdateProductDep,
 )
 from app.presentation.audit.schemas import AuditEntryResponse
@@ -46,6 +47,7 @@ from app.presentation.products.schemas import (
     ApplyImportResponse,
     CategoryCreateRequest,
     CategoryResponse,
+    CategoryUpdateRequest,
     GenerateBarcodeResponse,
     ImportProductsResponse,
     PreviewProductsResponse,
@@ -213,6 +215,14 @@ async def create_category(
 @router.get("/categories")
 async def list_categories(use_case: ListCategoriesDep) -> list[CategoryResponse]:
     return [CategoryResponse.from_entity(c) for c in await use_case.execute()]
+
+
+@router.put("/categories/{category_id}")
+async def update_category(
+    category_id: int, body: CategoryUpdateRequest, actor: ActorDep, use_case: UpdateCategoryDep
+) -> CategoryResponse:
+    category = await use_case.execute(actor, body.to_command(category_id))
+    return CategoryResponse.from_entity(category)
 
 
 @router.get("")

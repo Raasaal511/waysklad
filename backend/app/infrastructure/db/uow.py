@@ -29,6 +29,7 @@ from app.infrastructure.db.repositories.inventory import (
 from app.infrastructure.db.repositories.marketplace import SqlAlchemyMarketplaceProductRepository
 from app.infrastructure.db.repositories.notifications import SqlAlchemyNotificationRepository
 from app.infrastructure.db.repositories.orders import SqlAlchemyOrderRepository
+from app.infrastructure.db.repositories.platform import SqlAlchemyPlatformCategoryRepository
 from app.infrastructure.db.repositories.reviews import SqlAlchemyReviewRepository
 from app.infrastructure.db.repositories.sales import (
     SqlAlchemySaleRepository,
@@ -79,6 +80,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.audit = SqlAlchemyAuditRepository(self)
         self.analytics = SqlAlchemyAnalyticsRepository(self)
         self.marketplace_products = SqlAlchemyMarketplaceProductRepository(self.session)
+        self.platform_categories = SqlAlchemyPlatformCategoryRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:

@@ -1,8 +1,13 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.application.admin.get_server_status import MetricsPoint, RecentTenant, ServerStatusResult
 from app.application.admin.get_tenant_detail import TenantDetail
 from app.application.admin.list_tenants import TenantListItem
+from app.application.admin.platform_categories import (
+    CreatePlatformCategoryCommand,
+    UpdatePlatformCategoryCommand,
+)
+from app.domain.platform.entities import PlatformCategory
 
 
 class AdminLoginRequest(BaseModel):
@@ -23,6 +28,7 @@ class TenantListItemResponse(BaseModel):
     slug: str | None
     storefront_enabled: bool
     is_suspended: bool
+    is_verified: bool
     created_at: str
 
     @classmethod
@@ -33,6 +39,7 @@ class TenantListItemResponse(BaseModel):
             slug=item.slug,
             storefront_enabled=item.storefront_enabled,
             is_suspended=item.is_suspended,
+            is_verified=item.is_verified,
             created_at=item.created_at,
         )
 
@@ -52,6 +59,7 @@ class TenantDetailResponse(BaseModel):
     slug: str | None
     storefront_enabled: bool
     is_suspended: bool
+    is_verified: bool
     created_at: str
     owner: TenantOwnerResponse | None
     users_count: int
@@ -67,6 +75,7 @@ class TenantDetailResponse(BaseModel):
             slug=d.slug,
             storefront_enabled=d.storefront_enabled,
             is_suspended=d.is_suspended,
+            is_verified=d.is_verified,
             created_at=d.created_at,
             owner=TenantOwnerResponse(name=d.owner.name, phone=d.owner.phone) if d.owner else None,
             users_count=d.users_count,
@@ -147,3 +156,55 @@ class ErrorLogEntryResponse(BaseModel):
 
 class ErrorLogResponse(BaseModel):
     errors: list[ErrorLogEntryResponse]
+
+
+class PlatformCategoryCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    slug: str = Field(min_length=1, max_length=100)
+    sort_order: int = 0
+    parent_id: int | None = None
+
+    model_config = {"extra": "forbid"}
+
+    def to_command(self) -> CreatePlatformCategoryCommand:
+        return CreatePlatformCategoryCommand(
+            name=self.name, slug=self.slug, sort_order=self.sort_order, parent_id=self.parent_id
+        )
+
+
+class PlatformCategoryUpdateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    slug: str = Field(min_length=1, max_length=100)
+    sort_order: int = 0
+    is_active: bool = True
+    parent_id: int | None = None
+
+    model_config = {"extra": "forbid"}
+
+    def to_command(self, category_id: int) -> UpdatePlatformCategoryCommand:
+        return UpdatePlatformCategoryCommand(
+            category_id=category_id, name=self.name, slug=self.slug,
+            sort_order=self.sort_order, is_active=self.is_active, parent_id=self.parent_id,
+        )
+
+
+class PlatformCategoryResponse(BaseModel):
+    id: int
+    name: str
+    slug: str
+    image: str
+    sort_order: int
+    is_active: bool
+    parent_id: int | None
+
+    @classmethod
+    def from_entity(cls, category: PlatformCategory) -> "PlatformCategoryResponse":
+        return cls(
+            id=category.id,
+            name=category.name,
+            slug=category.slug,
+            image=category.image,
+            sort_order=category.sort_order,
+            is_active=category.is_active,
+            parent_id=category.parent_id,
+        )

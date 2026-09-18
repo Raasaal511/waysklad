@@ -1,7 +1,7 @@
 import dataclasses
 from dataclasses import asdict
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 
 from app.application.admin.get_server_status import (
     MetricsPoint,
@@ -11,7 +11,16 @@ from app.application.admin.get_server_status import (
 )
 from app.application.admin.get_tenant_detail import get_tenant_detail
 from app.application.admin.list_tenants import list_tenants
+from app.application.admin.platform_categories import (
+    create_platform_category,
+    delete_platform_category,
+    list_all_platform_categories,
+    set_platform_category_image,
+    update_platform_category,
+)
 from app.application.admin.set_tenant_suspended import set_tenant_suspended
+from app.application.admin.set_tenant_verified import set_tenant_verified
+from app.domain.common.exceptions import NotFoundError
 from app.infrastructure.cache.cache_aside import cached
 from app.infrastructure.config import settings
 from app.infrastructure.rate_limit import limiter
@@ -21,6 +30,9 @@ from app.presentation.admin.schemas import (
     AdminLoginRequest,
     AdminTokenResponse,
     ErrorLogResponse,
+    PlatformCategoryCreateRequest,
+    PlatformCategoryResponse,
+    PlatformCategoryUpdateRequest,
     ServerStatusResponse,
     TenantDetailResponse,
     TenantListItemResponse,
@@ -28,6 +40,7 @@ from app.presentation.admin.schemas import (
 )
 from app.presentation.deps.admin import ErrorLogDep, require_admin_token
 from app.presentation.deps.cache import CacheDep
+from app.presentation.deps.security import FileStorageDep
 from app.presentation.deps.session import SessionFactoryDep
 
 _STATUS_CACHE_TTL_SECONDS = 5
@@ -124,3 +137,74 @@ async def admin_unsuspend_tenant(
         raise HTTPException(status_code=404, detail="Магазин не найден")
     detail = await get_tenant_detail(factory, tenant_id)
     return TenantDetailResponse.from_detail(detail)
+
+
+@router.post("/tenants/{tenant_id}/verify")
+async def admin_verify_tenant(
+    tenant_id: int, factory: SessionFactoryDep, cache: CacheDep
+) -> TenantDetailResponse:
+    applied = await set_tenant_verified(factory, cache, tenant_id, verified=True)
+    if not applied:
+        raise HTTPException(status_code=404, detail="Магазин не найден")
+    detail = await get_tenant_detail(factory, tenant_id)
+    return TenantDetailResponse.from_detail(detail)
+
+
+@router.post("/tenants/{tenant_id}/unverify")
+async def admin_unverify_tenant(
+    tenant_id: int, factory: SessionFactoryDep, cache: CacheDep
+) -> TenantDetailResponse:
+    applied = await set_tenant_verified(factory, cache, tenant_id, verified=False)
+    if not applied:
+        raise HTTPException(status_code=404, detail="Магазин не найден")
+    detail = await get_tenant_detail(factory, tenant_id)
+    return TenantDetailResponse.from_detail(detail)
+
+
+@router.get("/platform-categories")
+async def admin_list_platform_categories(
+    factory: SessionFactoryDep,
+) -> list[PlatformCategoryResponse]:
+    categories = await list_all_platform_categories(factory)
+    return [PlatformCategoryResponse.from_entity(c) for c in categories]
+
+
+@router.post("/platform-categories", status_code=201)
+async def admin_create_platform_category(
+    body: PlatformCategoryCreateRequest, factory: SessionFactoryDep
+) -> PlatformCategoryResponse:
+    category = await create_platform_category(factory, body.to_command())
+    return PlatformCategoryResponse.from_entity(category)
+
+
+@router.put("/platform-categories/{category_id}")
+async def admin_update_platform_category(
+    category_id: int, body: PlatformCategoryUpdateRequest, factory: SessionFactoryDep
+) -> PlatformCategoryResponse:
+    category = await update_platform_category(factory, body.to_command(category_id))
+    if category is None:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    return PlatformCategoryResponse.from_entity(category)
+
+
+@router.delete("/platform-categories/{category_id}")
+async def admin_delete_platform_category(
+    category_id: int, factory: SessionFactoryDep
+) -> PlatformCategoryResponse:
+    category = await delete_platform_category(factory, category_id)
+    if category is None:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    return PlatformCategoryResponse.from_entity(category)
+
+
+@router.post("/platform-categories/{category_id}/image", status_code=201)
+async def admin_set_platform_category_image(
+    category_id: int, file: UploadFile, factory: SessionFactoryDep, storage: FileStorageDep
+) -> PlatformCategoryResponse:
+    try:
+        category = await set_platform_category_image(
+            factory, storage, category_id, file.filename or "category.jpg", await file.read()
+        )
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    return PlatformCategoryResponse.from_entity(category)
