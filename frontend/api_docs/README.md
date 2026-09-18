@@ -5,6 +5,32 @@
 
 ---
 
+## 2026-09-18 — Главная маркетплейса M-B1: категории платформы, город, проверенный магазин, старая цена
+
+Первый бэкенд-шаг под главную страницу маркетплейса «как на wikkeo»
+(`docs/MARKETPLACE_HOME_PROMPTS.md`, промпт M-B1). Фронтенд не менялся.
+
+Новое: `GET /api/marketplace/categories` (справочник категорий платформы со
+счётчиком товаров), `GET /api/marketplace/cities` (города с числом
+магазинов), `PUT /api/products/categories/{id}` (раньше категорию нельзя
+было редактировать), `POST /api/auth/shop/logo` (логотип магазина),
+`POST/GET/PUT/DELETE /api/admin/platform-categories` +
+`POST .../image` (админка справочника), `POST /api/admin/tenants/{id}/verify`
+и `.../unverify` (проверенный магазин).
+
+Изменено: `Tenant` получил `city`/`is_verified`/`logo`; `Category` (магазина)
+получила `platform_category_id`; `Product` получил `compare_at_price` (+
+`old_price`/`discount_percent` в ответах витрины и маркетплейса); `GET
+/api/marketplace/products` и `GET /api/storefront/{slug}` получили параметры
+`platform_category`, `city`, `with_discount` и новые значения `sort`
+(`popular`, `rating`, `discount`); карточки маркетплейса получили
+`shop_logo`, `shop_is_verified`, `shop_city`, `is_new`, `is_hit`.
+
+Полное описание, включая формат ответов и что можно сделать на фронте —
+новый **`marketplace_home.md`**.
+
+---
+
 ## 2026-09-16 — Карточка товара маркетплейса: GET /marketplace/products/{id}
 
 Новый эндпоинт — детальная карточка товара по глобально уникальному `id`,
