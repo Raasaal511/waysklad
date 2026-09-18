@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
+from app.application.marketplace.hit_products import get_hit_product_ids
 from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.marketplace.repository import MarketplaceProductRow
@@ -9,13 +10,16 @@ from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 
 _CACHE_TTL_SECONDS = 20
 
-# та же публично безопасная сортировка, что у витрины одного магазина (см. storefront/get_catalog.py) —
-# ни margin, ни точный stock наружу не отдаются
+# та же публично безопасная сортировка, что у витрины одного магазина (см. storefront/get_catalog.py),
+# плюс popular/rating/discount — новые в M-B1 (считаются в репозитории, не здесь)
 _SORT_ALIASES = {
     "name": "name",
     "price_asc": "price_asc",
     "price_desc": "price_desc",
     "created_desc": "created_desc",
+    "popular": "popular",
+    "rating": "rating",
+    "discount": "discount",
 }
 
 
@@ -23,9 +27,12 @@ _SORT_ALIASES = {
 class ListMarketplaceProductsCommand:
     query: str = ""
     category: str | None = None
+    platform_category: str | None = None  # slug — включает дочерние категории
+    city: str | None = None
     price_min: Decimal | None = None
     price_max: Decimal | None = None
     in_stock_only: bool = False
+    with_discount: bool = False
     variant_size: str | None = None
     variant_color: str | None = None
     shop_slug: str | None = None
@@ -73,7 +80,7 @@ class ListMarketplaceProductsUseCase:
     ) -> ListMarketplaceProductsResult:
         async with SqlAlchemyUnitOfWork(None, session_factory=self._session_factory) as uow:
             all_tenants = await uow.tenants.list_all()
-            visible_tenants = [t for t in all_tenants if t.storefront_enabled]
+            visible_tenants = [t for t in all_tenants if t.storefront_enabled and not t.is_suspended]
             if cmd.shop_slug is not None:
                 visible_tenants = [t for t in visible_tenants if t.slug == cmd.shop_slug]
             visible_tenant_ids = [t.id for t in visible_tenants]
@@ -81,17 +88,30 @@ class ListMarketplaceProductsUseCase:
             if not visible_tenant_ids:
                 return ListMarketplaceProductsResult(products=[], total=0)
 
+            platform_category_ids: list[int] | None = None
+            if cmd.platform_category is not None:
+                platform_category_ids = await _resolve_platform_category_ids(
+                    uow, cmd.platform_category
+                )
+                if not platform_category_ids:
+                    return ListMarketplaceProductsResult(products=[], total=0)
+
             warehouse_ids = await uow.marketplace_products.list_visible_warehouse_ids(
                 visible_tenant_ids
             )
+            # кешируется на 10 минут (см. hit_products.py) — не лишний запрос на каждый вызов
+            hit_product_ids = await get_hit_product_ids(uow, self._cache, visible_tenant_ids)
             products, total = await uow.marketplace_products.list_products(
                 visible_tenant_ids=visible_tenant_ids,
                 warehouse_ids=warehouse_ids,
                 query=cmd.query,
                 category=cmd.category,
+                platform_category_ids=platform_category_ids,
+                city=cmd.city,
                 price_min=cmd.price_min,
                 price_max=cmd.price_max,
                 in_stock_only=cmd.in_stock_only,
+                with_discount=cmd.with_discount,
                 variant_size=cmd.variant_size,
                 variant_color=cmd.variant_color,
                 shop_slug=cmd.shop_slug,
@@ -99,6 +119,7 @@ class ListMarketplaceProductsUseCase:
                 limit=cmd.limit,
                 offset=cmd.offset,
                 min_rating=cmd.min_rating,
+                hit_product_ids=hit_product_ids,
             )
         return ListMarketplaceProductsResult(products=products, total=total)
 
@@ -108,3 +129,14 @@ class ListMarketplaceProductsUseCase:
         to_json=lambda r: r.to_json(),
         from_json=ListMarketplaceProductsResult.from_json,
     )(_execute_uncached)
+
+
+async def _resolve_platform_category_ids(uow, slug: str) -> list[int]:
+    """Категория + все её прямые дети (один уровень вложенности, см. промпт M-B1 п.1)."""
+    category = await uow.platform_categories.get_by_slug(slug)
+    if category is None:
+        return []
+    all_categories = await uow.platform_categories.list_all()
+    ids = [category.id]
+    ids.extend(c.id for c in all_categories if c.parent_id == category.id)
+    return ids

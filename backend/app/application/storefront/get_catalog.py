@@ -18,6 +18,9 @@ _SORT_ALIASES = {
     "price_asc": "retail_price",
     "price_desc": "-retail_price",
     "created_desc": "-created_at",
+    "popular": "-sold_count_30d",
+    "rating": "-average_rating",
+    "discount": "-discount_percent",
 }
 
 
@@ -33,6 +36,7 @@ class GetStorefrontCatalogCommand:
     min_price: Decimal | None = None
     max_price: Decimal | None = None
     in_stock_only: bool = False
+    with_discount: bool = False
     variant_size: str | None = None
     variant_color: str | None = None
     min_rating: int | None = None  # 1..5 — «от N звёзд», товар без отзывов не проходит
@@ -161,6 +165,8 @@ class GetStorefrontCatalogUseCase:
                 raw_params["retail_price__lte"] = cmd.max_price
             if cmd.in_stock_only:
                 raw_params["stock__gt"] = 0
+            if cmd.with_discount:
+                raw_params["discount_percent__is_null"] = False
             if cmd.min_rating is not None:
                 raw_params["average_rating__gte"] = cmd.min_rating
             products, total = await uow.products.list_filtered(

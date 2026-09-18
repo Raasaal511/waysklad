@@ -25,6 +25,13 @@ class MarketplaceProductRow:
     sku: str
     sold_count: Decimal = Decimal("0")
     rating: ProductRatingAggregate = ProductRatingAggregate(average_rating=0.0, reviews_count=0)
+    shop_logo: str = ""
+    shop_is_verified: bool = False
+    shop_city: str | None = None
+    old_price: Decimal | None = None  # уже с учётом «скидка не видна при retail_price > compare_at_price»
+    discount_percent: int | None = None  # округление вниз, только при >= 3%
+    is_new: bool = False  # created_at за последние 14 дней
+    is_hit: bool = False  # топ-10% по sold_count за 30 дней среди видимых товаров платформы, минимум 5 продаж
 
     def to_dict(self) -> dict:
         return {
@@ -44,6 +51,13 @@ class MarketplaceProductRow:
             "sold_count": str(self.sold_count),
             "average_rating": self.rating.average_rating,
             "reviews_count": self.rating.reviews_count,
+            "shop_logo": self.shop_logo,
+            "shop_is_verified": self.shop_is_verified,
+            "shop_city": self.shop_city,
+            "old_price": str(self.old_price) if self.old_price is not None else None,
+            "discount_percent": self.discount_percent,
+            "is_new": self.is_new,
+            "is_hit": self.is_hit,
         }
 
     @classmethod
@@ -67,6 +81,13 @@ class MarketplaceProductRow:
                 average_rating=d.get("average_rating", 0.0),
                 reviews_count=d.get("reviews_count", 0),
             ),
+            shop_logo=d.get("shop_logo", ""),
+            shop_is_verified=d.get("shop_is_verified", False),
+            shop_city=d.get("shop_city"),
+            old_price=Decimal(d["old_price"]) if d.get("old_price") is not None else None,
+            discount_percent=d.get("discount_percent"),
+            is_new=d.get("is_new", False),
+            is_hit=d.get("is_hit", False),
         )
 
 
@@ -85,15 +106,24 @@ class IMarketplaceProductRepository(Protocol):
         товара маркетплейса, GET /marketplace/products/{id})."""
         ...
 
+    async def get_created_at(self, product_id: int):
+        """ProductModel.created_at одного товара — Product (domain-сущность)
+        не хранит created_at, поэтому для бейджа «Новинка» на карточке
+        товара маркетплейса берём его отдельным точечным запросом."""
+        ...
+
     async def list_products(
         self,
         visible_tenant_ids: list[int],
         warehouse_ids: list[int],
         query: str = "",
         category: str | None = None,
+        platform_category_ids: list[int] | None = None,
+        city: str | None = None,
         price_min: Decimal | None = None,
         price_max: Decimal | None = None,
         in_stock_only: bool = False,
+        with_discount: bool = False,
         variant_size: str | None = None,
         variant_color: str | None = None,
         shop_slug: str | None = None,
@@ -101,7 +131,12 @@ class IMarketplaceProductRepository(Protocol):
         limit: int = 50,
         offset: int = 0,
         min_rating: int | None = None,
-    ) -> tuple[list[MarketplaceProductRow], int]: ...
+        hit_product_ids: frozenset[int] = frozenset(),
+    ) -> tuple[list[MarketplaceProductRow], int]:
+        """hit_product_ids — предпосчитанный набор «хитов» (см. compute_hit_product_ids),
+        нужен только чтобы проставить MarketplaceProductRow.is_hit и для sort='popular'/
+        валидации — сам расчёт топ-10% здесь не делается, это отдельный пакетный запрос."""
+        ...
 
     async def sold_count_by_products(self, product_ids: list[int]) -> dict[int, Decimal]:
         """Кросс-tenant агрегат — product_id глобально уникален (общий serial PK
@@ -113,4 +148,23 @@ class IMarketplaceProductRepository(Protocol):
         self, product_ids: list[int]
     ) -> dict[int, ProductRatingAggregate]:
         """Кросс-tenant аналог IReviewRepository.rating_by_products — только видимые отзывы."""
+        ...
+
+    async def compute_hit_product_ids(self, visible_tenant_ids: list[int]) -> frozenset[int]:
+        """Топ-10% по продажам за последние 30 дней среди видимых товаров
+        платформы, минимум 5 продаж — пакетный расчёт для бейджа «Хит»
+        (см. промпт M-B1 п.5), кешируется вызывающим на 10 минут."""
+        ...
+
+    async def count_by_platform_category(
+        self, visible_tenant_ids: list[int], city: str | None = None
+    ) -> dict[int, int]:
+        """Сколько видимых товаров платформы в каждой платформенной категории
+        (включая дочерние — считает вызывающий, здесь сырые счётчики по
+        Category.platform_category_id) — для GET /marketplace/categories."""
+        ...
+
+    async def list_cities(self, visible_tenant_ids: list[int]) -> dict[str, int]:
+        """Города магазинов среди видимых tenant -> число магазинов в городе,
+        для GET /marketplace/cities."""
         ...
