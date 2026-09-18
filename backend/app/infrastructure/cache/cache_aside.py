@@ -26,6 +26,22 @@ def shop_prefix(slug: str) -> str:
     return f"shop:{slug}:"
 
 
+# Префиксы кросс-tenant кешей маркетплейса (без shop_prefix — их ключ не завязан
+# на один slug, т.к. одна запись отвечает сразу за много магазинов). Admin-действия,
+# которые должны быть видны на маркетплейсе немедленно (verify/unverify, suspend/
+# unsuspend), чистят эти namespace целиком, а не ждут TTL (_CACHE_TTL_SECONDS
+# в list_products.py/get_product.py).
+MARKETPLACE_CATALOG_PREFIX = "marketplace_catalog:"
+MARKETPLACE_PRODUCT_PREFIX = "marketplace_product:"
+
+
+async def invalidate_marketplace_cache(cache: ICache | None) -> None:
+    if cache is None:
+        return
+    await cache.delete_prefix(MARKETPLACE_CATALOG_PREFIX)
+    await cache.delete_prefix(MARKETPLACE_PRODUCT_PREFIX)
+
+
 async def cached(
     cache: ICache,
     key: str,

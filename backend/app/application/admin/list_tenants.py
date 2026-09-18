@@ -12,6 +12,7 @@ class TenantListItem:
     slug: str | None
     storefront_enabled: bool
     is_suspended: bool
+    is_verified: bool
     created_at: str
 
 
@@ -30,6 +31,7 @@ async def list_tenants(session_factory) -> list[TenantListItem]:
                 slug=m.slug,
                 storefront_enabled=m.storefront_enabled,
                 is_suspended=m.is_suspended,
+                is_verified=m.is_verified,
                 created_at=m.created_at.isoformat(),
             )
             for m in models

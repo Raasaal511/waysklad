@@ -21,6 +21,7 @@ class TenantDetail:
     slug: str | None
     storefront_enabled: bool
     is_suspended: bool
+    is_verified: bool
     created_at: str
     owner: TenantOwnerInfo | None
     users_count: int
@@ -81,6 +82,7 @@ async def get_tenant_detail(session_factory, tenant_id: int) -> TenantDetail | N
             slug=tenant.slug,
             storefront_enabled=tenant.storefront_enabled,
             is_suspended=tenant.is_suspended,
+            is_verified=tenant.is_verified,
             created_at=tenant.created_at.isoformat(),
             owner=owner,
             users_count=users_count,
