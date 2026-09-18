@@ -137,6 +137,8 @@ async def test_marketplace_lists_products_from_multiple_shops(client, random_pho
         "id", "name", "retail_price", "photo", "category_name", "in_stock",
         "min_order_qty", "order_step_qty", "shop_slug", "shop_name",
         "sold_count", "average_rating", "reviews_count",
+        "shop_logo", "shop_is_verified", "shop_city", "old_price", "discount_percent",
+        "is_new", "is_hit",
     }
 
 

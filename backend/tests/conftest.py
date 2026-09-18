@@ -38,7 +38,9 @@ from app.domain.common.phone import Phone
 from app.domain.customers.entities import Customer
 from app.domain.identity.entities import Role, Tenant, User, Warehouse
 from app.domain.identity.permissions import Actor
+from app.domain.platform.category_synonyms import SEED_PLATFORM_CATEGORIES
 from app.infrastructure.db.models.base import Base
+from app.infrastructure.db.models.catalog import PlatformCategoryModel
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.files import LocalFileStorage
 from app.infrastructure.security import BcryptPasswordHasher, create_customer_access_token
@@ -94,13 +96,23 @@ async def _test_db_ready() -> AsyncIterator[str]:
 
 @pytest.fixture
 async def db_session_factory(_test_db_ready) -> AsyncIterator[async_sessionmaker]:
-    """Чистая схема на каждый тест, в БД, выделенной текущему xdist-воркеру."""
+    """Чистая схема на каждый тест, в БД, выделенной текущему xdist-воркеру.
+
+    Схема создаётся из моделей (Base.metadata.create_all), не через Alembic —
+    поэтому сид platform_categories, который в проде накатывается сид-миграцией
+    (migrations/versions/2026-09-18_platform_categories.py), здесь сеется вручную
+    тем же списком (app.domain.platform.category_synonyms.SEED_PLATFORM_CATEGORIES)."""
     db_url = f"postgresql+psycopg://postgres:postgres@localhost:5432/{_test_db_ready}"
     engine = create_async_engine(db_url, poolclass=NullPool)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
-    yield async_sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    factory = async_sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    async with factory() as session:
+        for slug, name, sort_order in SEED_PLATFORM_CATEGORIES:
+            session.add(PlatformCategoryModel(name=name, slug=slug, sort_order=sort_order))
+        await session.commit()
+    yield factory
     await engine.dispose()
 
 
