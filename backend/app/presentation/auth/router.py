@@ -22,6 +22,7 @@ from app.presentation.deps import (
     ChangePasswordDep,
     ConnectTelegramDep,
     CreateEmployeeDep,
+    DeleteShopLogoDep,
     GetShopDep,
     ListEmployeesDep,
     LoginDep,
@@ -104,6 +105,11 @@ async def set_shop_logo(
 ) -> TenantResponse:
     command = SetShopLogoCommand(file.filename or "logo.jpg", await file.read())
     return TenantResponse.from_entity(await use_case.execute(actor, command))
+
+
+@router.delete("/shop/logo")
+async def delete_shop_logo(actor: ActorDep, use_case: DeleteShopLogoDep) -> TenantResponse:
+    return TenantResponse.from_entity(await use_case.execute(actor))
 
 
 @router.patch("/me/password")

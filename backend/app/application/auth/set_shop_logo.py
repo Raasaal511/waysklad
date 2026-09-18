@@ -17,8 +17,9 @@ class SetShopLogoCommand:
 
 class SetShopLogoUseCase:
     """Логотип магазина — тот же паттерн, что SetProductPhotoUseCase/
-    SetWarehousePhotoUseCase (M-B1 п.5: поле storefront_logo из B2, здесь —
-    минимальная реализация до появления B2)."""
+    SetWarehousePhotoUseCase (M-B1 п.5). Поле — Tenant.logo (в промпте B2
+    названо storefront_logo, но это то же самое существующее поле, отдельного
+    поля storefront_logo нет). Симметричный DeleteShopLogoUseCase — B2 п.1."""
 
     def __init__(self, uow: IUnitOfWork, storage: IFileStorage, cache: ICache | None = None):
         self._uow = uow
