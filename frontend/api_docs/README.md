@@ -5,6 +5,34 @@
 
 ---
 
+## 2026-09-18 — Карточка товара витрины B1: варианты, наличие, гарантия, просмотры
+
+Первый бэкенд-шаг под новую карточку товара витрины «как на wikkeo»
+(`docs/PRODUCT_PAGE_PROMPTS.md`, промпт B1). Фронтенд не менялся.
+
+Изменено (только добавлены поля, контракт не сломан): `GET
+/api/storefront/{slug}/products/{product_id}` получил `product.category`
+(вложенный объект с родителем), `unit_code`/`unit_label`, `warranty_text`,
+`views_90d`, `stock_level`/`stock_qty` у товара и у каждого варианта,
+`variants[].name`/`display_name`/`in_stock`/`stock_level`/`stock_qty`.
+`GET/PATCH /api/auth/shop` получил `storefront_show_stock_qty` (bool,
+управляет видимостью `stock_qty`). `POST/PUT /api/products` и варианты
+принимают/отдают `warranty_text` и `variants[].name`.
+
+Новое: `POST /api/storefront/{slug}/products/{product_id}/view` → `204` —
+засчитать просмотр карточки (без авторизации, дедупликация по IP на 30
+минут, rate limit 120/минуту).
+
+Известное ограничение: фильтры каталога `in_stock_only` и
+`variant_size`/`variant_color` пока не связаны между собой (наличие
+считается по товару целиком, не по подошедшему варианту) — подробности в
+`product_page_v2.md`, раздел 2.
+
+Полное описание, включая TS-контракт и что сделать на фронте — новый
+**`product_page_v2.md`**.
+
+---
+
 ## 2026-09-18 — Главная маркетплейса M-B2: баннеры, GET /marketplace/home, /shops, /suggest
 
 Второй бэкенд-шаг под главную страницу маркетплейса «как на wikkeo»
