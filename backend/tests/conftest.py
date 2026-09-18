@@ -250,6 +250,39 @@ async def client(db_session_factory, tmp_path) -> AsyncIterator[AsyncClient]:
     fastapi_app.dependency_overrides.clear()
 
 
+class SqlQueryCounter:
+    """Считает SQL-запросы, выполненные через движок db_session_factory, пока
+    активен (см. фикстуру sql_query_counter) — нет готового приёма для этого
+    в проекте (см. промпт M-B2 п.2), поэтому используем event.listen на
+    Engine.before_cursor_execute, самый низкоуровневый и надёжный хук
+    SQLAlchemy (считает буквально то, что ушло на сервер, а не ORM-вызовы)."""
+
+    def __init__(self):
+        self.count = 0
+
+    def _on_execute(self, conn, cursor, statement, parameters, context, executemany):
+        self.count += 1
+
+    def reset(self) -> None:
+        self.count = 0
+
+
+@pytest.fixture
+async def sql_query_counter(db_session_factory) -> AsyncIterator[SqlQueryCounter]:
+    """counter.count — число SQL-запросов с последнего reset()/начала теста,
+    выполненных через тестовую БД (db_session_factory и, следовательно, client —
+    оба используют один engine, см. фикстуру client)."""
+    from sqlalchemy import event
+
+    engine = db_session_factory.kw["bind"]
+    counter = SqlQueryCounter()
+    event.listen(engine.sync_engine, "before_cursor_execute", counter._on_execute)
+    try:
+        yield counter
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", counter._on_execute)
+
+
 @pytest.fixture
 async def customer_headers(make_uow, random_phone) -> Callable:
     """Authorization-заголовок авторизованного покупателя витрины — заводит
