@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import AccessDeniedError, DomainError, NotFoundError
 from app.domain.reviews.entities import Review
 from app.domain.storefront.entities import StorefrontRequestStatus
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 
 
@@ -23,8 +25,9 @@ class CreateReviewUseCase:
     (см. IStorefrontRequestRepository.list_by_customer), а не отдельным
     правом доступа."""
 
-    def __init__(self, session_factory):
+    def __init__(self, session_factory, cache: ICache | None = None):
         self._session_factory = session_factory
+        self._cache = cache
 
     async def execute(self, cmd: CreateReviewCommand) -> Review:
         async with SqlAlchemyUnitOfWork(None, session_factory=self._session_factory) as public_uow:
@@ -58,4 +61,7 @@ class CreateReviewUseCase:
             review.validate()
             await uow.reviews.add(review)
             await uow.commit()
+            # новый отзыв меняет средний рейтинг товара и магазина целиком
+            # (публичный профиль, промпт B2 п.2) — оба закешированы
+            await invalidate_shop_cache(self._cache, uow)
             return review

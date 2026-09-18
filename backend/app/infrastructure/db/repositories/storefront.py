@@ -125,6 +125,18 @@ class SqlAlchemyStorefrontRequestRepository(SqlAlchemyRepository, IStorefrontReq
             )
         ).scalar_one()
 
+    async def count_accepted(self) -> int:
+        return (
+            await self._session.execute(
+                select(func.count())
+                .select_from(StorefrontRequestModel)
+                .where(
+                    StorefrontRequestModel.tenant_id == self._tenant,
+                    StorefrontRequestModel.status == StorefrontRequestStatus.ACCEPTED,
+                )
+            )
+        ).scalar_one()
+
     async def _get_model(self, request_id: int) -> StorefrontRequestModel | None:
         return (
             await self._session.execute(

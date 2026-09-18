@@ -80,6 +80,18 @@ class SqlAlchemyReviewRepository(SqlAlchemyRepository, IReviewRepository):
             for product_id, avg, count in rows
         }
 
+    async def rating_for_shop(self) -> ProductRatingAggregate:
+        row = (
+            await self._session.execute(
+                select(func.avg(ReviewModel.rating), func.count(ReviewModel.id)).where(
+                    ReviewModel.tenant_id == self._tenant,
+                    ReviewModel.is_hidden.is_(False),
+                )
+            )
+        ).one()
+        avg, count = row
+        return ProductRatingAggregate(average_rating=float(avg) if avg is not None else 0.0, reviews_count=count)
+
     async def _get_model(self, review_id: int) -> ReviewModel | None:
         return (
             await self._session.execute(

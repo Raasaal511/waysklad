@@ -40,6 +40,12 @@ class ISaleRepository(Protocol):
 
     async def save(self, sale: Sale) -> None: ...
 
+    async def count_all(self) -> int:
+        """Все непроведённые к удалению продажи tenant — лёгкий COUNT без
+        подгрузки строк чека, для orders_count публичного профиля магазина
+        (промпт B2 п.2: «принятые заявки витрины + продажи»)."""
+        ...
+
 
 class ISaleReturnRepository(Protocol):
     async def add(self, sale_return: SaleReturn) -> SaleReturn: ...

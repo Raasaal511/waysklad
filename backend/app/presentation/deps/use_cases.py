@@ -17,6 +17,7 @@ from app.application.analytics.top_products import (
 from app.application.auth.change_password import ChangePasswordUseCase
 from app.application.auth.connect_telegram import ConnectTelegramUseCase
 from app.application.auth.create_employee import CreateEmployeeUseCase
+from app.application.auth.delete_shop_logo import DeleteShopLogoUseCase
 from app.application.auth.get_shop import GetShopUseCase
 from app.application.auth.list_employees import ListEmployeesUseCase
 from app.application.auth.login import LoginUseCase
@@ -128,6 +129,7 @@ from app.application.storefront.accept_request import AcceptStorefrontRequestUse
 from app.application.storefront.create_request import CreateStorefrontRequestUseCase
 from app.application.storefront.get_catalog import GetStorefrontCatalogUseCase
 from app.application.storefront.get_product import GetStorefrontProductUseCase
+from app.application.storefront.get_profile import GetStorefrontProfileUseCase
 from app.application.storefront.get_request import GetStorefrontRequestUseCase
 from app.application.storefront.get_request_status import GetStorefrontRequestStatusUseCase
 from app.application.storefront.list_messages import (
@@ -342,6 +344,12 @@ def get_set_shop_logo(
     uow: UowDep, storage: FileStorageDep, cache: CacheDep
 ) -> SetShopLogoUseCase:
     return SetShopLogoUseCase(uow, storage, cache)
+
+
+def get_delete_shop_logo(
+    uow: UowDep, storage: FileStorageDep, cache: CacheDep
+) -> DeleteShopLogoUseCase:
+    return DeleteShopLogoUseCase(uow, storage, cache)
 get_mark_notification_read = _with_uow(MarkNotificationReadUseCase)
 get_mark_all_notifications_read = _with_uow(MarkAllNotificationsReadUseCase)
 get_list_notifications = _with_uow(ListNotificationsUseCase)
@@ -393,6 +401,12 @@ def get_storefront_product(
     return GetStorefrontProductUseCase(factory, cache)
 
 
+def get_storefront_profile(
+    factory: SessionFactoryDep, cache: CacheDep
+) -> GetStorefrontProfileUseCase:
+    return GetStorefrontProfileUseCase(factory, cache)
+
+
 def get_record_product_view(
     factory: SessionFactoryDep, cache: CacheDep
 ) -> RecordProductViewUseCase:
@@ -417,7 +431,7 @@ def get_create_storefront_request(
 
 get_list_storefront_requests = _with_uow(ListStorefrontRequestsUseCase)
 get_storefront_request = _with_uow(GetStorefrontRequestUseCase)
-get_accept_storefront_request = _with_uow(AcceptStorefrontRequestUseCase)
+get_accept_storefront_request = _with_uow_and_cache(AcceptStorefrontRequestUseCase)
 get_reject_storefront_request = _with_uow(RejectStorefrontRequestUseCase)
 get_list_staff_storefront_messages = _with_uow(ListStaffStorefrontMessagesUseCase)
 get_send_staff_storefront_message = _with_uow(SendStaffStorefrontMessageUseCase)
@@ -433,8 +447,8 @@ def get_send_storefront_message(
     return SendStorefrontMessageUseCase(factory, notifier)
 
 
-def get_create_review(factory: SessionFactoryDep) -> CreateReviewUseCase:
-    return CreateReviewUseCase(factory)
+def get_create_review(factory: SessionFactoryDep, cache: CacheDep) -> CreateReviewUseCase:
+    return CreateReviewUseCase(factory, cache)
 
 
 def get_list_product_reviews(factory: SessionFactoryDep) -> ListProductReviewsUseCase:
@@ -442,7 +456,7 @@ def get_list_product_reviews(factory: SessionFactoryDep) -> ListProductReviewsUs
 
 
 get_list_reviews_for_owner = _with_uow(ListReviewsForOwnerUseCase)
-get_set_review_hidden = _with_uow(SetReviewHiddenUseCase)
+get_set_review_hidden = _with_uow_and_cache(SetReviewHiddenUseCase)
 
 
 def get_create_task(uow: UowDep, notifier: NotifierDep) -> CreateTaskUseCase:
@@ -583,6 +597,7 @@ ApplyOfflineSalesDep = Annotated[
 ConnectTelegramDep = Annotated[ConnectTelegramUseCase, Depends(get_connect_telegram)]
 UpdateShopDep = Annotated[UpdateShopUseCase, Depends(get_update_shop)]
 SetShopLogoDep = Annotated[SetShopLogoUseCase, Depends(get_set_shop_logo)]
+DeleteShopLogoDep = Annotated[DeleteShopLogoUseCase, Depends(get_delete_shop_logo)]
 ChangePasswordDep = Annotated[ChangePasswordUseCase, Depends(get_change_password)]
 LogoutAllDep = Annotated[LogoutAllUseCase, Depends(get_logout_all)]
 CreateTaskDep = Annotated[CreateTaskUseCase, Depends(get_create_task)]
@@ -617,6 +632,9 @@ ListShopsDep = Annotated[ListShopsUseCase, Depends(get_list_shops)]
 SuggestDep = Annotated[SuggestUseCase, Depends(get_suggest)]
 GetStorefrontProductDep = Annotated[
     GetStorefrontProductUseCase, Depends(get_storefront_product)
+]
+GetStorefrontProfileDep = Annotated[
+    GetStorefrontProfileUseCase, Depends(get_storefront_profile)
 ]
 RecordProductViewDep = Annotated[
     RecordProductViewUseCase, Depends(get_record_product_view)

@@ -15,6 +15,10 @@ from app.application.storefront.get_catalog import (
 )
 from app.application.customers.list_my_requests import MyStorefrontRequestItem
 from app.application.storefront.get_product import StorefrontProductResult, VariantStock
+from app.application.storefront.get_profile import (
+    StorefrontProfileResult,
+    orders_count_label,
+)
 from app.application.storefront.get_request_status import StorefrontRequestStatusResult
 from app.application.storefront.send_message import (
     SendStaffStorefrontMessageCommand,
@@ -136,6 +140,7 @@ class StorefrontCatalogResponse(BaseModel):
     available_sizes: list[str]
     available_colors: list[str]
     total: int
+    min_order_total: Decimal | None
 
     @classmethod
     def from_result(cls, result: StorefrontCatalogResult) -> "StorefrontCatalogResponse":
@@ -158,6 +163,7 @@ class StorefrontCatalogResponse(BaseModel):
             available_sizes=result.available_sizes,
             available_colors=result.available_colors,
             total=result.total,
+            min_order_total=result.min_order_total,
         )
 
 
@@ -226,6 +232,18 @@ class StorefrontProductCategoryResponse(BaseModel):
         )
 
 
+class StorefrontProductShopResponse(BaseModel):
+    """Короткая версия профиля магазина для шапки карточки товара (промпт
+    B2 п.3) — чтобы отрисовать её без второго запроса к /profile. Полный
+    профиль (контакты, FAQ, адреса) фронт грузит отдельно, при необходимости."""
+
+    slug: str
+    name: str
+    logo: str
+    average_rating: float
+    reviews_count: int
+
+
 class StorefrontProductDetailResponse(StorefrontProductResponse):
     """Карточка одного товара — то же самое, что в списке, плюс варианты
     (размер/цвет) для полноты информации на отдельной странице/при шеринге."""
@@ -241,6 +259,7 @@ class StorefrontProductDetailResponse(StorefrontProductResponse):
     unit_code: str
     unit_label: str
     views_90d: int
+    shop: StorefrontProductShopResponse
 
     @classmethod
     def from_entity(
@@ -249,6 +268,10 @@ class StorefrontProductDetailResponse(StorefrontProductResponse):
         in_stock: bool,
         sold_count: Decimal = Decimal("0"),
         rating: ProductRatingAggregate = _EMPTY_RATING,
+        shop_slug: str = "",
+        shop_name: str = "",
+        shop_logo: str = "",
+        shop_rating: ProductRatingAggregate = _EMPTY_RATING,
     ) -> "StorefrontProductDetailResponse":
         """Облегчённый конструктор без остатков по видимым складам магазина,
         категории и просмотров — для мест, где их ещё не считают (сейчас:
@@ -273,6 +296,13 @@ class StorefrontProductDetailResponse(StorefrontProductResponse):
             unit_code=product.unit.code,
             unit_label=product.unit.name,
             views_90d=0,
+            shop=StorefrontProductShopResponse(
+                slug=shop_slug,
+                name=shop_name,
+                logo=shop_logo,
+                average_rating=shop_rating.average_rating,
+                reviews_count=shop_rating.reviews_count,
+            ),
         )
 
     @classmethod
@@ -304,6 +334,13 @@ class StorefrontProductDetailResponse(StorefrontProductResponse):
             unit_code=product.unit.code,
             unit_label=product.unit.name,
             views_90d=result.views_90d,
+            shop=StorefrontProductShopResponse(
+                slug=result.shop_slug,
+                name=result.shop_name,
+                logo=result.shop_logo,
+                average_rating=result.shop_rating.average_rating,
+                reviews_count=result.shop_rating.reviews_count,
+            ),
         )
 
 
@@ -316,6 +353,84 @@ class StorefrontProductPageResponse(BaseModel):
         return cls(
             shop_name=result.shop_name,
             product=StorefrontProductDetailResponse.from_result(result),
+        )
+
+
+class StorefrontProfileRatingResponse(BaseModel):
+    average_rating: float
+    reviews_count: int
+
+
+class StorefrontProfileContactsResponse(BaseModel):
+    phone: str
+    whatsapp: str
+    telegram: str
+
+
+class StorefrontProfileAddressResponse(BaseModel):
+    name: str
+    address: str
+
+
+class StorefrontProfilePoliciesResponse(BaseModel):
+    """Пустая строка -> null, чтобы фронт не рисовал пункт FAQ без текста
+    (промпт B2 п.2) — в отличие от контактов, где "" остаётся "" (просто не
+    показываем саму кнопку способа связи, а не строку меню)."""
+
+    refund_money: str | None
+    payment: str | None
+    delivery: str | None
+    returns: str | None
+
+
+class StorefrontProfileResponse(BaseModel):
+    name: str
+    slug: str
+    logo: str
+    description: str
+    on_platform_since: date
+    rating: StorefrontProfileRatingResponse
+    products_count: int
+    orders_count: int | None
+    orders_count_label: str | None
+    min_order_total: Decimal | None
+    contacts: StorefrontProfileContactsResponse
+    addresses: list[StorefrontProfileAddressResponse]
+    policies: StorefrontProfilePoliciesResponse
+
+    @classmethod
+    def from_result(cls, result: StorefrontProfileResult) -> "StorefrontProfileResponse":
+        return cls(
+            name=result.name,
+            slug=result.slug,
+            logo=result.logo,
+            description=result.description,
+            on_platform_since=result.on_platform_since,
+            rating=StorefrontProfileRatingResponse(
+                average_rating=result.rating.average_rating,
+                reviews_count=result.rating.reviews_count,
+            ),
+            products_count=result.products_count,
+            orders_count=result.orders_count,
+            orders_count_label=(
+                orders_count_label(result.orders_count) if result.orders_count is not None else None
+            ),
+            min_order_total=result.min_order_total,
+            contacts=StorefrontProfileContactsResponse(
+                phone=result.contact_phone,
+                whatsapp=result.contact_whatsapp,
+                telegram=result.contact_telegram,
+            ),
+            addresses=[
+                StorefrontProfileAddressResponse(name=a.name, address=a.address)
+                for a in result.addresses
+            ],
+            policies=StorefrontProfilePoliciesResponse(
+                refund_money=result.policy_refund_money or None,
+                payment=result.policy_payment or None,
+                delivery=result.policy_delivery or None,
+                returns=result.policy_returns or None,
+            ),
         )
 
 

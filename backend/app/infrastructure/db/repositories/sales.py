@@ -154,6 +154,15 @@ class SqlAlchemySaleRepository(SqlAlchemyRepository, ISaleRepository):
         model.note = sale.note
         model.deleted_at = sale.deleted_at
 
+    async def count_all(self) -> int:
+        return (
+            await self._session.execute(
+                select(func.count())
+                .select_from(SaleModel)
+                .where(SaleModel.tenant_id == self._tenant, SaleModel.deleted_at.is_(None))
+            )
+        ).scalar_one()
+
 
 class SqlAlchemySaleReturnRepository(SqlAlchemyRepository, ISaleReturnRepository):
     async def add(self, sale_return: SaleReturn) -> SaleReturn:

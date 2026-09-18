@@ -27,6 +27,11 @@ class IStorefrontRequestRepository(Protocol):
         к какому магазину относится заявка)."""
         ...
 
+    async def count_accepted(self) -> int:
+        """Заявки со статусом ACCEPTED — часть orders_count публичного
+        профиля магазина (промпт B2 п.2)."""
+        ...
+
 
 class IStorefrontMessageRepository(Protocol):
     async def add(self, message: StorefrontMessage) -> StorefrontMessage: ...

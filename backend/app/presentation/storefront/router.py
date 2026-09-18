@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse
 from slowapi.util import get_remote_address
 
 from app.application.storefront.get_product import GetStorefrontProductCommand
+from app.application.storefront.get_profile import GetStorefrontProfileCommand
 from app.application.storefront.get_request_status import GetStorefrontRequestStatusCommand
 from app.application.storefront.list_messages import ListStorefrontMessagesCommand
 from app.application.storefront.record_product_view import RecordProductViewCommand
@@ -19,6 +20,7 @@ from app.presentation.deps import (
     CreateStorefrontRequestDep,
     GetStorefrontCatalogDep,
     GetStorefrontProductDep,
+    GetStorefrontProfileDep,
     GetStorefrontRequestDep,
     GetStorefrontRequestStatusDep,
     ListMyStorefrontRequestsDep,
@@ -44,6 +46,7 @@ from app.presentation.storefront.schemas import (
     StorefrontCatalogResponse,
     StorefrontMessageResponse,
     StorefrontProductPageResponse,
+    StorefrontProfileResponse,
     StorefrontRequestCreatedResponse,
     StorefrontRequestResponse,
     StorefrontRequestStatusResponse,
@@ -80,6 +83,17 @@ async def get_storefront_product(
     return StorefrontProductPageResponse.from_result(result)
 
 
+@router.get("/{slug}/profile")
+@limiter.limit("300/minute")
+async def get_storefront_profile(
+    request: Request, slug: str, use_case: GetStorefrontProfileDep
+) -> StorefrontProfileResponse:
+    result = await use_case.execute(GetStorefrontProfileCommand(slug=slug))
+    if result is None:
+        raise HTTPException(status_code=404, detail="Витрина не найдена")
+    return StorefrontProfileResponse.from_result(result)
+
+
 @router.post("/{slug}/products/{product_id}/view", status_code=204)
 @limiter.limit("120/minute")
 async def record_storefront_product_view(
@@ -113,6 +127,7 @@ async def get_storefront_catalog_og(
         title=tenant.name,
         description=f"Каталог магазина «{tenant.name}» на WaySklad",
         canonical_url=canonical,
+        image_url=absolute_asset_url(origin, tenant.logo) if tenant.logo else None,
         site_name="WaySklad",
     )
 
