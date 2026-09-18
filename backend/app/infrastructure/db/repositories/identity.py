@@ -64,6 +64,15 @@ class SqlAlchemyTenantRepository(SqlAlchemyRepository, ITenantRepository):
         model.city = tenant.city
         model.logo = tenant.logo
         model.storefront_show_stock_qty = tenant.storefront_show_stock_qty
+        model.storefront_description = tenant.storefront_description
+        model.contact_phone = tenant.contact_phone
+        model.contact_whatsapp = tenant.contact_whatsapp
+        model.contact_telegram = tenant.contact_telegram
+        model.storefront_min_order_total = tenant.storefront_min_order_total
+        model.policy_refund_money = tenant.policy_refund_money
+        model.policy_payment = tenant.policy_payment
+        model.policy_delivery = tenant.policy_delivery
+        model.policy_returns = tenant.policy_returns
         # is_verified намеренно не трогаем здесь — меняется только через
         # set_tenant_verified (админ), владелец через save() повлиять не может
         await self._session.flush()

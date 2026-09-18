@@ -1,5 +1,7 @@
+from decimal import Decimal
+
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, Integer, SmallInteger, String
+from sqlalchemy import ForeignKey, Integer, Numeric, SmallInteger, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domain.identity.entities import Role
@@ -28,6 +30,15 @@ class TenantModel(Base, TimestampMixin):
     is_verified: Mapped[bool] = mapped_column(default=False)
     logo: Mapped[str] = mapped_column(String(500), default="")
     storefront_show_stock_qty: Mapped[bool] = mapped_column(default=False)
+    storefront_description: Mapped[str] = mapped_column(String(500), default="")
+    contact_phone: Mapped[str] = mapped_column(String(20), default="")
+    contact_whatsapp: Mapped[str] = mapped_column(String(20), default="")
+    contact_telegram: Mapped[str] = mapped_column(String(32), default="")
+    storefront_min_order_total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    policy_refund_money: Mapped[str] = mapped_column(Text, default="")
+    policy_payment: Mapped[str] = mapped_column(Text, default="")
+    policy_delivery: Mapped[str] = mapped_column(Text, default="")
+    policy_returns: Mapped[str] = mapped_column(Text, default="")
 
 
 class WarehouseModel(Base, TenantMixin, TimestampMixin):

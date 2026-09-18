@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from pydantic import BaseModel, Field
 
 from app.application.auth.change_password import ChangePasswordCommand
@@ -104,6 +106,15 @@ class TenantResponse(BaseModel):
     is_verified: bool
     logo: str
     storefront_show_stock_qty: bool
+    storefront_description: str
+    contact_phone: str
+    contact_whatsapp: str
+    contact_telegram: str
+    storefront_min_order_total: Decimal | None
+    policy_refund_money: str
+    policy_payment: str
+    policy_delivery: str
+    policy_returns: str
 
     @classmethod
     def from_entity(cls, tenant: Tenant) -> "TenantResponse":
@@ -120,6 +131,15 @@ class TenantResponse(BaseModel):
             is_verified=tenant.is_verified,
             logo=tenant.logo,
             storefront_show_stock_qty=tenant.storefront_show_stock_qty,
+            storefront_description=tenant.storefront_description,
+            contact_phone=tenant.contact_phone,
+            contact_whatsapp=tenant.contact_whatsapp,
+            contact_telegram=tenant.contact_telegram,
+            storefront_min_order_total=tenant.storefront_min_order_total,
+            policy_refund_money=tenant.policy_refund_money,
+            policy_payment=tenant.policy_payment,
+            policy_delivery=tenant.policy_delivery,
+            policy_returns=tenant.policy_returns,
         )
 
 
@@ -132,8 +152,20 @@ class UpdateShopRequest(BaseModel):
     storefront_enabled: bool | None = None
     city: str | None = None  # валидация по справочнику CITIES — в UpdateShopUseCase
     storefront_show_stock_qty: bool | None = None
+    storefront_description: str | None = Field(default=None, max_length=500)
+    contact_phone: str | None = None  # формат — в UpdateShopUseCase (Phone), "" сбрасывает
+    contact_whatsapp: str | None = None
+    contact_telegram: str | None = None  # username без "@", формат — в UpdateShopUseCase
+    # null (явно переданный) — сбросить лимит; поле отсутствует в body — не трогать;
+    # число — установить новое значение (см. clear_min_order_total в команде)
+    storefront_min_order_total: Decimal | None = Field(default=None, ge=0)
+    policy_refund_money: str | None = Field(default=None, max_length=5000)
+    policy_payment: str | None = Field(default=None, max_length=5000)
+    policy_delivery: str | None = Field(default=None, max_length=5000)
+    policy_returns: str | None = Field(default=None, max_length=5000)
 
     def to_command(self) -> UpdateShopCommand:
+        min_order_total_set = "storefront_min_order_total" in self.model_fields_set
         return UpdateShopCommand(
             name=self.name,
             summary_daily_enabled=self.summary_daily_enabled,
@@ -143,6 +175,16 @@ class UpdateShopRequest(BaseModel):
             storefront_enabled=self.storefront_enabled,
             city=self.city,
             storefront_show_stock_qty=self.storefront_show_stock_qty,
+            storefront_description=self.storefront_description,
+            contact_phone=self.contact_phone,
+            contact_whatsapp=self.contact_whatsapp,
+            contact_telegram=self.contact_telegram,
+            clear_min_order_total=min_order_total_set and self.storefront_min_order_total is None,
+            storefront_min_order_total=self.storefront_min_order_total,
+            policy_refund_money=self.policy_refund_money,
+            policy_payment=self.policy_payment,
+            policy_delivery=self.policy_delivery,
+            policy_returns=self.policy_returns,
         )
 
 

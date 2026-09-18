@@ -20,6 +20,15 @@ class TenantMapper:
             is_verified=tenant.is_verified,
             logo=tenant.logo,
             storefront_show_stock_qty=tenant.storefront_show_stock_qty,
+            storefront_description=tenant.storefront_description,
+            contact_phone=tenant.contact_phone,
+            contact_whatsapp=tenant.contact_whatsapp,
+            contact_telegram=tenant.contact_telegram,
+            storefront_min_order_total=tenant.storefront_min_order_total,
+            policy_refund_money=tenant.policy_refund_money,
+            policy_payment=tenant.policy_payment,
+            policy_delivery=tenant.policy_delivery,
+            policy_returns=tenant.policy_returns,
         )
 
     @staticmethod
@@ -39,6 +48,16 @@ class TenantMapper:
             is_verified=model.is_verified,
             logo=model.logo,
             storefront_show_stock_qty=model.storefront_show_stock_qty,
+            storefront_description=model.storefront_description,
+            contact_phone=model.contact_phone,
+            contact_whatsapp=model.contact_whatsapp,
+            contact_telegram=model.contact_telegram,
+            storefront_min_order_total=model.storefront_min_order_total,
+            policy_refund_money=model.policy_refund_money,
+            policy_payment=model.policy_payment,
+            policy_delivery=model.policy_delivery,
+            policy_returns=model.policy_returns,
+            created_at=model.created_at,
         )
 
 

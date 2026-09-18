@@ -1,4 +1,6 @@
 from dataclasses import dataclass, field
+from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 
 from app.domain.common.phone import Phone
@@ -40,6 +42,21 @@ class Tenant:
     # точный остаток варианта/товара на витрине (B1 п.2) — по умолчанию выключено:
     # владелец сам решает, раскрывать ли конкурентам объём своих продаж
     storefront_show_stock_qty: bool = False
+    # публичный профиль магазина (B2) — карточка продавца, FAQ, контакты
+    storefront_description: str = ""  # до 500 символов, короткое «о магазине»
+    contact_phone: str = ""
+    contact_whatsapp: str = ""
+    contact_telegram: str = ""  # username без "@" — валидируется в UpdateShopUseCase
+    storefront_min_order_total: Decimal | None = None
+    policy_refund_money: str = ""
+    policy_payment: str = ""
+    policy_delivery: str = ""
+    policy_returns: str = ""
+    # когда магазин зарегистрирован — «На ВайСклад с …» в публичном профиле
+    # (B2 п.2). Заполняется мапперами из TenantModel.created_at (TimestampMixin),
+    # у самой Tenant это единственное поле, публикующее created_at наружу —
+    # остальной домен считает его инфраструктурной деталью
+    created_at: datetime | None = None
 
 
 @dataclass
