@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Protocol
 
+from app.domain.platform.banners import PlatformBanner
 from app.domain.platform.entities import PlatformCategory
 
 
@@ -28,3 +30,23 @@ class IPlatformCategoryRepository(Protocol):
     async def delete(self, category_id: int) -> None:
         """Физическое удаление — вызывать только когда has_bindings() вернул False."""
         ...
+
+
+class IPlatformBannerRepository(Protocol):
+    """Глобальный справочник баннеров (без tenant_id) — тот же принцип, что
+    и у IPlatformCategoryRepository."""
+
+    async def add(self, banner: PlatformBanner) -> PlatformBanner: ...
+    async def save(self, banner: PlatformBanner) -> PlatformBanner: ...
+    async def get(self, banner_id: int) -> PlatformBanner | None: ...
+    async def list_all(self) -> list[PlatformBanner]:
+        """Все баннеры, включая неактивные/просроченные — для админки."""
+        ...
+    async def list_live(self, today: date, city: str | None) -> list[PlatformBanner]:
+        """Активные баннеры, подходящие по датам и городу — is_live() уже
+        применён на уровне SQL (см. реализацию), отсортированы по sort_order."""
+        ...
+    async def set_image(
+        self, banner_id: int, image: str | None = None, image_mobile: str | None = None
+    ) -> PlatformBanner: ...
+    async def delete(self, banner_id: int) -> None: ...

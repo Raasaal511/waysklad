@@ -11,6 +11,13 @@ from app.application.admin.get_server_status import (
 )
 from app.application.admin.get_tenant_detail import get_tenant_detail
 from app.application.admin.list_tenants import list_tenants
+from app.application.admin.platform_banners import (
+    create_platform_banner,
+    delete_platform_banner,
+    list_all_platform_banners,
+    set_platform_banner_image,
+    update_platform_banner,
+)
 from app.application.admin.platform_categories import (
     create_platform_category,
     delete_platform_category,
@@ -29,6 +36,8 @@ from app.infrastructure.notifications.ws_broadcast import broadcaster
 from app.presentation.admin.schemas import (
     AdminLoginRequest,
     AdminTokenResponse,
+    BannerRequest,
+    BannerResponse,
     ErrorLogResponse,
     PlatformCategoryCreateRequest,
     PlatformCategoryResponse,
@@ -208,3 +217,64 @@ async def admin_set_platform_category_image(
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Категория не найдена")
     return PlatformCategoryResponse.from_entity(category)
+
+
+@router.get("/banners")
+async def admin_list_banners(factory: SessionFactoryDep) -> list[BannerResponse]:
+    banners = await list_all_platform_banners(factory)
+    return [BannerResponse.from_entity(b) for b in banners]
+
+
+@router.post("/banners", status_code=201)
+async def admin_create_banner(
+    body: BannerRequest, factory: SessionFactoryDep, cache: CacheDep
+) -> BannerResponse:
+    banner = await create_platform_banner(factory, cache, body.to_fields())
+    return BannerResponse.from_entity(banner)
+
+
+@router.put("/banners/{banner_id}")
+async def admin_update_banner(
+    banner_id: int, body: BannerRequest, factory: SessionFactoryDep, cache: CacheDep
+) -> BannerResponse:
+    banner = await update_platform_banner(factory, cache, banner_id, body.to_fields())
+    if banner is None:
+        raise HTTPException(status_code=404, detail="Баннер не найден")
+    return BannerResponse.from_entity(banner)
+
+
+@router.delete("/banners/{banner_id}")
+async def admin_delete_banner(
+    banner_id: int, factory: SessionFactoryDep, cache: CacheDep, storage: FileStorageDep
+) -> BannerResponse:
+    banner = await delete_platform_banner(factory, cache, storage, banner_id)
+    if banner is None:
+        raise HTTPException(status_code=404, detail="Баннер не найден")
+    return BannerResponse.from_entity(banner)
+
+
+@router.post("/banners/{banner_id}/image", status_code=201)
+async def admin_set_banner_image(
+    banner_id: int, file: UploadFile, factory: SessionFactoryDep, cache: CacheDep, storage: FileStorageDep
+) -> BannerResponse:
+    try:
+        banner = await set_platform_banner_image(
+            factory, cache, storage, banner_id, file.filename or "banner.jpg", await file.read()
+        )
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Баннер не найден")
+    return BannerResponse.from_entity(banner)
+
+
+@router.post("/banners/{banner_id}/image-mobile", status_code=201)
+async def admin_set_banner_image_mobile(
+    banner_id: int, file: UploadFile, factory: SessionFactoryDep, cache: CacheDep, storage: FileStorageDep
+) -> BannerResponse:
+    try:
+        banner = await set_platform_banner_image(
+            factory, cache, storage, banner_id, file.filename or "banner.jpg", await file.read(),
+            mobile=True,
+        )
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Баннер не найден")
+    return BannerResponse.from_entity(banner)

@@ -1,6 +1,7 @@
+from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import JSON, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Date, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.db.models.base import Base, TenantMixin, TimestampMixin
@@ -31,6 +32,28 @@ class PlatformCategoryModel(Base, TimestampMixin):
     sort_order: Mapped[int] = mapped_column(default=0)
     is_active: Mapped[bool] = mapped_column(default=True)
     parent_id: Mapped[int | None] = mapped_column(ForeignKey("platform_categories.id"))
+
+
+class PlatformBannerModel(Base, TimestampMixin):
+    """Баннер платформы (карусель hero / промо-плитки главной маркетплейса) —
+    без tenant_id, ведёт только админ (см. app.domain.platform.banners.PlatformBanner)."""
+
+    __tablename__ = "platform_banners"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    placement: Mapped[str] = mapped_column(String(20), index=True)  # 'hero' | 'promo'
+    title: Mapped[str] = mapped_column(String(300))
+    subtitle: Mapped[str] = mapped_column(String(500), default="")
+    button_text: Mapped[str] = mapped_column(String(100), default="")
+    link: Mapped[str] = mapped_column(String(500), default="")
+    image: Mapped[str] = mapped_column(String(500), default="")
+    image_mobile: Mapped[str] = mapped_column(String(500), default="")
+    theme: Mapped[str] = mapped_column(String(20), default="light")
+    sort_order: Mapped[int] = mapped_column(default=0)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    starts_at: Mapped[date | None] = mapped_column(Date)
+    ends_at: Mapped[date | None] = mapped_column(Date)
+    city: Mapped[str | None] = mapped_column(String(100))  # None — показывать во всех городах
 
 
 class CategoryModel(Base, TenantMixin, TimestampMixin):

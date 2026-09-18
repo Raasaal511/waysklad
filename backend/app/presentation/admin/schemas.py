@@ -1,12 +1,16 @@
+from datetime import date
+
 from pydantic import BaseModel, Field
 
 from app.application.admin.get_server_status import MetricsPoint, RecentTenant, ServerStatusResult
 from app.application.admin.get_tenant_detail import TenantDetail
 from app.application.admin.list_tenants import TenantListItem
+from app.application.admin.platform_banners import BannerFields
 from app.application.admin.platform_categories import (
     CreatePlatformCategoryCommand,
     UpdatePlatformCategoryCommand,
 )
+from app.domain.platform.banners import PlatformBanner
 from app.domain.platform.entities import PlatformCategory
 
 
@@ -207,4 +211,74 @@ class PlatformCategoryResponse(BaseModel):
             sort_order=category.sort_order,
             is_active=category.is_active,
             parent_id=category.parent_id,
+        )
+
+
+class BannerRequest(BaseModel):
+    """Общее тело создания/редактирования баннера — is_active игнорируется при
+    создании (новый баннер всегда активен), как и у PlatformCategory*Request."""
+
+    placement: str
+    title: str = Field(min_length=1, max_length=300)
+    subtitle: str = Field("", max_length=500)
+    button_text: str = Field("", max_length=100)
+    link: str = Field("", max_length=500)
+    theme: str = "light"
+    sort_order: int = 0
+    starts_at: date | None = None
+    ends_at: date | None = None
+    city: str | None = None
+    is_active: bool = True
+
+    model_config = {"extra": "forbid"}
+
+    def to_fields(self) -> BannerFields:
+        return BannerFields(
+            placement=self.placement,
+            title=self.title,
+            subtitle=self.subtitle,
+            button_text=self.button_text,
+            link=self.link,
+            theme=self.theme,
+            sort_order=self.sort_order,
+            starts_at=self.starts_at,
+            ends_at=self.ends_at,
+            city=self.city,
+            is_active=self.is_active,
+        )
+
+
+class BannerResponse(BaseModel):
+    id: int
+    placement: str
+    title: str
+    subtitle: str
+    button_text: str
+    link: str
+    image: str
+    image_mobile: str
+    theme: str
+    sort_order: int
+    is_active: bool
+    starts_at: date | None
+    ends_at: date | None
+    city: str | None
+
+    @classmethod
+    def from_entity(cls, banner: PlatformBanner) -> "BannerResponse":
+        return cls(
+            id=banner.id,
+            placement=banner.placement,
+            title=banner.title,
+            subtitle=banner.subtitle,
+            button_text=banner.button_text,
+            link=banner.link,
+            image=banner.image,
+            image_mobile=banner.image_mobile,
+            theme=banner.theme,
+            sort_order=banner.sort_order,
+            is_active=banner.is_active,
+            starts_at=banner.starts_at,
+            ends_at=banner.ends_at,
+            city=banner.city,
         )
