@@ -126,6 +126,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     MarkNotificationReadDep,
     PreviewImportProductsDep,
     ReceiveGoodsDep,
+    RecordProductViewDep,
     RegisterShopDep,
     RejectStorefrontRequestDep,
     RepayDebtDep,

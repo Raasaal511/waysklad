@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Protocol
 
 from app.domain.storefront.entities import StorefrontMessage, StorefrontRequest
@@ -31,3 +31,15 @@ class IStorefrontRequestRepository(Protocol):
 class IStorefrontMessageRepository(Protocol):
     async def add(self, message: StorefrontMessage) -> StorefrontMessage: ...
     async def list_by_request(self, request_id: int) -> list[StorefrontMessage]: ...
+
+
+class IProductViewRepository(Protocol):
+    async def record_view(self, product_id: int, day: date) -> None:
+        """Инкремент дневного счётчика (upsert) — дедупликация по IP уже
+        сделана вызывающим use case через Redis, сюда попадают только
+        засчитанные просмотры."""
+        ...
+
+    async def views_since(self, product_id: int, since: date) -> int:
+        """Сумма count за дни >= since (включительно) — для views_90d."""
+        ...

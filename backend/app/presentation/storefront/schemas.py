@@ -14,13 +14,13 @@ from app.application.storefront.get_catalog import (
     StorefrontCategoryCount,
 )
 from app.application.customers.list_my_requests import MyStorefrontRequestItem
-from app.application.storefront.get_product import StorefrontProductResult
+from app.application.storefront.get_product import StorefrontProductResult, VariantStock
 from app.application.storefront.get_request_status import StorefrontRequestStatusResult
 from app.application.storefront.send_message import (
     SendStaffStorefrontMessageCommand,
     SendStorefrontMessageCommand,
 )
-from app.domain.catalog.entities import Product
+from app.domain.catalog.entities import Category, Product, ProductVariant
 from app.domain.orders.entities import Order
 from app.domain.reviews.repository import ProductRatingAggregate
 from app.domain.storefront.entities import StorefrontMessage, StorefrontRequest
@@ -161,12 +161,69 @@ class StorefrontCatalogResponse(BaseModel):
         )
 
 
+def _variant_display_name(variant: ProductVariant, index: int) -> str:
+    """name, если задан; иначе «color · size» без пустых частей; иначе
+    «Вариант N» (index — 1-based позиция варианта в списке товара)."""
+    if variant.name.strip():
+        return variant.name.strip()
+    parts = [p for p in (variant.color.strip(), variant.size.strip()) if p]
+    if parts:
+        return " · ".join(parts)
+    return f"Вариант {index}"
+
+
 class StorefrontProductVariantResponse(BaseModel):
     id: int
     size: str
     color: str
     photo: str
     price: Decimal | None
+    name: str
+    display_name: str
+    in_stock: bool
+    stock_level: str
+    stock_qty: str | None  # заполнен только если у магазина включена настройка витрины
+
+    @classmethod
+    def from_entity(
+        cls, variant: ProductVariant, index: int, stock: VariantStock | None, show_stock_qty: bool
+    ) -> "StorefrontProductVariantResponse":
+        resolved_stock = stock or VariantStock(
+            variant_id=variant.id or 0, in_stock=False, stock_level="out", quantity=Decimal("0.000")
+        )
+        return cls(
+            id=variant.id,
+            size=variant.size,
+            color=variant.color,
+            photo=variant.photo,
+            price=variant.price.amount if variant.price else None,
+            name=variant.name,
+            display_name=_variant_display_name(variant, index),
+            in_stock=resolved_stock.in_stock,
+            stock_level=resolved_stock.stock_level,
+            stock_qty=str(resolved_stock.quantity) if show_stock_qty else None,
+        )
+
+
+class StorefrontCategoryRefResponse(BaseModel):
+    id: int
+    name: str
+
+
+class StorefrontProductCategoryResponse(BaseModel):
+    id: int
+    name: str
+    parent: StorefrontCategoryRefResponse | None
+
+    @classmethod
+    def from_entity(cls, category: Category, parent: Category | None) -> "StorefrontProductCategoryResponse":
+        return cls(
+            id=category.id,
+            name=category.name,
+            parent=StorefrontCategoryRefResponse(id=parent.id, name=parent.name)
+            if parent is not None
+            else None,
+        )
 
 
 class StorefrontProductDetailResponse(StorefrontProductResponse):
@@ -175,8 +232,15 @@ class StorefrontProductDetailResponse(StorefrontProductResponse):
 
     sku: str
     description: str
+    warranty_text: str
     storefront_photos: list[str]
     variants: list[StorefrontProductVariantResponse]
+    stock_level: str
+    stock_qty: str | None
+    category: StorefrontProductCategoryResponse | None
+    unit_code: str
+    unit_label: str
+    views_90d: int
 
     @classmethod
     def from_entity(
@@ -186,19 +250,60 @@ class StorefrontProductDetailResponse(StorefrontProductResponse):
         sold_count: Decimal = Decimal("0"),
         rating: ProductRatingAggregate = _EMPTY_RATING,
     ) -> "StorefrontProductDetailResponse":
+        """Облегчённый конструктор без остатков по видимым складам магазина,
+        категории и просмотров — для мест, где их ещё не считают (сейчас:
+        GET /api/marketplace/products/{id}, см. MarketplaceProductPageResponse).
+        Публичная карточка одной витрины (GetStorefrontProductUseCase) всегда
+        идёт через from_result() — с честными stock_level/stock_qty/category."""
         base = StorefrontProductResponse.from_entity(product, in_stock, sold_count, rating)
+        fallback_level = "in" if in_stock else "out"
         return cls(
             **base.model_dump(),
             sku=product.sku,
             description=product.description,
+            warranty_text=product.warranty_text,
             storefront_photos=list(product.storefront_photos),
             variants=[
-                StorefrontProductVariantResponse(
-                    id=v.id, size=v.size, color=v.color,
-                    photo=v.photo, price=v.price.amount if v.price else None,
-                )
-                for v in product.variants
+                StorefrontProductVariantResponse.from_entity(v, index, None, False)
+                for index, v in enumerate(product.variants, start=1)
             ],
+            stock_level=fallback_level,
+            stock_qty=None,
+            category=None,
+            unit_code=product.unit.code,
+            unit_label=product.unit.name,
+            views_90d=0,
+        )
+
+    @classmethod
+    def from_result(cls, result: StorefrontProductResult) -> "StorefrontProductDetailResponse":
+        product = result.product
+        base = StorefrontProductResponse.from_entity(
+            product, result.in_stock, result.sold_count, result.rating
+        )
+        return cls(
+            **base.model_dump(),
+            sku=product.sku,
+            description=product.description,
+            warranty_text=product.warranty_text,
+            storefront_photos=list(product.storefront_photos),
+            variants=[
+                StorefrontProductVariantResponse.from_entity(
+                    v, index, result.variant_stock.get(v.id) if v.id is not None else None,
+                    result.show_stock_qty,
+                )
+                for index, v in enumerate(product.variants, start=1)
+            ],
+            stock_level=result.stock_level,
+            stock_qty=str(result.stock_qty) if result.stock_qty is not None else None,
+            category=StorefrontProductCategoryResponse.from_entity(
+                result.category.category, result.category.parent
+            )
+            if result.category is not None
+            else None,
+            unit_code=product.unit.code,
+            unit_label=product.unit.name,
+            views_90d=result.views_90d,
         )
 
 
@@ -210,9 +315,7 @@ class StorefrontProductPageResponse(BaseModel):
     def from_result(cls, result: StorefrontProductResult) -> "StorefrontProductPageResponse":
         return cls(
             shop_name=result.shop_name,
-            product=StorefrontProductDetailResponse.from_entity(
-                result.product, result.in_stock, result.sold_count, result.rating
-            ),
+            product=StorefrontProductDetailResponse.from_result(result),
         )
 
 

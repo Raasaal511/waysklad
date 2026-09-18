@@ -1,7 +1,19 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Enum as SAEnum, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Enum as SAEnum,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.storefront.entities import MessageAuthor, StorefrontRequestStatus
@@ -68,3 +80,17 @@ class StorefrontMessageModel(Base, TenantMixin):
     author: Mapped[MessageAuthor] = mapped_column(MessageAuthorColumn)
     text: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ProductViewDailyModel(Base, TenantMixin):
+    """Просмотры карточки товара, агрегированные по дню — сырые события
+    (кто, когда, с какого IP) не храним, см. промпт B1 п.5: дедупликация
+    делается на уровне Redis-ключа до инкремента этого счётчика."""
+
+    __tablename__ = "product_view_daily"
+    __table_args__ = (UniqueConstraint("tenant_id", "product_id", "day"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"))
+    day: Mapped[date] = mapped_column(Date)
+    count: Mapped[int] = mapped_column(Integer, default=0)

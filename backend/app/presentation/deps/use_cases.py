@@ -135,6 +135,7 @@ from app.application.storefront.list_messages import (
     ListStorefrontMessagesUseCase,
 )
 from app.application.storefront.list_requests import ListStorefrontRequestsUseCase
+from app.application.storefront.record_product_view import RecordProductViewUseCase
 from app.application.storefront.reject_request import RejectStorefrontRequestUseCase
 from app.application.storefront.send_message import (
     SendStaffStorefrontMessageUseCase,
@@ -392,6 +393,12 @@ def get_storefront_product(
     return GetStorefrontProductUseCase(factory, cache)
 
 
+def get_record_product_view(
+    factory: SessionFactoryDep, cache: CacheDep
+) -> RecordProductViewUseCase:
+    return RecordProductViewUseCase(factory, cache)
+
+
 def get_storefront_request_status(factory: SessionFactoryDep) -> GetStorefrontRequestStatusUseCase:
     return GetStorefrontRequestStatusUseCase(factory)
 
@@ -610,6 +617,9 @@ ListShopsDep = Annotated[ListShopsUseCase, Depends(get_list_shops)]
 SuggestDep = Annotated[SuggestUseCase, Depends(get_suggest)]
 GetStorefrontProductDep = Annotated[
     GetStorefrontProductUseCase, Depends(get_storefront_product)
+]
+RecordProductViewDep = Annotated[
+    RecordProductViewUseCase, Depends(get_record_product_view)
 ]
 GetStorefrontRequestStatusDep = Annotated[
     GetStorefrontRequestStatusUseCase, Depends(get_storefront_request_status)

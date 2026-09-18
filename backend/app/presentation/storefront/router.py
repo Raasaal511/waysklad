@@ -2,10 +2,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
+from slowapi.util import get_remote_address
 
 from app.application.storefront.get_product import GetStorefrontProductCommand
 from app.application.storefront.get_request_status import GetStorefrontRequestStatusCommand
 from app.application.storefront.list_messages import ListStorefrontMessagesCommand
+from app.application.storefront.record_product_view import RecordProductViewCommand
 from app.application.storefront.reject_request import RejectStorefrontRequestCommand
 from app.domain.identity.permissions import Permission
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
@@ -23,6 +25,7 @@ from app.presentation.deps import (
     ListStaffStorefrontMessagesDep,
     ListStorefrontMessagesDep,
     ListStorefrontRequestsDep,
+    RecordProductViewDep,
     RejectStorefrontRequestDep,
     SendStaffStorefrontMessageDep,
     SendStorefrontMessageDep,
@@ -75,6 +78,23 @@ async def get_storefront_product(
     if result is None:
         raise HTTPException(status_code=404, detail="Товар не найден")
     return StorefrontProductPageResponse.from_result(result)
+
+
+@router.post("/{slug}/products/{product_id}/view", status_code=204)
+@limiter.limit("120/minute")
+async def record_storefront_product_view(
+    request: Request, slug: str, product_id: int, use_case: RecordProductViewDep
+) -> None:
+    """Без авторизации — вызывается при открытии карточки товара покупателем
+    (в т.ч. анонимным). 404 — как у самой карточки: и несуществующий, и
+    скрытый товар неотличимы снаружи."""
+    found = await use_case.execute(
+        RecordProductViewCommand(
+            slug=slug, product_id=product_id, client_ip=get_remote_address(request)
+        )
+    )
+    if not found:
+        raise HTTPException(status_code=404, detail="Товар не найден")
 
 
 @router.get("/{slug}/og", response_class=HTMLResponse)
