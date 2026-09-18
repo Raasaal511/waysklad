@@ -29,6 +29,7 @@ class CreateProductCommand:
     unit_code: str
     purchase_price: Decimal
     retail_price: Decimal
+    compare_at_price: Decimal | None = None
     sku: str = ""
     barcode: str | None = None
     category_id: int | None = None
@@ -78,12 +79,18 @@ class CreateProductUseCase:
                 if qty is not None and qty <= 0:
                     raise DomainError("Мин. количество и шаг заказа на витрине должны быть больше нуля")
 
+            if cmd.compare_at_price is not None and cmd.compare_at_price <= cmd.retail_price:
+                raise DomainError("Старая цена должна быть больше текущей")
+
             product = Product(
                 id=None,
                 name=cmd.name,
                 unit=unit,
                 purchase_price=Money.of(cmd.purchase_price),
                 retail_price=Money.of(cmd.retail_price),
+                compare_at_price=Money.of(cmd.compare_at_price)
+                if cmd.compare_at_price is not None
+                else None,
                 sku=cmd.sku,
                 barcode=Barcode(cmd.barcode) if cmd.barcode else None,
                 category_id=cmd.category_id,

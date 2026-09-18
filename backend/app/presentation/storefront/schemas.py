@@ -34,10 +34,11 @@ class StorefrontCatalogParams(BaseModel):
     offset: int = Field(0, ge=0)
     category_id: int | None = None
     warehouse_id: int | None = None  # витрина одного склада — см. ?warehouse=<id>
-    sort: str = "name"  # name, price_asc, price_desc, created_desc
+    sort: str = "name"  # name, price_asc, price_desc, created_desc, popular, rating, discount
     min_price: Decimal | None = Field(None, ge=0)
     max_price: Decimal | None = Field(None, ge=0)
     in_stock_only: bool = False
+    with_discount: bool = False
     variant_size: str | None = None
     variant_color: str | None = None
     min_rating: int | None = Field(None, ge=1, le=5)
@@ -56,6 +57,7 @@ class StorefrontCatalogParams(BaseModel):
             min_price=self.min_price,
             max_price=self.max_price,
             in_stock_only=self.in_stock_only,
+            with_discount=self.with_discount,
             variant_size=self.variant_size,
             variant_color=self.variant_color,
             min_rating=self.min_rating,
@@ -84,6 +86,8 @@ class StorefrontProductResponse(BaseModel):
     id: int
     name: str
     retail_price: Decimal
+    old_price: Decimal | None  # None и при отсутствии скидки, и когда retail_price подняли выше compare_at_price
+    discount_percent: int | None  # округление вниз, только при >= 3%
     photo: str
     category_id: int | None
     in_stock: bool
@@ -105,6 +109,8 @@ class StorefrontProductResponse(BaseModel):
             id=product.id,
             name=product.name,
             retail_price=product.retail_price.amount,
+            old_price=product.old_price.amount if product.old_price is not None else None,
+            discount_percent=product.discount_percent,
             photo=product.photo,
             category_id=product.category_id,
             in_stock=in_stock,
