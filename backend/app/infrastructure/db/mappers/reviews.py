@@ -14,12 +14,14 @@ class ReviewMapper:
             text=review.text,
             author_name=review.author_name,
             photo=review.photo,
+            photos=review.photos,
+            tags=review.tags,
             is_hidden=review.is_hidden,
         )
 
     @staticmethod
     def to_entity(model: ReviewModel) -> Review:
-        return Review(
+        entity = Review(
             id=model.id,
             tenant_id=model.tenant_id,
             product_id=model.product_id,
@@ -29,6 +31,10 @@ class ReviewMapper:
             text=model.text,
             author_name=model.author_name,
             photo=model.photo,
+            photos=list(model.photos or []),
+            tags=list(model.tags or []),
             is_hidden=model.is_hidden,
             created_at=model.created_at,
         )
+        entity.normalize_photos()  # photo/photos согласованы независимо от того, что было в БД
+        return entity

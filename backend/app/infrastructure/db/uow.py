@@ -33,7 +33,11 @@ from app.infrastructure.db.repositories.platform import (
     SqlAlchemyPlatformBannerRepository,
     SqlAlchemyPlatformCategoryRepository,
 )
-from app.infrastructure.db.repositories.reviews import SqlAlchemyReviewRepository
+from app.infrastructure.db.repositories.reviews import (
+    SqlAlchemyReviewRepository,
+    SqlAlchemyReviewUploadRepository,
+    SqlAlchemyReviewVoteRepository,
+)
 from app.infrastructure.db.repositories.sales import (
     SqlAlchemySaleRepository,
     SqlAlchemySaleReturnRepository,
@@ -80,6 +84,8 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.storefront_messages = SqlAlchemyStorefrontMessageRepository(self)
         self.product_views = SqlAlchemyProductViewRepository(self)
         self.reviews = SqlAlchemyReviewRepository(self)
+        self.review_uploads = SqlAlchemyReviewUploadRepository(self)
+        self.review_votes = SqlAlchemyReviewVoteRepository(self)
         self.tasks = SqlAlchemyTaskRepository(self)
         self.notifications = SqlAlchemyNotificationRepository(self)
         self.audit = SqlAlchemyAuditRepository(self)

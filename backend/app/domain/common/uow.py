@@ -27,7 +27,11 @@ if TYPE_CHECKING:
     from app.domain.notifications.repository import INotificationRepository
     from app.domain.orders.repository import IOrderRepository
     from app.domain.platform.repository import IPlatformBannerRepository, IPlatformCategoryRepository
-    from app.domain.reviews.repository import IReviewRepository
+    from app.domain.reviews.repository import (
+        IReviewRepository,
+        IReviewUploadRepository,
+        IReviewVoteRepository,
+    )
     from app.domain.sales.repository import ISaleRepository, ISaleReturnRepository
     from app.domain.storefront.repository import (
         IProductViewRepository,
@@ -67,6 +71,8 @@ class IUnitOfWork(ABC):
     storefront_messages: IStorefrontMessageRepository
     product_views: IProductViewRepository
     reviews: IReviewRepository
+    review_uploads: IReviewUploadRepository
+    review_votes: IReviewVoteRepository
     tasks: ITaskRepository
     notifications: INotificationRepository
     audit: IAuditRepository
