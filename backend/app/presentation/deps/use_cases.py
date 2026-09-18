@@ -114,10 +114,14 @@ from app.application.products.update_product import UpdateProductUseCase
 from app.application.sales.create_sale import CreateSaleUseCase
 from app.application.sales.delete_sale import DeleteSaleUseCase
 from app.application.sales.edit_sale import EditSaleUseCase
+from app.application.reviews.check_review_eligibility import CheckReviewEligibilityUseCase
 from app.application.reviews.create_review import CreateReviewUseCase
+from app.application.reviews.list_all_reviews_for_owner import ListAllReviewsForOwnerUseCase
 from app.application.reviews.list_product_reviews import ListProductReviewsUseCase
 from app.application.reviews.list_reviews_for_owner import ListReviewsForOwnerUseCase
 from app.application.reviews.set_review_hidden import SetReviewHiddenUseCase
+from app.application.reviews.upload_review_photo import UploadReviewPhotoUseCase
+from app.application.reviews.vote_review import VoteReviewUseCase
 from app.application.sales.get_receipt_data import GetReceiptDataUseCase
 from app.application.sales.get_sale import GetSaleUseCase
 from app.application.sales.get_sale_history import GetSaleHistoryUseCase
@@ -455,7 +459,22 @@ def get_list_product_reviews(factory: SessionFactoryDep) -> ListProductReviewsUs
     return ListProductReviewsUseCase(factory)
 
 
+def get_upload_review_photo(
+    factory: SessionFactoryDep, storage: FileStorageDep
+) -> UploadReviewPhotoUseCase:
+    return UploadReviewPhotoUseCase(factory, storage)
+
+
+def get_vote_review(factory: SessionFactoryDep) -> VoteReviewUseCase:
+    return VoteReviewUseCase(factory)
+
+
+def get_check_review_eligibility(factory: SessionFactoryDep) -> CheckReviewEligibilityUseCase:
+    return CheckReviewEligibilityUseCase(factory)
+
+
 get_list_reviews_for_owner = _with_uow(ListReviewsForOwnerUseCase)
+get_list_all_reviews_for_owner = _with_uow(ListAllReviewsForOwnerUseCase)
 get_set_review_hidden = _with_uow_and_cache(SetReviewHiddenUseCase)
 
 
@@ -674,8 +693,16 @@ SendStaffStorefrontMessageDep = Annotated[
 ]
 CreateReviewDep = Annotated[CreateReviewUseCase, Depends(get_create_review)]
 ListProductReviewsDep = Annotated[ListProductReviewsUseCase, Depends(get_list_product_reviews)]
+UploadReviewPhotoDep = Annotated[UploadReviewPhotoUseCase, Depends(get_upload_review_photo)]
+VoteReviewDep = Annotated[VoteReviewUseCase, Depends(get_vote_review)]
+CheckReviewEligibilityDep = Annotated[
+    CheckReviewEligibilityUseCase, Depends(get_check_review_eligibility)
+]
 ListReviewsForOwnerDep = Annotated[
     ListReviewsForOwnerUseCase, Depends(get_list_reviews_for_owner)
+]
+ListAllReviewsForOwnerDep = Annotated[
+    ListAllReviewsForOwnerUseCase, Depends(get_list_all_reviews_for_owner)
 ]
 SetReviewHiddenDep = Annotated[SetReviewHiddenUseCase, Depends(get_set_review_hidden)]
  

@@ -31,6 +31,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     ChangeOrderStatusDep,
     ChangePasswordDep,
     ChangeTaskStatusDep,
+    CheckReviewEligibilityDep,
     ConnectTelegramDep,
     CreateCategoryDep,
     CreateClientDep,
@@ -96,6 +97,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     IssueSupplierDebtDep,
     ListActiveOrdersDep,
     ListActiveTasksDep,
+    ListAllReviewsForOwnerDep,
     ListCategoriesDep,
     ListCitiesDep,
     ListClientDebtsDep,
@@ -157,5 +159,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     UpdateShopDep,
     UpdateTaskDep,
     UpdateWarehouseDetailsDep,
+    UploadReviewPhotoDep,
+    VoteReviewDep,
     WriteOffDep,
 )

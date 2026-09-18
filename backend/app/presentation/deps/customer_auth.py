@@ -41,3 +41,34 @@ async def get_current_customer(
 
 
 CurrentCustomerDep = Annotated[CurrentCustomer, Depends(get_current_customer)]
+
+
+async def get_current_customer_optional(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    factory: SessionFactoryDep,
+) -> CurrentCustomer | None:
+    """Как get_current_customer, но без 401 при отсутствии/недействительности
+    токена — для публичных эндпоинтов, где авторизация опциональна (промпт
+    B3 п.4/5: my_vote заполняется, если Authorization есть, иначе 0, без
+    ошибки). Невалидный токен тоже тихо трактуется как «анонимный запрос»,
+    а не как ошибка — иначе протухший токен ломал бы публичный список."""
+    if credentials is None:
+        return None
+    try:
+        payload = decode_customer_access_token(credentials.credentials)
+    except jwt.InvalidTokenError:
+        return None
+
+    customer_id = int(payload["sub"])
+    token_version = payload.get("tv", 0)
+    uow = SqlAlchemyUnitOfWork(None, session_factory=factory)
+    async with uow:
+        current_version = await uow.customers.get_token_version(customer_id)
+    if current_version is None or current_version != token_version:
+        return None
+    return CurrentCustomer(id=customer_id)
+
+
+CurrentCustomerOptionalDep = Annotated[
+    CurrentCustomer | None, Depends(get_current_customer_optional)
+]
