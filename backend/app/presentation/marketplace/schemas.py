@@ -2,13 +2,17 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
+from app.application.marketplace.get_home import GetHomeCommand, GetHomeResult, HomeSection
 from app.application.marketplace.get_product import MarketplaceProductResult
 from app.application.marketplace.list_platform_categories import PlatformCategoryWithCount
 from app.application.marketplace.list_products import (
     ListMarketplaceProductsCommand,
     ListMarketplaceProductsResult,
 )
-from app.domain.marketplace.repository import MarketplaceProductRow
+from app.application.marketplace.list_shops import ListShopsCommand, ListShopsResult
+from app.application.marketplace.suggest import SuggestResult
+from app.domain.marketplace.repository import MarketplaceProductRow, ShopChip, SuggestProductRow
+from app.domain.platform.banners import PlatformBanner
 from app.presentation.storefront.schemas import StorefrontProductDetailResponse
 
 
@@ -172,4 +176,184 @@ class MarketplaceProductPageResponse(BaseModel):
             product=StorefrontProductDetailResponse.from_entity(
                 result.product, result.in_stock, result.sold_count, result.rating
             ),
+        )
+
+
+class BannerPublicResponse(BaseModel):
+    id: int
+    placement: str
+    title: str
+    subtitle: str
+    button_text: str
+    link: str
+    image: str
+    image_mobile: str
+    theme: str
+    city: str | None
+
+    @classmethod
+    def from_entity(cls, banner: PlatformBanner) -> "BannerPublicResponse":
+        return cls(
+            id=banner.id,
+            placement=banner.placement,
+            title=banner.title,
+            subtitle=banner.subtitle,
+            button_text=banner.button_text,
+            link=banner.link,
+            image=banner.image,
+            image_mobile=banner.image_mobile,
+            theme=banner.theme,
+            city=banner.city,
+        )
+
+
+class HomeBannersResponse(BaseModel):
+    hero: list[BannerPublicResponse]
+    promo: list[BannerPublicResponse]
+
+
+class ShopChipResponse(BaseModel):
+    slug: str
+    name: str
+    logo: str
+    city: str | None
+    is_verified: bool
+    average_rating: float
+    reviews_count: int
+    products_count: int
+
+    @classmethod
+    def from_entity(cls, shop: ShopChip) -> "ShopChipResponse":
+        return cls(
+            slug=shop.slug,
+            name=shop.name,
+            logo=shop.logo,
+            city=shop.city,
+            is_verified=shop.is_verified,
+            average_rating=shop.average_rating,
+            reviews_count=shop.reviews_count,
+            products_count=shop.products_count,
+        )
+
+
+class HomeSectionResponse(BaseModel):
+    key: str
+    title: str
+    products: list[MarketplaceProductResponse]
+
+    @classmethod
+    def from_entity(cls, section: HomeSection) -> "HomeSectionResponse":
+        return cls(
+            key=section.key,
+            title=section.title,
+            products=[MarketplaceProductResponse.from_row(p) for p in section.products],
+        )
+
+
+class HomeStatsResponse(BaseModel):
+    shops_count: int
+    products_count: int
+    cities_count: int
+
+
+class MarketplaceHomeParams(BaseModel):
+    city: str | None = None
+
+    model_config = {"extra": "forbid"}
+
+    def to_command(self) -> GetHomeCommand:
+        return GetHomeCommand(city=self.city)
+
+
+class MarketplaceHomeResponse(BaseModel):
+    banners: HomeBannersResponse
+    categories: list[PlatformCategoryPublicResponse]
+    shops: list[ShopChipResponse]
+    sections: list[HomeSectionResponse]
+    stats: HomeStatsResponse
+
+    @classmethod
+    def from_result(cls, result: GetHomeResult) -> "MarketplaceHomeResponse":
+        return cls(
+            banners=HomeBannersResponse(
+                hero=[BannerPublicResponse.from_entity(b) for b in result.hero_banners],
+                promo=[BannerPublicResponse.from_entity(b) for b in result.promo_banners],
+            ),
+            categories=[
+                PlatformCategoryPublicResponse(
+                    id=c.id, slug=c.slug, name=c.name, image=c.image, parent_id=c.parent_id,
+                    products_count=result.category_products_counts.get(c.id, 0),
+                )
+                for c in result.categories
+            ],
+            shops=[ShopChipResponse.from_entity(s) for s in result.shops],
+            sections=[HomeSectionResponse.from_entity(s) for s in result.sections],
+            stats=HomeStatsResponse(
+                shops_count=result.stats.shops_count,
+                products_count=result.stats.products_count,
+                cities_count=result.stats.cities_count,
+            ),
+        )
+
+
+class MarketplaceShopsParams(BaseModel):
+    city: str | None = None
+    query: str = ""
+    sort: str = "popular"  # popular | rating | new
+    limit: int = Field(20, le=50)
+    offset: int = Field(0, ge=0)
+
+    model_config = {"extra": "forbid"}
+
+    def to_command(self) -> ListShopsCommand:
+        return ListShopsCommand(
+            city=self.city, query=self.query, sort=self.sort,
+            limit=self.limit, offset=self.offset,
+        )
+
+
+class MarketplaceShopsResponse(BaseModel):
+    shops: list[ShopChipResponse]
+    total: int
+
+    @classmethod
+    def from_result(cls, result: ListShopsResult) -> "MarketplaceShopsResponse":
+        return cls(
+            shops=[ShopChipResponse.from_entity(s) for s in result.shops], total=result.total
+        )
+
+
+class SuggestProductResponse(BaseModel):
+    id: int
+    name: str
+    photo: str
+    price: Decimal
+    shop_slug: str
+
+    @classmethod
+    def from_row(cls, row: SuggestProductRow) -> "SuggestProductResponse":
+        return cls(
+            id=row.product_id, name=row.name, photo=row.photo,
+            price=row.retail_price, shop_slug=row.shop_slug,
+        )
+
+
+class SuggestCategoryResponse(BaseModel):
+    slug: str
+    name: str
+
+
+class SuggestResponse(BaseModel):
+    products: list[SuggestProductResponse]
+    shops: list[ShopChipResponse]
+    categories: list[SuggestCategoryResponse]
+
+    @classmethod
+    def from_result(cls, result: SuggestResult) -> "SuggestResponse":
+        return cls(
+            products=[SuggestProductResponse.from_row(p) for p in result.products],
+            shops=[ShopChipResponse.from_entity(s) for s in result.shops],
+            categories=[
+                SuggestCategoryResponse(slug=c.slug, name=c.name) for c in result.categories
+            ],
         )

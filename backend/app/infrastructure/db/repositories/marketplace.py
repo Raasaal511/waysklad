@@ -4,7 +4,12 @@ from decimal import Decimal
 from sqlalchemy import case, false, func, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.marketplace.repository import IMarketplaceProductRepository, MarketplaceProductRow
+from app.domain.marketplace.repository import (
+    IMarketplaceProductRepository,
+    MarketplaceProductRow,
+    ShopChip,
+    SuggestProductRow,
+)
 from app.domain.reviews.repository import ProductRatingAggregate
 from app.infrastructure.db.models.catalog import CategoryModel, ProductModel, ProductVariantModel
 from app.infrastructure.db.models.identity import TenantModel, WarehouseModel
@@ -155,6 +160,9 @@ class SqlAlchemyMarketplaceProductRepository(IMarketplaceProductRepository):
         offset: int = 0,
         min_rating: int | None = None,
         hit_product_ids: frozenset[int] = frozenset(),
+        skip_count: bool = False,
+        sold_counts: dict[int, Decimal] | None = None,
+        ratings: dict[int, ProductRatingAggregate] | None = None,
     ) -> tuple[list[MarketplaceProductRow], int]:
         if not visible_tenant_ids:
             return [], 0
@@ -224,14 +232,17 @@ class SqlAlchemyMarketplaceProductRepository(IMarketplaceProductRepository):
             .where(*conditions)
         )
 
-        count_stmt = (
-            select(func.count())
-            .select_from(ProductModel)
-            .join(TenantModel, TenantModel.id == ProductModel.tenant_id)
-            .outerjoin(CategoryModel, CategoryModel.id == ProductModel.category_id)
-            .where(*conditions)
-        )
-        total = (await self._session.execute(count_stmt)).scalar_one()
+        if skip_count:
+            total = -1  # вызывающему total не нужен (см. docstring в протоколе) — не считаем
+        else:
+            count_stmt = (
+                select(func.count())
+                .select_from(ProductModel)
+                .join(TenantModel, TenantModel.id == ProductModel.tenant_id)
+                .outerjoin(CategoryModel, CategoryModel.id == ProductModel.category_id)
+                .where(*conditions)
+            )
+            total = (await self._session.execute(count_stmt)).scalar_one()
 
         if sort == "popular":
             since = datetime.now(timezone.utc) - timedelta(days=_HIT_WINDOW_DAYS)
@@ -249,8 +260,10 @@ class SqlAlchemyMarketplaceProductRepository(IMarketplaceProductRepository):
         rows = (await self._session.execute(stmt)).all()
 
         product_ids = [product.id for product, _, _, _ in rows]
-        sold_counts = await self.sold_count_by_products(product_ids)
-        ratings = await self.rating_by_products(product_ids)
+        if sold_counts is None:
+            sold_counts = await self.sold_count_by_products(product_ids)
+        if ratings is None:
+            ratings = await self.rating_by_products(product_ids)
         _empty_rating = ProductRatingAggregate(average_rating=0.0, reviews_count=0)
         new_cutoff = datetime.now(timezone.utc) - timedelta(days=_NEW_WINDOW_DAYS)
 
@@ -409,6 +422,164 @@ class SqlAlchemyMarketplaceProductRepository(IMarketplaceProductRepository):
             )
         ).all()
         return {city: count for city, count in rows}
+
+    async def list_shop_chips(
+        self,
+        visible_tenant_ids: list[int],
+        city: str | None = None,
+        query: str = "",
+        sort: str = "popular",
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[ShopChip], int]:
+        if not visible_tenant_ids:
+            return [], 0
+
+        visible_products = (
+            select(ProductModel.tenant_id, func.count(ProductModel.id).label("products_count"))
+            .where(
+                ProductModel.tenant_id.in_(visible_tenant_ids),
+                ProductModel.is_active.is_(True),
+                ProductModel.show_on_storefront.is_(True),
+            )
+            .group_by(ProductModel.tenant_id)
+            .subquery()
+        )
+        # магазины без единого видимого товара на витрине не считаются
+        # магазинами маркетплейса (см. промпт M-B2 п.2) — INNER JOIN отсекает их сразу
+        conditions = [TenantModel.id == visible_products.c.tenant_id]
+        if city is not None:
+            conditions.append(TenantModel.city == city)
+        if query.strip():
+            conditions.append(TenantModel.name.ilike(f"%{query.strip()}%"))
+
+        since = datetime.now(timezone.utc) - timedelta(days=_HIT_WINDOW_DAYS)
+        sold_expr = (
+            select(func.coalesce(func.sum(SaleLineModel.quantity), 0))
+            .join(SaleModel, SaleModel.id == SaleLineModel.sale_id)
+            .where(
+                SaleModel.tenant_id == TenantModel.id,
+                SaleModel.deleted_at.is_(None),
+                SaleModel.created_at >= since,
+            )
+            .correlate(TenantModel)
+            .scalar_subquery()
+        )
+        rating_expr = (
+            select(func.avg(ReviewModel.rating))
+            .where(ReviewModel.tenant_id == TenantModel.id, ReviewModel.is_hidden.is_(False))
+            .correlate(TenantModel)
+            .scalar_subquery()
+        )
+        reviews_count_expr = (
+            select(func.count(ReviewModel.id))
+            .where(ReviewModel.tenant_id == TenantModel.id, ReviewModel.is_hidden.is_(False))
+            .correlate(TenantModel)
+            .scalar_subquery()
+        )
+
+        # count(*) over() — общее число подходящих магазинов в той же строке,
+        # без отдельного COUNT(*)-запроса (см. промпт M-B2 п.2 — тест на
+        # число SQL-запросов у GET /marketplace/home, использующего эту функцию)
+        total_expr = func.count().over().label("total")
+
+        base = (
+            select(
+                TenantModel,
+                visible_products.c.products_count,
+                func.coalesce(sold_expr, 0).label("sold_count_30d"),
+                rating_expr.label("average_rating"),
+                func.coalesce(reviews_count_expr, 0).label("reviews_count"),
+                total_expr,
+            )
+            .join(visible_products, visible_products.c.tenant_id == TenantModel.id)
+            .where(*conditions)
+        )
+
+        if sort == "rating":
+            order_cols = (rating_expr.desc().nullslast(), reviews_count_expr.desc())
+        elif sort == "new":
+            order_cols = (TenantModel.created_at.desc(),)
+        else:  # popular (по умолчанию)
+            order_cols = (func.coalesce(sold_expr, 0).desc(),)
+
+        stmt = base.order_by(*order_cols).limit(limit).offset(offset)
+        rows = (await self._session.execute(stmt)).all()
+
+        total = rows[0].total if rows else 0
+        chips = [
+            ShopChip(
+                slug=tenant.slug or "",
+                name=tenant.name,
+                logo=tenant.logo,
+                city=tenant.city,
+                is_verified=tenant.is_verified,
+                average_rating=float(average_rating) if average_rating is not None else 0.0,
+                reviews_count=reviews_count,
+                products_count=products_count,
+                sold_count_30d=Decimal(sold_count_30d),
+            )
+            for tenant, products_count, sold_count_30d, average_rating, reviews_count, _total in rows
+        ]
+        return chips, total
+
+    async def suggest_products(
+        self, visible_tenant_ids: list[int], query: str, city: str | None, limit: int = 5
+    ) -> list[SuggestProductRow]:
+        if not visible_tenant_ids or not query.strip():
+            return []
+        pattern = f"%{query.strip()}%"
+        conditions = [
+            ProductModel.tenant_id.in_(visible_tenant_ids),
+            ProductModel.is_active.is_(True),
+            ProductModel.show_on_storefront.is_(True),
+            or_(ProductModel.name.ilike(pattern), ProductModel.sku.ilike(pattern)),
+        ]
+        stmt = (
+            select(ProductModel.id, ProductModel.name, ProductModel.photo,
+                   ProductModel.retail_price, TenantModel.slug)
+            .join(TenantModel, TenantModel.id == ProductModel.tenant_id)
+            .where(*conditions)
+        )
+        if city is not None:
+            stmt = stmt.where(TenantModel.city == city)
+        # по имени — самые точные совпадения (начинающиеся с запроса) первыми
+        stmt = stmt.order_by(
+            case((ProductModel.name.ilike(f"{query.strip()}%"), 0), else_=1), ProductModel.name
+        ).limit(limit)
+        rows = (await self._session.execute(stmt)).all()
+        return [
+            SuggestProductRow(
+                product_id=product_id, name=name, photo=photo,
+                retail_price=retail_price, shop_slug=shop_slug or "",
+            )
+            for product_id, name, photo, retail_price, shop_slug in rows
+        ]
+
+    async def platform_stats(self, visible_tenant_ids: list[int]) -> tuple[int, int]:
+        """(products_count, cities_count) — один запрос с двумя скалярными
+        подзапросами вместо двух отдельных SELECT (см. промпт M-B2 п.2: тест
+        на число SQL-запросов у GET /marketplace/home)."""
+        if not visible_tenant_ids:
+            return 0, 0
+        products_count_expr = (
+            select(func.count(ProductModel.id))
+            .where(
+                ProductModel.tenant_id.in_(visible_tenant_ids),
+                ProductModel.is_active.is_(True),
+                ProductModel.show_on_storefront.is_(True),
+            )
+            .scalar_subquery()
+        )
+        cities_count_expr = (
+            select(func.count(func.distinct(TenantModel.city)))
+            .where(TenantModel.id.in_(visible_tenant_ids), TenantModel.city.is_not(None))
+            .scalar_subquery()
+        )
+        row = (
+            await self._session.execute(select(products_count_expr, cities_count_expr))
+        ).one()
+        return row[0], row[1]
 
 
 def _compute_discount_percent(retail_price: Decimal, compare_at_price: Decimal | None) -> int | None:

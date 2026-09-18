@@ -33,6 +33,11 @@ def shop_prefix(slug: str) -> str:
 # в list_products.py/get_product.py).
 MARKETPLACE_CATALOG_PREFIX = "marketplace_catalog:"
 MARKETPLACE_PRODUCT_PREFIX = "marketplace_product:"
+# главная (M-B2): баннеры/секции меняются при verify/unverify/suspend магазина,
+# а также при любой мутации баннера в админке (см. platform_banners.py)
+MARKETPLACE_HOME_PREFIX = "marketplace_home:"
+MARKETPLACE_SHOPS_PREFIX = "marketplace_shops:"
+MARKETPLACE_SUGGEST_PREFIX = "marketplace_suggest:"
 
 
 async def invalidate_marketplace_cache(cache: ICache | None) -> None:
@@ -40,6 +45,9 @@ async def invalidate_marketplace_cache(cache: ICache | None) -> None:
         return
     await cache.delete_prefix(MARKETPLACE_CATALOG_PREFIX)
     await cache.delete_prefix(MARKETPLACE_PRODUCT_PREFIX)
+    await cache.delete_prefix(MARKETPLACE_HOME_PREFIX)
+    await cache.delete_prefix(MARKETPLACE_SHOPS_PREFIX)
+    await cache.delete_prefix(MARKETPLACE_SUGGEST_PREFIX)
 
 
 async def cached(

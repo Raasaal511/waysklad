@@ -69,10 +69,13 @@ from app.application.inventory.update_warehouse_details import (
     UpdateWarehouseDetailsUseCase,
 )
 from app.application.inventory.write_off import WriteOffUseCase
+from app.application.marketplace.get_home import GetMarketplaceHomeUseCase
 from app.application.marketplace.get_product import GetMarketplaceProductUseCase
 from app.application.marketplace.list_cities import ListCitiesUseCase
 from app.application.marketplace.list_platform_categories import ListPlatformCategoriesUseCase
 from app.application.marketplace.list_products import ListMarketplaceProductsUseCase
+from app.application.marketplace.list_shops import ListShopsUseCase
+from app.application.marketplace.suggest import SuggestUseCase
 from app.application.notifications.list_notifications import ListNotificationsUseCase
 from app.application.notifications.mark_read import (
     MarkAllNotificationsReadUseCase,
@@ -371,6 +374,18 @@ def get_list_cities(factory: SessionFactoryDep, cache: CacheDep) -> ListCitiesUs
     return ListCitiesUseCase(factory, cache)
 
 
+def get_marketplace_home(factory: SessionFactoryDep, cache: CacheDep) -> GetMarketplaceHomeUseCase:
+    return GetMarketplaceHomeUseCase(factory, cache)
+
+
+def get_list_shops(factory: SessionFactoryDep, cache: CacheDep) -> ListShopsUseCase:
+    return ListShopsUseCase(factory, cache)
+
+
+def get_suggest(factory: SessionFactoryDep, cache: CacheDep) -> SuggestUseCase:
+    return SuggestUseCase(factory, cache)
+
+
 def get_storefront_product(
     factory: SessionFactoryDep, cache: CacheDep
 ) -> GetStorefrontProductUseCase:
@@ -590,6 +605,9 @@ ListPlatformCategoriesDep = Annotated[
     ListPlatformCategoriesUseCase, Depends(get_list_platform_categories)
 ]
 ListCitiesDep = Annotated[ListCitiesUseCase, Depends(get_list_cities)]
+GetMarketplaceHomeDep = Annotated[GetMarketplaceHomeUseCase, Depends(get_marketplace_home)]
+ListShopsDep = Annotated[ListShopsUseCase, Depends(get_list_shops)]
+SuggestDep = Annotated[SuggestUseCase, Depends(get_suggest)]
 GetStorefrontProductDep = Annotated[
     GetStorefrontProductUseCase, Depends(get_storefront_product)
 ]

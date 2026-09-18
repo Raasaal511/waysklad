@@ -91,6 +91,60 @@ class MarketplaceProductRow:
         )
 
 
+@dataclass(frozen=True)
+class ShopChip:
+    """Магазин в ряду/списке магазинов маркетплейса (M-B2 п.2, п.3) — не
+    Tenant-сущность, публично безопасная read-only проекция."""
+
+    slug: str
+    name: str
+    logo: str
+    city: str | None
+    is_verified: bool
+    average_rating: float
+    reviews_count: int
+    products_count: int
+    sold_count_30d: Decimal = Decimal("0")  # только для сортировки popular, в ответ API не идёт
+
+    def to_dict(self) -> dict:
+        return {
+            "slug": self.slug,
+            "name": self.name,
+            "logo": self.logo,
+            "city": self.city,
+            "is_verified": self.is_verified,
+            "average_rating": self.average_rating,
+            "reviews_count": self.reviews_count,
+            "products_count": self.products_count,
+            "sold_count_30d": str(self.sold_count_30d),
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "ShopChip":
+        return cls(
+            slug=d["slug"],
+            name=d["name"],
+            logo=d.get("logo", ""),
+            city=d.get("city"),
+            is_verified=d.get("is_verified", False),
+            average_rating=d.get("average_rating", 0.0),
+            reviews_count=d.get("reviews_count", 0),
+            products_count=d.get("products_count", 0),
+            sold_count_30d=Decimal(d.get("sold_count_30d", "0")),
+        )
+
+
+@dataclass(frozen=True)
+class SuggestProductRow:
+    """Товар в подсказках поиска (M-B2 п.4) — урезанный набор полей."""
+
+    product_id: int
+    name: str
+    photo: str
+    retail_price: Decimal
+    shop_slug: str
+
+
 class IMarketplaceProductRepository(Protocol):
     """Отдельный от IProductRepository протокол: тот завязан на SqlAlchemyRepository._tenant
     (один tenant на запрос), а общий каталог принципиально читает сразу много tenant."""
@@ -132,10 +186,20 @@ class IMarketplaceProductRepository(Protocol):
         offset: int = 0,
         min_rating: int | None = None,
         hit_product_ids: frozenset[int] = frozenset(),
+        skip_count: bool = False,
+        sold_counts: dict[int, Decimal] | None = None,
+        ratings: dict[int, ProductRatingAggregate] | None = None,
     ) -> tuple[list[MarketplaceProductRow], int]:
         """hit_product_ids — предпосчитанный набор «хитов» (см. compute_hit_product_ids),
         нужен только чтобы проставить MarketplaceProductRow.is_hit и для sort='popular'/
-        валидации — сам расчёт топ-10% здесь не делается, это отдельный пакетный запрос."""
+        валидации — сам расчёт топ-10% здесь не делается, это отдельный пакетный запрос.
+
+        skip_count=True пропускает COUNT(*)-запрос (total возвращается как -1) —
+        для мест, где total не нужен вызывающему (несколько секций главной,
+        см. GetMarketplaceHomeUseCase), это лишний запрос на каждую секцию.
+        sold_counts/ratings — если переданы, используются вместо собственных
+        точечных запросов (чтобы вызывающий мог посчитать их одним batch-запросом
+        сразу на все product_id всех секций, а не по одному на секцию)."""
         ...
 
     async def sold_count_by_products(self, product_ids: list[int]) -> dict[int, Decimal]:
@@ -167,4 +231,29 @@ class IMarketplaceProductRepository(Protocol):
     async def list_cities(self, visible_tenant_ids: list[int]) -> dict[str, int]:
         """Города магазинов среди видимых tenant -> число магазинов в городе,
         для GET /marketplace/cities."""
+        ...
+
+    async def list_shop_chips(
+        self,
+        visible_tenant_ids: list[int],
+        city: str | None = None,
+        query: str = "",
+        sort: str = "popular",
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[ShopChip], int]:
+        """Магазины с хотя бы одним видимым товаром на витрине — для ряда
+        магазинов главной (M-B2 п.2) и GET /marketplace/shops (п.3).
+        sort: popular (продажи за 30 дней), rating, new (дата регистрации)."""
+        ...
+
+    async def suggest_products(
+        self, visible_tenant_ids: list[int], query: str, city: str | None, limit: int = 5
+    ) -> list[SuggestProductRow]:
+        """ILIKE по названию/артикулу — до limit товаров, для подсказок поиска (M-B2 п.4)."""
+        ...
+
+    async def platform_stats(self, visible_tenant_ids: list[int]) -> tuple[int, int]:
+        """(products_count, cities_count) среди видимых товаров видимых магазинов —
+        для stats в GET /marketplace/home."""
         ...
