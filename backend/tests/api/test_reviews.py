@@ -192,7 +192,7 @@ async def test_review_moderation_via_api(client, owner_headers, customer_headers
     # владелец видит отзыв в панели (включая скрытость)
     response = await client.get(f"/api/reviews/product/{product['id']}", headers=owner_headers)
     assert response.status_code == 200, response.text
-    assert response.json()[0]["is_hidden"] is False
+    assert response.json()["reviews"][0]["is_hidden"] is False
 
     # скрываем
     response = await client.post(f"/api/reviews/{review_id}/hide", headers=owner_headers)
