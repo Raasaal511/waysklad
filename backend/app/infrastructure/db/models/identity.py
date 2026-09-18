@@ -24,6 +24,9 @@ class TenantModel(Base, TimestampMixin):
     summary_monthly_enabled: Mapped[bool] = mapped_column(default=False)
     summary_daily_hour_msk: Mapped[int] = mapped_column(SmallInteger, default=20)
     is_suspended: Mapped[bool] = mapped_column(default=False)
+    city: Mapped[str | None] = mapped_column(String(100))
+    is_verified: Mapped[bool] = mapped_column(default=False)
+    logo: Mapped[str] = mapped_column(String(500), default="")
 
 
 class WarehouseModel(Base, TenantMixin, TimestampMixin):

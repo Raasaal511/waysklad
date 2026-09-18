@@ -32,6 +32,11 @@ class Tenant:
     # неоплату. Заблокированный tenant: обычный логин (get_current_user) и
     # публичная витрина недоступны, существующие данные не удаляются.
     is_suspended: bool = False
+    city: str | None = None  # из справочника app.domain.platform.cities.CITIES
+    # Проставляется только админом платформы (POST /api/admin/tenants/{id}/verify) —
+    # значок доверия на витрине/маркетплейсе, магазин повлиять сам не может.
+    is_verified: bool = False
+    logo: str = ""  # тот же паттерн, что Warehouse.photo — необязательный логотип магазина
 
 
 @dataclass
