@@ -100,6 +100,9 @@ class TenantResponse(BaseModel):
     summary_weekly_enabled: bool
     summary_monthly_enabled: bool
     summary_daily_hour_msk: int
+    city: str | None
+    is_verified: bool
+    logo: str
 
     @classmethod
     def from_entity(cls, tenant: Tenant) -> "TenantResponse":
@@ -112,6 +115,9 @@ class TenantResponse(BaseModel):
             summary_weekly_enabled=tenant.summary_weekly_enabled,
             summary_monthly_enabled=tenant.summary_monthly_enabled,
             summary_daily_hour_msk=tenant.summary_daily_hour_msk,
+            city=tenant.city,
+            is_verified=tenant.is_verified,
+            logo=tenant.logo,
         )
 
 
@@ -122,6 +128,7 @@ class UpdateShopRequest(BaseModel):
     summary_monthly_enabled: bool | None = None
     summary_daily_hour_msk: int | None = Field(default=None, ge=0, le=23)
     storefront_enabled: bool | None = None
+    city: str | None = None  # валидация по справочнику CITIES — в UpdateShopUseCase
 
     def to_command(self) -> UpdateShopCommand:
         return UpdateShopCommand(
@@ -131,6 +138,7 @@ class UpdateShopRequest(BaseModel):
             summary_monthly_enabled=self.summary_monthly_enabled,
             summary_daily_hour_msk=self.summary_daily_hour_msk,
             storefront_enabled=self.storefront_enabled,
+            city=self.city,
         )
 
 
