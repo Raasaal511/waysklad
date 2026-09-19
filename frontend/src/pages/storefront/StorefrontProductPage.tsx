@@ -16,6 +16,8 @@ import { TotalCard } from './product/TotalCard'
 import { ConditionsCard } from './product/ConditionsCard'
 import { ShopCard } from './product/ShopCard'
 import { FaqLinks } from './product/FaqLinks'
+import { AboutSection } from './product/AboutSection'
+import { WarrantySection } from './product/WarrantySection'
 import { useSelection } from './product/useSelection'
 import { variantPrice, galleryForVariant } from './product/productUtils'
 import { addToCart, cartCount, loadCart } from './cart'
@@ -275,12 +277,8 @@ export function StorefrontProductPage() {
           below={
             <>
               <BuyerPhotos photos={reviewsPage?.photos ?? []} />
-              {product.description?.trim() && (
-                <div className={styles.card}>
-                  <h2 className={styles.sectionTitle}>О товаре</h2>
-                  <p style={{ whiteSpace: 'pre-line', margin: 0 }}>{product.description}</p>
-                </div>
-              )}
+              <AboutSection product={product} />
+              <WarrantySection warrantyText={product.warranty_text} />
             </>
           }
         />
