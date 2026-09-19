@@ -20,11 +20,13 @@ from app.application.storefront.get_profile import (
     orders_count_label,
 )
 from app.application.storefront.get_request_status import StorefrontRequestStatusResult
+from app.application.storefront.get_similar_products import GetSimilarProductsResult
 from app.application.storefront.send_message import (
     SendStaffStorefrontMessageCommand,
     SendStorefrontMessageCommand,
 )
 from app.domain.catalog.entities import Category, Product, ProductVariant
+from app.domain.marketplace.repository import MarketplaceProductRow
 from app.domain.orders.entities import Order
 from app.domain.reviews.repository import ProductRatingAggregate
 from app.domain.storefront.entities import StorefrontMessage, StorefrontRequest
@@ -66,6 +68,13 @@ class StorefrontCatalogParams(BaseModel):
             variant_color=self.variant_color,
             min_rating=self.min_rating,
         )
+
+
+class SimilarProductsParams(BaseModel):
+    scope: str = "shop"  # "shop" | "marketplace"
+    limit: int = Field(10, ge=1, le=20)
+
+    model_config = {"extra": "forbid"}
 
 
 class StorefrontCategoryResponse(BaseModel):
@@ -575,6 +584,92 @@ class StorefrontRequestStatusResponse(BaseModel):
         return cls(
             status=result.request.status.value,
             order=StorefrontRequestOrderSummary.from_entity(result.order) if result.order else None,
+        )
+
+
+class SimilarMarketplaceProductResponse(BaseModel):
+    """Элемент scope=marketplace — те же поля, что у GET /api/marketplace/products
+    (MarketplaceProductResponse), продублировано здесь намеренно: storefront/schemas.py
+    не может импортировать presentation/marketplace/schemas.py — тот сам уже
+    импортирует StorefrontProductDetailResponse отсюда (циклический импорт)."""
+
+    id: int
+    name: str
+    retail_price: Decimal
+    photo: str
+    category_name: str | None
+    in_stock: bool
+    min_order_qty: Decimal | None
+    order_step_qty: Decimal | None
+    shop_slug: str
+    shop_name: str
+    sold_count: Decimal
+    average_rating: float
+    reviews_count: int
+    shop_logo: str
+    shop_is_verified: bool
+    shop_city: str | None
+    old_price: Decimal | None
+    discount_percent: int | None
+    is_new: bool
+    is_hit: bool
+
+    @classmethod
+    def from_row(cls, row: MarketplaceProductRow) -> "SimilarMarketplaceProductResponse":
+        return cls(
+            id=row.product_id,
+            name=row.name,
+            retail_price=row.retail_price,
+            photo=row.photo,
+            category_name=row.category_name,
+            in_stock=row.in_stock,
+            min_order_qty=row.min_order_qty,
+            order_step_qty=row.order_step_qty,
+            shop_slug=row.shop_slug,
+            shop_name=row.shop_name,
+            sold_count=row.sold_count,
+            average_rating=row.rating.average_rating,
+            reviews_count=row.rating.reviews_count,
+            shop_logo=row.shop_logo,
+            shop_is_verified=row.shop_is_verified,
+            shop_city=row.shop_city,
+            old_price=row.old_price,
+            discount_percent=row.discount_percent,
+            is_new=row.is_new,
+            is_hit=row.is_hit,
+        )
+
+
+class SimilarProductsResponse(BaseModel):
+    """GET /storefront/{slug}/products/{id}/similar (промпт B4). scope=shop
+    заполняет shop_products (формат StorefrontProductResponse каталога),
+    scope=marketplace — marketplace_products (формат GET /marketplace/products).
+    Ровно одно из двух полей непустое по смыслу scope, второе — []."""
+
+    shop_products: list[StorefrontProductResponse]
+    marketplace_products: list[SimilarMarketplaceProductResponse]
+
+    @classmethod
+    def from_result(cls, result: GetSimilarProductsResult) -> "SimilarProductsResponse":
+        if result.shop is not None:
+            shop = result.shop
+            return cls(
+                shop_products=[
+                    StorefrontProductResponse.from_entity(
+                        product,
+                        in_stock=product.id in shop.in_stock_product_ids,
+                        sold_count=shop.sold_count_by_product_id.get(product.id, Decimal("0")),
+                        rating=shop.rating_by_product_id.get(product.id, _EMPTY_RATING),
+                    )
+                    for product in shop.products
+                ],
+                marketplace_products=[],
+            )
+        return cls(
+            shop_products=[],
+            marketplace_products=[
+                SimilarMarketplaceProductResponse.from_row(row) for row in (result.marketplace or [])
+            ],
         )
 
 

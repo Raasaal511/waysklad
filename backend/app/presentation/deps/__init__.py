@@ -82,6 +82,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     GetSaleHistoryDep,
     GetSalesSummaryDep,
     GetShopDep,
+    GetSimilarProductsDep,
     GetStockValueDep,
     GetTaskDep,
     GetTaskHistoryDep,

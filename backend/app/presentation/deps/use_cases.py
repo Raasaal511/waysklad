@@ -134,6 +134,7 @@ from app.application.storefront.create_request import CreateStorefrontRequestUse
 from app.application.storefront.get_catalog import GetStorefrontCatalogUseCase
 from app.application.storefront.get_product import GetStorefrontProductUseCase
 from app.application.storefront.get_profile import GetStorefrontProfileUseCase
+from app.application.storefront.get_similar_products import GetSimilarProductsUseCase
 from app.application.storefront.get_request import GetStorefrontRequestUseCase
 from app.application.storefront.get_request_status import GetStorefrontRequestStatusUseCase
 from app.application.storefront.list_messages import (
@@ -411,6 +412,12 @@ def get_storefront_profile(
     return GetStorefrontProfileUseCase(factory, cache)
 
 
+def get_similar_products(
+    factory: SessionFactoryDep, cache: CacheDep
+) -> GetSimilarProductsUseCase:
+    return GetSimilarProductsUseCase(factory, cache)
+
+
 def get_record_product_view(
     factory: SessionFactoryDep, cache: CacheDep
 ) -> RecordProductViewUseCase:
@@ -654,6 +661,9 @@ GetStorefrontProductDep = Annotated[
 ]
 GetStorefrontProfileDep = Annotated[
     GetStorefrontProfileUseCase, Depends(get_storefront_profile)
+]
+GetSimilarProductsDep = Annotated[
+    GetSimilarProductsUseCase, Depends(get_similar_products)
 ]
 RecordProductViewDep = Annotated[
     RecordProductViewUseCase, Depends(get_record_product_view)

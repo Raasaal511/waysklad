@@ -7,6 +7,7 @@ from slowapi.util import get_remote_address
 from app.application.storefront.get_product import GetStorefrontProductCommand
 from app.application.storefront.get_profile import GetStorefrontProfileCommand
 from app.application.storefront.get_request_status import GetStorefrontRequestStatusCommand
+from app.application.storefront.get_similar_products import GetSimilarProductsCommand
 from app.application.storefront.list_messages import ListStorefrontMessagesCommand
 from app.application.storefront.record_product_view import RecordProductViewCommand
 from app.application.storefront.reject_request import RejectStorefrontRequestCommand
@@ -19,6 +20,7 @@ from app.presentation.deps import (
     ActorDep,
     CreateStorefrontRequestDep,
     GetStorefrontCatalogDep,
+    GetSimilarProductsDep,
     GetStorefrontProductDep,
     GetStorefrontProfileDep,
     GetStorefrontRequestDep,
@@ -50,6 +52,8 @@ from app.presentation.storefront.schemas import (
     StorefrontRequestCreatedResponse,
     StorefrontRequestResponse,
     StorefrontRequestStatusResponse,
+    SimilarProductsParams,
+    SimilarProductsResponse,
 )
 
 router = APIRouter(prefix="/storefront", tags=["storefront"])
@@ -81,6 +85,27 @@ async def get_storefront_product(
     if result is None:
         raise HTTPException(status_code=404, detail="Товар не найден")
     return StorefrontProductPageResponse.from_result(result)
+
+
+@router.get("/{slug}/products/{product_id}/similar")
+@limiter.limit("300/minute")
+async def get_storefront_similar_products(
+    request: Request,
+    slug: str,
+    product_id: int,
+    params: Annotated[SimilarProductsParams, Depends()],
+    use_case: GetSimilarProductsDep,
+) -> SimilarProductsResponse:
+    if params.scope not in ("shop", "marketplace"):
+        raise HTTPException(status_code=422, detail="scope должен быть shop или marketplace")
+    result = await use_case.execute(
+        GetSimilarProductsCommand(
+            slug=slug, product_id=product_id, scope=params.scope, limit=params.limit
+        )
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+    return SimilarProductsResponse.from_result(result)
 
 
 @router.get("/{slug}/profile")
