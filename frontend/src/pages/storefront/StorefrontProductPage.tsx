@@ -18,6 +18,7 @@ import { ShopCard } from './product/ShopCard'
 import { FaqLinks } from './product/FaqLinks'
 import { AboutSection } from './product/AboutSection'
 import { WarrantySection } from './product/WarrantySection'
+import { ReviewsSection } from './product/ReviewsSection'
 import { useSelection } from './product/useSelection'
 import { variantPrice, galleryForVariant } from './product/productUtils'
 import { addToCart, cartCount, loadCart } from './cart'
@@ -279,6 +280,7 @@ export function StorefrontProductPage() {
               <BuyerPhotos photos={reviewsPage?.photos ?? []} />
               <AboutSection product={product} />
               <WarrantySection warrantyText={product.warranty_text} />
+              <ReviewsSection slug={slug} productId={productId} />
             </>
           }
         />
