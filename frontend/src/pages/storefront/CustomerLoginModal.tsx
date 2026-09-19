@@ -100,7 +100,7 @@ export function CustomerLoginModal({ onClose, onSuccess }: CustomerLoginModalPro
       {!deepLink ? (
         <form className={styles.form} onSubmit={handleRequestLink}>
           <p className={styles.hint}>
-            Чтобы оформить заявку, подтвердите номер через Telegram — тот же бот, что и у витрины.
+            Чтобы оформить заказ, подтвердите номер через Telegram — тот же бот, что и у витрины.
           </p>
           <label className={styles.field}>
             Телефон

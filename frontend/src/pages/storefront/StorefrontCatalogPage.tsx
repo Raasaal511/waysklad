@@ -255,7 +255,7 @@ export function StorefrontCatalogPage() {
             <CustomerAuthChip slug={slug} onLoginClick={() => setShowLogin(true)} />
             {requestToken && (
               <Link to={`/store/${slug}/request`} className={styles.headerLink}>
-                Моя заявка
+                Мой заказ
               </Link>
             )}
             <Link to={`/store/${slug}/cart`} className={styles.cartBtn} aria-label="Корзина">
@@ -267,7 +267,7 @@ export function StorefrontCatalogPage() {
       </div>
 
       <section className={styles.intro}>
-        <p className={styles.introLead}>Выберите товары и оставьте заявку — магазин подтвердит наличие.</p>
+        <p className={styles.introLead}>Выберите товары и оформите заказ — магазин подтвердит наличие.</p>
       </section>
 
       <header className={styles.header}>

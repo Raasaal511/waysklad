@@ -1,0 +1,348 @@
+/* --- MinOrderProgress --- */
+
+.progressTitle {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+
+.progressBar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill {
+    transition: none;
+  }
+}
+
+.progressLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.progressDone {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.progressHint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 8px 0 0;
+}
+
+/* --- TotalCard --- */
+
+.totalLabel {
+  font-size: 20px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.totalValue {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 4px 0 0;
+}
+
+.totalCount {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.addBtn {
+  height: 48px;
+  border-radius: 12px;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.contactBtn {
+  height: 44px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: filter 0.15s ease;
+}
+
+.contactBtn:hover {
+  filter: brightness(0.96);
+}
+
+.contactBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.inCartRow {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+}
+
+.inCartLink {
+  color: var(--accent);
+  text-decoration: underline;
+  margin-left: 4px;
+}
+
+.deliveryHint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 12px 0 0;
+}
+
+.contactSheet {
+  position: absolute;
+  z-index: 20;
+  margin-top: 8px;
+  left: 0;
+  right: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contactSheetItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.contactSheetItem:hover {
+  background: var(--bg-muted);
+}
+
+.contactWrap {
+  position: relative;
+}
+
+/* --- ConditionsCard --- */
+
+.conditionsRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 12px 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.conditionsRow + .conditionsRow {
+  border-top: 1px solid var(--border);
+}
+
+.conditionsIcon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.conditionsBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.conditionsTitle {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.conditionsSub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conditionsChevron {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* --- ShopCard --- */
+
+.shopHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.shopLogo {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.shopLogoFallback {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.shopName {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.shopRating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.shopRatingStar {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.shopRatingCount {
+  color: var(--accent);
+}
+
+.shopSince {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+}
+
+.shopStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.shopStat {
+  text-align: center;
+}
+
+.shopStatValue {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.shopStatLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+}
+
+/* --- FaqLinks --- */
+
+.faqTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+
+.faqGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+
+.faqLink {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.faqLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .faqGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .shopStats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

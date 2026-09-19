@@ -13,9 +13,9 @@ import { CustomerLoginModal, notifyCustomerAuthChanged } from './CustomerLoginMo
 import styles from './Storefront.module.css'
 
 const STATUS_LABEL: Record<CustomerRequest['status'], string> = {
-  new: 'Новая',
-  accepted: 'Принята',
-  rejected: 'Отклонена',
+  new: 'Новый',
+  accepted: 'Подтверждён',
+  rejected: 'Отклонён',
 }
 
 export function StorefrontMyOrdersPage() {
@@ -68,11 +68,11 @@ export function StorefrontMyOrdersPage() {
 
       <main className={styles.cartPage}>
         <h1>Мои заказы</h1>
-        <p className={styles.muted}>Заявки во всех магазинах ВайСклада с вашего аккаунта.</p>
+        <p className={styles.muted}>Заказы во всех магазинах ВайСклада с вашего аккаунта.</p>
 
         {!token && (
           <div className={styles.emptyState}>
-            <p>Войдите, чтобы увидеть историю заявок.</p>
+            <p>Войдите, чтобы увидеть историю заказов.</p>
             <Button type="button" onClick={() => setShowLogin(true)}>
               Войти
             </Button>
@@ -84,7 +84,7 @@ export function StorefrontMyOrdersPage() {
 
         {token && !loading && !error && items.length === 0 && (
           <div className={styles.emptyState}>
-            <p>Пока нет заявок</p>
+            <p>Пока нет заказов</p>
             <Link to={`/store/${slug}`}>
               <Button>В каталог</Button>
             </Link>
@@ -110,7 +110,7 @@ export function StorefrontMyOrdersPage() {
                   {req.note ? ` · ${req.note}` : ''}
                 </p>
                 {req.insufficient_stock_at_request && (
-                  <p className={styles.muted}>На момент заявки часть позиций могла быть без остатка</p>
+                  <p className={styles.muted}>На момент заказа часть позиций могла быть без остатка</p>
                 )}
               </li>
             ))}

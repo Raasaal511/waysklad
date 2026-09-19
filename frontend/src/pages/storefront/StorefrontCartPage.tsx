@@ -86,7 +86,7 @@ export function StorefrontCartPage() {
         setError('Сессия истекла — войдите снова')
         return
       }
-      setError(err instanceof ApiError ? err.message : 'Не удалось отправить заявку')
+      setError(err instanceof ApiError ? err.message : 'Не удалось отправить заказ')
     } finally {
       setSaving(false)
     }
@@ -157,7 +157,7 @@ export function StorefrontCartPage() {
             </p>
 
             <form className={styles.checkoutForm} onSubmit={handleSubmit}>
-              <h2>Оформить заявку</h2>
+              <h2>Оформить заказ</h2>
               <p className={styles.muted}>
                 Это не мгновенный заказ — магазин подтвердит наличие и свяжется с вами.
                 {!customerToken && ' Перед отправкой нужно войти через Telegram.'}
@@ -180,8 +180,8 @@ export function StorefrontCartPage() {
                 {saving
                   ? 'Отправка…'
                   : customerToken
-                    ? 'Отправить заявку'
-                    : 'Войти и отправить'}
+                    ? 'Оформить заказ'
+                    : 'Войти и оформить'}
               </Button>
             </form>
           </>

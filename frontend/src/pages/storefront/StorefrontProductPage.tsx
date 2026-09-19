@@ -1,16 +1,21 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { IconChevronLeft, IconShoppingCart, IconHeart, IconHeartFilled, IconCheck } from '@tabler/icons-react'
+import { IconChevronLeft, IconShoppingCart, IconHeart, IconHeartFilled } from '@tabler/icons-react'
 import { useState, useEffect } from 'react'
 import { Button } from '../../shared/ui/Button'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { formatMoney, plural } from '../../shared/lib/format'
-import { useStorefrontProduct, useProductReviews } from './product/useProductPageData'
+import { useStorefrontProduct, useProductReviews, useShopProfile } from './product/useProductPageData'
 import { ProductLayout } from './product/ProductLayout'
 import { Breadcrumbs } from './product/Breadcrumbs'
 import { ProductHeader } from './product/ProductHeader'
 import { ProductGallery } from './product/ProductGallery'
 import { BuyerPhotos } from './product/BuyerPhotos'
 import { VariantList, variantListSectionTitle } from './product/VariantList'
+import { MinOrderProgress } from './product/MinOrderProgress'
+import { TotalCard } from './product/TotalCard'
+import { ConditionsCard } from './product/ConditionsCard'
+import { ShopCard } from './product/ShopCard'
+import { FaqLinks } from './product/FaqLinks'
 import { useSelection } from './product/useSelection'
 import { variantPrice, galleryForVariant } from './product/productUtils'
 import { addToCart, cartCount, loadCart } from './cart'
@@ -45,6 +50,7 @@ export function StorefrontProductPage() {
   const [activePhoto, setActivePhoto] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
   const { page: reviewsPage } = useProductReviews(slug, productId, {})
+  const { profile: shopProfile } = useShopProfile(slug)
 
   useEffect(() => {
     if (!product) return
@@ -145,6 +151,11 @@ export function StorefrontProductPage() {
     return sum + price * qty
   }, 0)
 
+  const cartTotalInShop = cartItems.reduce((sum, i) => sum + Number(i.retail_price) * Number(i.quantity), 0)
+  const cartQtyForThisProduct = cartItems
+    .filter((i) => i.product_id === product.id)
+    .reduce((sum, i) => sum + Number(i.quantity), 0)
+
   function handleAdd() {
     if (!product || !product.in_stock) return
     if (selection.size === 0) {
@@ -235,28 +246,31 @@ export function StorefrontProductPage() {
             </>
           }
           aside={
-            <div className={styles.card}>
-              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 20 }}>Итого:</p>
-              <p style={{ fontSize: 24, fontWeight: 700, margin: '4px 0 4px' }}>
-                {formatMoney(selectionTotal.toFixed(2))} ₽
-              </p>
-              {linesCount > 0 && (
-                <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-muted)' }}>
-                  {totalQty} {plural(totalQty, ['товар', 'товара', 'товаров'])}
-                </p>
+            <>
+              {shopProfile?.min_order_total && (
+                <MinOrderProgress
+                  minOrderTotal={shopProfile.min_order_total}
+                  currentTotal={cartTotalInShop + selectionTotal}
+                />
               )}
-              <Button style={{ width: '100%', marginTop: 12 }} onClick={handleAdd} disabled={!product.in_stock}>
-                {added ? (
-                  <>
-                    <IconCheck size={18} stroke={2} /> Добавлено
-                  </>
-                ) : product.in_stock ? (
-                  'В корзину'
-                ) : (
-                  'Нет в наличии'
-                )}
-              </Button>
-            </div>
+              <TotalCard
+                slug={slug}
+                total={selectionTotal}
+                linesCount={linesCount}
+                totalQty={totalQty}
+                inStock={product.in_stock}
+                added={added}
+                onAdd={handleAdd}
+                cartQtyInShop={cartQtyForThisProduct}
+                contacts={shopProfile?.contacts}
+                productName={product.name}
+              />
+              {shopProfile && (
+                <ConditionsCard addresses={shopProfile.addresses} paymentPolicy={shopProfile.policies.payment} />
+              )}
+              {shopProfile && <ShopCard profile={shopProfile} />}
+              {shopProfile && <FaqLinks policies={shopProfile.policies} />}
+            </>
           }
           below={
             <>
