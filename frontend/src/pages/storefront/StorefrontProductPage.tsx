@@ -1,18 +1,20 @@
-import { Link, useParams } from 'react-router-dom'
-import { IconChevronLeft, IconShoppingCart, IconHeart, IconHeartFilled } from '@tabler/icons-react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { IconChevronLeft, IconShoppingCart, IconHeart, IconHeartFilled, IconCheck } from '@tabler/icons-react'
 import { useState, useEffect } from 'react'
 import { Button } from '../../shared/ui/Button'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
-import { formatMoney } from '../../shared/lib/format'
+import { formatMoney, plural } from '../../shared/lib/format'
 import { useStorefrontProduct, useProductReviews } from './product/useProductPageData'
 import { ProductLayout } from './product/ProductLayout'
 import { Breadcrumbs } from './product/Breadcrumbs'
 import { ProductHeader } from './product/ProductHeader'
 import { ProductGallery } from './product/ProductGallery'
 import { BuyerPhotos } from './product/BuyerPhotos'
+import { VariantList, variantListSectionTitle } from './product/VariantList'
+import { useSelection } from './product/useSelection'
 import { variantPrice, galleryForVariant } from './product/productUtils'
 import { addToCart, cartCount, loadCart } from './cart'
-import { initialOrderQty, bumpOrderQty } from '../../entities/storefront/api'
+import { initialOrderQty } from '../../entities/storefront/api'
 import shellStyles from './Storefront.module.css'
 import styles from './product/ProductPage.module.css'
 
@@ -33,21 +35,33 @@ function saveFavorites(slug: string, ids: number[]) {
 
 export function StorefrontProductPage() {
   const { slug = '', productId = '' } = useParams<{ slug: string; productId: string }>()
+  const [searchParams] = useSearchParams()
+  const highlightVariantId = searchParams.get('v')
   const { product, shopName, loading, error } = useStorefrontProduct(slug, productId)
   const [cartItems, setCartItems] = useState(() => loadCart(slug))
   const [favorites, setFavorites] = useState(() => loadFavorites(slug))
-  const [variantId, setVariantId] = useState<number | null>(null)
-  const [qty, setQty] = useState(1)
+  const { selection, setQty, clear, totalQty, linesCount } = useSelection()
   const [added, setAdded] = useState(false)
   const [activePhoto, setActivePhoto] = useState(0)
+  const [toast, setToast] = useState<string | null>(null)
   const { page: reviewsPage } = useProductReviews(slug, productId, {})
 
   useEffect(() => {
     if (!product) return
-    setVariantId(product.variants[0]?.id ?? null)
-    setQty(initialOrderQty(product.min_order_qty, product.order_step_qty))
     setActivePhoto(0)
+    // если в URL указан конкретный вариант — сразу выделяем его фото в галерее
+    if (highlightVariantId) {
+      const idx = product.variants.findIndex((v) => String(v.id) === highlightVariantId)
+      if (idx >= 0 && product.variants[idx].photo) setActivePhoto(0)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 2200)
+    return () => clearTimeout(t)
+  }, [toast])
 
   useEffect(() => {
     if (!product || !shopName) return
@@ -117,31 +131,67 @@ export function StorefrontProductPage() {
   }
 
   const isFavorite = favorites.includes(product.id)
-  const selectedVariant = product.variants.find((v) => v.id === variantId)
-  const unitPrice = variantPrice(product, selectedVariant)
-  const minOrderQty = product.min_order_qty
-  const orderStepQty = product.order_step_qty
-  const minQty = initialOrderQty(minOrderQty, orderStepQty)
+  const highlightedVariant = product.variants.find((v) => String(v.id) === highlightVariantId)
+  const previewVariant =
+    highlightedVariant ??
+    (selection.size === 1 && product.variants.length > 0
+      ? product.variants.find((v) => selection.has(v.id))
+      : undefined)
+  const previewPrice = previewVariant ? variantPrice(product, previewVariant) : null
+
+  const selectionTotal = Array.from(selection.entries()).reduce((sum, [key, qty]) => {
+    const variant = key === 'base' ? undefined : product.variants.find((v) => v.id === key)
+    const price = Number(variantPrice(product, variant))
+    return sum + price * qty
+  }, 0)
 
   function handleAdd() {
     if (!product || !product.in_stock) return
-    const variant = product.variants.find((v) => v.id === variantId)
-    addToCart(slug, {
-      product_id: product.id,
-      name: product.name,
-      retail_price: variantPrice(product, variant),
-      photo: variant?.photo || product.photo,
-      quantity: String(qty),
-      variant_id: variantId,
-      variant_label: variant ? variant.display_name : undefined,
-    })
+    if (selection.size === 0) {
+      // ничего не выбрано: для товара без вариантов добавляем сразу,
+      // для товара с несколькими вариантами — просим выбрать
+      if (product.variants.length === 0) {
+        addToCart(slug, {
+          product_id: product.id,
+          name: product.name,
+          retail_price: product.retail_price,
+          photo: product.photo,
+          quantity: String(initialOrderQty(product.min_order_qty, product.order_step_qty)),
+          variant_id: null,
+        })
+        setCartItems(loadCart(slug))
+        setAdded(true)
+        setToast('Добавлено: 1 товар')
+        setTimeout(() => setAdded(false), 1600)
+        return
+      }
+      const firstAvailable = product.variants.find((v) => v.in_stock)
+      if (firstAvailable) {
+        setQty(firstAvailable.id, initialOrderQty(product.min_order_qty, product.order_step_qty))
+      } else {
+        setToast('Выберите вариант')
+      }
+      return
+    }
+    let count = 0
+    for (const [key, qty] of selection.entries()) {
+      const variant = key === 'base' ? undefined : product.variants.find((v) => v.id === key)
+      addToCart(slug, {
+        product_id: product.id,
+        name: product.name,
+        retail_price: variantPrice(product, variant),
+        photo: variant?.photo || product.photo,
+        quantity: String(qty),
+        variant_id: key === 'base' ? null : key,
+        variant_label: variant ? variant.display_name : undefined,
+      })
+      count += 1
+    }
     setCartItems(loadCart(slug))
+    clear()
     setAdded(true)
+    setToast(`Добавлено: ${count} ${plural(count, ['товар', 'товара', 'товаров'])}`)
     setTimeout(() => setAdded(false), 1600)
-  }
-
-  function bump(deltaSteps: number) {
-    setQty((q) => bumpOrderQty(q, deltaSteps, minOrderQty, orderStepQty))
   }
 
   return (
@@ -160,34 +210,51 @@ export function StorefrontProductPage() {
         <ProductLayout
           gallery={
             <ProductGallery
-              photos={galleryForVariant(product, selectedVariant)}
+              photos={galleryForVariant(product, previewVariant)}
               productName={product.name}
               activeIndex={activePhoto}
               onActiveIndexChange={setActivePhoto}
             />
           }
           info={
-            <div className={styles.card}>
-              <ProductHeader product={product} selectedPrice={selectedVariant ? unitPrice : null} />
-              <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
-                <button type="button" onClick={() => bump(-1)} disabled={qty <= minQty} aria-label="Меньше">
-                  −
-                </button>
-                <span>{qty}</span>
-                <button type="button" onClick={() => bump(1)} disabled={qty >= 9999} aria-label="Больше">
-                  +
-                </button>
+            <>
+              <div className={styles.card}>
+                <ProductHeader product={product} selectedPrice={previewPrice} />
               </div>
-            </div>
+              <div className={styles.card}>
+                <h2 className={styles.sectionTitle} style={{ fontSize: 18, marginBottom: 16 }}>
+                  {variantListSectionTitle(product.variants.length)}
+                </h2>
+                <VariantList
+                  product={product}
+                  selection={selection}
+                  onQtyChange={setQty}
+                  onShowToast={setToast}
+                />
+              </div>
+            </>
           }
           aside={
             <div className={styles.card}>
-              <p style={{ margin: 0, color: 'var(--text-muted)' }}>Итого</p>
-              <p style={{ fontSize: 24, fontWeight: 700, margin: '4px 0 12px' }}>
-                {formatMoney((Number(unitPrice) * qty).toFixed(2))} ₽
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 20 }}>Итого:</p>
+              <p style={{ fontSize: 24, fontWeight: 700, margin: '4px 0 4px' }}>
+                {formatMoney(selectionTotal.toFixed(2))} ₽
               </p>
-              <Button style={{ width: '100%' }} onClick={handleAdd} disabled={!product.in_stock}>
-                {added ? 'Добавлено' : 'В корзину'}
+              {linesCount > 0 && (
+                <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-muted)' }}>
+                  {totalQty} {plural(totalQty, ['товар', 'товара', 'товаров'])}
+                </p>
+              )}
+              <Button style={{ width: '100%', marginTop: 12 }} onClick={handleAdd} disabled={!product.in_stock}>
+                {added ? (
+                  <>
+                    <IconCheck size={18} stroke={2} /> Добавлено
+                  </>
+                ) : product.in_stock ? (
+                  'В корзину'
+                ) : (
+                  'Нет в наличии'
+                )}
               </Button>
             </div>
           }
@@ -204,6 +271,12 @@ export function StorefrontProductPage() {
           }
         />
       </div>
+
+      {toast && (
+        <div className={styles.toast} role="status">
+          {toast}
+        </div>
+      )}
     </div>
   )
 }
