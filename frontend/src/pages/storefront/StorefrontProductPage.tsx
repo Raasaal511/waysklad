@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react'
 import { Button } from '../../shared/ui/Button'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { formatMoney } from '../../shared/lib/format'
-import { useStorefrontProduct } from './product/useProductPageData'
+import { useStorefrontProduct, useProductReviews } from './product/useProductPageData'
 import { ProductLayout } from './product/ProductLayout'
 import { Breadcrumbs } from './product/Breadcrumbs'
 import { ProductHeader } from './product/ProductHeader'
-import { variantPrice } from './product/productUtils'
+import { ProductGallery } from './product/ProductGallery'
+import { BuyerPhotos } from './product/BuyerPhotos'
+import { variantPrice, galleryForVariant } from './product/productUtils'
 import { addToCart, cartCount, loadCart } from './cart'
 import { initialOrderQty, bumpOrderQty } from '../../entities/storefront/api'
 import shellStyles from './Storefront.module.css'
@@ -37,11 +39,14 @@ export function StorefrontProductPage() {
   const [variantId, setVariantId] = useState<number | null>(null)
   const [qty, setQty] = useState(1)
   const [added, setAdded] = useState(false)
+  const [activePhoto, setActivePhoto] = useState(0)
+  const { page: reviewsPage } = useProductReviews(slug, productId, {})
 
   useEffect(() => {
     if (!product) return
     setVariantId(product.variants[0]?.id ?? null)
     setQty(initialOrderQty(product.min_order_qty, product.order_step_qty))
+    setActivePhoto(0)
   }, [product])
 
   useEffect(() => {
@@ -154,24 +159,12 @@ export function StorefrontProductPage() {
 
         <ProductLayout
           gallery={
-            <div className={styles.card}>
-              {product.storefront_photos[0] || product.photo ? (
-                <img
-                  src={product.storefront_photos[0] || product.photo}
-                  alt={product.name}
-                  style={{ width: '100%', borderRadius: 16, aspectRatio: '4 / 5', objectFit: 'cover' }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: '100%',
-                    aspectRatio: '4 / 5',
-                    borderRadius: 16,
-                    background: 'var(--bg-muted)',
-                  }}
-                />
-              )}
-            </div>
+            <ProductGallery
+              photos={galleryForVariant(product, selectedVariant)}
+              productName={product.name}
+              activeIndex={activePhoto}
+              onActiveIndexChange={setActivePhoto}
+            />
           }
           info={
             <div className={styles.card}>
@@ -199,12 +192,15 @@ export function StorefrontProductPage() {
             </div>
           }
           below={
-            product.description?.trim() ? (
-              <div className={styles.card}>
-                <h2 className={styles.sectionTitle}>О товаре</h2>
-                <p style={{ whiteSpace: 'pre-line', margin: 0 }}>{product.description}</p>
-              </div>
-            ) : null
+            <>
+              <BuyerPhotos photos={reviewsPage?.photos ?? []} />
+              {product.description?.trim() && (
+                <div className={styles.card}>
+                  <h2 className={styles.sectionTitle}>О товаре</h2>
+                  <p style={{ whiteSpace: 'pre-line', margin: 0 }}>{product.description}</p>
+                </div>
+              )}
+            </>
           }
         />
       </div>
