@@ -1,15 +1,6 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import {
-  IconSearch,
-  IconShoppingCart,
-  IconPackage,
-  IconHeart,
-  IconHeartFilled,
-  IconPlus,
-  IconX,
-  IconBuildingStore,
-} from '@tabler/icons-react'
+import { IconSearch, IconShoppingCart, IconPackage, IconX, IconBuildingStore } from '@tabler/icons-react'
 import {
   getStorefrontCatalog,
   initialOrderQty,
@@ -19,13 +10,12 @@ import {
   type StorefrontSort,
 } from '../../entities/storefront/api'
 import { ApiError } from '../../shared/api/client'
-import { formatMoney, formatQuantity } from '../../shared/lib/format'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { Select } from '../../shared/ui/Select'
 import { Button } from '../../shared/ui/Button'
-import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { addToCart, loadCart, cartCount, type StorefrontCartItem } from './cart'
 import { CustomerAuthChip, CustomerLoginModal, notifyCustomerAuthChanged } from './CustomerLoginModal'
+import { ProductCard } from './ProductCard'
 import styles from './Storefront.module.css'
 
 const FAVORITES_KEY = 'waysklad:storefront-favorites'
@@ -440,15 +430,14 @@ export function StorefrontCatalogPage() {
           </div>
         ) : (
           <div className={styles.grid}>
-            {products.map((p, i) => (
+            {products.map((p) => (
               <ProductCard
                 key={p.id}
-                slug={slug}
-                product={p}
+                item={p}
+                href={`/store/${slug}/products/${p.id}`}
                 favorite={favorites.includes(p.id)}
                 onToggleFavorite={() => toggleFavorite(p.id)}
                 onQuickAdd={() => quickAdd(p)}
-                style={{ animationDelay: `${Math.min(i, 12) * 40}ms` }}
               />
             ))}
           </div>
@@ -468,63 +457,5 @@ export function StorefrontCatalogPage() {
         />
       )}
     </div>
-  )
-}
-
-function ProductCard({
-  slug,
-  product,
-  favorite,
-  onToggleFavorite,
-  onQuickAdd,
-  style,
-}: {
-  slug: string
-  product: StorefrontProduct
-  favorite: boolean
-  onToggleFavorite: () => void
-  onQuickAdd: () => void
-  style?: CSSProperties
-}) {
-  return (
-    <article className={styles.card} style={style}>
-      <Link to={`/store/${slug}/products/${product.id}`} className={styles.cardLink}>
-        <div className={styles.cardPhoto}>
-          <ProductPhoto src={product.photo} size={48} />
-          {!product.in_stock && <span className={styles.outOfStock}>Нет в наличии</span>}
-          {Number(product.sold_count ?? 0) > 0 && (
-            <span className={styles.soldBadge}>Продано {formatQuantity(product.sold_count!)}</span>
-          )}
-        </div>
-        <div className={styles.cardBody}>
-          <h2 className={styles.cardName}>{product.name}</h2>
-          <div className={styles.cardFooter}>
-            <p className={styles.cardPrice}>{formatMoney(product.retail_price)} ₽</p>
-            {product.in_stock && (
-              <button
-                type="button"
-                className={styles.quickAdd}
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  onQuickAdd()
-                }}
-                aria-label="Добавить в корзину"
-              >
-                <IconPlus size={16} stroke={2} />
-              </button>
-            )}
-          </div>
-        </div>
-      </Link>
-      <button
-        type="button"
-        className={styles.favBtn}
-        onClick={onToggleFavorite}
-        aria-label={favorite ? 'Убрать из избранного' : 'В избранное'}
-      >
-        {favorite ? <IconHeartFilled size={22} /> : <IconHeart size={22} stroke={1.8} />}
-      </button>
-    </article>
   )
 }

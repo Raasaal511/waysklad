@@ -54,7 +54,7 @@ export function TotalCard({
   const messageText = `Здравствуйте! Вопрос по товару ${productName} ${pageUrl}`
 
   return (
-    <div className={pageStyles.card}>
+    <div className={pageStyles.card} id="product-total-card">
       <p className={styles.totalLabel}>Итого:</p>
       <p className={styles.totalValue}>{formatMoney(total.toFixed(2))} ₽</p>
       {linesCount > 0 && (

@@ -1,10 +1,14 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { IconChevronLeft, IconShoppingCart, IconHeart, IconHeartFilled } from '@tabler/icons-react'
-import { useState, useEffect } from 'react'
-import { Button } from '../../shared/ui/Button'
+import { useState, useEffect, Suspense, lazy } from 'react'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { formatMoney, plural } from '../../shared/lib/format'
-import { useStorefrontProduct, useProductReviews, useShopProfile } from './product/useProductPageData'
+import {
+  useStorefrontProduct,
+  useProductReviews,
+  useShopProfile,
+  useTrackProductView,
+} from './product/useProductPageData'
 import { ProductLayout } from './product/ProductLayout'
 import { Breadcrumbs } from './product/Breadcrumbs'
 import { ProductHeader } from './product/ProductHeader'
@@ -18,13 +22,21 @@ import { ShopCard } from './product/ShopCard'
 import { FaqLinks } from './product/FaqLinks'
 import { AboutSection } from './product/AboutSection'
 import { WarrantySection } from './product/WarrantySection'
-import { ReviewsSection } from './product/ReviewsSection'
+import { MobileDock } from './product/MobileDock'
+import { ProductPageSkeleton, ProductPageError } from './product/ProductPageStates'
 import { useSelection } from './product/useSelection'
 import { variantPrice, galleryForVariant } from './product/productUtils'
+import { pushRecentlyViewed } from './product/recentlyViewed'
 import { addToCart, cartCount, loadCart } from './cart'
 import { initialOrderQty } from '../../entities/storefront/api'
 import shellStyles from './Storefront.module.css'
 import styles from './product/ProductPage.module.css'
+
+const ReviewsSection = lazy(() => import('./product/ReviewsSection').then((m) => ({ default: m.ReviewsSection })))
+const SimilarSection = lazy(() => import('./product/SimilarSection').then((m) => ({ default: m.SimilarSection })))
+const RecentlyViewedSection = lazy(() =>
+  import('./product/RecentlyViewedSection').then((m) => ({ default: m.RecentlyViewedSection })),
+)
 
 const FAVORITES_KEY = 'waysklad:storefront-favorites'
 
@@ -45,7 +57,7 @@ export function StorefrontProductPage() {
   const { slug = '', productId = '' } = useParams<{ slug: string; productId: string }>()
   const [searchParams] = useSearchParams()
   const highlightVariantId = searchParams.get('v')
-  const { product, shopName, loading, error } = useStorefrontProduct(slug, productId)
+  const { product, shopName, loading, error, errorStatus } = useStorefrontProduct(slug, productId)
   const [cartItems, setCartItems] = useState(() => loadCart(slug))
   const [favorites, setFavorites] = useState(() => loadFavorites(slug))
   const { selection, setQty, clear, totalQty, linesCount } = useSelection()
@@ -54,16 +66,66 @@ export function StorefrontProductPage() {
   const [toast, setToast] = useState<string | null>(null)
   const { page: reviewsPage } = useProductReviews(slug, productId, {})
   const { profile: shopProfile } = useShopProfile(slug)
+  const [dockVisible, setDockVisible] = useState(false)
 
+  useTrackProductView(slug, productId, !loading && !!product)
+
+  // переход между товарами: скролл вверх, сброс выбора и фото
   useEffect(() => {
     if (!product) return
+    window.scrollTo({ top: 0 })
     setActivePhoto(0)
+    clear()
     // если в URL указан конкретный вариант — сразу выделяем его фото в галерее
     if (highlightVariantId) {
       const idx = product.variants.findIndex((v) => String(v.id) === highlightVariantId)
       if (idx >= 0 && product.variants[idx].photo) setActivePhoto(0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id])
+
+  useEffect(() => {
+    if (!product) return
+    pushRecentlyViewed(slug, {
+      id: product.id,
+      name: product.name,
+      retail_price: product.retail_price,
+      photo: product.photo,
+      in_stock: product.in_stock,
+    })
+  }, [slug, product])
+
+  // JSON-LD schema.org Product — добавляется в useEffect, удаляется при уходе со страницы
+  useEffect(() => {
+    if (!product) return
+    const script = document.createElement('script')
+    script.type = 'application/ld+json'
+    const jsonLd: Record<string, unknown> = {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.name,
+      image: product.storefront_photos.length > 0 ? product.storefront_photos : product.photo ? [product.photo] : undefined,
+      description: product.description || undefined,
+      sku: product.sku || undefined,
+      offers: {
+        '@type': 'Offer',
+        price: product.retail_price,
+        priceCurrency: 'RUB',
+        availability: product.in_stock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      },
+    }
+    if (product.reviews_count > 0) {
+      jsonLd.aggregateRating = {
+        '@type': 'AggregateRating',
+        ratingValue: product.average_rating,
+        reviewCount: product.reviews_count,
+      }
+    }
+    script.textContent = JSON.stringify(jsonLd)
+    document.head.appendChild(script)
+    return () => {
+      document.head.removeChild(script)
+    }
   }, [product])
 
   useEffect(() => {
@@ -89,6 +151,24 @@ export function StorefrontProductPage() {
     return () => window.removeEventListener('waysklad:storefront-cart', sync)
   }, [slug])
 
+  // мобильный dock появляется, когда TotalCard уходит из вьюпорта
+  useEffect(() => {
+    let observer: IntersectionObserver | null = null
+    // TotalCard рендерится асинхронно (после первой загрузки товара) — небольшая отсрочка
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById('product-total-card')
+      if (!el) return
+      observer = new IntersectionObserver(([entry]) => setDockVisible(!entry.isIntersecting), {
+        rootMargin: '-56px 0px 0px 0px',
+      })
+      observer.observe(el)
+    }, 0)
+    return () => {
+      window.clearTimeout(timer)
+      observer?.disconnect()
+    }
+  }, [product])
+
   function toggleFavorite() {
     if (!product) return
     setFavorites((prev) => {
@@ -110,7 +190,7 @@ export function StorefrontProductPage() {
           onToggleFavorite={undefined}
         />
         <div className={styles.container}>
-          <p style={{ padding: '32px 0', color: 'var(--text-muted)' }}>Загрузка…</p>
+          <ProductPageSkeleton />
         </div>
       </div>
     )
@@ -128,12 +208,7 @@ export function StorefrontProductPage() {
           onToggleFavorite={undefined}
         />
         <div className={styles.container}>
-          <div className={shellStyles.emptyState}>
-            <p>{error ?? 'Товар не найден'}</p>
-            <Link to={`/store/${slug}`}>
-              <Button>Вернуться в витрину</Button>
-            </Link>
-          </div>
+          <ProductPageError status={errorStatus} slug={slug} />
         </div>
       </div>
     )
@@ -280,7 +355,16 @@ export function StorefrontProductPage() {
               <BuyerPhotos photos={reviewsPage?.photos ?? []} />
               <AboutSection product={product} />
               <WarrantySection warrantyText={product.warranty_text} />
-              <ReviewsSection slug={slug} productId={productId} />
+              <Suspense fallback={null}>
+                <SimilarSection slug={slug} productId={productId} scope="shop" shopName={shopName} />
+                <SimilarSection slug={slug} productId={productId} scope="marketplace" shopName={shopName} />
+              </Suspense>
+              <Suspense fallback={null}>
+                <ReviewsSection slug={slug} productId={productId} />
+              </Suspense>
+              <Suspense fallback={null}>
+                <RecentlyViewedSection slug={slug} currentProductId={product.id} />
+              </Suspense>
             </>
           }
         />
@@ -290,6 +374,16 @@ export function StorefrontProductPage() {
         <div className={styles.toast} role="status">
           {toast}
         </div>
+      )}
+
+      {dockVisible && (
+        <MobileDock
+          total={selectionTotal}
+          inStock={product.in_stock}
+          added={added}
+          onAdd={handleAdd}
+          hasContacts={!!(shopProfile?.contacts && (shopProfile.contacts.phone || shopProfile.contacts.whatsapp || shopProfile.contacts.telegram))}
+        />
       )}
     </div>
   )

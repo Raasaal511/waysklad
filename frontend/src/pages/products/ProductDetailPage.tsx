@@ -6,6 +6,7 @@ import {
   deleteProduct,
   type Product,
 } from '../../entities/product/api'
+import { getOwnerProductReviews, hideReview, unhideReview, type Review } from '../../entities/review/api'
 import { useCatalog } from '../../app/CatalogContext'
 import { useAuth } from '../../app/AuthContext'
 import { ApiError } from '../../shared/api/client'
@@ -14,6 +15,8 @@ import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { InfoHint } from '../../shared/ui/InfoHint'
 import { HistoryDisclosure } from '../../shared/ui/HistoryDisclosure'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
+import { StarRating } from '../../shared/ui/StarRating'
+import { Button } from '../../shared/ui/Button'
 import { formatMoney, formatQuantity, isLowStock, isOutOfStock } from '../../shared/lib/format'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './ProductDetailPage.module.css'
@@ -31,6 +34,10 @@ import {
   IconBuildingStore,
   IconShoppingBag,
   IconTrash,
+  IconThumbUp,
+  IconThumbDown,
+  IconEye,
+  IconEyeOff,
   type Icon as TablerIcon,
 } from '@tabler/icons-react'
 
@@ -416,6 +423,12 @@ export function ProductDetailPage() {
             </section>
           )}
 
+          {canManage && (
+            <section className={`${styles.section} ${styles.reveal}`} style={{ '--reveal-delay': '190ms' } as CSSProperties}>
+              <ProductReviewsSection productId={product.id} />
+            </section>
+          )}
+
           <div className={styles.reveal} style={{ '--reveal-delay': '200ms' } as CSSProperties}>
             <HistoryDisclosure
               load={() => getProductHistory(product.id)}
@@ -441,5 +454,117 @@ export function ProductDetailPage() {
         />
       )}
     </div>
+  )
+}
+
+/** Список отзывов товара для владельца/менеджера — модерация (скрыть/вернуть). */
+function ProductReviewsSection({ productId }: { productId: number }) {
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getOwnerProductReviews(productId)
+      .then((data) => {
+        if (!cancelled) setReviews(data.reviews)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof ApiError ? err.message : 'Не удалось загрузить отзывы')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [productId])
+
+  async function toggleHidden(review: Review) {
+    setBusyId(review.id)
+    setError(null)
+    try {
+      const updated = review.is_hidden ? await unhideReview(review.id) : await hideReview(review.id)
+      setReviews((prev) => prev.map((r) => (r.id === review.id ? updated : r)))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось изменить отзыв')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <>
+      <h3 className={styles.sectionTitle}>Отзывы{reviews.length > 0 ? ` (${reviews.length})` : ''}</h3>
+      {loading ? (
+        <p className={layoutStyles.textMuted}>Загрузка…</p>
+      ) : error ? (
+        <p className={layoutStyles.error}>{error}</p>
+      ) : reviews.length === 0 ? (
+        <p className={layoutStyles.textMuted}>Пока нет отзывов на этот товар</p>
+      ) : (
+        <div className={layoutStyles.stack}>
+          {reviews.map((r) => (
+            <div
+              key={r.id}
+              className={layoutStyles.card}
+              style={{ opacity: r.is_hidden ? 0.55 : 1 }}
+            >
+              <div className={layoutStyles.row} style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div className={layoutStyles.row} style={{ gap: 8, alignItems: 'center' }}>
+                    <strong>{r.author_name || 'Покупатель'}</strong>
+                    <StarRating value={r.rating} size={14} />
+                  </div>
+                  {r.text && <p style={{ margin: '6px 0 0', whiteSpace: 'pre-line' }}>{r.text}</p>}
+                  {r.photos.length > 0 && (
+                    <div className={layoutStyles.row} style={{ gap: 6, marginTop: 8 }}>
+                      {r.photos.map((url) => (
+                        <img key={url} src={url} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8 }} />
+                      ))}
+                    </div>
+                  )}
+                  {r.tags.length > 0 && (
+                    <div className={layoutStyles.row} style={{ gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                      {r.tags.map((t) => (
+                        <span key={t.code} className="badge">
+                          {t.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className={layoutStyles.row} style={{ gap: 14, marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+                    <span className={layoutStyles.row} style={{ gap: 4 }}>
+                      <IconThumbUp size={14} stroke={1.8} /> {r.likes}
+                    </span>
+                    <span className={layoutStyles.row} style={{ gap: 4 }}>
+                      <IconThumbDown size={14} stroke={1.8} /> {r.dislikes}
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => toggleHidden(r)}
+                  disabled={busyId === r.id}
+                >
+                  {r.is_hidden ? (
+                    <>
+                      <IconEye size={14} stroke={1.8} /> Вернуть
+                    </>
+                  ) : (
+                    <>
+                      <IconEyeOff size={14} stroke={1.8} /> Скрыть
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   )
 }

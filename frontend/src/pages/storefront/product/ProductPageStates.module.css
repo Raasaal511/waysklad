@@ -1,0 +1,96 @@
+.skeletonLayout {
+  display: grid;
+  gap: 20px;
+  padding-top: 20px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) 340px;
+}
+
+@media (max-width: 1199px) {
+  .skeletonLayout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+}
+
+@media (max-width: 767px) {
+  .skeletonLayout {
+    grid-template-columns: 1fr;
+    padding-top: 0;
+  }
+}
+
+.skeletonBlock {
+  border-radius: 16px;
+  background: var(--bg-muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeletonBlock::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--bg) 45%, transparent), transparent);
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonBlock::after {
+    animation: none;
+  }
+}
+
+.skeletonGallery {
+  aspect-ratio: 4 / 5;
+}
+
+.skeletonInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skeletonInfoBlock {
+  height: 160px;
+}
+
+.skeletonAside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skeletonAsideBlock {
+  height: 140px;
+}
+
+/* --- Пустые/ошибочные состояния --- */
+
+.stateWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  padding: 64px 16px;
+}
+
+.stateWrap img {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+}
+
+.stateTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}

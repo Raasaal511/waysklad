@@ -211,7 +211,7 @@ export function ProductForm({
   const [createdProduct, setCreatedProduct] = useState<Product | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const [variants, setVariants] = useState<VariantInput[]>(
-    product?.variants.map((v) => ({ id: v.id, size: v.size, color: v.color, barcode: v.barcode })) ?? [],
+    product?.variants.map((v) => ({ id: v.id, size: v.size, color: v.color, barcode: v.barcode, name: v.name })) ?? [],
   )
   const [initialStockWarehouseId, setInitialStockWarehouseId] = useState<number | null>(
     warehouses[0]?.id ?? null,
@@ -221,6 +221,7 @@ export function ProductForm({
   const [storefrontMinQty, setStorefrontMinQty] = useState(product?.storefront_min_qty ?? '')
   const [storefrontStepQty, setStorefrontStepQty] = useState(product?.storefront_step_qty ?? '')
   const [description, setDescription] = useState(product?.description ?? '')
+  const [warrantyText, setWarrantyText] = useState(product?.warranty_text ?? '')
   const [storefrontPhotos, setStorefrontPhotosState] = useState<string[]>(
     product?.storefront_photos ?? [],
   )
@@ -340,7 +341,7 @@ export function ProductForm({
   }
 
   function addVariant() {
-    setVariants((v) => [...v, { size: '', color: '' }])
+    setVariants((v) => [...v, { size: '', color: '', name: '' }])
   }
 
   function updateVariant(index: number, patch: Partial<VariantInput>) {
@@ -400,6 +401,7 @@ export function ProductForm({
       min_stock: minStock || '0',
       category_id: categoryId,
       description,
+      warranty_text: warrantyText,
       show_on_storefront: showOnStorefront,
       storefront_min_qty: storefrontMinQty || null,
       storefront_step_qty: storefrontStepQty || null,
@@ -763,6 +765,18 @@ export function ProductForm({
               />
             </label>
 
+            <label className={styles.showcaseField}>
+              <span className={styles.showcaseFieldLabel}>Гарантия</span>
+              <textarea
+                className={styles.descriptionInput}
+                value={warrantyText}
+                onChange={(e) => setWarrantyText(e.target.value)}
+                rows={3}
+                maxLength={5000}
+                placeholder="Условия гарантии — покажем отдельным блоком на карточке товара"
+              />
+            </label>
+
             <div className={styles.showcaseField}>
               <div className={styles.showcaseFieldLabelRow}>
                 <span className={styles.showcaseFieldLabel}>
@@ -924,14 +938,20 @@ export function ProductForm({
           ) : (
             <div className={styles.variantList}>
               <div className={`${styles.variantRow} ${styles.variantRowHeader}`}>
+                <span>Название</span>
                 <span>Размер</span>
                 <span>Цвет</span>
                 <span />
               </div>
               {variants.map((v, i) => (
                 <div key={i} className={styles.variantRow}>
-                  <input value={v.size} onChange={(e) => updateVariant(i, { size: e.target.value })} />
-                  <input value={v.color} onChange={(e) => updateVariant(i, { color: e.target.value })} />
+                  <input
+                    value={v.name ?? ''}
+                    onChange={(e) => updateVariant(i, { name: e.target.value })}
+                    placeholder="например, Aurum. Если пусто — цвет · размер"
+                  />
+                  <input value={v.size} onChange={(e) => updateVariant(i, { size: e.target.value })} placeholder="Размер" />
+                  <input value={v.color} onChange={(e) => updateVariant(i, { color: e.target.value })} placeholder="Цвет" />
                   <IconButton
                     type="button"
                     variant="danger"

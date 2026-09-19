@@ -5,6 +5,7 @@ export interface Variant {
   size: string
   color: string
   barcode: string | null
+  name: string
 }
 
 export interface VariantInput {
@@ -12,6 +13,7 @@ export interface VariantInput {
   size: string
   color: string
   barcode?: string | null
+  name?: string
 }
 
 export interface Product {
@@ -27,6 +29,7 @@ export interface Product {
   min_stock: string
   photo: string
   description: string
+  warranty_text: string
   storefront_photos: string[]
   show_on_storefront: boolean
   storefront_min_qty: string | null
@@ -127,6 +130,7 @@ interface ProductInput {
   category_id?: number | null
   min_stock?: string
   description?: string
+  warranty_text?: string
   show_on_storefront?: boolean
   storefront_min_qty?: string | null
   storefront_step_qty?: string | null

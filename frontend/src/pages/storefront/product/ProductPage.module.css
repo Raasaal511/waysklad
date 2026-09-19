@@ -7,6 +7,12 @@
   padding-bottom: 32px;
 }
 
+@media (max-width: 767px) {
+  .page {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 .container {
   width: min(1440px, 100%);
   margin: 0 auto;
