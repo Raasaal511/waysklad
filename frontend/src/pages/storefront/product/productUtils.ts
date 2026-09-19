@@ -1,4 +1,5 @@
 import type { StorefrontProductDetail, StorefrontVariant } from '../../../entities/storefront/api'
+import { formatQuantity } from '../../../shared/lib/format'
 
 /** Цена варианта, если задана, иначе розничная цена товара. */
 export function variantPrice(product: StorefrontProductDetail, variant: StorefrontVariant | null | undefined): string {
@@ -24,9 +25,9 @@ interface StockLike {
 }
 
 /** Текст остатка: точное число, если разрешено бэком, иначе по уровню запаса. */
-export function stockText(item: StockLike): string {
+export function stockText(item: StockLike, unitLabel: string): string {
   if (item.stock_qty != null) {
-    return `Осталось ${item.stock_qty} шт`
+    return `Осталось ${formatQuantity(item.stock_qty)} ${unitLabel}`
   }
   if (item.stock_level === 'out' || !item.in_stock) return 'Нет в наличии'
   if (item.stock_level === 'low') return 'Мало'

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { IconMinus, IconPlus, IconSearch, IconInfoCircle, IconArrowsMaximize } from '@tabler/icons-react'
 import type { StorefrontProductDetail, StorefrontVariant } from '../../../entities/storefront/api'
 import { initialOrderQty, bumpOrderQty } from '../../../entities/storefront/api'
-import { formatMoney } from '../../../shared/lib/format'
+import { formatMoney, formatQuantity } from '../../../shared/lib/format'
 import { Lightbox } from '../../../shared/ui/Lightbox'
 import { stockText, variantPrice } from './productUtils'
 import type { SelectionKey } from './useSelection'
@@ -126,8 +126,9 @@ export function VariantList({ product, selection, onQtyChange, onShowToast }: Va
   }
 
   const qtyHintParts: string[] = []
-  if (product.min_order_qty) qtyHintParts.push(`мин. ${product.min_order_qty} шт`)
-  if (product.order_step_qty) qtyHintParts.push(`шаг ${product.order_step_qty}`)
+  if (product.min_order_qty)
+    qtyHintParts.push(`мин. ${formatQuantity(product.min_order_qty)} ${product.unit_label}`)
+  if (product.order_step_qty) qtyHintParts.push(`шаг ${formatQuantity(product.order_step_qty)}`)
 
   const lightboxPhotos = rows.map((r) => r.photo).filter(Boolean)
 
@@ -179,7 +180,7 @@ export function VariantList({ product, selection, onQtyChange, onShowToast }: Va
         const stockObj = row.variant
           ? { in_stock: row.variant.in_stock, stock_level: row.variant.stock_level, stock_qty: row.variant.stock_qty }
           : { in_stock: product.in_stock, stock_level: product.stock_level, stock_qty: product.stock_qty }
-        const stockLabel = stockText(stockObj)
+        const stockLabel = stockText(stockObj, product.unit_label)
 
         return (
           <div
