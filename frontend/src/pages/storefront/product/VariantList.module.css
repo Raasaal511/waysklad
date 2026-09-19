@@ -218,6 +218,7 @@
 }
 
 .stepValue {
+  width: 32px;
   min-width: 28px;
   text-align: center;
   font-size: 15px;
