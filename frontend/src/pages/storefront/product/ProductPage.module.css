@@ -1,0 +1,339 @@
+/* Общие стили карточки товара витрины (F2+). Раскладка — по блокам, каждый компонент
+   переиспользует эти классы через CSS Modules (composes не нужен — импортируем один файл). */
+
+.page {
+  background: var(--bg-muted);
+  min-height: 100vh;
+  padding-bottom: 32px;
+}
+
+.container {
+  width: min(1440px, 100%);
+  margin: 0 auto;
+  padding: 0 clamp(16px, 3.5vw, 32px);
+}
+
+/* --- Раскладка --- */
+
+.layout {
+  display: grid;
+  gap: 20px;
+  padding-top: 20px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) 340px;
+  grid-template-areas:
+    'gallery info aside'
+    'below below aside';
+  align-items: start;
+}
+
+.areaGallery {
+  grid-area: gallery;
+  min-width: 0;
+}
+
+.areaInfo {
+  grid-area: info;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.areaAside {
+  grid-area: aside;
+  min-width: 0;
+  position: sticky;
+  top: calc(64px + 16px);
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.areaBelow {
+  grid-area: below;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1199px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-areas:
+      'gallery aside'
+      'info aside'
+      'below below';
+  }
+}
+
+@media (max-width: 767px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'gallery'
+      'info'
+      'below'
+      'aside';
+    gap: 16px;
+    padding-top: 0;
+  }
+
+  .areaAside {
+    position: static;
+    top: auto;
+  }
+}
+
+/* --- Карточка-секция (блок с белым фоном) --- */
+
+.card {
+  background: var(--bg);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+@media (max-width: 767px) {
+  .card {
+    border-radius: 12px;
+    padding: 16px;
+  }
+}
+
+.sectionTitle {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 12px;
+}
+
+@media (max-width: 767px) {
+  .sectionTitle {
+    font-size: 22px;
+  }
+}
+
+/* --- Хлебные крошки --- */
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+
+.breadcrumbs::-webkit-scrollbar {
+  display: none;
+}
+
+.breadcrumbLink {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.breadcrumbLink:hover,
+.breadcrumbLink:focus-visible {
+  color: var(--accent);
+}
+
+.breadcrumbCurrent {
+  color: var(--text);
+}
+
+.breadcrumbSep {
+  opacity: 0.6;
+}
+
+/* --- Заголовок товара --- */
+
+.headerPrice {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.headerPriceUnit {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.headerTitle {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.3;
+}
+
+@media (max-width: 767px) {
+  .headerTitle {
+    font-size: 20px;
+  }
+
+  .headerPrice {
+    font-size: 22px;
+  }
+}
+
+.headerMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.headerMetaSep {
+  opacity: 0.6;
+}
+
+.headerMetaLink {
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.headerMetaLink:hover,
+.headerMetaLink:focus-visible {
+  color: var(--accent);
+}
+
+.headerSku {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.headerSku:hover,
+.headerSku:focus-visible {
+  color: var(--accent);
+}
+
+.shareBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.shareBtn:hover,
+.shareBtn:focus-visible {
+  color: var(--accent);
+}
+
+.sharePopover {
+  position: absolute;
+  z-index: 20;
+  margin-top: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+  animation: popIn 0.14s ease;
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sharePopoverItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sharePopoverItem:hover,
+.sharePopoverItem:focus-visible {
+  background: var(--bg-muted);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: var(--bg);
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  z-index: 100;
+  animation: toastIn 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toastLink {
+  color: var(--bg);
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sharePopover,
+  .toast {
+    animation: none;
+  }
+}

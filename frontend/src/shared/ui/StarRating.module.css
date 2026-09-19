@@ -1,0 +1,61 @@
+.row {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.star {
+  color: var(--border);
+  display: inline-flex;
+}
+
+.starFilled {
+  color: var(--warning);
+}
+
+.starHalfWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.starHalfFill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  width: 50%;
+  color: var(--warning);
+}
+
+.interactive {
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  color: var(--border);
+  transition: transform 0.1s ease;
+  border-radius: 4px;
+}
+
+.interactive:hover {
+  transform: scale(1.1);
+}
+
+.interactive:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.interactiveFilled {
+  color: var(--warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interactive {
+    transition: none;
+  }
+
+  .interactive:hover {
+    transform: none;
+  }
+}
