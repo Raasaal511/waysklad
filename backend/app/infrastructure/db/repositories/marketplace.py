@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy import case, false, func, literal, or_, select
+from sqlalchemy import case, false, func, literal, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.marketplace.repository import (
@@ -580,6 +580,130 @@ class SqlAlchemyMarketplaceProductRepository(IMarketplaceProductRepository):
             await self._session.execute(select(products_count_expr, cities_count_expr))
         ).one()
         return row[0], row[1]
+
+    async def _pg_trgm_available(self) -> bool:
+        # Проверяем каждый раз, а не кешируем в процессе — расширение либо есть,
+        # либо нет, запрос к pg_extension дешёвый (одна строка), а на managed
+        # Postgres без прав миграция (см. 2026-09-19_pg_trgm_extension.py) просто
+        # не создаёт расширение, и мы должны это увидеть без рестарта процесса.
+        row = (
+            await self._session.execute(
+                text("SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm'")
+            )
+        ).first()
+        return row is not None
+
+    async def list_similar_cross_shop(
+        self,
+        visible_tenant_ids: list[int],
+        warehouse_ids: list[int],
+        exclude_product_id: int,
+        exclude_tenant_id: int,
+        category_name: str | None,
+        name_words: list[str],
+        limit: int,
+    ) -> list[MarketplaceProductRow]:
+        other_tenant_ids = [t for t in visible_tenant_ids if t != exclude_tenant_id]
+        if not other_tenant_ids:
+            return []
+
+        base_conditions = [
+            ProductModel.tenant_id.in_(other_tenant_ids),
+            ProductModel.is_active.is_(True),
+            ProductModel.show_on_storefront.is_(True),
+            ProductModel.id != exclude_product_id,
+        ]
+
+        async def _fetch(extra_conditions, order_col, extra_limit: int):
+            if extra_limit <= 0:
+                return []
+            stock_expr = _stock_expr(warehouse_ids) if warehouse_ids else None
+            stock_col = (
+                func.coalesce(stock_expr, 0) if stock_expr is not None else literal(0)
+            ).label("stock")
+            stmt = (
+                select(ProductModel, TenantModel, CategoryModel, stock_col)
+                .join(TenantModel, TenantModel.id == ProductModel.tenant_id)
+                .outerjoin(CategoryModel, CategoryModel.id == ProductModel.category_id)
+                .where(*base_conditions, *extra_conditions)
+                .order_by(order_col)
+                .limit(extra_limit)
+            )
+            return (await self._session.execute(stmt)).all()
+
+        # 1. Совпадение по названию категории (как category в GET /marketplace/products)
+        rows = []
+        seen_ids: set[int] = set()
+        if category_name is not None:
+            rows = await _fetch(
+                [CategoryModel.name == category_name],
+                ProductModel.id.desc(),
+                limit,
+            )
+            seen_ids = {product.id for product, _, _, _ in rows}
+
+        # 2. Добор по похожести названия, если совпадений по категории не хватило
+        remaining = limit - len(rows)
+        if remaining > 0 and name_words:
+            exclude_ids = seen_ids | {exclude_product_id}
+            extra_conditions = [ProductModel.id.not_in(exclude_ids)] if exclude_ids else []
+            if await self._pg_trgm_available():
+                query_text = " ".join(name_words)
+                similarity_expr = func.similarity(ProductModel.name, query_text)
+                more_rows = await _fetch(
+                    [*extra_conditions, similarity_expr > 0.1],
+                    similarity_expr.desc(),
+                    remaining,
+                )
+            else:
+                # ILIKE по каждому значимому слову — совпадение любого из них
+                # (обычно 2 слова: имя товара часто отличается брендом/моделью,
+                # AND по обоим сильно сузил бы выборку до почти пустой)
+                like_conditions = [
+                    ProductModel.name.ilike(f"%{word}%") for word in name_words
+                ]
+                more_rows = await _fetch(
+                    [*extra_conditions, or_(*like_conditions)],
+                    ProductModel.id.desc(),
+                    remaining,
+                )
+            rows = [*rows, *more_rows]
+
+        if not rows:
+            return []
+
+        product_ids = [product.id for product, _, _, _ in rows]
+        sold_counts = await self.sold_count_by_products(product_ids)
+        ratings = await self.rating_by_products(product_ids)
+        _empty_rating = ProductRatingAggregate(average_rating=0.0, reviews_count=0)
+        new_cutoff = datetime.now(timezone.utc) - timedelta(days=_NEW_WINDOW_DAYS)
+
+        def _row(product, tenant, category_model, stock) -> MarketplaceProductRow:
+            discount_percent = _compute_discount_percent(product.retail_price, product.compare_at_price)
+            return MarketplaceProductRow(
+                product_id=product.id,
+                name=product.name,
+                retail_price=product.retail_price,
+                photo=product.photo,
+                category_name=category_model.name if category_model else None,
+                in_stock=stock > 0,
+                min_order_qty=product.storefront_min_qty,
+                order_step_qty=product.storefront_step_qty,
+                shop_slug=tenant.slug or "",
+                shop_name=tenant.name,
+                sku=product.sku or "",
+                sold_count=sold_counts.get(product.id, Decimal("0")),
+                rating=ratings.get(product.id, _empty_rating),
+                shop_logo=tenant.logo,
+                shop_is_verified=tenant.is_verified,
+                shop_city=tenant.city,
+                old_price=product.compare_at_price if discount_percent is not None else None,
+                discount_percent=discount_percent,
+                is_new=_as_utc(product.created_at) >= new_cutoff,
+                is_hit=False,  # список похожих товаров не участвует в подсчёте хитов платформы
+            )
+
+        return [_row(*row) for row in rows]
 
 
 def _compute_discount_percent(retail_price: Decimal, compare_at_price: Decimal | None) -> int | None:

@@ -257,3 +257,22 @@ class IMarketplaceProductRepository(Protocol):
         """(products_count, cities_count) среди видимых товаров видимых магазинов —
         для stats в GET /marketplace/home."""
         ...
+
+    async def list_similar_cross_shop(
+        self,
+        visible_tenant_ids: list[int],
+        warehouse_ids: list[int],
+        exclude_product_id: int,
+        exclude_tenant_id: int,
+        category_name: str | None,
+        name_words: list[str],
+        limit: int,
+    ) -> list[MarketplaceProductRow]:
+        """Похожие товары ДРУГИХ магазинов платформы (промпт B4 п.2) — текущий
+        магазин (exclude_tenant_id) исключён целиком, текущий товар — тоже.
+        Сначала — совпадение по названию категории (category_name, как
+        category в GET /marketplace/products); если найденных меньше limit —
+        добор по похожести названия: pg_trgm similarity(), если расширение
+        доступно, иначе ILIKE по name_words (первые два значимых слова
+        названия текущего товара, без стоп-слов — считает вызывающий)."""
+        ...

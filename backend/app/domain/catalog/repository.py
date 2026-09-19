@@ -58,6 +58,20 @@ class IProductRepository(Protocol):
         витрине (show_on_storefront=True) — для построения фильтра «Размер»/
         «Цвет» на публичной странице. Возвращает (sizes, colors)."""
         ...
+    async def list_similar_in_shop(
+        self,
+        product_id: int,
+        category_id: int | None,
+        parent_category_id: int | None,
+        warehouse_ids: list[int],
+        limit: int,
+    ) -> list[Product]:
+        """Похожие товары этого же магазина (промпт B4 п.1) — кроме самого
+        product_id, только show_on_storefront=True. Порядок: сначала та же
+        категория, затем та же родительская категория, затем остальные;
+        внутри группы — сначала в наличии (по warehouse_ids), затем по
+        sold_count за всё время по убыванию."""
+        ...
 
 
 class IUnitRepository(Protocol):
