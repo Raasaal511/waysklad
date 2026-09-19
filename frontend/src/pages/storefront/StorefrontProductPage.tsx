@@ -15,6 +15,7 @@ import {
   bumpOrderQty,
   type StorefrontProductDetail,
 } from '../../entities/storefront/api'
+import { variantPrice } from './product/productUtils'
 import { ApiError } from '../../shared/api/client'
 import { formatMoney, formatQuantity } from '../../shared/lib/format'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
@@ -128,11 +129,11 @@ export function StorefrontProductPage() {
     addToCart(slug, {
       product_id: product.id,
       name: product.name,
-      retail_price: product.retail_price,
-      photo: product.photo,
+      retail_price: variantPrice(product, variant),
+      photo: variant?.photo || product.photo,
       quantity: String(qty),
       variant_id: variantId,
-      variant_label: variant ? [variant.size, variant.color].filter(Boolean).join(' / ') : undefined,
+      variant_label: variant ? (variant.display_name || [variant.size, variant.color].filter(Boolean).join(' / ')) : undefined,
     })
     setCartItems(loadCart(slug))
     setAdded(true)
@@ -169,7 +170,9 @@ export function StorefrontProductPage() {
     )
   }
 
-  const lineTotal = (Number(product.retail_price) * qty).toFixed(2)
+  const selectedVariant = product.variants.find((v) => v.id === variantId)
+  const unitPrice = variantPrice(product, selectedVariant)
+  const lineTotal = (Number(unitPrice) * qty).toFixed(2)
   const minQty = initialOrderQty(product.min_order_qty, product.order_step_qty)
 
   return (
@@ -260,7 +263,7 @@ export function StorefrontProductPage() {
         </div>
 
         <div className={styles.productInfo}>
-          <p className={styles.productPrice}>{formatMoney(product.retail_price)} ₽</p>
+          <p className={styles.productPrice}>{formatMoney(unitPrice)} ₽</p>
 
           {product.description?.trim() && (
             <div className={styles.descriptionBlock}>
