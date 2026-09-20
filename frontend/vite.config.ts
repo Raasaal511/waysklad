@@ -53,4 +53,19 @@ export default defineConfig({
       },
     },
   },
+  // vite preview — тот же прокси, что и dev-сервер, чтобы можно было гонять
+  // Lighthouse/QA-скрипты по production-сборке с реальным backend (P7 п.2).
+  preview: {
+    proxy: {
+      '/api': {
+        target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:8000',
+        changeOrigin: true,
+        ws: true,
+      },
+      '/uploads': {
+        target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
+  },
 })
