@@ -1,6 +1,13 @@
 import { api } from '../../shared/api/client'
 
-export type MarketplaceSort = 'name' | 'price_asc' | 'price_desc' | 'created_desc'
+export type MarketplaceSort =
+  | 'name'
+  | 'price_asc'
+  | 'price_desc'
+  | 'created_desc'
+  | 'popular'
+  | 'rating'
+  | 'discount'
 
 export interface MarketplaceProduct {
   id: number
@@ -33,9 +40,13 @@ export interface MarketplaceCatalog {
 export interface MarketplaceParams {
   query?: string
   category?: string
+  platformCategory?: string
+  city?: string
   priceMin?: string
   priceMax?: string
   inStockOnly?: boolean
+  withDiscount?: boolean
+  minRating?: number
   variantSize?: string
   variantColor?: string
   shopSlug?: string
@@ -48,9 +59,13 @@ export function listMarketplaceProducts(params: MarketplaceParams = {}) {
   const search = new URLSearchParams()
   if (params.query) search.set('query', params.query)
   if (params.category) search.set('category', params.category)
+  if (params.platformCategory) search.set('platform_category', params.platformCategory)
+  if (params.city) search.set('city', params.city)
   if (params.priceMin) search.set('price_min', params.priceMin)
   if (params.priceMax) search.set('price_max', params.priceMax)
   if (params.inStockOnly) search.set('in_stock_only', 'true')
+  if (params.withDiscount) search.set('with_discount', 'true')
+  if (params.minRating) search.set('min_rating', String(params.minRating))
   if (params.variantSize) search.set('variant_size', params.variantSize)
   if (params.variantColor) search.set('variant_color', params.variantColor)
   if (params.shopSlug) search.set('shop_slug', params.shopSlug)
@@ -59,4 +74,94 @@ export function listMarketplaceProducts(params: MarketplaceParams = {}) {
   if (params.offset != null) search.set('offset', String(params.offset))
   const qs = search.toString()
   return api.get<MarketplaceCatalog>(`/marketplace/products${qs ? `?${qs}` : ''}`)
+}
+
+export interface PlatformCategory {
+  id: number
+  slug: string
+  name: string
+  image: string
+  parent_id: number | null
+  products_count: number
+}
+
+export interface Banner {
+  id: number
+  placement: 'hero' | 'promo'
+  title: string
+  subtitle: string
+  button_text: string
+  link: string
+  image: string
+  image_mobile: string
+  theme: 'light' | 'accent' | 'dark'
+  sort_order: number
+  is_active: boolean
+  starts_at: string | null
+  ends_at: string | null
+  city: string | null
+}
+
+export interface ShopChip {
+  slug: string
+  name: string
+  logo: string
+  city: string | null
+  is_verified: boolean
+  average_rating: number
+  reviews_count: number
+  products_count: number
+}
+
+export type HomeSectionKey = 'discount' | 'popular' | 'new' | 'top_rated'
+
+export interface HomeSection {
+  key: HomeSectionKey
+  title: string
+  products: MarketplaceProduct[]
+}
+
+export interface MarketplaceHomeResponse {
+  banners: { hero: Banner[]; promo: Banner[] }
+  categories: PlatformCategory[]
+  shops: ShopChip[]
+  sections: HomeSection[]
+  stats: { shops_count: number; products_count: number; cities_count: number }
+}
+
+export function getMarketplaceHome(city?: string) {
+  const qs = city ? `?city=${encodeURIComponent(city)}` : ''
+  return api.get<MarketplaceHomeResponse>(`/marketplace/home${qs}`)
+}
+
+export interface MarketplaceCitiesResponse {
+  cities: { name: string; shops_count: number }[]
+}
+
+export function getMarketplaceCities() {
+  return api.get<MarketplaceCitiesResponse>('/marketplace/cities')
+}
+
+export function getMarketplaceCategories(city?: string) {
+  const qs = city ? `?city=${encodeURIComponent(city)}` : ''
+  return api.get<{ categories: PlatformCategory[] }>(`/marketplace/categories${qs}`)
+}
+
+export interface MarketplaceShopsParams {
+  city?: string
+  query?: string
+  sort?: 'popular' | 'rating' | 'new'
+  limit?: number
+  offset?: number
+}
+
+export function listMarketplaceShops(params: MarketplaceShopsParams = {}) {
+  const search = new URLSearchParams()
+  if (params.city) search.set('city', params.city)
+  if (params.query) search.set('query', params.query)
+  if (params.sort) search.set('sort', params.sort)
+  if (params.limit != null) search.set('limit', String(params.limit))
+  if (params.offset != null) search.set('offset', String(params.offset))
+  const qs = search.toString()
+  return api.get<{ shops: ShopChip[]; total: number }>(`/marketplace/shops${qs ? `?${qs}` : ''}`)
 }
