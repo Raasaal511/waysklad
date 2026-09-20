@@ -16,6 +16,12 @@ interface ProductGridProps<T extends ProductCardItem> {
   onLoadMore?: () => void
   loadingMore?: boolean
   hasMore?: boolean
+  /** На мобильном — горизонтальный скролл карточек 160px вместо сетки (секции главной
+   * маркетплейса, кроме первой). На ≥768 поведение не меняется. M-F3 п.3. */
+  mobileScroll?: boolean
+  /** На мобильном показывать не больше 6 карточек сетки (секция «Скидки» главной —
+   * 6 из до 10 загруженных, чтобы не резать десктопную сетку 5×2). На ≥768 не действует. */
+  mobileLimitSix?: boolean
 }
 
 /** Общая сетка карточек товара — каталог магазина, маркетплейс, избранное. Блок «Д» п.2. */
@@ -31,10 +37,20 @@ export function ProductGrid<T extends ProductCardItem>({
   onLoadMore,
   loadingMore,
   hasMore,
+  mobileScroll,
+  mobileLimitSix,
 }: ProductGridProps<T>) {
+  const gridClass = [
+    styles.grid,
+    mobileScroll ? styles.mobileScroll : '',
+    mobileLimitSix ? styles.mobileLimitSix : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   if (loading) {
     return (
-      <div className={styles.grid}>
+      <div className={gridClass}>
         {Array.from({ length: skeletonCount }).map((_, i) => (
           <ProductCardSkeleton key={i} />
         ))}
@@ -44,7 +60,7 @@ export function ProductGrid<T extends ProductCardItem>({
 
   return (
     <>
-      <div className={styles.grid}>
+      <div className={gridClass}>
         {items.map((item) => (
           <ProductCard
             // товары маркетплейса не уникальны по одному id (тот же id у разных

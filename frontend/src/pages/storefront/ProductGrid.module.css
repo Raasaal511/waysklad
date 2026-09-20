@@ -32,3 +32,30 @@
   justify-content: center;
   margin-top: 24px;
 }
+
+/* Секции главной маркетплейса на мобильном (кроме первой) — горизонтальный
+   скролл карточек фиксированной ширины вместо сетки (M-F3 п.3). */
+@media (max-width: 767px) {
+  .mobileScroll {
+    display: flex;
+    grid-template-columns: none;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .mobileScroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobileScroll > * {
+    flex: 0 0 160px;
+    width: 160px;
+  }
+
+  /* Секция «Скидки» главной — сетка 2 колонки, но не больше 6 карточек
+     (M-F3 п.3); десктоп остаётся без обрезки, т.к. это только мобильный блок. */
+  .mobileLimitSix > :nth-child(n + 7) {
+    display: none;
+  }
+}
