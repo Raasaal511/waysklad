@@ -90,8 +90,8 @@ export function ProductHeader({ product, selectedPrice }: ProductHeaderProps) {
       <h1 className={styles.headerTitle}>{product.name}</h1>
       <div className={styles.headerMeta}>
         {product.reviews_count > 0 && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <StarRating value={product.average_rating} size={14} />
+          <span className={styles.headerMetaStars}>
+            <StarRating value={product.average_rating} size={16} />
           </span>
         )}
         <a href="#reviews" className={styles.headerMetaLink}>
@@ -107,15 +107,15 @@ export function ProductHeader({ product, selectedPrice }: ProductHeaderProps) {
           <>
             <span className={styles.headerMetaSep}>·</span>
             <button type="button" className={styles.headerSku} onClick={copySku} aria-label="Скопировать артикул">
-              <IconCopy size={13} stroke={1.8} />
+              <IconCopy size={16} stroke={1.8} />
               арт. {product.sku}
             </button>
           </>
         )}
         <span className={styles.headerMetaSep}>·</span>
-        <div style={{ position: 'relative' }} ref={shareRef}>
+        <div className={styles.shareWrap} ref={shareRef}>
           <button type="button" className={styles.shareBtn} onClick={handleShare} aria-label="Поделиться">
-            <IconShare size={14} stroke={1.8} />
+            <IconShare size={16} stroke={1.8} />
             Поделиться
           </button>
           {sharing && (

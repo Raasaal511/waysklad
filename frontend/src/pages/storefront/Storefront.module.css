@@ -99,6 +99,10 @@
   padding-top: 16px;
 }
 
+.crumbRow > *:first-child {
+  min-width: 0;
+}
+
 .header {
   display: flex;
   flex-direction: column;

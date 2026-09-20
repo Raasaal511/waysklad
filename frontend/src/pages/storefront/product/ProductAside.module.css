@@ -112,6 +112,13 @@
   outline-offset: 2px;
 }
 
+.emptyHint {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 8px 0 0;
+}
+
 .inCartRow {
   text-align: center;
   font-size: 13px;
@@ -175,7 +182,7 @@
 
 .conditionsRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   width: 100%;
   border: none;
@@ -184,6 +191,11 @@
   text-align: left;
   cursor: pointer;
   color: inherit;
+}
+
+.conditionsIcon,
+.conditionsChevron {
+  margin-top: 1px;
 }
 
 .conditionsRow + .conditionsRow {
@@ -213,6 +225,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.conditionsSubMultiline {
+  white-space: normal;
+  line-height: 1.45;
 }
 
 .conditionsChevron {
@@ -259,11 +276,21 @@
   margin: 0;
 }
 
+.shopHeaderInfo {
+  min-width: 0;
+}
+
 .shopRating {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.shopRatingMuted {
+  font-size: 13px;
+  color: var(--text-muted);
   margin: 4px 0 0;
 }
 
@@ -280,6 +307,20 @@
   font-size: 12px;
   color: var(--text-muted);
   margin: 2px 0 0;
+}
+
+.shopAddress {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 10px 0 0;
+}
+
+.shopAddress svg {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .shopStats {
@@ -305,6 +346,30 @@
   font-size: 11px;
   color: var(--text-muted);
   margin: 2px 0 0;
+}
+
+.shopVisitBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  margin-top: 16px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: filter 0.15s ease;
+}
+
+.shopVisitBtn:hover {
+  filter: brightness(0.96);
+}
+
+.shopVisitBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* --- FaqLinks --- */

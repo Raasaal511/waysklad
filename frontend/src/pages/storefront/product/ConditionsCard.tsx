@@ -28,7 +28,7 @@ export function ConditionsCard({ addresses, paymentPolicy }: ConditionsCardProps
           <div className={styles.conditionsBody}>
             <p className={styles.conditionsTitle}>Адрес магазина</p>
             <p className={styles.conditionsSub}>
-              {firstAddress.address || firstAddress.name}
+              {firstAddress.name}
               {extraCount > 0 ? ` · + ещё ${extraCount}` : ''}
             </p>
           </div>
@@ -43,7 +43,9 @@ export function ConditionsCard({ addresses, paymentPolicy }: ConditionsCardProps
         <IconCash size={20} stroke={1.8} className={styles.conditionsIcon} />
         <div className={styles.conditionsBody}>
           <p className={styles.conditionsTitle}>Оплата при получении</p>
-          <p className={styles.conditionsSub}>Онлайн-оплаты нет — платите магазину при получении</p>
+          <p className={`${styles.conditionsSub} ${styles.conditionsSubMultiline}`}>
+            Онлайн-оплаты нет — платите магазину при получении
+          </p>
         </div>
         {paymentPolicy && <IconChevronRight size={16} stroke={1.8} className={styles.conditionsChevron} />}
       </button>
