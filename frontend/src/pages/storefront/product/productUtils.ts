@@ -1,5 +1,10 @@
-import type { StorefrontProductDetail, StorefrontVariant } from '../../../entities/storefront/api'
+import type {
+  StorefrontProductCategory,
+  StorefrontProductDetail,
+  StorefrontVariant,
+} from '../../../entities/storefront/api'
 import { formatQuantity } from '../../../shared/lib/format'
+import type { BreadcrumbItem } from '../../../shared/ui/Breadcrumbs'
 
 /** Цена варианта, если задана, иначе розничная цена товара. */
 export function variantPrice(product: StorefrontProductDetail, variant: StorefrontVariant | null | undefined): string {
@@ -103,6 +108,23 @@ export function galleryFor(product: StorefrontProductDetail): string[] {
     if (!list.includes(p)) list.push(p)
   }
   return list
+}
+
+/** «Каталог магазина › <родитель> › <категория> › <товар>» — последний элемент не ссылка. */
+export function buildProductBreadcrumbs(
+  slug: string,
+  category: StorefrontProductCategory | null,
+  productName: string,
+): BreadcrumbItem[] {
+  const items: BreadcrumbItem[] = [{ label: 'Каталог магазина', to: `/store/${slug}` }]
+  if (category?.parent) {
+    items.push({ label: category.parent.name, to: `/store/${slug}?category_id=${category.parent.id}` })
+  }
+  if (category) {
+    items.push({ label: category.name, to: `/store/${slug}?category_id=${category.id}` })
+  }
+  items.push({ label: productName })
+  return items
 }
 
 /** Фото для конкретного варианта, если оно есть — иначе общая галерея товара. */

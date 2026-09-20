@@ -10,7 +10,7 @@ import {
   useTrackProductView,
 } from './product/useProductPageData'
 import { ProductLayout } from './product/ProductLayout'
-import { Breadcrumbs } from './product/Breadcrumbs'
+import { Breadcrumbs } from '../../shared/ui/Breadcrumbs'
 import { ProductHeader } from './product/ProductHeader'
 import { ProductGallery } from './product/ProductGallery'
 import { BuyerPhotos } from './product/BuyerPhotos'
@@ -25,7 +25,7 @@ import { WarrantySection } from './product/WarrantySection'
 import { MobileDock } from './product/MobileDock'
 import { ProductPageSkeleton, ProductPageError } from './product/ProductPageStates'
 import { useSelection } from './product/useSelection'
-import { variantPrice, galleryForVariant } from './product/productUtils'
+import { variantPrice, galleryForVariant, buildProductBreadcrumbs } from './product/productUtils'
 import { pushRecentlyViewed } from './product/recentlyViewed'
 import { addToCart, loadCart } from './cart'
 import { initialOrderQty } from '../../entities/storefront/api'
@@ -293,7 +293,7 @@ export function StorefrontProductPage() {
     <div className={styles.page}>
       <div className={styles.container}>
         <div className={shellStyles.crumbRow}>
-          <Breadcrumbs slug={slug} category={product.category} productName={product.name} />
+          <Breadcrumbs items={buildProductBreadcrumbs(slug, product.category, product.name)} />
           <button
             type="button"
             className={shellStyles.iconGhost}

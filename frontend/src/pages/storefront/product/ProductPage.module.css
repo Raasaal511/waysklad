@@ -151,60 +151,6 @@
 
 /* --- Хлебные крошки --- */
 
-.breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 14px 0;
-  font-size: 13px;
-  color: var(--text-muted);
-  overflow-x: auto;
-  white-space: nowrap;
-  scrollbar-width: none;
-  min-width: 0;
-}
-
-.breadcrumbs::-webkit-scrollbar {
-  display: none;
-}
-
-.breadcrumbItem {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-/* Последняя крошка (товар) — не ссылка, единственная, которой разрешено сжиматься и обрезаться. */
-.breadcrumbItem:last-child {
-  min-width: 0;
-  max-width: 320px;
-}
-
-.breadcrumbLink {
-  color: var(--text-muted);
-  text-decoration: none;
-  transition: color 0.15s ease;
-  flex-shrink: 0;
-}
-
-.breadcrumbLink:hover,
-.breadcrumbLink:focus-visible {
-  color: var(--accent);
-}
-
-.breadcrumbCurrent {
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.breadcrumbSep {
-  opacity: 0.6;
-}
-
 /* --- Заголовок товара --- */
 
 .headerPrice {
