@@ -84,7 +84,7 @@ export function ReviewCard({ review, isOwn, onVote, onOpenPhoto, onRequireLogin,
           className={review.my_vote === 1 ? `${styles.voteBtn} ${styles.voteBtnActive}` : styles.voteBtn}
           onClick={() => handleVote(1)}
           disabled={isOwn}
-          aria-label="Полезно"
+          aria-label={`Полезно, ${review.likes}`}
           aria-pressed={review.my_vote === 1}
         >
           <IconThumbUp size={16} stroke={1.8} /> {review.likes}
@@ -94,7 +94,7 @@ export function ReviewCard({ review, isOwn, onVote, onOpenPhoto, onRequireLogin,
           className={review.my_vote === -1 ? `${styles.voteBtn} ${styles.voteBtnActive}` : styles.voteBtn}
           onClick={() => handleVote(-1)}
           disabled={isOwn}
-          aria-label="Не полезно"
+          aria-label={`Не полезно, ${review.dislikes}`}
           aria-pressed={review.my_vote === -1}
         >
           <IconThumbDown size={16} stroke={1.8} /> {review.dislikes}

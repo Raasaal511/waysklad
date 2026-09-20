@@ -155,30 +155,40 @@
 
 .dots {
   position: absolute;
-  bottom: 16px;
+  bottom: 8px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 8px;
   z-index: 2;
 }
 
+/* Кликабельная область кнопки — стабильные 24×24 (WCAG 2.5.8 target-size), не
+   масштабируется, чтобы не наезжать на соседнюю кнопку; масштабируется только
+   .dotMark внутри. */
 .dot {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dotMark {
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  border: none;
   background: rgba(255, 255, 255, 0.5);
-  cursor: pointer;
-  padding: 0;
   transition: background 150ms ease-out, transform 150ms ease-out;
 }
 
-.dot:hover {
+.dot:hover .dotMark {
   background: rgba(255, 255, 255, 0.8);
 }
 
-.dotActive {
+.dotMarkActive {
   background: #fff;
   transform: scale(1.25);
 }
@@ -186,6 +196,7 @@
 .dot:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
+  border-radius: 999px;
 }
 
 .skeleton {

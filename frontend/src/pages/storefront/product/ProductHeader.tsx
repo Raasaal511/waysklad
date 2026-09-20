@@ -106,7 +106,12 @@ export function ProductHeader({ product, selectedPrice }: ProductHeaderProps) {
         {product.sku && (
           <>
             <span className={styles.headerMetaSep}>·</span>
-            <button type="button" className={styles.headerSku} onClick={copySku} aria-label="Скопировать артикул">
+            <button
+              type="button"
+              className={styles.headerSku}
+              onClick={copySku}
+              aria-label={`арт. ${product.sku} — скопировать`}
+            >
               <IconCopy size={16} stroke={1.8} />
               арт. {product.sku}
             </button>

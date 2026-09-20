@@ -226,15 +226,33 @@
   margin-bottom: 12px;
 }
 
+/* Высота под 2 строки меты (14px/1.45 ≈ 20px на строку) — на мобильном реальная
+   строка «★ 4.8 · N отзывов · Город · N товаров · На ВайСклад с …» часто переносится
+   (нулевой CLS при переходе skeleton → контент). */
 .skeletonMeta {
-  height: 16px;
-  width: 60%;
+  height: 40px;
+  width: 70%;
   margin-bottom: 12px;
 }
 
+/* Высота под 2 строки описания (ExpandableText clampLines=2, 16px/1.55 ≈ 25px) */
 .skeletonText {
-  height: 14px;
+  height: 50px;
   width: 90%;
+}
+
+/* Кнопки «Написать» / «Адрес и условия» — высота по блоку «Д» п.5 (48/44 на мобильном) */
+.skeletonActionBtn {
+  height: 44px;
+  flex: 1;
+}
+
+@media (min-width: 1024px) {
+  .skeletonActionBtn {
+    flex: none;
+    width: 120px;
+    height: 48px;
+  }
 }
 
 .skeletonLogo::after,

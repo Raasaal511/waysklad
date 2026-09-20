@@ -119,6 +119,13 @@
   color: var(--text);
 }
 
+/* outline у самого <input> снят намеренно — фокус показывает контейнер
+   (блок «Д» п.5: у каждого интерактивного элемента есть :focus-visible) */
+.searchDesktop:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .searchDesktop input {
   flex: 1;
   min-width: 0;
@@ -181,6 +188,11 @@
     border-radius: 12px;
     background: var(--bg-muted);
     color: var(--text);
+  }
+
+  .searchMobile:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   .searchMobile input {

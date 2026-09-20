@@ -50,6 +50,9 @@ interface FilterBarProps {
   availableColors?: string[]
   /** Категории платформы/магазина лентой чипов; скрыта при пустом списке. */
   categories?: FilterBarCategory[]
+  /** Список категорий ещё грузится — рисуем skeleton-ленту той же высоты вместо
+   *  того, чтобы дождаться загрузки и раздвинуть макет (нулевой CLS, блок «Д» п.9). */
+  categoriesLoading?: boolean
   activeCategoryId?: number | string | null
   onCategoryChange?: (id: number | string | null) => void
   totalCount?: number
@@ -84,6 +87,7 @@ export function FilterBar({
   availableSizes = [],
   availableColors = [],
   categories = [],
+  categoriesLoading = false,
   activeCategoryId = null,
   onCategoryChange,
   totalCount,
@@ -209,17 +213,25 @@ export function FilterBar({
         </div>
       )}
 
-      {categories.length > 0 && (
-        <div className={styles.categories}>
-          <Chip active={activeCategoryId == null} onClick={() => onCategoryChange?.(null)}>
-            Все{totalCount != null ? ` ${totalCount}` : ''}
-          </Chip>
-          {categories.map((c) => (
-            <Chip key={c.id} active={activeCategoryId === c.id} onClick={() => onCategoryChange?.(c.id)}>
-              {c.name} {c.count}
-            </Chip>
+      {categoriesLoading ? (
+        <div className={styles.categories} aria-hidden="true">
+          {[64, 88, 72, 96].map((w, i) => (
+            <span key={i} className={styles.categorySkeleton} style={{ width: w }} />
           ))}
         </div>
+      ) : (
+        categories.length > 0 && (
+          <div className={styles.categories}>
+            <Chip active={activeCategoryId == null} onClick={() => onCategoryChange?.(null)}>
+              Все{totalCount != null ? ` ${totalCount}` : ''}
+            </Chip>
+            {categories.map((c) => (
+              <Chip key={c.id} active={activeCategoryId === c.id} onClick={() => onCategoryChange?.(c.id)}>
+                {c.name} {c.count}
+              </Chip>
+            ))}
+          </div>
+        )
       )}
 
       {sheetOpen && (

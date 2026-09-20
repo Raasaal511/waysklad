@@ -57,7 +57,9 @@ export function StarRating({ value, size = 16, onChange, labels }: StarRatingPro
   const roundedFull = value - full >= 0.75 ? full + 1 : full
 
   return (
-    <span className={styles.row} aria-label={`Рейтинг ${value.toFixed(1)} из 5`}>
+    // role="img" — звёзды тут декоративны, aria-label целиком заменяет их одним
+    // значением; без валидной role на <span> aria-label игнорируется (axe aria-prohibited-attr)
+    <span className={styles.row} role="img" aria-label={`Рейтинг ${value.toFixed(1)} из 5`}>
       {[1, 2, 3, 4, 5].map((n) => {
         if (n <= roundedFull) {
           return <IconStarFilled key={n} size={size} className={styles.starFilled} />

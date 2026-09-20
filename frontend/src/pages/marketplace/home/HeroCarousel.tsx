@@ -155,12 +155,18 @@ export function HeroCarousel({ banners, city }: { banners: Banner[]; city: strin
                 <h2 className={styles.slideTitle}>{renderTitle(slide.title)}</h2>
                 {slide.subtitle && <p className={styles.slideSubtitle}>{slide.subtitle}</p>}
                 {isExternalLink(slide.link) ? (
-                  <a href={slide.link} target="_blank" rel="noopener noreferrer">
-                    <Button className={styles.slideBtn}>{slide.buttonText}</Button>
+                  <a href={slide.link} target="_blank" rel="noopener noreferrer" tabIndex={i === index ? 0 : -1}>
+                    {/* aria-hidden="true" на скрытом слайде не убирает фокусируемость вложенной
+                        <button> — Lighthouse aria-hidden-focus — поэтому tabIndex дублируется на неё */}
+                    <Button className={styles.slideBtn} tabIndex={-1}>
+                      {slide.buttonText}
+                    </Button>
                   </a>
                 ) : (
                   <Link to={slide.link} tabIndex={i === index ? 0 : -1}>
-                    <Button className={styles.slideBtn}>{slide.buttonText}</Button>
+                    <Button className={styles.slideBtn} tabIndex={-1}>
+                      {slide.buttonText}
+                    </Button>
                   </Link>
                 )}
               </div>
@@ -198,11 +204,15 @@ export function HeroCarousel({ banners, city }: { banners: Banner[]; city: strin
               <button
                 key={slide.key}
                 type="button"
-                className={`${styles.dot} ${i === index ? styles.dotActive : ''}`}
+                className={styles.dot}
                 onClick={() => goTo(i)}
                 aria-label={`Слайд ${i + 1}`}
                 aria-current={i === index}
-              />
+              >
+                {/* масштабируется только визуальная точка внутри — hit-box кнопки
+                    остаётся стабильным 24×24 и не наезжает на соседа (target-size) */}
+                <span className={`${styles.dotMark} ${i === index ? styles.dotMarkActive : ''}`} />
+              </button>
             ))}
           </div>
         </>

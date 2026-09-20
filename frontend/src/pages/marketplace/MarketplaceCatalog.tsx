@@ -76,6 +76,7 @@ export function MarketplaceCatalog() {
   const [error, setError] = useState<string | null>(null)
   const [cities, setCities] = useState<{ name: string; shops_count: number }[]>([])
   const [categories, setCategories] = useState<PlatformCategory[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState(true)
 
   // позиция скролла при «назад» из карточки товара (см. shared/lib/useScrollRestore.ts, P6)
   useScrollRestore(!loading)
@@ -87,6 +88,7 @@ export function MarketplaceCatalog() {
     getMarketplaceCategories()
       .then((data) => setCategories(data.categories))
       .catch(() => setCategories([]))
+      .finally(() => setCategoriesLoading(false))
   }, [])
 
   const listParams = useMemo(
@@ -244,6 +246,7 @@ export function MarketplaceCatalog() {
         onClear={clearAllFilters}
         cityOptions={cities.map((c) => ({ value: c.name, label: c.name }))}
         categories={categories.map((c) => ({ id: c.slug, name: c.name, count: c.products_count }))}
+        categoriesLoading={categoriesLoading}
         activeCategoryId={pcat || null}
         onCategoryChange={(id) => patchParams({ pcat: id != null ? String(id) : null, category: null })}
         totalCount={total}
@@ -251,6 +254,9 @@ export function MarketplaceCatalog() {
       />
 
       <main>
+        {/* h1 — заголовок каталога выше, товары — h3 (ProductCard); без этого h2
+            порядок заголовков прыгает через уровень (Lighthouse heading-order) */}
+        <h2 className="sr-only">Товары</h2>
         {error ? (
           <EmptyState title="Не удалось загрузить каталог" description={error} actionLabel="Повторить" onAction={() => patchParams({})} />
         ) : loading ? (

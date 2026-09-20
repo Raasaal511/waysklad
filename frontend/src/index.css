@@ -1,6 +1,8 @@
 :root {
   --text: #1a1d21;
-  --text-muted: #6b7280;
+  /* #6b7280 давал 4.35:1 на --bg-muted — ниже порога 4.5:1 WCAG AA
+     (Lighthouse color-contrast), затемнено до прохождения на всех фонах */
+  --text-muted: #5f6673;
   --bg: #ffffff;
   --bg-muted: #f1f3f5;
   --border: #e2e5e9;
@@ -11,7 +13,8 @@
   --ink-hover: #0c1913;
   --danger: #c0392b;
   --danger-bg: #fdecea;
-  --warning: #a3690a;
+  /* #a3690a давал 4.06:1 на --warning-bg — ниже порога 4.5:1, затемнено */
+  --warning: #966008;
   --warning-bg: #fbf0dc;
   /* Цвета статусов канбан-досок (Заказы/Задачи) — не зависят от выбранного --accent,
      чтобы колонки читались одинаково при любой персонализации */
@@ -229,6 +232,20 @@ button:disabled {
 .text-muted {
   color: var(--text-muted);
   font-size: 14px;
+}
+
+/* Скрыто визуально, доступно скринридеру — для заголовков секций, которые
+   нужны только для правильного порядка <h1>…<h6> (Lighthouse heading-order). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .field-label {

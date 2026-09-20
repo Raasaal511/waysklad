@@ -114,6 +114,40 @@
   scrollbar-width: thin;
 }
 
+/* Высота = Chip (padding 8px + font-size 13px), чтобы переход skeleton → реальные
+   чипы категорий не двигал макет (нулевой CLS). */
+.categorySkeleton {
+  flex-shrink: 0;
+  height: 35px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.categorySkeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  animation: categorySkeletonShimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .categorySkeleton::after {
+    animation: none;
+  }
+}
+
+@keyframes categorySkeletonShimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
 /* --- Нижний шит (<1024), рендерится внутри общего Modal --- */
 
 .sheetBody {

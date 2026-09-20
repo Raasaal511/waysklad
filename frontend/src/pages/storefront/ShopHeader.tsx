@@ -151,7 +151,9 @@ export function ShopHeader({ profile }: ShopHeaderProps) {
   )
 }
 
-/** Skeleton той же геометрии, что ShopHeader — состояние загрузки каталога. */
+/** Skeleton той же геометрии, что ShopHeader — состояние загрузки каталога.
+ *  Строка кнопок (.actions) зарезервирована на случай самого частого исхода —
+ *  у магазина есть контакты — чтобы переход в контент не двигал макет (CLS). */
 export function ShopHeaderSkeleton() {
   return (
     <div className={styles.card} aria-hidden="true">
@@ -161,6 +163,10 @@ export function ShopHeaderSkeleton() {
           <div className={`${styles.skeletonLine} ${styles.skeletonTitle}`} />
           <div className={`${styles.skeletonLine} ${styles.skeletonMeta}`} />
           <div className={`${styles.skeletonLine} ${styles.skeletonText}`} />
+        </div>
+        <div className={styles.actions}>
+          <div className={`${styles.skeletonLine} ${styles.skeletonActionBtn}`} />
+          <div className={`${styles.skeletonLine} ${styles.skeletonActionBtn}`} />
         </div>
       </div>
     </div>
