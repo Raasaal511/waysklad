@@ -7,6 +7,10 @@ import { chromium } from 'playwright'
 
 const BASE = process.env.SHOTS_BASE_URL ?? 'http://localhost:5173'
 const RICH_PRODUCT_ID = 2
+// «Плед флисовый 6» — тот же товар с 6 фото галереи, что GALLERY_PRODUCT_ID в shots.mjs;
+// RICH_PRODUCT_ID (id=2, «Наушники беспроводные Sonic») намеренно без фото — не годится
+// для проверки лайтбокса (P6, проверено через GET /storefront/demo-market/products/23).
+const GALLERY_PRODUCT_ID = 23
 const results = []
 
 function log(section, msg, ok = true) {
@@ -38,42 +42,80 @@ async function main() {
 
     await page.goto(`${BASE}/marketplace`, { waitUntil: 'networkidle' })
     const marketHeaderH = await page.locator('header').first().boundingBox()
-    const scrollHeight1 = await page.evaluate(() => document.body.scrollHeight)
+    const scrollHeightBefore = await page.evaluate(() => document.body.scrollHeight)
+    log('scenario', `marketplace layout has content: scrollHeight=${scrollHeightBefore}`, scrollHeightBefore > 900)
 
     // клик по первой карточке товара в ленте
     const firstCard = page.locator('article a[href*="/products/"]').first()
     await firstCard.waitFor({ state: 'visible', timeout: 10000 })
     const productHref = await firstCard.getAttribute('href')
     await firstCard.click()
+    // Client-side роутинг (react-router): networkidle недостаточно — реальные данные
+    // страницы уже могли быть в кеше React Query/fetch, поэтому сеть «утихает» раньше,
+    // чем React перерисует DOM. Ждём саму смену URL, иначе следующий локатор может
+    // поймать разметку ещё предыдущей страницы (P6, флейки скрипта).
+    if (productHref) await page.waitForURL(`**${productHref}`, { timeout: 10000 })
     await page.waitForLoadState('networkidle')
+    // макет не прыгает: URL после клика ведёт ровно на href карточки, без промежуточных скачков
+    log('scenario', `navigated to clicked card href: ${page.url()} matches ${productHref}`, productHref != null && page.url().endsWith(productHref))
     const productHeaderH = await page.locator('header').first().boundingBox()
     log('scenario', `header height marketplace=${marketHeaderH?.height} product=${productHeaderH?.height}`, marketHeaderH?.height === productHeaderH?.height)
 
-    // переход в магазин
-    const crumbLink = page.locator('a[href^="/store/"]').first()
+    // переход в магазин — «Каталог магазина» в хлебных крошках (не первый a[href^="/store/"]
+    // в DOM, им может быть иконка-стрелка «назад» в шапке — берём именно текстовую крошку)
+    const crumbLink = page.getByRole('link', { name: 'Каталог магазина', exact: true })
+    await crumbLink.waitFor({ state: 'visible', timeout: 10000 })
     const shopHref = await crumbLink.getAttribute('href')
     await crumbLink.click()
+    if (shopHref) await page.waitForURL(`**${shopHref}`, { timeout: 10000 })
     await page.waitForLoadState('networkidle')
+    log('scenario', `navigated to shop href: ${page.url()} matches ${shopHref}`, shopHref != null && page.url().endsWith(shopHref))
     const catalogHeaderH = await page.locator('header').first().boundingBox()
     log('scenario', `header height catalog=${catalogHeaderH?.height}`, catalogHeaderH?.height === marketHeaderH?.height)
 
-    // применяем фильтр "только в наличии", если есть
+    // применяем фильтр "только в наличии" — сразу после client-side перехода из карточки
+    // товара FilterBar может ещё не успеть примонтироваться (React дорисовывает уже после
+    // networkidle), поэтому не гейтим клик через .count() «в лоб» — ждём появления
+    // локатора отдельным waitFor с запасом, .count()===0 в этот момент не значит,
+    // что элемента не будет (P6, флейки скрипта, не баг приложения).
     const inStockToggle = page.getByText('Только в наличии', { exact: false }).first()
     let filterApplied = false
-    if (await inStockToggle.count()) {
-      await inStockToggle.click().catch(() => {})
-      await page.waitForTimeout(500)
+    try {
+      await inStockToggle.waitFor({ state: 'visible', timeout: 8000 })
+      await inStockToggle.scrollIntoViewIfNeeded()
+      const cardsBefore = await page.locator('article a[href*="/products/"]').count()
+      await inStockToggle.click()
+      await page.waitForFunction(() => location.search.includes('in_stock_only'), { timeout: 5000 })
+      // URL меняется синхронно, но отфильтрованный список — уже отдельный React-рендер
+      // после фетча: networkidle сам по себе не гарантирует, что DOM-сетка уже
+      // перерисована (гонка поймана вживую на P6 — «Только в наличии» временно оставляет
+      // старую, неотфильтрованную сетку видимой ещё несколько кадров). Ждём, пока число
+      // карточек реально изменится, а не просто «сеть утихла».
+      await page
+        .waitForFunction(
+          (prev) => document.querySelectorAll('article a[href*="/products/"]').length !== prev,
+          cardsBefore,
+          { timeout: 5000 },
+        )
+        .catch(() => {})
+      await page.waitForLoadState('networkidle')
       filterApplied = true
+    } catch {
+      // фильтра «Только в наличии» нет на этом брейкпоинте/наборе данных — не критично
     }
     const urlAfterFilter = page.url()
     log('scenario', `filter in URL after apply: ${urlAfterFilter}`, filterApplied ? urlAfterFilter.includes('=') : true)
 
-    // скроллим каталог, запоминаем позицию, открываем другой товар
+    // скроллим каталог, запоминаем позицию, открываем другой товар — берём первый товар
+    // именно «в наличии» (после фильтра выше все карточки такие), чтобы гарантированно
+    // попасть на страницу с активной кнопкой «В корзину», а не на «Нет в наличии».
     await page.evaluate(() => window.scrollTo(0, 800))
     const scrollBeforeNav = await page.evaluate(() => window.scrollY)
     const secondCard = page.locator('article a[href*="/products/"]').nth(1)
     await secondCard.waitFor({ state: 'visible', timeout: 10000 })
+    const secondCardHref = await secondCard.getAttribute('href')
     await secondCard.click()
+    if (secondCardHref) await page.waitForURL(`**${secondCardHref}`, { timeout: 10000 })
     await page.waitForLoadState('networkidle')
 
     // назад — проверяем сохранение скролла и фильтра
@@ -85,10 +127,16 @@ async function main() {
     log('scenario', `scroll preserved on back: before=${scrollBeforeNav} after=${scrollAfterBack}`, Math.abs(scrollBeforeNav - scrollAfterBack) < 50)
     log('scenario', `filter preserved on back: ${urlAfterBack}`, filterApplied ? urlAfterBack.includes('=') : true)
 
-    // снова товар -> добавление в корзину -> переход в корзину
+    // снова товар -> добавление в корзину -> переход в корзину. Берём href заново прямо
+    // перед кликом (не переиспользуем secondCardHref из первого захода) — после goBack()
+    // список на мгновение может отрисоваться в другом порядке, пока фильтр из URL не
+    // применится повторно, и старый href окажется невалидной целью для waitForURL (P6).
+    await secondCard.waitFor({ state: 'visible', timeout: 10000 })
+    const secondCardHrefAfterBack = await secondCard.getAttribute('href')
     await secondCard.click().catch(async () => {
       await page.locator('article a[href*="/products/"]').nth(1).click()
     })
+    if (secondCardHrefAfterBack) await page.waitForURL(`**${secondCardHrefAfterBack}`, { timeout: 10000 }).catch(() => {})
     await page.waitForLoadState('networkidle')
     const addBtn = page.getByRole('button', { name: /В корзину|Добавлено/ }).first()
     await addBtn.waitFor({ state: 'visible', timeout: 10000 })
@@ -173,22 +221,25 @@ async function main() {
   {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
     const page = await context.newPage()
-    await page.goto(`${BASE}/store/demo-market/products/${RICH_PRODUCT_ID}`, { waitUntil: 'networkidle' })
-    const galleryImg = page.locator('[class*="gallery"] img, [class*="Gallery"] img').first()
-    if (await galleryImg.count()) {
-      await galleryImg.click({ force: true }).catch(() => {})
-      await page.waitForTimeout(300)
-      const lightboxOpen = await page.locator('[role="dialog"][aria-label="Просмотр фото"]').count()
-      if (lightboxOpen) {
+    await page.goto(`${BASE}/store/demo-market/products/${GALLERY_PRODUCT_ID}`, { waitUntil: 'networkidle' })
+    // Триггер лайтбокса — кнопка вокруг главного фото (ProductGallery.tsx: styles.stageImgBtn,
+    // aria-label «Открыть фото на весь экран»), не просто <img> — картинка не кликабельна сама
+    // по себе (P6, поймано через реальную разметку компонента, не по угаданному классу).
+    const openBtn = page.getByRole('button', { name: 'Открыть фото на весь экран' }).first()
+    if (await openBtn.count()) {
+      await openBtn.click()
+      const lightbox = page.locator('[role="dialog"][aria-label="Просмотр фото"]')
+      await lightbox.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {})
+      if (await lightbox.count()) {
         await page.keyboard.press('Escape')
         await page.waitForTimeout(300)
-        const activeTag = await page.evaluate(() => document.activeElement?.tagName)
-        log('focus-lightbox', `lightbox closed via Esc, activeElement=${activeTag}`, true)
+        const focusReturned = await openBtn.evaluate((el) => el === document.activeElement)
+        log('focus-lightbox', `focus returned to gallery open-button after Esc: ${focusReturned}`, focusReturned)
       } else {
-        log('focus-lightbox', 'clicking gallery image did not open lightbox (may need different selector)', false)
+        log('focus-lightbox', 'clicking gallery photo did not open lightbox', false)
       }
     } else {
-      log('focus-lightbox', 'no gallery image found', false)
+      log('focus-lightbox', 'no gallery open-photo button found', false)
     }
     await context.close()
   }
