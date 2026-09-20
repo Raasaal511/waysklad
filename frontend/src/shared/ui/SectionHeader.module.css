@@ -6,8 +6,9 @@
   margin-bottom: 20px;
 }
 
+/* Заголовок секции (не H1 страницы) — блок «Д» п.4: 24/700/1.25, мобильный 20. */
 .title {
-  font-size: 32px;
+  font-size: 24px;
   font-weight: 700;
   line-height: 1.25;
   margin: 0;
@@ -15,7 +16,7 @@
 
 @media (max-width: 767px) {
   .title {
-    font-size: 22px;
+    font-size: 20px;
   }
 }
 
