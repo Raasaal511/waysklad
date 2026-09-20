@@ -27,7 +27,7 @@ import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
 import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
-import { normalizeDecimalInput, pluralizeGoods } from '../../shared/lib/format'
+import { normalizeDecimalInput, plural } from '../../shared/lib/format'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './ImportProductsModal.module.css'
 
@@ -370,7 +370,9 @@ function PreviewStep({
     )
     setLastBulkLabel(label)
     setAppliedNotice(
-      affected > 0 ? `Применено «${label}» к ${affected} ${pluralizeGoods(affected)}` : 'Нет строк для применения',
+      affected > 0
+        ? `Применено «${label}» к ${affected} ${plural(affected, ['товару', 'товарам', 'товарам'])}`
+        : 'Нет строк для применения',
     )
     if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current)
     noticeTimerRef.current = window.setTimeout(() => setAppliedNotice(null), 2600)

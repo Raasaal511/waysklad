@@ -18,8 +18,10 @@ function buildSpecs(product: StorefrontProductDetail): SpecRow[] {
   if (colors.length > 0) specs.push({ label: 'Цвета', value: colors.join(', ') })
   const sizes = Array.from(new Set(product.variants.map((v) => v.size).filter(Boolean)))
   if (sizes.length > 0) specs.push({ label: 'Размеры', value: sizes.join(', ') })
-  if (product.min_order_qty) specs.push({ label: 'Мин. заказ', value: `${product.min_order_qty} ${product.unit_label}` })
-  if (product.order_step_qty) specs.push({ label: 'Шаг заказа', value: `${product.order_step_qty} ${product.unit_label}` })
+  if (product.min_order_qty)
+    specs.push({ label: 'Мин. заказ', value: `${formatQuantity(product.min_order_qty)} ${product.unit_label}` })
+  if (product.order_step_qty)
+    specs.push({ label: 'Шаг заказа', value: `${formatQuantity(product.order_step_qty)} ${product.unit_label}` })
   return specs
 }
 
