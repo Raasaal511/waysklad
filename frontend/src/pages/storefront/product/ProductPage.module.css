@@ -58,6 +58,12 @@
   gap: 16px;
   max-height: calc(100vh - 72px - 16px);
   overflow-y: auto;
+  /* stable — место под скроллбар зарезервировано всегда, колонка не «прыгает» по ширине,
+     когда контент становится выше экрана; отступ уводит сам скроллбар за пределы карточек,
+     чтобы он не наезжал на их padding (видно на не-overlay скроллбарах, напр. Windows). */
+  scrollbar-gutter: stable;
+  padding-right: 4px;
+  margin-right: -4px;
 }
 
 .areaBelow {
