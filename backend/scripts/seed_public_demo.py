@@ -50,10 +50,6 @@ from app.application.auth.update_shop import UpdateShopCommand, UpdateShopUseCas
 from app.application.inventory.common import LineInput
 from app.application.inventory.create_warehouse import CreateWarehouseCommand, CreateWarehouseUseCase
 from app.application.products.create_category import CreateCategoryCommand, CreateCategoryUseCase
-from app.application.products.add_storefront_photo import (
-    AddStorefrontPhotoCommand,
-    AddStorefrontPhotoUseCase,
-)
 from app.application.products.create_product import (
     CreateProductCommand,
     CreateProductUseCase,
@@ -415,7 +411,6 @@ class ProductPlan:
     has_description: bool
     has_warranty: bool
     has_min_step: bool
-    photo_count: int
     variant_count: int
     sold_count: int
 
@@ -446,11 +441,6 @@ def _build_product_plans(spec: ShopSpec) -> list[ProductPlan]:
         has_description = i % 2 == 0
         has_warranty = i % 4 == 0
         has_min_step = i % 5 == 0
-        # намеренно расфазировано с variant_count (i % 7 против i % 3) — иначе
-        # "без фото" и "без вариантов" всегда совпадали бы (оба завязаны на
-        # делимость на 3), и не нашлось бы ни одного по-настоящему простого
-        # товара (без фото, без вариантов, без отзывов) для скриншотов P0
-        photo_count = 0 if i % 7 == 0 else RNG.randint(2, 6)
         variant_count = 0 if i % 3 != 0 else RNG.randint(2, 8)
         sold_count = [0, 0, 2, 5, 8, 15, 22, 40][i % 8]
 
@@ -465,7 +455,6 @@ def _build_product_plans(spec: ShopSpec) -> list[ProductPlan]:
                 has_description=has_description,
                 has_warranty=has_warranty,
                 has_min_step=has_min_step,
-                photo_count=photo_count,
                 variant_count=variant_count,
                 sold_count=sold_count,
             )
@@ -568,23 +557,17 @@ async def _seed_products(
                 ReceiveGoodsCommand(warehouse_id=warehouse_id, lines=lines),
             )
 
-        # галерея — по одному вызову на фото, как это делает реальная загрузка
-        # (AddStorefrontPhotoUseCase сам вызывает storage.save() и добавляет
-        # URL в конец product.storefront_photos)
-        if plan.photo_count:
-            for n in range(plan.photo_count):
-                source = RNG.choice(SOURCE_IMAGES)
-                await AddStorefrontPhotoUseCase(uow(), storage).execute(
-                    actor,
-                    AddStorefrontPhotoCommand(
-                        product_id=product.id,
-                        filename=source.name,
-                        content=source.read_bytes(),
-                    ),
-                )
+        # Реальных товарных фото у нас нет — единственный источник картинок в
+        # demo-данных это брендовые иллюстрации платформы (hero-banner, onbarding,
+        # логотипы), и подставлять их как "фото шампуня"/"фото кроссовок" даёт
+        # тот самый эффект "одна и та же картинка везде не в тему". Честнее
+        # оставить товар без фото — витрина корректно показывает плейсхолдер
+        # (см. ProductCard/ProductGallery), это ближе к реальному новому магазину,
+        # чем нерелевантная картинка. Фото остаются только там, где по смыслу
+        # это именно фото "от покупателя" — см. отзывы, _random_photo ниже.
 
         print(f"    [{sku}] {plan.name} — цена {plan.retail_price}₽, остаток «{plan.stock_state}», "
-              f"вариантов {plan.variant_count}, фото {plan.photo_count}")
+              f"вариантов {plan.variant_count}")
 
     return product_ids
 
