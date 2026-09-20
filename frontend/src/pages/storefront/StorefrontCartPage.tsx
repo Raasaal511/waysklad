@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { IconTrash } from '@tabler/icons-react'
 import {
   clearCustomerToken,
@@ -12,6 +12,7 @@ import {
 import { ApiError } from '../../shared/api/client'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
 import { Button } from '../../shared/ui/Button'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { IconButton } from '../../shared/ui/IconButton'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { loadCart, saveCart, type StorefrontCartItem } from './cart'
@@ -110,12 +111,12 @@ export function StorefrontCartPage() {
         <h1 className={styles.pageTitle}>Корзина</h1>
 
         {cart.length === 0 ? (
-          <div className={styles.emptyState}>
-            <p>Корзина пуста</p>
-            <Link to={`/store/${slug}`}>
-              <Button>В каталог</Button>
-            </Link>
-          </div>
+          <EmptyState
+            illustration="empty-cart"
+            title="Корзина пуста"
+            actionLabel="В каталог"
+            onAction={() => navigate(`/store/${slug}`)}
+          />
         ) : (
           <>
             <div className={styles.cartList}>

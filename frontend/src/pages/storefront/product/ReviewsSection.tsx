@@ -274,7 +274,7 @@ export function ReviewsSection({ slug, productId }: ReviewsSectionProps) {
           )}
         </div>
 
-        {page && (
+        {page && reviewsCount > 0 && (
           <RatingPanel
             averageRating={page.average_rating}
             reviewsCount={page.reviews_count}
