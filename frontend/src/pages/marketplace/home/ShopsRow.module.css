@@ -1,0 +1,118 @@
+.row {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+
+.row::-webkit-scrollbar {
+  display: none;
+}
+
+.item {
+  flex-shrink: 0;
+  width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--text);
+  text-align: center;
+}
+
+.circleWrap {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 150ms ease-out;
+  flex-shrink: 0;
+}
+
+.item:hover .circleWrap,
+.item:focus-visible .circleWrap {
+  border-color: var(--accent);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+.circle {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.circleFallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.verifiedBadge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  color: var(--accent);
+  background: var(--bg);
+  border-radius: 999px;
+}
+
+.name {
+  font-size: 14px;
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rating {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.skeletonHeader {
+  height: 32px;
+  width: 200px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+  margin-bottom: 20px;
+}
+
+.skeletonCircle {
+  background: var(--bg-muted);
+  border: none;
+}
+
+@media (max-width: 767px) {
+  .item {
+    width: 80px;
+  }
+  .circleWrap {
+    width: 64px;
+    height: 64px;
+  }
+  .circleFallback {
+    font-size: 24px;
+  }
+  .name {
+    max-width: 80px;
+    font-size: 12px;
+  }
+}
