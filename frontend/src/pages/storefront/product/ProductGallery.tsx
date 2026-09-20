@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { IconChevronLeft, IconChevronRight, IconChevronDown, IconChevronUp, IconShare } from '@tabler/icons-react'
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronDown,
+  IconChevronUp,
+  IconShare,
+  IconPhoto,
+} from '@tabler/icons-react'
 import { Lightbox } from '../../../shared/ui/Lightbox'
 import styles from './ProductGallery.module.css'
 
@@ -53,7 +60,10 @@ export function ProductGallery({ photos, productName, activeIndex, onActiveIndex
     return (
       <div className={styles.wrap}>
         <div className={styles.stage}>
-          <div className={styles.stageEmpty}>Нет фото</div>
+          <div className={styles.stageEmpty}>
+            <IconPhoto size={40} stroke={1.5} />
+            <span>Нет фото</span>
+          </div>
         </div>
       </div>
     )

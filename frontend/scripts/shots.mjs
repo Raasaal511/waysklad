@@ -29,12 +29,22 @@ const BASE_URL = process.env.SHOTS_BASE_URL ?? 'http://localhost:5173'
 // товар "Худи оверсайз 2" (id=9) — без вариантов, без фото, без отзывов.
 const RICH_PRODUCT_ID = 2
 const SIMPLE_PRODUCT_ID = 9
+// доп. контрольные случаи для приёмки P4 (docs/PUBLIC_PAGES_FINISH_PROMPTS.md):
+// "Плед флисовый 6" (id=23) — 6 фото, 8 вариантов, скидка, в наличии;
+// "Туфли классические 4" (id=16) — без вариантов, 0 остаток («нет в наличии»);
+// "Скотч" (id=1, магазин waysklad) — без вариантов, мин. заказ 5 шт · шаг 1.
+const GALLERY_PRODUCT_ID = 23
+const OUT_OF_STOCK_PRODUCT_ID = 16
+const MIN_ORDER_PRODUCT_ID = 1
 
 const PAGES = [
   { key: 'marketplace', path: '/marketplace' },
   { key: 'store-catalog', path: '/store/demo-market' },
   { key: 'product-rich', path: `/store/demo-market/products/${RICH_PRODUCT_ID}` },
   { key: 'product-simple', path: `/store/demo-market/products/${SIMPLE_PRODUCT_ID}` },
+  { key: 'product-gallery', path: `/store/demo-market/products/${GALLERY_PRODUCT_ID}` },
+  { key: 'product-out-of-stock', path: `/store/demo-market/products/${OUT_OF_STOCK_PRODUCT_ID}` },
+  { key: 'product-min-order', path: `/store/waysklad/products/${MIN_ORDER_PRODUCT_ID}` },
   { key: 'cart', path: '/store/demo-market/cart' },
 ]
 
