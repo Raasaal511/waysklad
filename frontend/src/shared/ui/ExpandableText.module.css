@@ -20,9 +20,16 @@
 
 .clamped {
   display: -webkit-box;
-  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.clamp3 {
+  -webkit-line-clamp: 3;
+}
+
+.clamp2 {
+  -webkit-line-clamp: 2;
 }
 
 .text a {

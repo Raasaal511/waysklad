@@ -24,14 +24,17 @@ interface ExpandableTextProps {
   extra?: ReactNode
   titleAs?: 'h2' | 'h3'
   boldFirstLine?: boolean
+  /** Число строк до обрезки (по умолчанию 3 — «О товаре»/«Гарантии»; ShopHeader просит 2). */
+  clampLines?: 2 | 3
 }
 
 /**
- * Общий компонент «О товаре» / «Гарантии»: заголовок секции, текст с переносами и
- * кликабельными ссылками, обрезка до 3 строк с «Читать полностью» / «Свернуть» —
- * кнопка показывается, только если текст реально обрезан (scrollHeight > clientHeight).
+ * Общий компонент «О товаре» / «Гарантии» / описание магазина: заголовок секции,
+ * текст с переносами и кликабельными ссылками, обрезка до clampLines строк с
+ * «Читать полностью» / «Свернуть» — кнопка показывается, только если текст реально
+ * обрезан (scrollHeight > clientHeight).
  */
-export function ExpandableText({ title, text, extra, titleAs = 'h2', boldFirstLine }: ExpandableTextProps) {
+export function ExpandableText({ title, text, extra, titleAs = 'h2', boldFirstLine, clampLines = 3 }: ExpandableTextProps) {
   const [expanded, setExpanded] = useState(false)
   const [clampable, setClampable] = useState(false)
   const textRef = useRef<HTMLParagraphElement>(null)
@@ -73,7 +76,10 @@ export function ExpandableText({ title, text, extra, titleAs = 'h2', boldFirstLi
   return (
     <div>
       {title && <Title className={styles.title}>{title}</Title>}
-      <p ref={textRef} className={expanded ? styles.text : `${styles.text} ${styles.clamped}`}>
+      <p
+        ref={textRef}
+        className={expanded ? styles.text : `${styles.text} ${styles.clamped} ${styles[`clamp${clampLines}`]}`}
+      >
         {body}
       </p>
       {(clampable || expanded) && (

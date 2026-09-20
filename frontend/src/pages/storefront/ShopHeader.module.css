@@ -1,0 +1,263 @@
+/* ShopHeader — карточка магазина в каталоге и на карточке товара. Блок «Д» шаг P3 п.1. */
+
+.card {
+  background: var(--bg);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+:root[data-theme='dark'] .card {
+  border: 1px solid var(--border);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .card {
+    border: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 767px) {
+  .card {
+    padding: 16px;
+  }
+}
+
+.main {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+@media (max-width: 767px) {
+  .main {
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+}
+
+.logo,
+.logoFallback {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.logoFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  margin: 0 0 6px;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+  .name {
+    font-size: 24px;
+  }
+}
+
+.meta {
+  margin: 0 0 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+}
+
+.metaItem:not(:last-child)::after {
+  content: '·';
+  margin: 0 8px;
+  color: var(--border);
+}
+
+.ratingStar {
+  color: var(--warning);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+/* ≥1024 — кнопки в строке справа от info (п.1: "справа (≥1024) — две кнопки").
+   <1024 не хватает ширины для трёх колонок (лого+текст+кнопки) — переносим
+   кнопки на отдельную строку под контентом (basis:100% + flex-wrap на .main).
+   <768 (.main — column) дополнительно растягиваем их на всю ширину, п.1
+   "кнопки — в ряд на всю ширину". */
+.actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+@media (max-width: 1023px) {
+  .actions {
+    flex-basis: 100%;
+    margin-left: 0;
+    margin-top: 4px;
+  }
+}
+
+@media (max-width: 767px) {
+  .actions > * {
+    flex: 1;
+  }
+}
+
+.contactList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.contactItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+  transition: background 0.15s ease;
+}
+
+.contactItem:hover {
+  background: var(--bg-muted);
+}
+
+.contactItem:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contactItem {
+    transition: none;
+  }
+}
+
+.conditionsBody {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.conditionsTitle {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.addressList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.addressItem {
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg-muted);
+}
+
+.addressName {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.addressValue {
+  margin: 0;
+  font-size: 15px;
+}
+
+.policyText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-line;
+}
+
+/* --- Skeleton: та же геометрия, что карточка ShopHeader --- */
+
+.skeletonLogo {
+  background: var(--bg-muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeletonLine {
+  border-radius: 8px;
+  background: var(--bg-muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeletonTitle {
+  height: 32px;
+  width: 45%;
+  margin-bottom: 12px;
+}
+
+.skeletonMeta {
+  height: 16px;
+  width: 60%;
+  margin-bottom: 12px;
+}
+
+.skeletonText {
+  height: 14px;
+  width: 90%;
+}
+
+.skeletonLogo::after,
+.skeletonLine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--bg) 45%, transparent), transparent);
+  animation: shopHeaderShimmer 1.4s infinite;
+}
+
+@keyframes shopHeaderShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonLogo::after,
+  .skeletonLine::after {
+    animation: none;
+  }
+}
