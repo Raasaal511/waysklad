@@ -19,11 +19,16 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-width: 0;
+  /* flex-shrink: 0 — крошка не должна сжиматься уже своего содержимого: контейнер
+     .breadcrumbs скроллится по горизонтали (overflow-x: auto), а не сминает ссылки.
+     min-width: 0 здесь (без flex-shrink: 0) давал ссылке схлопнуться уже своего
+     min-content и наезжать на соседнюю крошку — баг, видно на мобильном (P6). */
+  flex-shrink: 0;
 }
 
 /* Последняя крошка — не ссылка, единственная, которой разрешено сжиматься и обрезаться. */
 .breadcrumbItem:last-child {
+  flex-shrink: 1;
   min-width: 0;
   max-width: 320px;
 }

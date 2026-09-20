@@ -52,17 +52,23 @@ export function Modal({ title, onClose, children, wide, size, footer, headerActi
   const titleId = useId()
   const bodyRef = useRef<HTMLDivElement>(null)
   const [atBottom, setAtBottom] = useState(true)
+  // Фокус должен вернуться на кнопку, которая открыла модалку (см. Lightbox — тот же паттерн),
+  // иначе после Esc/крестика фокус улетает на <body> и клавиатурная навигация теряется (блок «Д» п.11).
+  const previouslyFocused = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
+    previouslyFocused.current = document.activeElement as HTMLElement
     document.addEventListener('keydown', handleKey)
     lockBodyScroll()
     return () => {
       document.removeEventListener('keydown', handleKey)
       unlockBodyScroll()
+      previouslyFocused.current?.focus?.()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onClose])
 
   useEffect(() => {

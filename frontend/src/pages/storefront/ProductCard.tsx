@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { IconHeart, IconHeartFilled, IconPlus, IconShieldCheck } from '@tabler/icons-react'
-import { formatMoney, formatQuantity } from '../../shared/lib/format'
+import { formatMoney, formatPriceOrRequest, formatQuantity } from '../../shared/lib/format'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import styles from './ProductCard.module.css'
 
@@ -82,7 +82,7 @@ export function ProductCard({ item, href, showShop, favorite, onToggleFavorite, 
         </h3>
 
         <div className={styles.priceRow}>
-          <span className={styles.price}>{formatMoney(item.retail_price)} ₽</span>
+          <span className={styles.price}>{formatPriceOrRequest(item.retail_price)}</span>
           {hasOldPrice && <span className={styles.oldPrice}>{formatMoney(item.old_price!)} ₽</span>}
           {hasRating && <span className={styles.rating}>★ {item.average_rating!.toFixed(1)}</span>}
           {item.in_stock && onQuickAdd && (

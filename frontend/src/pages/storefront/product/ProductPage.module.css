@@ -118,12 +118,23 @@
 .card {
   background: var(--bg);
   border-radius: 16px;
-  padding: 20px;
+  padding: 24px;
+}
+
+/* Светлая тема: у карточек рамки нет (блок «Д» п.1). Тёмная — рамка 1px var(--border),
+   как у ShopHeader и ProductCard — иначе секции карточки товара выпадают из системы. */
+:root[data-theme='dark'] .card {
+  border: 1px solid var(--border);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .card {
+    border: 1px solid var(--border);
+  }
 }
 
 @media (max-width: 767px) {
   .card {
-    border-radius: 12px;
     padding: 16px;
   }
 }

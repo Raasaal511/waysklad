@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { IconCopy, IconShare, IconBrandWhatsapp, IconBrandTelegram, IconLink } from '@tabler/icons-react'
 import type { StorefrontProductDetail } from '../../../entities/storefront/api'
 import { StarRating } from '../../../shared/ui/StarRating'
-import { formatMoney, formatQuantity, plural } from '../../../shared/lib/format'
+import { formatMoney, formatPriceOrRequest, formatQuantity, plural } from '../../../shared/lib/format'
 import { priceRange } from './productUtils'
 import styles from './ProductPage.module.css'
 
@@ -74,12 +74,12 @@ export function ProductHeader({ product, selectedPrice }: ProductHeaderProps) {
 
   const priceNode = range.sameForAll ? (
     <p className={styles.headerPrice}>
-      {formatMoney(selectedPrice ?? product.retail_price)} ₽
+      {formatPriceOrRequest(selectedPrice ?? product.retail_price)}
       <span className={styles.headerPriceUnit}>за {product.unit_label || 'шт'}</span>
     </p>
   ) : (
     <p className={styles.headerPrice}>
-      {selectedPrice ? `${formatMoney(selectedPrice)} ₽` : `от ${formatMoney(range.min)} ₽`}
+      {selectedPrice ? formatPriceOrRequest(selectedPrice) : `от ${formatMoney(range.min)} ₽`}
       <span className={styles.headerPriceUnit}>за {product.unit_label || 'шт'}</span>
     </p>
   )

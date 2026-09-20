@@ -1,6 +1,6 @@
 import { useParams, useSearchParams } from 'react-router-dom'
 import { IconHeart, IconHeartFilled } from '@tabler/icons-react'
-import { useState, useEffect, Suspense, lazy } from 'react'
+import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { formatMoney, plural } from '../../shared/lib/format'
 import {
@@ -39,6 +39,9 @@ const RecentlyViewedSection = lazy(() =>
 )
 
 const FAVORITES_KEY = 'waysklad:storefront-favorites'
+// Окно защиты от двойного клика по «В корзину» — короче анимации «Добавлено» (1600ms),
+// чтобы не мешать намеренным быстрым повторным добавлениям, но перекрыть double-click.
+const ADD_GUARD_MS = 500
 
 function loadFavorites(slug: string): number[] {
   try {
@@ -65,6 +68,7 @@ export function StorefrontProductPage() {
   const [activePhoto, setActivePhoto] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
   const [flashVariantKey, setFlashVariantKey] = useState<number | 'base' | null>(null)
+  const lastAddAt = useRef(0)
   const { page: reviewsPage } = useProductReviews(slug, productId, {})
   const { profile: shopProfile } = useShopProfile(slug)
   const [dockVisible, setDockVisible] = useState(false)
@@ -225,6 +229,12 @@ export function StorefrontProductPage() {
 
   function handleAdd() {
     if (!product || !product.in_stock) return
+    // Двойной клик по «В корзину» успевает сработать дважды до того, как React
+    // перерисует кнопку с новым состоянием added — блокируем повторный вызов
+    // коротким окном, независимым от рендера (P6, «мелочи»).
+    const now = Date.now()
+    if (now - lastAddAt.current < ADD_GUARD_MS) return
+    lastAddAt.current = now
     if (selection.size === 0) {
       // ничего не выбрано: кнопка «В корзину» остаётся активной и сама добавляет
       // минимальное количество (п.6 промпта P4) — для товара без вариантов сразу

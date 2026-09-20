@@ -114,6 +114,12 @@ body {
   overflow-x: hidden;
 }
 
+/* Выделение текста — фирменный акцент вместо дефолтного синего браузера (P6, «мелочи»). */
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
 #root {
   min-height: 100svh;
 }

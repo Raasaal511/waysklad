@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { IconMinus, IconPlus, IconSearch, IconInfoCircle, IconArrowsMaximize } from '@tabler/icons-react'
 import type { StorefrontProductDetail, StorefrontVariant } from '../../../entities/storefront/api'
 import { initialOrderQty, bumpOrderQty } from '../../../entities/storefront/api'
-import { formatMoney, formatQuantity } from '../../../shared/lib/format'
+import { formatPriceOrRequest, formatQuantity } from '../../../shared/lib/format'
 import { Lightbox } from '../../../shared/ui/Lightbox'
 import { stockText, variantPrice } from './productUtils'
 import type { SelectionKey } from './useSelection'
@@ -175,7 +175,7 @@ export function VariantList({ product, selection, onQtyChange, onShowToast, flas
         >
           <div className={styles.qtyBlockInfo}>
             <p className={styles.qtyBlockPrice}>
-              {formatMoney(unitPrice)} ₽ <span className={styles.qtyBlockUnit}>за {product.unit_label || 'шт'}</span>
+              {formatPriceOrRequest(unitPrice)} <span className={styles.qtyBlockUnit}>за {product.unit_label || 'шт'}</span>
             </p>
             <p
               className={[
@@ -326,7 +326,7 @@ export function VariantList({ product, selection, onQtyChange, onShowToast, flas
               >
                 {stockLabel}
               </p>
-              {priceDiffers && <p className={styles.rowPrice}>{formatMoney(rowPrice)} ₽</p>}
+              {priceDiffers && <p className={styles.rowPrice}>{formatPriceOrRequest(rowPrice)}</p>}
             </div>
 
             {!inStock ? null : isSelected ? (
