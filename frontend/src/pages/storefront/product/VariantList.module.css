@@ -217,15 +217,21 @@
 .stepBtn {
   width: 32px;
   height: 32px;
+  padding: 0;
   border-radius: 999px;
   border: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   cursor: pointer;
   transition:
     transform 0.1s ease,
     opacity 0.15s ease;
+}
+
+.stepBtn svg {
+  flex-shrink: 0;
 }
 
 .stepBtn:hover:not(:disabled) {
@@ -277,6 +283,7 @@ input.stepValue.stepValue:focus-visible {
 .addOnlyBtn {
   width: 32px;
   height: 32px;
+  padding: 0;
   border-radius: 999px;
   border: none;
   background: var(--accent);
@@ -287,6 +294,10 @@ input.stepValue.stepValue:focus-visible {
   cursor: pointer;
   flex-shrink: 0;
   transition: transform 0.1s ease;
+}
+
+.addOnlyBtn svg {
+  flex-shrink: 0;
 }
 
 .addOnlyBtn:hover {
