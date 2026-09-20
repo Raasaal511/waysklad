@@ -13,6 +13,16 @@ export interface MarketplaceProduct {
   order_step_qty: string | null
   shop_slug: string
   shop_name: string
+  sold_count: string
+  average_rating: number
+  reviews_count: number
+  shop_logo: string
+  shop_is_verified: boolean
+  shop_city: string | null
+  old_price: string | null
+  discount_percent: number | null
+  is_new: boolean
+  is_hit: boolean
 }
 
 export interface MarketplaceCatalog {
