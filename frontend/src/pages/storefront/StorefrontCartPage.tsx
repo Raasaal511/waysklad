@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { IconChevronLeft, IconTrash } from '@tabler/icons-react'
+import { IconTrash } from '@tabler/icons-react'
 import {
   clearCustomerToken,
   loadCustomerToken,
@@ -106,14 +106,8 @@ export function StorefrontCartPage() {
 
   return (
     <div className={styles.shell}>
-      <header className={styles.headerCompact}>
-        <Link to={`/store/${slug}`} className={styles.back}>
-          <IconChevronLeft size={16} /> К каталогу
-        </Link>
-      </header>
-
-      <main className={styles.cartPage}>
-        <h1>Корзина</h1>
+      <main className={styles.cartPageContent}>
+        <h1 className={styles.pageTitle}>Корзина</h1>
 
         {cart.length === 0 ? (
           <div className={styles.emptyState}>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { IconChevronLeft } from '@tabler/icons-react'
+import { IconChevronLeft, IconLogout } from '@tabler/icons-react'
 import {
   clearCustomerToken,
   listMyStorefrontRequests,
@@ -67,8 +67,26 @@ export function StorefrontMyOrdersPage() {
       </header>
 
       <main className={styles.cartPage}>
-        <h1>Мои заказы</h1>
-        <p className={styles.muted}>Заказы во всех магазинах ВайСклада с вашего аккаунта.</p>
+        <div className={styles.myOrdersHead}>
+          <div>
+            <h1>Мои заказы</h1>
+            <p className={styles.muted}>Заказы во всех магазинах ВайСклада с вашего аккаунта.</p>
+          </div>
+          {token && (
+            <button
+              type="button"
+              className={styles.iconGhost}
+              aria-label="Выйти"
+              onClick={() => {
+                clearCustomerToken()
+                notifyCustomerAuthChanged()
+                setToken(null)
+              }}
+            >
+              <IconLogout size={18} stroke={1.8} />
+            </button>
+          )}
+        </div>
 
         {!token && (
           <div className={styles.emptyState}>

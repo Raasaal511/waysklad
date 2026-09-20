@@ -47,6 +47,14 @@ export function MarketplacePage() {
     return () => clearTimeout(t)
   }, [query])
 
+  // ?q= может измениться извне (поиск в общей шапке PublicHeader), не только
+  // через локальное поле ввода на этой странице — держим их в синхронизации
+  useEffect(() => {
+    const urlQuery = searchParams.get('q') ?? ''
+    setQuery((prev) => (prev === urlQuery ? prev : urlQuery))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.get('q')])
+
   useEffect(() => {
     setMinPriceDraft(minPrice)
     setMaxPriceDraft(maxPrice)
@@ -155,22 +163,13 @@ export function MarketplacePage() {
 
   return (
     <div className={styles.shell}>
-      <div className={styles.topBar}>
-        <div className={styles.topBarInner}>
-          <div className={styles.brandBlock}>
-            <p className={styles.eyebrow}>WaySklad</p>
-            <h1 className={styles.shopName}>Маркетплейс</h1>
-          </div>
-        </div>
-      </div>
-
+      <h1 className={styles.pageTitle}>Маркетплейс</h1>
       <section className={styles.intro}>
         <p className={styles.introLead}>
           Товары всех магазинов с открытой витриной. Откройте карточку — и перейдите в витрину
           продавца, чтобы оформить заявку.
         </p>
       </section>
-
       <header className={styles.header}>
         <div className={styles.toolbar}>
           <label className={styles.search}>

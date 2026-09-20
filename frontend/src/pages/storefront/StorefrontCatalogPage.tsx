@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { IconSearch, IconShoppingCart, IconPackage, IconX, IconBuildingStore } from '@tabler/icons-react'
+import { IconSearch, IconPackage, IconX } from '@tabler/icons-react'
 import {
   getStorefrontCatalog,
   initialOrderQty,
@@ -13,8 +13,7 @@ import { ApiError } from '../../shared/api/client'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { Select } from '../../shared/ui/Select'
 import { Button } from '../../shared/ui/Button'
-import { addToCart, loadCart, cartCount, type StorefrontCartItem } from './cart'
-import { CustomerAuthChip, CustomerLoginModal, notifyCustomerAuthChanged } from './CustomerLoginModal'
+import { addToCart } from './cart'
 import { ProductCard } from './ProductCard'
 import styles from './Storefront.module.css'
 
@@ -63,16 +62,24 @@ export function StorefrontCatalogPage() {
   const [catalog, setCatalog] = useState<StorefrontCatalog | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [cart, setCart] = useState<StorefrontCartItem[]>(() => loadCart(slug))
   const [favorites, setFavorites] = useState<number[]>(() => loadFavorites(slug))
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
-  const [showLogin, setShowLogin] = useState(false)
+  // ?favorites=1 — используется ссылкой «Избранное» в общей шапке (PublicHeader),
+  // чтобы попасть сразу в отфильтрованный вид каталога магазина
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(() => searchParams.get('favorites') === '1')
   const requestToken = loadRequestToken(slug)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query), 300)
     return () => clearTimeout(t)
   }, [query])
+
+  // ?q= может измениться извне (поиск в общей шапке PublicHeader), не только
+  // через локальное поле ввода на этой странице — держим их в синхронизации
+  useEffect(() => {
+    const urlQuery = searchParams.get('q') ?? ''
+    setQuery((prev) => (prev === urlQuery ? prev : urlQuery))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.get('q')])
 
   useEffect(() => {
     let cancelled = false
@@ -139,18 +146,6 @@ export function StorefrontCatalogPage() {
     setMaxPriceDraft(maxPrice)
   }, [minPrice, maxPrice])
 
-  useEffect(() => {
-    function onStorage() {
-      setCart(loadCart(slug))
-    }
-    window.addEventListener('storage', onStorage)
-    window.addEventListener('waysklad:storefront-cart', onStorage)
-    return () => {
-      window.removeEventListener('storage', onStorage)
-      window.removeEventListener('waysklad:storefront-cart', onStorage)
-    }
-  }, [slug])
-
   const products = useMemo(() => {
     const list = catalog?.products ?? []
     if (!showFavoritesOnly) return list
@@ -186,7 +181,6 @@ export function StorefrontCatalogPage() {
       quantity: String(initialOrderQty(product.min_order_qty, product.order_step_qty)),
       variant_id: null,
     })
-    setCart(loadCart(slug))
   }
 
   const activeFilters: { key: string; label: string; clear: Record<string, string | null> }[] = []
@@ -231,29 +225,13 @@ export function StorefrontCatalogPage() {
 
   return (
     <div className={styles.shell}>
-      <div className={styles.topBar}>
-        <div className={styles.topBarInner}>
-          <div className={styles.brandBlock}>
-            <p className={styles.eyebrow}>Онлайн-витрина</p>
-            <h1 className={styles.shopName}>{catalog?.shop_name ?? '…'}</h1>
-          </div>
-          <div className={styles.headerActions}>
-            <Link to="/marketplace" className={styles.marketplaceLink}>
-              <IconBuildingStore size={16} stroke={1.8} />
-              Все магазины
-            </Link>
-            <CustomerAuthChip slug={slug} onLoginClick={() => setShowLogin(true)} />
-            {requestToken && (
-              <Link to={`/store/${slug}/request`} className={styles.headerLink}>
-                Мой заказ
-              </Link>
-            )}
-            <Link to={`/store/${slug}/cart`} className={styles.cartBtn} aria-label="Корзина">
-              <IconShoppingCart size={20} stroke={1.8} />
-              {cartCount(cart) > 0 && <span className={styles.cartBadge}>{cartCount(cart)}</span>}
-            </Link>
-          </div>
-        </div>
+      <div className={styles.catalogTopRow}>
+        <h1 className={styles.pageTitle}>{catalog?.shop_name ?? '…'}</h1>
+        {requestToken && (
+          <Link to={`/store/${slug}/request`} className={styles.headerLink}>
+            Мой заказ
+          </Link>
+        )}
       </div>
 
       <section className={styles.intro}>
@@ -446,16 +424,6 @@ export function StorefrontCatalogPage() {
           <p className={styles.muted}>Показано {products.length} из {catalog.total}</p>
         )}
       </main>
-
-      {showLogin && (
-        <CustomerLoginModal
-          onClose={() => setShowLogin(false)}
-          onSuccess={() => {
-            notifyCustomerAuthChanged()
-            setShowLogin(false)
-          }}
-        />
-      )}
     </div>
   )
 }

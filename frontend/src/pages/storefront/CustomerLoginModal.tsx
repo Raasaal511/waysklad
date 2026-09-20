@@ -1,10 +1,7 @@
-import { Link } from 'react-router-dom'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { IconBrandTelegram, IconLogout } from '@tabler/icons-react'
+import { IconBrandTelegram } from '@tabler/icons-react'
 import {
-  clearCustomerToken,
   getCustomerLoginStatus,
-  loadCustomerToken,
   requestCustomerLoginLink,
   saveCustomerToken,
 } from '../../entities/auth/customerApi'
@@ -134,57 +131,6 @@ export function CustomerLoginModal({ onClose, onSuccess }: CustomerLoginModalPro
         </div>
       )}
     </Modal>
-  )
-}
-
-/** Кнопка статуса в шапке витрины: войти / мои заказы / выйти. */
-export function CustomerAuthChip({
-  slug,
-  onLoginClick,
-}: {
-  slug: string
-  onLoginClick: () => void
-}) {
-  const [authed, setAuthed] = useState(() => !!loadCustomerToken())
-
-  useEffect(() => {
-    function sync() {
-      setAuthed(!!loadCustomerToken())
-    }
-    window.addEventListener('storage', sync)
-    window.addEventListener('waysklad:customer-auth', sync)
-    return () => {
-      window.removeEventListener('storage', sync)
-      window.removeEventListener('waysklad:customer-auth', sync)
-    }
-  }, [])
-
-  if (!authed) {
-    return (
-      <button type="button" className={styles.chipBtn} onClick={onLoginClick}>
-        Войти
-      </button>
-    )
-  }
-
-  return (
-    <span className={styles.chipRow}>
-      <Link to={`/store/${slug}/my-orders`} className={styles.chipLink}>
-        Мои заказы
-      </Link>
-      <button
-        type="button"
-        className={styles.chipIcon}
-        aria-label="Выйти"
-        onClick={() => {
-          clearCustomerToken()
-          window.dispatchEvent(new Event('waysklad:customer-auth'))
-          setAuthed(false)
-        }}
-      >
-        <IconLogout size={16} stroke={1.8} />
-      </button>
-    </span>
   )
 }
 

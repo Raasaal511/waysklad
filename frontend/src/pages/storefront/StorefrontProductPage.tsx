@@ -1,5 +1,5 @@
-import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { IconChevronLeft, IconShoppingCart, IconHeart, IconHeartFilled } from '@tabler/icons-react'
+import { useParams, useSearchParams } from 'react-router-dom'
+import { IconHeart, IconHeartFilled } from '@tabler/icons-react'
 import { useState, useEffect, Suspense, lazy } from 'react'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { formatMoney, plural } from '../../shared/lib/format'
@@ -27,7 +27,7 @@ import { ProductPageSkeleton, ProductPageError } from './product/ProductPageStat
 import { useSelection } from './product/useSelection'
 import { variantPrice, galleryForVariant } from './product/productUtils'
 import { pushRecentlyViewed } from './product/recentlyViewed'
-import { addToCart, cartCount, loadCart } from './cart'
+import { addToCart, loadCart } from './cart'
 import { initialOrderQty } from '../../entities/storefront/api'
 import shellStyles from './Storefront.module.css'
 import styles from './product/ProductPage.module.css'
@@ -181,14 +181,6 @@ export function StorefrontProductPage() {
   if (loading) {
     return (
       <div className={styles.page}>
-        <TopBar
-          slug={slug}
-          shopName={shopName}
-          cartCount={cartCount(cartItems)}
-          favoritesCount={favorites.length}
-          isFavorite={false}
-          onToggleFavorite={undefined}
-        />
         <div className={styles.container}>
           <ProductPageSkeleton />
         </div>
@@ -199,14 +191,6 @@ export function StorefrontProductPage() {
   if (error || !product) {
     return (
       <div className={styles.page}>
-        <TopBar
-          slug={slug}
-          shopName={shopName}
-          cartCount={cartCount(cartItems)}
-          favoritesCount={favorites.length}
-          isFavorite={false}
-          onToggleFavorite={undefined}
-        />
         <div className={styles.container}>
           <ProductPageError status={errorStatus} slug={slug} />
         </div>
@@ -285,16 +269,18 @@ export function StorefrontProductPage() {
 
   return (
     <div className={styles.page}>
-      <TopBar
-        slug={slug}
-        shopName={shopName}
-        cartCount={cartCount(cartItems)}
-        favoritesCount={favorites.length}
-        isFavorite={isFavorite}
-        onToggleFavorite={toggleFavorite}
-      />
       <div className={styles.container}>
-        <Breadcrumbs slug={slug} category={product.category} />
+        <div className={shellStyles.crumbRow}>
+          <Breadcrumbs slug={slug} category={product.category} />
+          <button
+            type="button"
+            className={shellStyles.iconGhost}
+            onClick={toggleFavorite}
+            aria-label={isFavorite ? 'Убрать из избранного' : 'В избранное'}
+          >
+            {isFavorite ? <IconHeartFilled size={20} /> : <IconHeart size={20} stroke={1.8} />}
+          </button>
+        </div>
 
         <ProductLayout
           gallery={
@@ -385,49 +371,6 @@ export function StorefrontProductPage() {
           hasContacts={!!(shopProfile?.contacts && (shopProfile.contacts.phone || shopProfile.contacts.whatsapp || shopProfile.contacts.telegram))}
         />
       )}
-    </div>
-  )
-}
-
-function TopBar({
-  slug,
-  shopName,
-  cartCount: count,
-  favoritesCount,
-  isFavorite,
-  onToggleFavorite,
-}: {
-  slug: string
-  shopName: string
-  cartCount: number
-  favoritesCount: number
-  isFavorite: boolean
-  onToggleFavorite: (() => void) | undefined
-}) {
-  return (
-    <div className={shellStyles.topBar}>
-      <div className={shellStyles.topBarInner}>
-        <Link to={`/store/${slug}`} className={shellStyles.back}>
-          <IconChevronLeft size={18} stroke={1.8} />
-          <span className={shellStyles.backShop}>{shopName || 'Магазин'}</span>
-        </Link>
-        <div className={shellStyles.headerActions}>
-          <button
-            type="button"
-            className={shellStyles.iconGhost}
-            onClick={onToggleFavorite}
-            disabled={!onToggleFavorite}
-            aria-label={isFavorite ? 'Убрать из избранного' : 'В избранное'}
-          >
-            {isFavorite ? <IconHeartFilled size={20} /> : <IconHeart size={20} stroke={1.8} />}
-            {favoritesCount > 0 && <span className={shellStyles.cartBadge}>{favoritesCount}</span>}
-          </button>
-          <Link to={`/store/${slug}/cart`} className={shellStyles.cartBtn} aria-label="Корзина">
-            <IconShoppingCart size={20} stroke={1.8} />
-            {count > 0 && <span className={shellStyles.cartBadge}>{count}</span>}
-          </Link>
-        </div>
-      </div>
     </div>
   )
 }
