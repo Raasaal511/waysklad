@@ -30,6 +30,7 @@ import { StorefrontCartPage } from './pages/storefront/StorefrontCartPage'
 import { StorefrontRequestPage } from './pages/storefront/StorefrontRequestPage'
 import { StorefrontMyOrdersPage } from './pages/storefront/StorefrontMyOrdersPage'
 import { MarketplacePage } from './pages/marketplace/MarketplacePage'
+import { PublicLayout } from './widgets/public-header/PublicLayout'
 import { TasksPage } from './pages/tasks/TasksPage'
 import { DebtsPage } from './pages/debts/DebtsPage'
 import { DebtNewPage } from './pages/debts/DebtNewPage'
@@ -49,10 +50,38 @@ export function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/admin/*" element={<AdminPage />} />
-            <Route path="/marketplace" element={<MarketplacePage />} />
-            <Route path="/store/:slug" element={<StorefrontCatalogPage />} />
-            <Route path="/store/:slug/products/:productId" element={<StorefrontProductPage />} />
-            <Route path="/store/:slug/cart" element={<StorefrontCartPage />} />
+            <Route
+              path="/marketplace"
+              element={
+                <PublicLayout>
+                  <MarketplacePage />
+                </PublicLayout>
+              }
+            />
+            <Route
+              path="/store/:slug"
+              element={
+                <PublicLayout>
+                  <StorefrontCatalogPage />
+                </PublicLayout>
+              }
+            />
+            <Route
+              path="/store/:slug/products/:productId"
+              element={
+                <PublicLayout>
+                  <StorefrontProductPage />
+                </PublicLayout>
+              }
+            />
+            <Route
+              path="/store/:slug/cart"
+              element={
+                <PublicLayout>
+                  <StorefrontCartPage />
+                </PublicLayout>
+              }
+            />
             <Route path="/store/:slug/request" element={<StorefrontRequestPage />} />
             <Route path="/store/:slug/my-orders" element={<StorefrontMyOrdersPage />} />
             <Route
