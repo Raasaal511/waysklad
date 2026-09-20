@@ -9,7 +9,7 @@ import {
   IconUserCircle,
   IconX,
 } from '@tabler/icons-react'
-import { getStorefrontShopProfile } from '../../entities/storefront/api'
+import { getStorefrontShopProfileCached, peekCachedStorefrontShopProfile } from '../../entities/storefront/api'
 import { loadCustomerToken } from '../../entities/auth/customerApi'
 import { useTheme } from '../../app/ThemeContext'
 import { totalCartCount, totalFavoritesCount } from '../../shared/lib/storefrontCounters'
@@ -47,15 +47,21 @@ export function PublicHeader() {
   }, [searchParams])
 
   // название магазина — для плейсхолдера поиска «Искать в магазине «...»»;
-  // берём отдельным лёгким запросом профиля, т.к. шапка не имеет доступа
-  // к данным, загруженным внутри страницы каталога/товара
+  // шапка не имеет доступа к данным, загруженным внутри страницы каталога/товара,
+  // но берёт профиль из общего кэша (getStorefrontShopProfileCached) — та же страница
+  // почти всегда уже запросила тот же профиль, второй поход на сервер не нужен (P7 п.2)
   useEffect(() => {
     if (!slug) {
       setShopName(null)
       return
     }
+    const cached = peekCachedStorefrontShopProfile(slug)
+    if (cached) {
+      setShopName(cached.name)
+      return
+    }
     let cancelled = false
-    getStorefrontShopProfile(slug)
+    getStorefrontShopProfileCached(slug)
       .then((profile) => {
         if (!cancelled) setShopName(profile.name)
       })

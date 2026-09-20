@@ -5,10 +5,10 @@ import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { formatMoney, plural } from '../../shared/lib/format'
 import {
   useStorefrontProduct,
-  useProductReviews,
   useShopProfile,
   useTrackProductView,
 } from './product/useProductPageData'
+import type { ReviewPhotoRef } from '../../entities/review/api'
 import { ProductLayout } from './product/ProductLayout'
 import { Breadcrumbs } from '../../shared/ui/Breadcrumbs'
 import { ProductHeader } from './product/ProductHeader'
@@ -69,7 +69,7 @@ export function StorefrontProductPage() {
   const [toast, setToast] = useState<string | null>(null)
   const [flashVariantKey, setFlashVariantKey] = useState<number | 'base' | null>(null)
   const lastAddAt = useRef(0)
-  const { page: reviewsPage } = useProductReviews(slug, productId, {})
+  const [reviewPhotos, setReviewPhotos] = useState<ReviewPhotoRef[]>([])
   const { profile: shopProfile } = useShopProfile(slug)
   const [dockVisible, setDockVisible] = useState(false)
 
@@ -369,7 +369,7 @@ export function StorefrontProductPage() {
           }
           below={
             <>
-              <BuyerPhotos photos={reviewsPage?.photos ?? []} />
+              <BuyerPhotos photos={reviewPhotos} />
               <AboutSection product={product} />
               <WarrantySection warrantyText={product.warranty_text} />
               <Suspense fallback={null}>
@@ -377,7 +377,7 @@ export function StorefrontProductPage() {
                 <SimilarSection slug={slug} productId={productId} scope="marketplace" shopName={shopName} />
               </Suspense>
               <Suspense fallback={null}>
-                <ReviewsSection slug={slug} productId={productId} />
+                <ReviewsSection slug={slug} productId={productId} onPhotosLoaded={setReviewPhotos} />
               </Suspense>
               <Suspense fallback={null}>
                 <RecentlyViewedSection slug={slug} currentProductId={product.id} />

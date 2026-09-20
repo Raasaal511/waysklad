@@ -252,6 +252,36 @@ export function getStorefrontShopProfile(slug: string) {
   return api.get<StorefrontShopProfile>(`/storefront/${encodeURIComponent(slug)}/profile`)
 }
 
+// Профиль магазина запрашивают одновременно PublicHeader (имя для плейсхолдера
+// поиска) и страница каталога/товара (вся карточка магазина) — общий кэш +
+// дедупликация одновременных запросов, чтобы это не превращалось в два похода
+// на сервер за одним и тем же (P7 п.2, не больше 4 запросов на карточке товара).
+const shopProfileCache = new Map<string, StorefrontShopProfile>()
+const shopProfileInflight = new Map<string, Promise<StorefrontShopProfile>>()
+
+export function getStorefrontShopProfileCached(slug: string): Promise<StorefrontShopProfile> {
+  const cached = shopProfileCache.get(slug)
+  if (cached) return Promise.resolve(cached)
+  const inflight = shopProfileInflight.get(slug)
+  if (inflight) return inflight
+  const request = getStorefrontShopProfile(slug)
+    .then((data) => {
+      shopProfileCache.set(slug, data)
+      shopProfileInflight.delete(slug)
+      return data
+    })
+    .catch((err) => {
+      shopProfileInflight.delete(slug)
+      throw err
+    })
+  shopProfileInflight.set(slug, request)
+  return request
+}
+
+export function peekCachedStorefrontShopProfile(slug: string): StorefrontShopProfile | null {
+  return shopProfileCache.get(slug) ?? null
+}
+
 /** Фиксирует просмотр карточки товара. Не бросает — вызывающий код не должен падать из-за метрики. */
 export async function trackProductView(slug: string, productId: number): Promise<void> {
   try {

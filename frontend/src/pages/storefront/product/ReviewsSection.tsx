@@ -8,18 +8,27 @@ import { ReviewFormModal } from './ReviewFormModal'
 import { Lightbox } from '../../../shared/ui/Lightbox'
 import { CustomerLoginModal, notifyCustomerAuthChanged } from '../CustomerLoginModal'
 import { loadCustomerToken } from '../../../entities/auth/customerApi'
-import { voteReview, getReviewEligibility, type Review, type ReviewSort } from '../../../entities/review/api'
+import {
+  voteReview,
+  getReviewEligibility,
+  type Review,
+  type ReviewPhotoRef,
+  type ReviewSort,
+} from '../../../entities/review/api'
 import pageStyles from './ProductPage.module.css'
 import styles from './ReviewsSection.module.css'
 
 interface ReviewsSectionProps {
   slug: string
   productId: string
+  /** Отдаёт photos наверх для BuyerPhotos — чтобы не делать второй запрос отзывов
+   *  только ради фото (не больше 4 запросов на странице товара, блок «Д» п.2 P7). */
+  onPhotosLoaded?: (photos: ReviewPhotoRef[]) => void
 }
 
 const PAGE_SIZE = 10
 
-export function ReviewsSection({ slug, productId }: ReviewsSectionProps) {
+export function ReviewsSection({ slug, productId, onPhotosLoaded }: ReviewsSectionProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const sort = (searchParams.get('rsort') as ReviewSort) || 'date_desc'
   const withPhotos = searchParams.get('rphoto') === '1'
@@ -33,6 +42,11 @@ export function ReviewsSection({ slug, productId }: ReviewsSectionProps) {
     rating: ratingFilter ?? undefined,
     limit: PAGE_SIZE,
   })
+
+  useEffect(() => {
+    if (page) onPhotosLoaded?.(page.photos)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page])
 
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!loadCustomerToken())
   const [showLogin, setShowLogin] = useState(false)

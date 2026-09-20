@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   getStorefrontCatalog,
-  getStorefrontShopProfile,
+  getStorefrontShopProfileCached,
+  peekCachedStorefrontShopProfile,
   initialOrderQty,
   loadRequestToken,
   type CatalogParams,
@@ -68,7 +69,9 @@ export function StorefrontCatalogPage() {
   }
   const query = searchParams.get('q') ?? ''
 
-  const [profile, setProfile] = useState<StorefrontShopProfile | null>(null)
+  const [profile, setProfile] = useState<StorefrontShopProfile | null>(() =>
+    peekCachedStorefrontShopProfile(slug),
+  )
   const [catalog, setCatalog] = useState<StorefrontCatalog | null>(null)
   const [products, setProducts] = useState<StorefrontProduct[]>([])
   const [loading, setLoading] = useState(true)
@@ -84,10 +87,11 @@ export function StorefrontCatalogPage() {
   // реально загружен, не в состоянии skeleton (см. shared/lib/useScrollRestore.ts, P6)
   useScrollRestore(!loading)
 
-  // профиль магазина — отдельный запрос (не входит в ответ каталога), нужен ShopHeader
+  // профиль магазина — отдельный запрос (не входит в ответ каталога), нужен ShopHeader;
+  // общий кэш с PublicHeader и карточкой товара — один поход на сервер на весь визит (P7 п.2)
   useEffect(() => {
     let cancelled = false
-    getStorefrontShopProfile(slug)
+    getStorefrontShopProfileCached(slug)
       .then((data) => {
         if (!cancelled) setProfile(data)
       })
@@ -322,6 +326,7 @@ export function StorefrontCatalogPage() {
             availableSizes={catalog?.available_sizes ?? []}
             availableColors={catalog?.available_colors ?? []}
             categories={(catalog?.categories ?? []).map((c) => ({ id: c.id, name: c.name, count: c.product_count }))}
+            categoriesLoading={loading}
             activeCategoryId={categoryId}
             onCategoryChange={(id) => {
               setShowFavoritesOnly(false)
@@ -339,6 +344,9 @@ export function StorefrontCatalogPage() {
       )}
 
       <main className={styles.main}>
+        {/* h1 — имя магазина (ShopHeader), товары — h3 (ProductCard); без этого h2
+            порядок заголовков прыгает через уровень (Lighthouse heading-order) */}
+        <h2 className="sr-only">Товары магазина</h2>
         {loading ? (
           <ProductGrid items={[]} getHref={() => ''} loading skeletonCount={8} />
         ) : shopEmpty ? (

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import {
   getSimilarProducts,
   getStorefrontProduct,
-  getStorefrontShopProfile,
+  getStorefrontShopProfileCached,
+  peekCachedStorefrontShopProfile,
   trackProductView,
   type SimilarProductsResponse,
   type SimilarScope,
@@ -61,17 +62,15 @@ export function useStorefrontProduct(slug: string, productId: string) {
   return state
 }
 
-// Кэш профиля магазина в памяти модуля на время сессии — профиль почти не меняется,
-// а к нему возвращаются много раз (переход между товарами одного магазина).
-const shopProfileCache = new Map<string, StorefrontShopProfile>()
-
 export function useShopProfile(slug: string) {
-  const [profile, setProfile] = useState<StorefrontShopProfile | null>(() => shopProfileCache.get(slug) ?? null)
-  const [loading, setLoading] = useState(!shopProfileCache.has(slug))
+  const [profile, setProfile] = useState<StorefrontShopProfile | null>(() =>
+    peekCachedStorefrontShopProfile(slug),
+  )
+  const [loading, setLoading] = useState(!profile)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const cached = shopProfileCache.get(slug)
+    const cached = peekCachedStorefrontShopProfile(slug)
     if (cached) {
       setProfile(cached)
       setLoading(false)
@@ -80,10 +79,9 @@ export function useShopProfile(slug: string) {
     let cancelled = false
     setLoading(true)
     setError(null)
-    getStorefrontShopProfile(slug)
+    getStorefrontShopProfileCached(slug)
       .then((data) => {
         if (cancelled) return
-        shopProfileCache.set(slug, data)
         setProfile(data)
       })
       .catch((err) => {
