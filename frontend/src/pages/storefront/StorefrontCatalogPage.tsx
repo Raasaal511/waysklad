@@ -1,23 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { IconSearch, IconPackage, IconX } from '@tabler/icons-react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   getStorefrontCatalog,
+  getStorefrontShopProfile,
   initialOrderQty,
   loadRequestToken,
+  type CatalogParams,
   type StorefrontCatalog,
   type StorefrontProduct,
+  type StorefrontShopProfile,
   type StorefrontSort,
 } from '../../entities/storefront/api'
 import { ApiError } from '../../shared/api/client'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
-import { Select } from '../../shared/ui/Select'
-import { Button } from '../../shared/ui/Button'
+import { MARKETPLACE_PATH } from '../../shared/config'
+import { Chip } from '../../shared/ui/Chip'
+import { EmptyState } from '../../shared/ui/EmptyState'
+import { ErrorState } from '../../shared/ui/ErrorState'
+import { ShopHeader, ShopHeaderSkeleton } from './ShopHeader'
+import { FilterBar, type FilterBarValue } from './filters/FilterBar'
 import { addToCart } from './cart'
 import { ProductGrid } from './ProductGrid'
 import styles from './Storefront.module.css'
 
 const FAVORITES_KEY = 'waysklad:storefront-favorites'
+const PAGE_SIZE = 24
 
 function loadFavorites(slug: string): number[] {
   try {
@@ -41,6 +48,7 @@ const SORT_OPTIONS: { value: StorefrontSort; label: string }[] = [
 
 export function StorefrontCatalogPage() {
   const { slug = '' } = useParams<{ slug: string }>()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const warehouseId = searchParams.get('warehouse_id')
     ? Number(searchParams.get('warehouse_id'))
@@ -49,67 +57,77 @@ export function StorefrontCatalogPage() {
   const categoryId = searchParams.get('category_id')
     ? Number(searchParams.get('category_id'))
     : null
-  const minPrice = searchParams.get('min_price') ?? ''
-  const maxPrice = searchParams.get('max_price') ?? ''
-  const inStockOnly = searchParams.get('in_stock_only') === 'true'
-  const variantSize = searchParams.get('variant_size') ?? ''
-  const variantColor = searchParams.get('variant_color') ?? ''
+  const filters: FilterBarValue = {
+    minPrice: searchParams.get('min_price') ?? '',
+    maxPrice: searchParams.get('max_price') ?? '',
+    inStockOnly: searchParams.get('in_stock_only') === 'true',
+    variantSize: searchParams.get('variant_size') ?? '',
+    variantColor: searchParams.get('variant_color') ?? '',
+    minRating: searchParams.get('min_rating') ? Number(searchParams.get('min_rating')) : null,
+  }
+  const query = searchParams.get('q') ?? ''
 
-  const [query, setQuery] = useState(searchParams.get('q') ?? '')
-  const [debouncedQuery, setDebouncedQuery] = useState(query)
-  const [minPriceDraft, setMinPriceDraft] = useState(minPrice)
-  const [maxPriceDraft, setMaxPriceDraft] = useState(maxPrice)
+  const [profile, setProfile] = useState<StorefrontShopProfile | null>(null)
   const [catalog, setCatalog] = useState<StorefrontCatalog | null>(null)
+  const [products, setProducts] = useState<StorefrontProduct[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [favorites, setFavorites] = useState<number[]>(() => loadFavorites(slug))
   // ?favorites=1 — используется ссылкой «Избранное» в общей шапке (PublicHeader),
   // чтобы попасть сразу в отфильтрованный вид каталога магазина
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(() => searchParams.get('favorites') === '1')
   const requestToken = loadRequestToken(slug)
 
+  // профиль магазина — отдельный запрос (не входит в ответ каталога), нужен ShopHeader
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query), 300)
-    return () => clearTimeout(t)
-  }, [query])
-
-  // ?q= может измениться извне (поиск в общей шапке PublicHeader), не только
-  // через локальное поле ввода на этой странице — держим их в синхронизации
-  useEffect(() => {
-    const urlQuery = searchParams.get('q') ?? ''
-    setQuery((prev) => (prev === urlQuery ? prev : urlQuery))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams.get('q')])
+    let cancelled = false
+    getStorefrontShopProfile(slug)
+      .then((data) => {
+        if (!cancelled) setProfile(data)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        // каталог и профиль ходят к одной и той же витрине — если профиль 404,
+        // основной запрос каталога ниже покажет тот же результат и выставит errorStatus;
+        // здесь достаточно молча оставить profile=null (ShopHeader тогда не рендерится)
+        if (!(err instanceof ApiError)) return
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [slug])
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       setLoading(true)
-      setError(null)
+      setErrorStatus(null)
       try {
-        const data = await getStorefrontCatalog(slug, {
-          query: debouncedQuery,
+        const params: CatalogParams = {
+          query,
           sort,
           categoryId,
           warehouseId,
-          minPrice: minPrice || undefined,
-          maxPrice: maxPrice || undefined,
-          inStockOnly: inStockOnly || undefined,
-          variantSize: variantSize || undefined,
-          variantColor: variantColor || undefined,
-          limit: 50,
-        })
-        if (!cancelled) setCatalog(data)
+          minPrice: filters.minPrice || undefined,
+          maxPrice: filters.maxPrice || undefined,
+          inStockOnly: filters.inStockOnly || undefined,
+          variantSize: filters.variantSize || undefined,
+          variantColor: filters.variantColor || undefined,
+          minRating: filters.minRating || undefined,
+          limit: PAGE_SIZE,
+          offset: 0,
+        }
+        const data = await getStorefrontCatalog(slug, params)
+        if (!cancelled) {
+          setCatalog(data)
+          setProducts(data.products)
+        }
       } catch (err) {
         if (!cancelled) {
           setCatalog(null)
-          setError(
-            err instanceof ApiError && err.status === 404
-              ? 'Витрина не найдена или выключена'
-              : err instanceof ApiError
-                ? err.message
-                : 'Не удалось загрузить витрину',
-          )
+          setProducts([])
+          setErrorStatus(err instanceof ApiError ? err.status : 0)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -119,44 +137,72 @@ export function StorefrontCatalogPage() {
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     slug,
-    debouncedQuery,
+    query,
     sort,
     categoryId,
     warehouseId,
-    minPrice,
-    maxPrice,
-    inStockOnly,
-    variantSize,
-    variantColor,
+    filters.minPrice,
+    filters.maxPrice,
+    filters.inStockOnly,
+    filters.variantSize,
+    filters.variantColor,
+    filters.minRating,
   ])
 
   useEffect(() => {
-    if (!catalog?.shop_name) return
+    if (!profile) return
     setPageMeta({
-      title: `${catalog.shop_name} · WaySklad`,
-      description: `Каталог магазина «${catalog.shop_name}»`,
+      title: `${profile.name} — онлайн-витрина`,
+      description: profile.description || `Каталог магазина «${profile.name}» на ВайСклад`,
     })
     return () => resetPageMeta()
-  }, [catalog?.shop_name])
+  }, [profile])
 
-  useEffect(() => {
-    setMinPriceDraft(minPrice)
-    setMaxPriceDraft(maxPrice)
-  }, [minPrice, maxPrice])
+  const visibleProducts = useMemo(() => {
+    if (!showFavoritesOnly) return products
+    return products.filter((p) => favorites.includes(p.id))
+  }, [products, showFavoritesOnly, favorites])
 
-  const products = useMemo(() => {
-    const list = catalog?.products ?? []
-    if (!showFavoritesOnly) return list
-    return list.filter((p) => favorites.includes(p.id))
-  }, [catalog, showFavoritesOnly, favorites])
-
-  function patchParams(patch: Record<string, string | null>) {
+  /** undefined в значении патча — «не трогать ключ» (в отличие от null — «удалить ключ»). */
+  function patchParams(patch: Record<string, string | null | undefined>) {
     const next = new URLSearchParams(searchParams)
     for (const [k, v] of Object.entries(patch)) {
-      if (v == null || v === '') next.delete(k)
+      if (v === undefined) continue
+      if (v === null || v === '') next.delete(k)
       else next.set(k, v)
+    }
+    setSearchParams(next, { replace: true })
+  }
+
+  function applyFilters(patch: Partial<FilterBarValue>) {
+    patchParams({
+      min_price: 'minPrice' in patch ? patch.minPrice || null : undefined,
+      max_price: 'maxPrice' in patch ? patch.maxPrice || null : undefined,
+      in_stock_only: 'inStockOnly' in patch ? (patch.inStockOnly ? 'true' : null) : undefined,
+      variant_size: 'variantSize' in patch ? patch.variantSize || null : undefined,
+      variant_color: 'variantColor' in patch ? patch.variantColor || null : undefined,
+      min_rating: 'minRating' in patch ? (patch.minRating ? String(patch.minRating) : null) : undefined,
+    })
+  }
+
+  function clearAllFilters() {
+    patchParams({
+      min_price: null,
+      max_price: null,
+      in_stock_only: null,
+      variant_size: null,
+      variant_color: null,
+      min_rating: null,
+    })
+  }
+
+  function clearFiltersAndSearch() {
+    const next = new URLSearchParams(searchParams)
+    for (const key of ['min_price', 'max_price', 'in_stock_only', 'variant_size', 'variant_color', 'min_rating', 'q']) {
+      next.delete(key)
     }
     setSearchParams(next, { replace: true })
   }
@@ -183,240 +229,148 @@ export function StorefrontCatalogPage() {
     })
   }
 
-  const activeFilters: { key: string; label: string; clear: Record<string, string | null> }[] = []
-  if (minPrice) activeFilters.push({ key: 'min', label: `от ${minPrice} ₽`, clear: { min_price: null } })
-  if (maxPrice) activeFilters.push({ key: 'max', label: `до ${maxPrice} ₽`, clear: { max_price: null } })
-  if (inStockOnly) activeFilters.push({ key: 'stock', label: 'В наличии', clear: { in_stock_only: null } })
-  if (variantSize) activeFilters.push({ key: 'size', label: `Размер ${variantSize}`, clear: { variant_size: null } })
-  if (variantColor) activeFilters.push({ key: 'color', label: variantColor, clear: { variant_color: null } })
-  if (warehouseId != null) {
-    const wh = catalog?.warehouses.find((w) => w.id === warehouseId)
-    activeFilters.push({
-      key: 'wh',
-      label: wh?.name ?? `Точка #${warehouseId}`,
-      clear: { warehouse_id: null },
-    })
+  async function loadMore() {
+    if (!catalog || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const data = await getStorefrontCatalog(slug, {
+        query,
+        sort,
+        categoryId,
+        warehouseId,
+        minPrice: filters.minPrice || undefined,
+        maxPrice: filters.maxPrice || undefined,
+        inStockOnly: filters.inStockOnly || undefined,
+        variantSize: filters.variantSize || undefined,
+        variantColor: filters.variantColor || undefined,
+        minRating: filters.minRating || undefined,
+        limit: PAGE_SIZE,
+        offset: products.length,
+      })
+      setProducts((prev) => [...prev, ...data.products])
+    } catch {
+      // «Показать ещё» — не критично, просто оставляем как есть при сбое сети
+    } finally {
+      setLoadingMore(false)
+    }
   }
 
-  function clearAllFilters() {
-    setMinPriceDraft('')
-    setMaxPriceDraft('')
-    patchParams({
-      min_price: null,
-      max_price: null,
-      in_stock_only: null,
-      variant_size: null,
-      variant_color: null,
-      warehouse_id: null,
-    })
-  }
-
-  if (error && !catalog) {
+  // 404 у публичных /storefront/{slug}* — общий статус и для несуществующей витрины, и
+  // для заблокированной (is_suspended): бэкенд не различает их отдельным кодом
+  // (backend/app/application/storefront/get_catalog.py:139 — обе причины дают None из
+  // use case, роутер превращает в 404 "Витрина не найдена"). Отдельного 403 для
+  // публичного каталога нет (403 в shared/api/client.ts — только для сессии сотрудника
+  // в кабинете владельца, другой контекст). Ветка errorStatus === 403 ниже — на случай,
+  // если статус всё же придёт другим путём (прокси/WAF), не как активный кейс сейчас.
+  if (errorStatus != null) {
     return (
       <div className={styles.shell}>
-        <div className={styles.emptyState}>
-          <IconPackage size={40} stroke={1.5} />
-          <h1>Витрина недоступна</h1>
-          <p>{error}</p>
-        </div>
+        <ErrorState
+          illustration={errorStatus === 403 ? 'error-403-blocked' : 'error-404-not-found'}
+          title={errorStatus === 403 ? 'Магазин заблокирован' : 'Витрина не найдена или выключена'}
+          description={
+            errorStatus === 403
+              ? 'Продавец временно заблокирован платформой.'
+              : 'Проверьте ссылку или загляните в другие магазины.'
+          }
+          actionLabel="Все магазины"
+          onAction={() => navigate(MARKETPLACE_PATH)}
+        />
       </div>
     )
   }
 
+  const hasActiveFilters =
+    !!filters.minPrice ||
+    !!filters.maxPrice ||
+    filters.inStockOnly ||
+    !!filters.variantSize ||
+    !!filters.variantColor ||
+    !!filters.minRating ||
+    !!query ||
+    categoryId != null
+
+  const shopEmpty = !loading && catalog && catalog.total === 0 && !hasActiveFilters
+  const filtersEmpty = !loading && catalog && visibleProducts.length === 0 && (hasActiveFilters || showFavoritesOnly)
+
   return (
     <div className={styles.shell}>
-      <div className={styles.catalogTopRow}>
-        <h1 className={styles.pageTitle}>{catalog?.shop_name ?? '…'}</h1>
-        {requestToken && (
+      {loading && !profile ? <ShopHeaderSkeleton /> : profile ? <ShopHeader profile={profile} /> : null}
+
+      {requestToken && (
+        <div className={styles.catalogTopRow}>
           <Link to={`/store/${slug}/request`} className={styles.headerLink}>
             Мой заказ
           </Link>
-        )}
-      </div>
+        </div>
+      )}
 
-      <section className={styles.intro}>
-        <p className={styles.introLead}>Выберите товары и оформите заказ — магазин подтвердит наличие.</p>
-      </section>
-
-      <header className={styles.header}>
-        <div className={styles.toolbar}>
-          <label className={styles.search}>
-            <IconSearch size={16} stroke={1.8} />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Найти товар…"
-            />
-          </label>
-          <Select
-            value={sort}
-            onChange={(v) => patchParams({ sort: v })}
-            options={SORT_OPTIONS}
+      {!shopEmpty && (
+        <div className={styles.header}>
+          <FilterBar
+            sort={sort}
+            sortOptions={SORT_OPTIONS}
+            onSortChange={(v) => patchParams({ sort: v })}
+            value={filters}
+            onChange={applyFilters}
+            onClear={clearAllFilters}
+            availableSizes={catalog?.available_sizes ?? []}
+            availableColors={catalog?.available_colors ?? []}
+            categories={(catalog?.categories ?? []).map((c) => ({ id: c.id, name: c.name, count: c.product_count }))}
+            activeCategoryId={categoryId}
+            onCategoryChange={(id) => {
+              setShowFavoritesOnly(false)
+              patchParams({ category_id: id != null ? String(id) : null })
+            }}
+            totalCount={catalog?.total}
+            resultCount={catalog?.total ?? 0}
           />
-        </div>
-
-        <div className={styles.filters}>
-          <label className={styles.filterField}>
-            Цена от
-            <input
-              type="text"
-              inputMode="decimal"
-              value={minPriceDraft}
-              onChange={(e) => setMinPriceDraft(e.target.value)}
-              onBlur={() => patchParams({ min_price: minPriceDraft.trim() || null })}
-              placeholder="0"
-            />
-          </label>
-          <label className={styles.filterField}>
-            до
-            <input
-              type="text"
-              inputMode="decimal"
-              value={maxPriceDraft}
-              onChange={(e) => setMaxPriceDraft(e.target.value)}
-              onBlur={() => patchParams({ max_price: maxPriceDraft.trim() || null })}
-              placeholder="∞"
-            />
-          </label>
-          <label className={styles.filterCheck}>
-            <input
-              type="checkbox"
-              checked={inStockOnly}
-              onChange={(e) => patchParams({ in_stock_only: e.target.checked ? 'true' : null })}
-            />
-            Только в наличии
-          </label>
-          {(catalog?.available_sizes.length ?? 0) > 0 && (
-            <Select
-              value={variantSize}
-              onChange={(v) => patchParams({ variant_size: v || null })}
-              options={[
-                { value: '', label: 'Размер' },
-                ...(catalog?.available_sizes.map((s) => ({ value: s, label: s })) ?? []),
-              ]}
-            />
-          )}
-          {(catalog?.available_colors.length ?? 0) > 0 && (
-            <Select
-              value={variantColor}
-              onChange={(v) => patchParams({ variant_color: v || null })}
-              options={[
-                { value: '', label: 'Цвет' },
-                ...(catalog?.available_colors.map((c) => ({ value: c, label: c })) ?? []),
-              ]}
-            />
-          )}
-          {(catalog?.warehouses.length ?? 0) > 1 && (
-            <Select
-              value={warehouseId != null ? String(warehouseId) : ''}
-              onChange={(v) => patchParams({ warehouse_id: v || null })}
-              options={[
-                { value: '', label: 'Все точки' },
-                ...(catalog?.warehouses.map((w) => ({ value: String(w.id), label: w.name })) ?? []),
-              ]}
-            />
+          {favorites.length > 0 && (
+            <Chip active={showFavoritesOnly} className={styles.favoritesChip} onClick={() => setShowFavoritesOnly((v) => !v)}>
+              Избранное · {favorites.length}
+            </Chip>
           )}
         </div>
-
-        {activeFilters.length > 0 && (
-          <div className={styles.filterChips}>
-            {activeFilters.map((f) => (
-              <button
-                key={f.key}
-                type="button"
-                className={styles.filterChip}
-                onClick={() => patchParams(f.clear)}
-              >
-                {f.label}
-                <IconX size={12} stroke={2} />
-              </button>
-            ))}
-            <button type="button" className={styles.filterChipClear} onClick={clearAllFilters}>
-              Сбросить
-            </button>
-          </div>
-        )}
-
-        {((catalog?.categories.length ?? 0) > 0 || favorites.length > 0) && (
-          <div className={styles.categories}>
-            <button
-              type="button"
-              className={!categoryId && !showFavoritesOnly ? styles.catActive : styles.cat}
-              onClick={() => {
-                setShowFavoritesOnly(false)
-                patchParams({ category_id: null })
-              }}
-            >
-              Все
-            </button>
-            {catalog?.categories.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className={categoryId === c.id && !showFavoritesOnly ? styles.catActive : styles.cat}
-                onClick={() => {
-                  setShowFavoritesOnly(false)
-                  patchParams({ category_id: String(c.id) })
-                }}
-              >
-                {c.name} · {c.product_count}
-              </button>
-            ))}
-            <button
-              type="button"
-              className={showFavoritesOnly ? styles.catActive : styles.cat}
-              onClick={() => setShowFavoritesOnly((v) => !v)}
-            >
-              Избранное{favorites.length > 0 ? ` · ${favorites.length}` : ''}
-            </button>
-          </div>
-        )}
-      </header>
+      )}
 
       <main className={styles.main}>
-        {catalog && !loading && (
-          <div className={styles.resultMeta}>
-            <span>
-              {showFavoritesOnly
-                ? `Избранное · ${products.length}`
-                : (
-                  <>
-                    Найдено <strong>{catalog.total}</strong>
-                    {products.length < catalog.total ? ` · показано ${products.length}` : ''}
-                  </>
-                )}
-            </span>
-          </div>
-        )}
-        {loading && !catalog ? (
-          <ProductGrid items={[]} getHref={() => ''} loading skeletonCount={10} />
-        ) : products.length === 0 ? (
-          <div className={styles.emptyState}>
-            <IconPackage size={36} stroke={1.5} />
-            <p>{activeFilters.length > 0 || debouncedQuery ? 'Ничего не найдено' : 'Пока нет товаров'}</p>
-            {(activeFilters.length > 0 || debouncedQuery) && (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setQuery('')
-                  clearAllFilters()
-                }}
-              >
-                Сбросить поиск и фильтры
-              </Button>
-            )}
-          </div>
-        ) : (
-          <ProductGrid
-            items={products}
-            getHref={(item) => `/store/${slug}/products/${item.id}`}
-            favorites={favorites}
-            onToggleFavorite={(item) => toggleFavorite(item.id)}
-            onQuickAdd={(item) => quickAdd(item)}
+        {loading ? (
+          <ProductGrid items={[]} getHref={() => ''} loading skeletonCount={8} />
+        ) : shopEmpty ? (
+          <EmptyState
+            illustration="empty-shelf"
+            title="В магазине пока нет товаров"
+            actionLabel="Все магазины"
+            onAction={() => navigate(MARKETPLACE_PATH)}
           />
-        )}
-        {catalog && catalog.total > products.length && !showFavoritesOnly && (
-          <p className={styles.muted}>Показано {products.length} из {catalog.total}</p>
+        ) : filtersEmpty ? (
+          <EmptyState
+            title="Ничего не найдено"
+            description="Попробуйте изменить фильтры"
+            actionLabel="Сбросить фильтры"
+            onAction={() => {
+              setShowFavoritesOnly(false)
+              clearFiltersAndSearch()
+            }}
+          />
+        ) : (
+          <>
+            <p className={styles.resultMeta}>
+              {showFavoritesOnly
+                ? `Избранное · ${visibleProducts.length}`
+                : `Показано ${products.length} из ${catalog?.total ?? products.length}`}
+            </p>
+            <ProductGrid
+              items={visibleProducts}
+              getHref={(item) => `/store/${slug}/products/${item.id}`}
+              favorites={favorites}
+              onToggleFavorite={(item) => toggleFavorite(item.id)}
+              onQuickAdd={(item) => quickAdd(item)}
+              onLoadMore={!showFavoritesOnly ? loadMore : undefined}
+              loadingMore={loadingMore}
+              hasMore={!showFavoritesOnly && catalog != null && products.length < catalog.total}
+            />
+          </>
         )}
       </main>
     </div>
