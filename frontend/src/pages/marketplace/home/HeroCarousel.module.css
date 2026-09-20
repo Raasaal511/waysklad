@@ -46,6 +46,14 @@
   color: var(--bg);
 }
 
+/* --ink инвертируется между темами (см. PromoTiles.module.css) — редакторски «тёмный» слайд
+   должен оставаться тёмным на тёмной странице, а не становиться светлым пятном (P6). */
+:root[data-theme='dark'] .slide[data-theme='dark'] {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
 .slideText {
   position: relative;
   z-index: 1;
