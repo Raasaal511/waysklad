@@ -9,6 +9,8 @@ import {
   type PlatformCategory,
 } from '../../entities/marketplace/api'
 import { ApiError } from '../../shared/api/client'
+import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
+import { useScrollRestore } from '../../shared/lib/useScrollRestore'
 import { Breadcrumbs } from '../../shared/ui/Breadcrumbs'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { FilterBar, type FilterBarValue } from '../storefront/filters/FilterBar'
@@ -74,6 +76,9 @@ export function MarketplaceCatalog() {
   const [error, setError] = useState<string | null>(null)
   const [cities, setCities] = useState<{ name: string; shops_count: number }[]>([])
   const [categories, setCategories] = useState<PlatformCategory[]>([])
+
+  // позиция скролла при «назад» из карточки товара (см. shared/lib/useScrollRestore.ts, P6)
+  useScrollRestore(!loading)
 
   useEffect(() => {
     getMarketplaceCities()
@@ -217,6 +222,11 @@ export function MarketplaceCatalog() {
         : pcat || 'Все товары'
 
   const crumbLabel = query ? `Поиск: «${query}»` : SECTION_TITLES[section] ?? activeCategory?.name ?? (pcat || 'Каталог')
+
+  useEffect(() => {
+    setPageMeta({ title: `${title} — ВайСклад`, description: `${title} на маркетплейсе ВайСклад` })
+    return () => resetPageMeta()
+  }, [title])
 
   return (
     <div className={styles.page}>

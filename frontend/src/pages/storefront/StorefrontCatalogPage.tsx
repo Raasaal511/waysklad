@@ -13,6 +13,7 @@ import {
 } from '../../entities/storefront/api'
 import { ApiError } from '../../shared/api/client'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
+import { useScrollRestore } from '../../shared/lib/useScrollRestore'
 import { MARKETPLACE_PATH } from '../../shared/config'
 import { Chip } from '../../shared/ui/Chip'
 import { EmptyState } from '../../shared/ui/EmptyState'
@@ -78,6 +79,10 @@ export function StorefrontCatalogPage() {
   // чтобы попасть сразу в отфильтрованный вид каталога магазина
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(() => searchParams.get('favorites') === '1')
   const requestToken = loadRequestToken(slug)
+
+  // позиция скролла при «назад» из карточки товара — восстанавливаем только когда список
+  // реально загружен, не в состоянии skeleton (см. shared/lib/useScrollRestore.ts, P6)
+  useScrollRestore(!loading)
 
   // профиль магазина — отдельный запрос (не входит в ответ каталога), нужен ShopHeader
   useEffect(() => {

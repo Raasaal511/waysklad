@@ -1,3 +1,6 @@
+import { useEffect } from 'react'
+import { setPageMeta, resetPageMeta } from '../../../shared/lib/pageMeta'
+import { useScrollRestore } from '../../../shared/lib/useScrollRestore'
 import { EmptyState } from '../../../shared/ui/EmptyState'
 import { AllProducts } from './AllProducts'
 import { CategoryTiles, CategoryTilesSkeleton } from './CategoryTiles'
@@ -17,6 +20,17 @@ interface MarketplaceHomeProps {
 /** Главная маркетплейса (режим без параметров в URL) — порядок блоков по M-F3 п.4. */
 export function MarketplaceHome({ city, onNearMe }: MarketplaceHomeProps) {
   const { data, loading, error } = useMarketplaceHome(city)
+
+  // позиция скролла при «назад» из карточки товара (см. shared/lib/useScrollRestore.ts, P6)
+  useScrollRestore(!loading)
+
+  useEffect(() => {
+    setPageMeta({
+      title: 'ВайСклад — маркетплейс товаров от локальных магазинов',
+      description: 'Каталог товаров от проверенных магазинов рядом с вами на платформе ВайСклад',
+    })
+    return () => resetPageMeta()
+  }, [])
 
   if (error) {
     return (
