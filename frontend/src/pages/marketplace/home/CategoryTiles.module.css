@@ -62,7 +62,17 @@
   object-fit: contain;
 }
 
+/* Заглушка (нет image у категории) не тянется как фото по object-fit —
+   без явного центрирования по всему imageWrap 48px-иконка "утопает" в
+   правом нижнем углу 96×96 контейнера и выглядит мелкой/смещённой. */
+.imageWrap:has(.fallbackIcon) {
+  align-items: center;
+  justify-content: center;
+}
+
 .fallbackIcon {
+  width: 64px;
+  height: 64px;
   color: var(--accent);
 }
 

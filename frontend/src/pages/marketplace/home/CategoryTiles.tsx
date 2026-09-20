@@ -51,7 +51,7 @@ export function CategoryTiles({ categories }: { categories: PlatformCategory[] }
               {cat.image ? (
                 <img src={cat.image} alt="" width={96} height={96} loading="lazy" />
               ) : (
-                <Icon size={48} stroke={1.5} className={styles.fallbackIcon} />
+                <Icon size={64} stroke={1.5} className={styles.fallbackIcon} />
               )}
             </span>
           </Link>
