@@ -1,0 +1,331 @@
+/* PublicHeader — единая шапка публичных страниц (маркетплейс, витрина, карточка товара). */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid transparent;
+  transition: border-color 150ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header {
+    transition: none;
+  }
+}
+
+.headerScrolled {
+  border-bottom-color: var(--border);
+}
+
+.row {
+  max-width: 1280px;
+  margin: 0 auto;
+  height: 72px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+@media (max-width: 1023px) {
+  .row {
+    height: 64px;
+    padding: 0 20px;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 767px) {
+  .row {
+    padding: 0 16px;
+  }
+}
+
+.backBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: var(--text);
+  transition: background 150ms ease-out;
+}
+
+@media (max-width: 1023px) {
+  .backBtn {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+.backBtn:hover {
+  background: var(--bg-muted);
+}
+
+.backBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.brand {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  border-radius: var(--radius-sm);
+}
+
+.brand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.logoMark {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.brandName {
+  font-size: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  /* на мобильном — только знак, если рядом есть кнопка «назад» */
+  .backBtn ~ .brand .brandName {
+    display: none;
+  }
+}
+
+.searchDesktop {
+  flex: 1;
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--bg-muted);
+  color: var(--text);
+}
+
+.searchDesktop input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+
+.searchDesktop input::placeholder {
+  color: var(--text-muted);
+}
+
+.searchIcon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.searchClear {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  color: var(--text-muted);
+}
+
+.searchClear:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.searchClear:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1023px) {
+  .searchDesktop {
+    display: none;
+  }
+}
+
+.searchMobile {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .searchMobile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    margin: 0 20px 12px;
+    padding: 0 14px;
+    border-radius: 12px;
+    background: var(--bg-muted);
+    color: var(--text);
+  }
+
+  .searchMobile input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    outline: none;
+  }
+
+  .searchMobile input::placeholder {
+    color: var(--text-muted);
+  }
+}
+
+@media (max-width: 767px) {
+  .searchMobile {
+    margin: 0 16px 12px;
+  }
+}
+
+.actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.allShopsLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-size: 14px;
+  white-space: nowrap;
+  transition: background 150ms ease-out, color 150ms ease-out;
+}
+
+.allShopsLink:hover {
+  color: var(--text);
+  background: var(--bg-muted);
+}
+
+.allShopsLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .allShopsLink {
+    display: none;
+  }
+}
+
+.iconAction {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: var(--text);
+  transition: background 150ms ease-out;
+}
+
+@media (max-width: 1023px) {
+  .iconAction {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+.iconAction:hover {
+  background: var(--bg-muted);
+}
+
+.iconAction:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.iconAction[aria-disabled='true'] {
+  color: var(--text-muted);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.iconAction[aria-disabled='true']:hover {
+  background: transparent;
+}
+
+.badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.loginBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 150ms ease-out, transform 150ms ease-out;
+}
+
+@media (max-width: 1023px) {
+  .loginBtn {
+    height: 40px;
+    padding: 0 14px;
+  }
+}
+
+.loginBtn:hover {
+  background: var(--accent-hover);
+}
+
+.loginBtn:active {
+  transform: scale(0.99);
+}
+
+.loginBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
