@@ -55,13 +55,6 @@
   color: var(--text-muted);
 }
 
-.headerActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
 .headerLink {
   font-size: 13px;
   color: var(--accent);
@@ -254,23 +247,6 @@
   font-weight: 600;
 }
 
-.marketplaceLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-  text-decoration: none;
-  font-size: 13px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  transition: color 0.15s ease, background 0.15s ease;
-}
-
-.marketplaceLink:hover {
-  color: var(--text);
-  background: color-mix(in srgb, var(--bg-muted) 70%, transparent);
-}
-
 .categories {
   display: flex;
   gap: 8px;
@@ -307,19 +283,6 @@
 .main {
   padding-top: 12px;
   padding-bottom: 56px;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
-  gap: 14px;
-}
-
-@media (min-width: 640px) {
-  .grid {
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-    gap: 18px;
-  }
 }
 
 .card {
@@ -394,13 +357,6 @@
   text-decoration: none;
   font-size: 14px;
   min-width: 0;
-}
-
-.backShop {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 48vw;
 }
 
 .headerCompact {
@@ -532,62 +488,6 @@
   color: var(--text);
   font-size: 14px;
   line-height: 1.4;
-}
-
-.mpCardMeta {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: auto;
-}
-
-.mpShopRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 0 12px 12px;
-}
-
-.mpShopName {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  font-size: 12px;
-  color: var(--text-muted);
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-}
-
-.mpShopName:hover {
-  color: var(--text);
-}
-
-.mpShopLink {
-  flex-shrink: 0;
-  font-size: 12px;
-  color: var(--accent);
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.mpShopLink:hover {
-  text-decoration: underline;
-}
-
-.mpCategory {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-muted);
 }
 
 .statusDetails {
