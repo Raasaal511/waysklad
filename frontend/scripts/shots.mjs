@@ -39,6 +39,11 @@ const MIN_ORDER_PRODUCT_ID = 1
 
 const PAGES = [
   { key: 'marketplace', path: '/marketplace' },
+  // Режим каталога главной маркетплейса (шаг P5) — подборка «Скидки» через чип
+  // SectionChips и поиск по запросу, оба переключают /marketplace в режим каталога.
+  { key: 'marketplace-catalog-discount', path: '/marketplace?section=discount' },
+  { key: 'marketplace-catalog-search', path: '/marketplace?q=%D1%84%D1%83%D1%82%D0%B1%D0%BE%D0%BB%D0%BA%D0%B0' },
+  { key: 'marketplace-shops', path: '/marketplace/shops' },
   { key: 'store-catalog', path: '/store/demo-market' },
   { key: 'product-rich', path: `/store/demo-market/products/${RICH_PRODUCT_ID}` },
   { key: 'product-simple', path: `/store/demo-market/products/${SIMPLE_PRODUCT_ID}` },
