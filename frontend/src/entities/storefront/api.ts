@@ -216,6 +216,8 @@ export interface CatalogParams {
   inStockOnly?: boolean
   variantSize?: string
   variantColor?: string
+  /** «от N звёзд» — backend уже поддерживает (StorefrontCatalogParams.min_rating), 1..5. */
+  minRating?: number | null
 }
 
 function catalogQuery(params: CatalogParams) {
@@ -231,6 +233,7 @@ function catalogQuery(params: CatalogParams) {
   if (params.inStockOnly) search.set('in_stock_only', 'true')
   if (params.variantSize) search.set('variant_size', params.variantSize)
   if (params.variantColor) search.set('variant_color', params.variantColor)
+  if (params.minRating != null) search.set('min_rating', String(params.minRating))
   const qs = search.toString()
   return qs ? `?${qs}` : ''
 }
