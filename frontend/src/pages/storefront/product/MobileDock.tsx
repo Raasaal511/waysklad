@@ -5,6 +5,7 @@ import styles from './MobileDock.module.css'
 
 interface MobileDockProps {
   total: number
+  hasSelection: boolean
   inStock: boolean
   added: boolean
   onAdd: () => void
@@ -13,7 +14,7 @@ interface MobileDockProps {
 
 /** Мобильный dock — показывается, когда TotalCard ушёл из вьюпорта. Кнопка «Написать»
  *  прокручивает к TotalCard, где уже реализовано меню контактов — логика не дублируется. */
-export function MobileDock({ total, inStock, added, onAdd, hasContacts }: MobileDockProps) {
+export function MobileDock({ total, hasSelection, inStock, added, onAdd, hasContacts }: MobileDockProps) {
   function scrollToContact() {
     document.getElementById('product-total-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
@@ -21,7 +22,7 @@ export function MobileDock({ total, inStock, added, onAdd, hasContacts }: Mobile
     <div className={styles.dock}>
       <div className={styles.totalBlock}>
         <p className={styles.totalLabel}>Итого</p>
-        <p className={styles.totalValue}>{formatMoney(total.toFixed(2))} ₽</p>
+        <p className={styles.totalValue}>{hasSelection ? `${formatMoney(total.toFixed(2))} ₽` : '—'}</p>
       </div>
       <div className={styles.actions}>
         {hasContacts && (

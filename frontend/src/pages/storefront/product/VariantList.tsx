@@ -24,9 +24,12 @@ interface VariantListProps {
   selection: Map<SelectionKey, number>
   onQtyChange: (key: SelectionKey, qty: number) => void
   onShowToast: (message: string) => void
+  /** Ключ строки, которую нужно однократно подсветить пульсацией — например,
+   * после того как «В корзину» сама выбрала вариант за покупателя (п.6 промпта P4). */
+  flashKey?: SelectionKey | null
 }
 
-export function VariantList({ product, selection, onQtyChange, onShowToast }: VariantListProps) {
+export function VariantList({ product, selection, onQtyChange, onShowToast, flashKey }: VariantListProps) {
   const [searchParams] = useSearchParams()
   const highlightId = searchParams.get('v')
   const [query, setQuery] = useState('')
@@ -36,6 +39,11 @@ export function VariantList({ product, selection, onQtyChange, onShowToast }: Va
   const [lightboxRow, setLightboxRow] = useState<number | null>(null)
   const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const scrolledToHighlight = useRef(false)
+
+  // товар без вариантов (или с единственным вариантом) показывает не строку выбора,
+  // а отдельный блок «Количество» — см. renderQuantityBlock ниже
+  const isSingleItem = product.variants.length <= 1
+  const singleVariant = product.variants.length === 1 ? product.variants[0] : null
 
   const rows: VariantRow[] = useMemo(() => {
     if (product.variants.length === 0) {
@@ -48,6 +56,8 @@ export function VariantList({ product, selection, onQtyChange, onShowToast }: Va
       photo: v.photo || product.photo,
     }))
   }, [product])
+
+  const singleRow = rows[0]
 
   const uniqueColors = useMemo(
     () => Array.from(new Set(product.variants.map((v) => v.color).filter(Boolean))),
@@ -88,6 +98,15 @@ export function VariantList({ product, selection, onQtyChange, onShowToast }: Va
       requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }))
     }
   }, [highlightId, filteredRows])
+
+  useEffect(() => {
+    if (flashKey == null) return
+    const el = rowRefs.current.get(String(flashKey))
+    if (el) {
+      setShowAll(true)
+      requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+    }
+  }, [flashKey])
 
   function handleStep(row: VariantRow, deltaSteps: number) {
     const current = selection.get(row.key) ?? 0
@@ -132,6 +151,86 @@ export function VariantList({ product, selection, onQtyChange, onShowToast }: Va
 
   const lightboxPhotos = rows.map((r) => r.photo).filter(Boolean)
 
+  // товар без вариантов (или с одним) — не список строк, а один блок «Количество»
+  // со степпером и ценой за единицу (п.5 промпта P4)
+  if (isSingleItem) {
+    const qty = selection.get(singleRow.key) ?? 0
+    const isSelected = qty > 0
+    const inStock = singleVariant ? singleVariant.in_stock : product.in_stock
+    const unitPrice = singleVariant ? variantPrice(product, singleVariant) : product.retail_price
+    const stockObj = singleVariant
+      ? { in_stock: singleVariant.in_stock, stock_level: singleVariant.stock_level, stock_qty: singleVariant.stock_qty }
+      : { in_stock: product.in_stock, stock_level: product.stock_level, stock_qty: product.stock_qty }
+    const stockLabel = stockText(stockObj, product.unit_label)
+    const highlighted = (highlightId != null && String(singleRow.key) === highlightId) || flashKey === singleRow.key
+
+    return (
+      <div className={styles.wrap}>
+        <div
+          className={[styles.qtyBlock, highlighted ? styles.rowHighlight : ''].filter(Boolean).join(' ')}
+          ref={(el) => {
+            if (el) rowRefs.current.set(String(singleRow.key), el)
+            else rowRefs.current.delete(String(singleRow.key))
+          }}
+        >
+          <div className={styles.qtyBlockInfo}>
+            <p className={styles.qtyBlockPrice}>
+              {formatMoney(unitPrice)} ₽ <span className={styles.qtyBlockUnit}>за {product.unit_label || 'шт'}</span>
+            </p>
+            <p
+              className={[
+                styles.rowStock,
+                stockObj.stock_level === 'low' ? styles.rowStockLow : '',
+                !inStock ? styles.rowStockOut : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              {stockLabel}
+            </p>
+          </div>
+
+          {inStock && (
+            <div className={styles.stepper}>
+              <button
+                type="button"
+                className={`${styles.stepBtn} ${styles.stepMinus}`}
+                onClick={() => handleStep(singleRow, -1)}
+                aria-label="Уменьшить количество"
+                disabled={!isSelected}
+              >
+                <IconMinus size={16} stroke={2} />
+              </button>
+              <input
+                className={styles.stepValue}
+                type="text"
+                inputMode="numeric"
+                value={String(qty)}
+                onChange={(e) => handleDirectInput(singleRow, e.target.value)}
+                aria-label="Количество"
+              />
+              <button
+                type="button"
+                className={`${styles.stepBtn} ${styles.stepPlus}`}
+                onClick={() => handleStep(singleRow, 1)}
+                aria-label="Увеличить количество"
+              >
+                <IconPlus size={16} stroke={2} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {qtyHintParts.length > 0 && (
+          <p className={styles.hint}>
+            <IconInfoCircle size={14} stroke={1.8} />
+            {qtyHintParts.join(' · ')}
+          </p>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className={styles.wrap}>
       {showTools && (
@@ -175,7 +274,7 @@ export function VariantList({ product, selection, onQtyChange, onShowToast }: Va
         const rowPrice = row.variant ? variantPrice(product, row.variant) : product.retail_price
         const priceDiffers = row.variant?.price != null && row.variant.price !== product.retail_price
         const rowIndexForLightbox = lightboxPhotos.indexOf(row.photo)
-        const highlighted = highlightId != null && String(row.key) === highlightId
+        const highlighted = (highlightId != null && String(row.key) === highlightId) || flashKey === row.key
 
         const stockObj = row.variant
           ? { in_stock: row.variant.in_stock, stock_level: row.variant.stock_level, stock_qty: row.variant.stock_qty }
@@ -297,5 +396,5 @@ export function VariantList({ product, selection, onQtyChange, onShowToast }: Va
 }
 
 export function variantListSectionTitle(count: number) {
-  return count > 1 ? 'Варианты' : 'Вариант'
+  return count > 1 ? `Варианты · ${count}` : 'Количество'
 }

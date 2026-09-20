@@ -62,6 +62,34 @@
   border-color: transparent;
 }
 
+/* --- Количество (товар без вариантов) --- */
+
+.qtyBlock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--bg-muted);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.qtyBlockInfo {
+  min-width: 0;
+}
+
+.qtyBlockPrice {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.qtyBlockUnit {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
 .row {
   display: flex;
   align-items: center;

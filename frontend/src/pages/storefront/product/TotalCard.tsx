@@ -53,11 +53,13 @@ export function TotalCard({
   const pageUrl = typeof window !== 'undefined' ? window.location.href : ''
   const messageText = `Здравствуйте! Вопрос по товару ${productName} ${pageUrl}`
 
+  const hasSelection = linesCount > 0
+
   return (
     <div className={pageStyles.card} id="product-total-card">
       <p className={styles.totalLabel}>Итого:</p>
-      <p className={styles.totalValue}>{formatMoney(total.toFixed(2))} ₽</p>
-      {linesCount > 0 && (
+      <p className={styles.totalValue}>{hasSelection ? `${formatMoney(total.toFixed(2))} ₽` : '—'}</p>
+      {hasSelection && (
         <p className={styles.totalCount}>
           {totalQty} {plural(totalQty, ['товар', 'товара', 'товаров'])}
         </p>
@@ -121,6 +123,8 @@ export function TotalCard({
           </div>
         )}
       </div>
+
+      {!hasSelection && inStock && <p className={styles.emptyHint}>Добавьте количество, чтобы оформить заказ</p>}
 
       {cartQtyInShop > 0 && (
         <p className={styles.inCartRow}>

@@ -64,6 +64,7 @@ export function StorefrontProductPage() {
   const [added, setAdded] = useState(false)
   const [activePhoto, setActivePhoto] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
+  const [flashVariantKey, setFlashVariantKey] = useState<number | 'base' | null>(null)
   const { page: reviewsPage } = useProductReviews(slug, productId, {})
   const { profile: shopProfile } = useShopProfile(slug)
   const [dockVisible, setDockVisible] = useState(false)
@@ -225,8 +226,10 @@ export function StorefrontProductPage() {
   function handleAdd() {
     if (!product || !product.in_stock) return
     if (selection.size === 0) {
-      // ничего не выбрано: для товара без вариантов добавляем сразу,
-      // для товара с несколькими вариантами — просим выбрать
+      // ничего не выбрано: кнопка «В корзину» остаётся активной и сама добавляет
+      // минимальное количество (п.6 промпта P4) — для товара без вариантов сразу
+      // кладёт его в корзину, для товара с вариантами берёт первый доступный
+      // и подсвечивает его в списке, чтобы покупатель видел, что именно добавлено
       if (product.variants.length === 0) {
         addToCart(slug, {
           product_id: product.id,
@@ -244,7 +247,22 @@ export function StorefrontProductPage() {
       }
       const firstAvailable = product.variants.find((v) => v.in_stock)
       if (firstAvailable) {
-        setQty(firstAvailable.id, initialOrderQty(product.min_order_qty, product.order_step_qty))
+        const qty = initialOrderQty(product.min_order_qty, product.order_step_qty)
+        addToCart(slug, {
+          product_id: product.id,
+          name: product.name,
+          retail_price: variantPrice(product, firstAvailable),
+          photo: firstAvailable.photo || product.photo,
+          quantity: String(qty),
+          variant_id: firstAvailable.id,
+          variant_label: firstAvailable.display_name,
+        })
+        setCartItems(loadCart(slug))
+        setAdded(true)
+        setToast(`Добавлено: ${firstAvailable.display_name}`)
+        setFlashVariantKey(firstAvailable.id)
+        setTimeout(() => setAdded(false), 1600)
+        setTimeout(() => setFlashVariantKey(null), 1700)
       } else {
         setToast('Выберите вариант')
       }
@@ -275,7 +293,7 @@ export function StorefrontProductPage() {
     <div className={styles.page}>
       <div className={styles.container}>
         <div className={shellStyles.crumbRow}>
-          <Breadcrumbs slug={slug} category={product.category} />
+          <Breadcrumbs slug={slug} category={product.category} productName={product.name} />
           <button
             type="button"
             className={shellStyles.iconGhost}
@@ -301,14 +319,13 @@ export function StorefrontProductPage() {
                 <ProductHeader product={product} selectedPrice={previewPrice} />
               </div>
               <div className={styles.card}>
-                <h2 className={styles.sectionTitle} style={{ fontSize: 18, marginBottom: 16 }}>
-                  {variantListSectionTitle(product.variants.length)}
-                </h2>
+                <h2 className={styles.blockTitle}>{variantListSectionTitle(product.variants.length)}</h2>
                 <VariantList
                   product={product}
                   selection={selection}
                   onQtyChange={setQty}
                   onShowToast={setToast}
+                  flashKey={flashVariantKey}
                 />
               </div>
             </>
@@ -369,6 +386,7 @@ export function StorefrontProductPage() {
       {dockVisible && (
         <MobileDock
           total={selectionTotal}
+          hasSelection={linesCount > 0}
           inStock={product.in_stock}
           added={added}
           onAdd={handleAdd}
