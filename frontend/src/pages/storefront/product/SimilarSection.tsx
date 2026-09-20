@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useSimilar } from './useProductPageData'
-import { ProductCard } from '../ProductCard'
+import { ProductGrid } from '../ProductGrid'
 import pageStyles from './ProductPage.module.css'
 import styles from './SimilarSection.module.css'
 
@@ -37,26 +37,15 @@ export function SimilarSection({ slug, productId, scope, shopName }: SimilarSect
       </div>
 
       {loading && !data ? (
-        <div className={styles.skeletonGrid}>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className={styles.skeletonCard} />
-          ))}
-        </div>
+        <ProductGrid items={[]} getHref={() => ''} loading skeletonCount={5} />
+      ) : scope === 'shop' ? (
+        <ProductGrid items={shopItems} getHref={(item) => `/store/${slug}/products/${item.id}`} />
       ) : (
-        <div className={styles.grid}>
-          {scope === 'shop'
-            ? shopItems.map((item) => (
-                <ProductCard key={item.id} item={item} href={`/store/${slug}/products/${item.id}`} />
-              ))
-            : marketplaceItems.map((item) => (
-                <ProductCard
-                  key={item.id}
-                  item={item}
-                  href={`/store/${item.shop_slug}/products/${item.id}`}
-                  showShopName
-                />
-              ))}
-        </div>
+        <ProductGrid
+          items={marketplaceItems}
+          getHref={(item) => `/store/${item.shop_slug}/products/${item.id}`}
+          showShop
+        />
       )}
     </div>
   )

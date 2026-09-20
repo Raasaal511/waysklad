@@ -90,8 +90,12 @@ export function StorefrontProductPage() {
       id: product.id,
       name: product.name,
       retail_price: product.retail_price,
+      old_price: product.old_price,
+      discount_percent: product.discount_percent,
       photo: product.photo,
       in_stock: product.in_stock,
+      average_rating: product.average_rating,
+      reviews_count: product.reviews_count,
     })
   }, [slug, product])
 

@@ -14,7 +14,7 @@ import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { Select } from '../../shared/ui/Select'
 import { Button } from '../../shared/ui/Button'
 import { addToCart } from './cart'
-import { ProductCard } from './ProductCard'
+import { ProductGrid } from './ProductGrid'
 import styles from './Storefront.module.css'
 
 const FAVORITES_KEY = 'waysklad:storefront-favorites'
@@ -389,7 +389,7 @@ export function StorefrontCatalogPage() {
           </div>
         )}
         {loading && !catalog ? (
-          <p className={styles.muted}>Загрузка…</p>
+          <ProductGrid items={[]} getHref={() => ''} loading skeletonCount={10} />
         ) : products.length === 0 ? (
           <div className={styles.emptyState}>
             <IconPackage size={36} stroke={1.5} />
@@ -407,18 +407,13 @@ export function StorefrontCatalogPage() {
             )}
           </div>
         ) : (
-          <div className={styles.grid}>
-            {products.map((p) => (
-              <ProductCard
-                key={p.id}
-                item={p}
-                href={`/store/${slug}/products/${p.id}`}
-                favorite={favorites.includes(p.id)}
-                onToggleFavorite={() => toggleFavorite(p.id)}
-                onQuickAdd={() => quickAdd(p)}
-              />
-            ))}
-          </div>
+          <ProductGrid
+            items={products}
+            getHref={(item) => `/store/${slug}/products/${item.id}`}
+            favorites={favorites}
+            onToggleFavorite={(item) => toggleFavorite(item.id)}
+            onQuickAdd={(item) => quickAdd(item)}
+          />
         )}
         {catalog && catalog.total > products.length && !showFavoritesOnly && (
           <p className={styles.muted}>Показано {products.length} из {catalog.total}</p>

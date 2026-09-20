@@ -1,5 +1,5 @@
 import { loadRecentlyViewed } from './recentlyViewed'
-import { ProductCard } from '../ProductCard'
+import { ProductGrid } from '../ProductGrid'
 import pageStyles from './ProductPage.module.css'
 import styles from './SimilarSection.module.css'
 
@@ -18,11 +18,7 @@ export function RecentlyViewedSection({ slug, currentProductId }: RecentlyViewed
       <div className={styles.head}>
         <h2 className={styles.title}>Вы недавно смотрели</h2>
       </div>
-      <div className={styles.grid}>
-        {items.map((item) => (
-          <ProductCard key={item.id} item={item} href={`/store/${slug}/products/${item.id}`} />
-        ))}
-      </div>
+      <ProductGrid items={items} getHref={(item) => `/store/${slug}/products/${item.id}`} />
     </div>
   )
 }

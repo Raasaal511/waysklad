@@ -1,16 +1,15 @@
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { IconPackage, IconSearch, IconBuildingStore, IconX } from '@tabler/icons-react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { IconPackage, IconSearch, IconX } from '@tabler/icons-react'
 import {
   listMarketplaceProducts,
   type MarketplaceProduct,
   type MarketplaceSort,
 } from '../../entities/marketplace/api'
 import { ApiError } from '../../shared/api/client'
-import { formatMoney } from '../../shared/lib/format'
 import { Select } from '../../shared/ui/Select'
 import { Button } from '../../shared/ui/Button'
-import { ProductPhoto } from '../../shared/ui/ProductPhoto'
+import { ProductGrid } from '../storefront/ProductGrid'
 import styles from '../storefront/Storefront.module.css'
 
 const SORT_OPTIONS: { value: MarketplaceSort; label: string }[] = [
@@ -256,7 +255,7 @@ export function MarketplacePage() {
           </div>
         )}
         {loading ? (
-          <p className={styles.muted}>Загрузка…</p>
+          <ProductGrid items={[]} getHref={() => ''} loading skeletonCount={10} />
         ) : products.length === 0 ? (
           <div className={styles.emptyState}>
             <IconPackage size={36} stroke={1.5} />
@@ -278,67 +277,16 @@ export function MarketplacePage() {
             )}
           </div>
         ) : (
-          <>
-            <div className={styles.grid}>
-              {products.map((p, i) => (
-                <MarketplaceCard
-                  key={`${p.shop_slug}-${p.id}`}
-                  product={p}
-                  onShopFilter={() => patchParams({ shop_slug: p.shop_slug })}
-                  style={{ animationDelay: `${Math.min(i, 12) * 40}ms` }}
-                />
-              ))}
-            </div>
-            {products.length < total && (
-              <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center' }}>
-                <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>
-                  {loadingMore ? 'Загрузка…' : `Показать ещё (${total - products.length})`}
-                </Button>
-              </div>
-            )}
-          </>
+          <ProductGrid
+            items={products}
+            getHref={(item) => `/store/${item.shop_slug}/products/${item.id}`}
+            showShop
+            onLoadMore={loadMore}
+            loadingMore={loadingMore}
+            hasMore={products.length < total}
+          />
         )}
       </main>
     </div>
-  )
-}
-
-function MarketplaceCard({
-  product,
-  onShopFilter,
-  style,
-}: {
-  product: MarketplaceProduct
-  onShopFilter: () => void
-  style?: CSSProperties
-}) {
-  return (
-    <article className={styles.card} style={style}>
-      <Link
-        to={`/store/${product.shop_slug}/products/${product.id}`}
-        className={styles.cardLink}
-      >
-        <div className={styles.cardPhoto}>
-          <ProductPhoto src={product.photo} size={48} />
-          {!product.in_stock && <span className={styles.outOfStock}>Нет в наличии</span>}
-        </div>
-        <div className={styles.cardBody}>
-          {product.category_name && <p className={styles.mpCategory}>{product.category_name}</p>}
-          <h2 className={styles.cardName}>{product.name}</h2>
-          <div className={styles.mpCardMeta}>
-            <p className={styles.cardPrice}>{formatMoney(product.retail_price)} ₽</p>
-          </div>
-        </div>
-      </Link>
-      <div className={styles.mpShopRow}>
-        <button type="button" className={styles.mpShopName} onClick={onShopFilter} title="Только этот магазин">
-          <IconBuildingStore size={14} stroke={1.8} />
-          {product.shop_name}
-        </button>
-        <Link to={`/store/${product.shop_slug}`} className={styles.mpShopLink}>
-          В витрину
-        </Link>
-      </div>
-    </article>
   )
 }

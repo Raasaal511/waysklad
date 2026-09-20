@@ -5,8 +5,12 @@ export interface RecentProduct {
   id: number
   name: string
   retail_price: string
+  old_price?: string | null
+  discount_percent?: number | null
   photo: string
   in_stock: boolean
+  average_rating?: number
+  reviews_count?: number
 }
 
 function key(slug: string) {
