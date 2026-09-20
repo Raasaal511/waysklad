@@ -1,0 +1,214 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px 0 48px;
+}
+
+.title {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+}
+
+@media (max-width: 767px) {
+  .title {
+    font-size: 24px;
+  }
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.search {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+}
+
+.search input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+  font-size: 15px;
+  height: 100%;
+}
+
+.sortRow {
+  display: flex;
+  gap: 4px;
+}
+
+.sortBtn {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 150ms ease-out, color 150ms ease-out;
+}
+
+.sortBtn:hover {
+  background: var(--bg-muted);
+}
+
+.sortBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sortBtnActive {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 24px 16px;
+  background: var(--bg);
+  border-radius: 16px;
+  text-decoration: none;
+  color: var(--text);
+  transition: transform 150ms ease-out;
+}
+
+:root[data-theme='dark'] .card {
+  border: 1px solid var(--border);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.logoWrap {
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.logoFallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.verified {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.meta {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.cardBtn {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.skeletonCard {
+  min-height: 220px;
+  background: var(--bg-muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeletonCard::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonCard::after {
+    animation: none;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.loadMoreRow {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}

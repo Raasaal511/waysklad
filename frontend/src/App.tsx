@@ -30,6 +30,7 @@ import { StorefrontCartPage } from './pages/storefront/StorefrontCartPage'
 import { StorefrontRequestPage } from './pages/storefront/StorefrontRequestPage'
 import { StorefrontMyOrdersPage } from './pages/storefront/StorefrontMyOrdersPage'
 import { MarketplacePage } from './pages/marketplace/MarketplacePage'
+import { MarketplaceShopsPage } from './pages/marketplace/MarketplaceShopsPage'
 import { PublicLayout } from './widgets/public-header/PublicLayout'
 import { TasksPage } from './pages/tasks/TasksPage'
 import { DebtsPage } from './pages/debts/DebtsPage'
@@ -55,6 +56,14 @@ export function App() {
               element={
                 <PublicLayout>
                   <MarketplacePage />
+                </PublicLayout>
+              }
+            />
+            <Route
+              path="/marketplace/shops"
+              element={
+                <PublicLayout>
+                  <MarketplaceShopsPage />
                 </PublicLayout>
               }
             />

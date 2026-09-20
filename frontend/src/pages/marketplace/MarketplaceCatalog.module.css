@@ -1,0 +1,31 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 48px;
+}
+
+.title {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+}
+
+@media (max-width: 767px) {
+  .title {
+    font-size: 24px;
+  }
+}
+
+.foundCount {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: -8px 0 0;
+}
+
+.resultMeta {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
