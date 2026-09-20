@@ -5,6 +5,56 @@
 
 ---
 
+## 2026-09-20 — Публичные страницы P0–P7: витрина, карточка товара, маркетплейс доведены до конца
+
+Финальный шаг серии `docs/PUBLIC_PAGES_FINISH_PROMPTS.md` (P0–P7). Backend не
+менялся на этом шаге — эта запись фиксирует, что все контракты серий M-B1/M-B2
+(главная маркетплейса) и B1/B2/B4 (карточка товара витрины), которые раньше
+были добавлены как «фронтенд не менялся», теперь реально используются фронтом
+целиком, плюс что именно оттуда взято на каждой из трёх публичных страниц:
+
+- **`GET /api/marketplace/home?city=`** (M-B2) — единственный запрос главной
+  `/marketplace`: `entities/marketplace/api.ts:getMarketplaceHome`, разбирается
+  в `pages/marketplace/home/useMarketplaceHome.ts` на баннеры (`HeroCarousel`),
+  категории (`CategoryTiles`), ряд магазинов (`ShopsRow`), 4 товарные секции
+  (`ProductSection`, ленивая подгрузка карточек через `IntersectionObserver`
+  при скролле) и статистику подвала.
+- **`GET /api/marketplace/categories`, `/cities`, `/shops`, `/suggest`** (M-B1/
+  M-B2) — режим каталога маркетплейса (`pages/marketplace/MarketplaceCatalog.tsx`)
+  и страница «Все магазины» (`MarketplaceShopsPage.tsx`); `platform_category`/
+  `city`/`with_discount` и `sort=popular|rating|discount` — параметры общего
+  `FilterBar`.
+- **`GET /api/storefront/{slug}/profile`** (B2) — `ShopHeader` на каталоге
+  магазина и карточке товара (компактный вариант), а также `PublicHeader` для
+  плейсхолдера поиска «Искать в магазине «...»»; все три места используют один
+  запрос через общий кэш модуля (`entities/storefront/api.ts:
+  getStorefrontShopProfileCached`) — без этого кэша шапка и страница спорили
+  бы за один и тот же профиль (исправлено в рамках P7 п.2, «не больше 4
+  запросов на карточке товара»).
+- **`GET /api/storefront/{slug}/products/{id}`** поля из B1 (`unit_code`/
+  `unit_label`, `warranty_text`, `views_90d`, `stock_level`/`stock_qty`,
+  `variants[].name`/`in_stock`/`stock_level`) — `product/VariantList.tsx`
+  (степпер количества и список вариантов), `product/ConditionsCard.tsx`
+  (гарантия), `product/ShopCard.tsx`.
+- **`POST /api/storefront/{slug}/products/{id}/view`** (B1) — `useTrackProductView`
+  в `product/useProductPageData.ts`, один вызов на открытие карточки.
+- **`GET /api/storefront/{slug}/products/{id}/similar?scope=shop|marketplace`**
+  (B4) — `product/SimilarSection.tsx` («Ещё в магазине» и «Похожие в других
+  магазинах»), обе секции лениво грузятся через `React.lazy` + `IntersectionObserver`,
+  не входят в исходные 4 запроса карточки товара.
+- **`compare_at_price`/`old_price`/`discount_percent`, `is_new`, `is_hit`,
+  `shop_logo`, `shop_is_verified`, `shop_city`** (M-B1) — единая `ProductCard`
+  (`pages/storefront/ProductCard.tsx`), бейджи и строка магазина по правилам
+  дизайн-системы (см. `docs/PUBLIC_UI_GUIDE.md`).
+
+Известный пробел (не backend-баг, а недостающее поле — см.
+`docs/PUBLIC_PAGES_FINISH_PROMPTS.md`, раздел «Известные легитимные
+отклонения»): `GET /storefront/{slug}/profile` не отдаёт город и щит
+проверенного магазина отдельно для `ShopHeader`/`ShopCard` витрины в некоторых
+местах — не устранялось на этом шаге, фронтенд-задача вне scope P7.
+
+---
+
 ## 2026-09-19 — Похожие товары B4: GET /storefront/{slug}/products/{id}/similar
 
 Последний бэкенд-шаг серии «карточка товара витрины как на wikkeo»
