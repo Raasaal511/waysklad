@@ -555,3 +555,44 @@ async def test_products_category_and_sort_via_api(client, owner_headers):
         params={"category_id": category_id, "sort": "created_asc"},
     )
     assert [p["name"] for p in response.json()] == ["Сок яблочный", "Сок вишнёвый"]
+
+
+async def test_search_by_digits_part_of_sku(client, owner_headers):
+    """Артикул генерируется как «СКО-1928463750124» (префикс из названия +
+    13 цифр), и владелец часто помнит/диктует только цифровую часть —
+    поиск по ней одной должен находить товар."""
+    created = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={
+                "name": "Смарт-часы Watch Ultra",
+                "sku": "СМА-1928463750124",
+                "purchase_price": "100",
+                "retail_price": "200",
+            },
+        )
+    ).json()
+    await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={
+            "name": "Кофта оверсайз",
+            "sku": "КОФ-9051432687193",
+            "purchase_price": "100",
+            "retail_price": "200",
+        },
+    )
+
+    # только цифры, без буквенного префикса
+    response = await client.get(
+        "/api/products", headers=owner_headers, params={"query": "1928463750124"}
+    )
+    assert response.status_code == 200, response.text
+    assert [p["id"] for p in response.json()] == [created["id"]]
+
+    # часть цифр в середине артикула — ILIKE ищет подстроку
+    response = await client.get(
+        "/api/products", headers=owner_headers, params={"query": "846375"}
+    )
+    assert [p["id"] for p in response.json()] == [created["id"]]

@@ -56,14 +56,26 @@ const BarcodeScanner = lazy(() =>
 
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 
+const SKU_DIGITS = 13
+
+/**
+ * Артикул вида «СКО-1928463750124»: первые 3 буквы названия + 13 случайных цифр.
+ * Цифровая часть фиксированной длины и всегда начинается не с нуля — её можно
+ * диктовать и искать отдельно от буквенного префикса (поиск товаров ищет
+ * подстроку в артикуле, см. product_filter._search_text_expr).
+ */
 export function generateSku(name: string): string {
   const prefix = name
     .trim()
     .toUpperCase()
     .replace(/[^A-ZА-Я0-9]+/g, '')
     .slice(0, 3)
-  const digits = Math.floor(1000 + Math.random() * 9000)
-  return prefix ? `${prefix}-${digits}` : String(digits)
+  // первая цифра 1..9, остальные любые — длина ровно SKU_DIGITS, без ведущего нуля
+  let digits = String(1 + Math.floor(Math.random() * 9))
+  while (digits.length < SKU_DIGITS) {
+    digits += String(Math.floor(Math.random() * 10))
+  }
+  return prefix ? `${prefix}-${digits}` : digits
 }
 
 export function categoryOptions(categories: Category[]): SelectOption[] {
