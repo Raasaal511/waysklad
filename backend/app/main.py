@@ -24,13 +24,6 @@ async def lifespan(app: FastAPI):
     yield
     await broadcaster.stop()
 
-# Дефолтный SECRET_KEY в проде = любой может подделать JWT с любым tenant_id/ролью.
-# debug=True допускается только локально, где .env обычно не переопределяет секрет.
-if not settings.debug and settings.secret_key == "dev-secret-change-me":
-    raise RuntimeError(
-        "SECRET_KEY не переопределён — задайте случайный секрет в .env перед запуском в проде"
-    )
-
 # /docs, /redoc, /openapi.json раскрывают всю карту API анонимному пользователю —
 # оставляем только при debug=True (локальная разработка)
 _docs_kwargs = (

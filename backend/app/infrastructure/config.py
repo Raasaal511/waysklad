@@ -2,8 +2,15 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+psycopg://waysklad:change-me@localhost:5432/waysklad"
-    secret_key: str = "dev-secret-change-me"
+    # Без дефолта намеренно — раньше "postgresql+psycopg://waysklad:change-me@..."
+    # и "dev-secret-change-me" тихо работали и без .env, включая в проде при
+    # забытой настройке (см. main.py — раньше был отдельный guard только на
+    # secret_key, DATABASE_URL мог утечь дефолтным паролем незамеченным).
+    # Теперь приложение просто не стартует без .env — Settings() кидает
+    # pydantic.ValidationError на первом импорте app.main, а не работает
+    # молча с чужим для прода паролем/секретом.
+    database_url: str
+    secret_key: str
     access_token_expire_minutes: int = 60 * 24 * 30
     debug: bool = False
     telegram_bot_token: str = ""

@@ -5,9 +5,18 @@ from typing import AsyncIterator, Callable
 # до импорта app.main — тесты логинятся многократно в одном сценарии,
 # и лимит /auth/login иначе рвёт их посреди прогона
 os.environ["RATE_LIMIT_ENABLED"] = "false"
-# тестовое окружение намеренно не хранит секретов — стартовая проверка
-# SECRET_KEY (см. app/main.py) иначе не даст приложению импортироваться
+# тестовое окружение намеренно не хранит секретов
 os.environ["DEBUG"] = "true"
+os.environ.setdefault("SECRET_KEY", "test-secret-not-for-prod")
+# реальные тесты подключаются к своей БД через _ADMIN_DB_URL/db_session_factory
+# ниже (CREATE DATABASE per xdist worker) — этот DATABASE_URL используется
+# только на уровне модуля, при импорте app.main -> db/session.py, где
+# create_async_engine() лениво валидирует URL, но не подключается сразу.
+# Settings() теперь требует DATABASE_URL/SECRET_KEY без дефолта (см.
+# app/infrastructure/config.py) — без этой строки импорт app.main упал бы.
+os.environ.setdefault(
+    "DATABASE_URL", "postgresql+psycopg://postgres:postgres@localhost:5432/waysklad_test"
+)
 # CACHE_REDIS_URL обязателен (deps/cache.py падает при старте без него) —
 # локальный Redis, отдельная логическая БД, чтобы не пересекаться с dev/prod.
 # PYTEST_XDIST_WORKER на этом этапе (импорт conftest.py, до pytest_configure)
