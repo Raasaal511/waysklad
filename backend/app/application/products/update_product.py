@@ -71,6 +71,11 @@ class UpdateProductUseCase:
                 if qty is not None and qty <= 0:
                     raise DomainError("Мин. количество и шаг заказа на витрине должны быть больше нуля")
 
+            # без фото товар на витрине выглядит как мусор (плейсхолдер в каждой
+            # карточке) — не даём включить показ, пока фото не загружено
+            if cmd.show_on_storefront and not cmd.photo:
+                raise DomainError("Добавьте фото товара, прежде чем показывать его на витрине")
+
             existing_product = await uow.products.get(cmd.product_id)
             existing_compare_at_price = (
                 existing_product.compare_at_price.amount

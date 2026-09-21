@@ -84,6 +84,12 @@ class CreateProductUseCase:
             if cmd.compare_at_price is not None and cmd.compare_at_price <= cmd.retail_price:
                 raise DomainError("Старая цена должна быть больше текущей")
 
+            # фото загружается отдельным вызовом уже после создания товара (нет
+            # поля photo в этой команде) — значит на этом шаге его точно нет,
+            # и включать показ на витрине сразу нельзя (см. UpdateProductUseCase)
+            if cmd.show_on_storefront:
+                raise DomainError("Добавьте фото товара, прежде чем показывать его на витрине")
+
             product = Product(
                 id=None,
                 name=cmd.name,
