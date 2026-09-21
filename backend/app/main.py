@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -43,6 +44,19 @@ app = FastAPI(title="ВайСклад API", version="0.1.0", lifespan=lifespan, 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+# Свой фронт всегда на том же origin (прод — nginx проксирует /api на тот же
+# домен, dev — Vite proxy), поэтому дефолт "не подключать CORS вовсе"
+# безопаснее и проще, чем добавлять "*" — без явного whitelist в .env браузер
+# просто блокирует межсайтовые fetch, как и должно быть.
+if settings.cors_origin_list:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origin_list,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(main_router)
 register_exception_handlers(app)

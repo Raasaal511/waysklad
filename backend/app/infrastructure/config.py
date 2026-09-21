@@ -53,8 +53,19 @@ class Settings(BaseSettings):
     # Срок жизни admin-токена короче обычного (access_token_expire_minutes) —
     # привилегированный доступ ко всей платформе, риск от утечки выше.
     admin_token_expire_minutes: int = 120
+    # Белый список origin для CORS, через запятую (например
+    # "https://waysklad.gwensoft.ru,https://waysklad.ru"). Пусто (дефолт) —
+    # CORSMiddleware не подключается вовсе: свой фронт всегда ходит на тот же
+    # origin (см. frontend/nginx.conf в проде, Vite proxy в dev) и в CORS не
+    # нуждается. Заполнять только при реальной необходимости у стороннего
+    # origin достучаться до API напрямую из браузера — никогда не "*" в проде.
+    cors_origins: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
 settings = Settings()
