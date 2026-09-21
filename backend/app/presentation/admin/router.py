@@ -3,6 +3,10 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 
+from app.application.admin.get_overview import (
+    CACHE_TTL_SECONDS as OVERVIEW_CACHE_TTL_SECONDS,
+)
+from app.application.admin.get_overview import PlatformOverview, get_platform_overview
 from app.application.admin.get_server_status import (
     MetricsPoint,
     RecentTenant,
@@ -34,6 +38,7 @@ from app.infrastructure.rate_limit import limiter
 from app.infrastructure.security import create_admin_access_token, verify_password
 from app.infrastructure.notifications.ws_broadcast import broadcaster
 from app.presentation.admin.schemas import (
+    PlatformOverviewResponse,
     AdminLoginRequest,
     AdminTokenResponse,
     BannerRequest,
@@ -101,6 +106,21 @@ async def admin_status(factory: SessionFactoryDep, cache: CacheDep) -> ServerSta
         cached_result, online_now=await broadcaster.online_now()
     )
     return ServerStatusResponse.from_result(result)
+
+
+@router.get("/overview")
+async def admin_overview(factory: SessionFactoryDep, cache: CacheDep) -> PlatformOverviewResponse:
+    """Сводка по платформе. Кросс-тенантные агрегаты считаются в SQL —
+    см. application/admin/get_overview.py."""
+    result = await cached(
+        cache,
+        "admin:overview",
+        OVERVIEW_CACHE_TTL_SECONDS,
+        lambda: get_platform_overview(factory),
+        to_json=lambda r: r.to_json(),
+        from_json=PlatformOverview.from_json,
+    )
+    return PlatformOverviewResponse.from_result(result)
 
 
 @router.get("/error-logs")

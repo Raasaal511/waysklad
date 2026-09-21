@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol
 
 from app.domain.identity.entities import Tenant, User, Warehouse
@@ -20,6 +21,11 @@ class ITenantRepository(Protocol):
 
 
 class IUserRepository(Protocol):
+    async def touch_last_login(self, user_id: int, at: datetime) -> None:
+        """Отметить вход. Отдельным методом, а не через save(): вход не должен
+        перезаписывать остальные поля пользователя."""
+        ...
+
     async def add(self, user: User) -> User: ...
     async def get(self, user_id: int) -> User: ...
     async def get_by_phone(self, phone: str) -> User | None: ...

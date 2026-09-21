@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from app.domain.common.exceptions import AccessDeniedError, DomainError
 from app.domain.common.phone import Phone
@@ -40,4 +41,10 @@ class LoginUseCase:
             # пароль уже проверен верно — законный владелец, честное сообщение не палит
             # посторонним ничего лишнего (для неверного пароля выше отдаём общую фразу)
             raise AccessDeniedError("Магазин заблокирован. Свяжитесь с поддержкой.")
+
+        # отметка входа — после всех проверок: неудачная попытка входом не считается
+        async with self._uow as uow:
+            await uow.users.touch_last_login(user.id, datetime.now(timezone.utc))
+            await uow.commit()
+
         return user

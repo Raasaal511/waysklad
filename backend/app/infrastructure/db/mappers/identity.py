@@ -84,6 +84,7 @@ class UserMapper:
             is_active=model.is_active,
             tenant_id=model.tenant_id,
             token_version=model.token_version,
+            last_login_at=model.last_login_at,
         )
 
 

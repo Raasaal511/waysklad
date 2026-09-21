@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import delete, select
+from datetime import datetime
+
+from sqlalchemy import delete, select, update
 
 from app.domain.common.exceptions import NotFoundError
 from app.domain.common.quantity import UNITS
@@ -98,6 +100,12 @@ class SqlAlchemyTenantRepository(SqlAlchemyRepository, ITenantRepository):
 
 
 class SqlAlchemyUserRepository(SqlAlchemyRepository, IUserRepository):
+    async def touch_last_login(self, user_id: int, at: datetime) -> None:
+        # точечный UPDATE: вход не должен перезаписывать остальные поля
+        await self._session.execute(
+            update(UserModel).where(UserModel.id == user_id).values(last_login_at=at)
+        )
+
     async def add(self, user: User) -> User:
         model = UserMapper.to_orm(user, self._tenant)
         self._session.add(model)

@@ -1,7 +1,10 @@
+from dataclasses import asdict
 from datetime import date
+from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
+from app.application.admin.get_overview import PlatformOverview
 from app.application.admin.get_server_status import MetricsPoint, RecentTenant, ServerStatusResult
 from app.application.admin.get_tenant_detail import TenantDetail
 from app.application.admin.list_tenants import TenantListItem
@@ -281,4 +284,76 @@ class BannerResponse(BaseModel):
             starts_at=banner.starts_at,
             ends_at=banner.ends_at,
             city=banner.city,
+        )
+
+
+class OverviewShopsResponse(BaseModel):
+    total: int
+    active_7d: int
+    active_30d: int
+    new_7d: int
+    new_30d: int
+    suspended: int
+    storefront_on: int
+
+
+class OverviewUsersResponse(BaseModel):
+    total: int
+    active_7d: int
+
+
+class OverviewCustomersResponse(BaseModel):
+    total: int
+    new_7d: int
+
+
+class OverviewSalesResponse(BaseModel):
+    today_count: int
+    today_sum: Decimal
+    d7_count: int
+    d7_sum: Decimal
+    d30_count: int
+    d30_sum: Decimal
+
+
+class OverviewDebtsResponse(BaseModel):
+    """Без разбивки по клиентам — админ платформы видит агрегат, не чужой бизнес."""
+
+    open_count: int
+    open_sum: Decimal
+
+
+class OverviewStorefrontResponse(BaseModel):
+    requests_7d: int
+    accepted_7d: int
+
+
+class OverviewSeriesResponse(BaseModel):
+    """Массивы одной длины: date[i] соответствует остальным полям по индексу."""
+
+    date: list[str]
+    new_shops: list[int]
+    sales_count: list[int]
+    active_shops: list[int]
+
+
+class PlatformOverviewResponse(BaseModel):
+    shops: OverviewShopsResponse
+    users: OverviewUsersResponse
+    customers: OverviewCustomersResponse
+    sales: OverviewSalesResponse
+    debts: OverviewDebtsResponse
+    storefront: OverviewStorefrontResponse
+    series_30d: OverviewSeriesResponse
+
+    @classmethod
+    def from_result(cls, result: PlatformOverview) -> "PlatformOverviewResponse":
+        return cls(
+            shops=OverviewShopsResponse(**asdict(result.shops)),
+            users=OverviewUsersResponse(**asdict(result.users)),
+            customers=OverviewCustomersResponse(**asdict(result.customers)),
+            sales=OverviewSalesResponse(**asdict(result.sales)),
+            debts=OverviewDebtsResponse(**asdict(result.debts)),
+            storefront=OverviewStorefrontResponse(**asdict(result.storefront)),
+            series_30d=OverviewSeriesResponse(**asdict(result.series_30d)),
         )

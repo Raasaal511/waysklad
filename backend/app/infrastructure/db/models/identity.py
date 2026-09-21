@@ -1,5 +1,7 @@
+from datetime import datetime
 from decimal import Decimal
 
+from sqlalchemy import DateTime
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import ForeignKey, Integer, Numeric, SmallInteger, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -63,6 +65,9 @@ class UserModel(Base, TenantMixin, TimestampMixin):
     # Инкрементируется при смене пароля/принудительном разлогине — токены,
     # выданные с прежним значением, перестают проходить проверку (см. get_current_user).
     token_version: Mapped[int] = mapped_column(Integer, default=0)
+    # последний успешный вход — нужен админке платформы, чтобы отличать
+    # живой магазин от заброшенного (NULL = ни разу не входил после введения поля)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class WarehouseAssignmentModel(Base):
