@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, matchPath, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  IconBuildingStore,
   IconChevronLeft,
   IconHeart,
   IconSearch,
@@ -14,7 +13,6 @@ import { loadCustomerToken } from '../../entities/auth/customerApi'
 import { useTheme } from '../../app/ThemeContext'
 import { totalCartCount, totalFavoritesCount } from '../../shared/lib/storefrontCounters'
 import { CustomerLoginModal, notifyCustomerAuthChanged } from '../../pages/storefront/CustomerLoginModal'
-import { MARKETPLACE_PATH } from '../../shared/config'
 import styles from './PublicHeader.module.css'
 
 const STORE_ROUTE = '/store/:slug/*'
@@ -140,10 +138,12 @@ export function PublicHeader() {
           </Link>
         )}
 
-        <Link to={MARKETPLACE_PATH} className={styles.brand} aria-label="ВайСклад — все магазины">
+        {/* не ссылка: общая витрина всех магазинов отключена, вести логотипу
+            некуда — покупатель всегда внутри конкретного магазина */}
+        <div className={styles.brand}>
           <img src={logoSrc} alt="" width={32} height={32} className={styles.logoMark} />
           <span className={styles.brandName}>ВайСклад</span>
-        </Link>
+        </div>
 
         <form
           className={styles.searchDesktop}
@@ -176,10 +176,6 @@ export function PublicHeader() {
         </form>
 
         <div className={styles.actions}>
-          <Link to={MARKETPLACE_PATH} className={styles.allShopsLink}>
-            <IconBuildingStore size={16} stroke={1.8} />
-            Все магазины
-          </Link>
           {slug ? (
             <Link to={`/store/${slug}?favorites=1`} className={styles.iconAction} aria-label="Избранное">
               <IconHeart size={22} stroke={1.8} />
