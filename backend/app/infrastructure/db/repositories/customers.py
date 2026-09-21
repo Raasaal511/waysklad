@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from app.domain.common.exceptions import NotFoundError
 from app.domain.customers.entities import Customer, CustomerLoginLink
@@ -36,6 +36,17 @@ class SqlAlchemyCustomerRepository(SqlAlchemyRepository, ICustomerRepository):
         ).scalar_one_or_none()
         return CustomerMapper.to_entity(model) if model else None
 
+    async def get_by_username(self, username: str) -> Customer | None:
+        model = (
+            await self._session.execute(
+                select(CustomerModel).where(
+                    func.lower(CustomerModel.username) == username.strip().lower(),
+                    CustomerModel.username != "",
+                )
+            )
+        ).scalar_one_or_none()
+        return CustomerMapper.to_entity(model) if model else None
+
     async def get_token_version(self, customer_id: int) -> int | None:
         return (
             await self._session.execute(
@@ -54,6 +65,8 @@ class SqlAlchemyCustomerRepository(SqlAlchemyRepository, ICustomerRepository):
         model.phone = str(customer.phone)
         model.name = customer.name
         model.telegram_chat_id = customer.telegram_chat_id
+        model.username = customer.username
+        model.password_hash = customer.password_hash
         model.token_version = customer.token_version
         await self._session.flush()
         return customer

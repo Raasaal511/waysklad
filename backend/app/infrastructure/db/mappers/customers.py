@@ -10,6 +10,8 @@ class CustomerMapper:
             phone=str(customer.phone),
             name=customer.name,
             telegram_chat_id=customer.telegram_chat_id,
+            username=customer.username,
+            password_hash=customer.password_hash,
             token_version=customer.token_version,
         )
 
@@ -20,6 +22,8 @@ class CustomerMapper:
             phone=Phone(model.phone),
             name=model.name,
             telegram_chat_id=model.telegram_chat_id,
+            username=model.username,
+            password_hash=model.password_hash,
             token_version=model.token_version,
         )
 
@@ -33,6 +37,8 @@ class CustomerLoginLinkMapper:
             created_at=link.created_at,
             customer_id=link.customer_id,
             confirmed_at=link.confirmed_at,
+            username=link.username,
+            password_hash=link.password_hash,
         )
 
     @staticmethod
@@ -43,4 +49,6 @@ class CustomerLoginLinkMapper:
             created_at=model.created_at,
             customer_id=model.customer_id,
             confirmed_at=model.confirmed_at,
+            username=model.username,
+            password_hash=model.password_hash,
         )
