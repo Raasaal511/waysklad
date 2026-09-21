@@ -12,6 +12,7 @@ from app.application.storefront.list_messages import ListStorefrontMessagesComma
 from app.application.storefront.record_product_view import RecordProductViewCommand
 from app.application.storefront.reject_request import RejectStorefrontRequestCommand
 from app.domain.identity.permissions import Permission
+from app.infrastructure.config import settings
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.rate_limit import limiter
 from app.infrastructure.notifications.ws_broadcast import broadcaster, storefront_request_channel
@@ -98,6 +99,11 @@ async def get_storefront_similar_products(
 ) -> SimilarProductsResponse:
     if params.scope not in ("shop", "marketplace"):
         raise HTTPException(status_code=422, detail="scope должен быть shop или marketplace")
+    # scope=marketplace — межмагазинная выдача (товары других магазинов
+    # платформы): часть маркетплейса, а не витрины магазина, поэтому живёт
+    # под тем же флагом, что и /api/marketplace/* (см. infrastructure/config.py).
+    if params.scope == "marketplace" and not settings.marketplace_enabled:
+        raise HTTPException(status_code=404, detail="Маркетплейс недоступен")
     result = await use_case.execute(
         GetSimilarProductsCommand(
             slug=slug, product_id=product_id, scope=params.scope, limit=params.limit

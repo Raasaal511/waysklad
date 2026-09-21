@@ -26,6 +26,12 @@ os.environ.setdefault(
 os.environ.setdefault("CACHE_REDIS_URL", "redis://localhost:6379/15")
 # фиксированные логин/пароль — тесты admin-роутера логинятся через POST /api/admin/login
 os.environ.setdefault("ADMIN_LOGIN", "test-admin")
+# Маркетплейс выключен в проде (MARKETPLACE_ENABLED=false по умолчанию, см.
+# app/infrastructure/config.py), но его код жив и покрыт тестами — включаем
+# флаг здесь, до импорта app.main, иначе роутер просто не подключится.
+# Поведение при выключенном флаге проверяет test_marketplace_disabled.py,
+# который поднимает отдельное приложение.
+os.environ.setdefault("MARKETPLACE_ENABLED", "true")
 os.environ.setdefault(
     "ADMIN_PASSWORD_HASH",
     "$2b$12$hVd0LRFO6SZp0qzOTV3pAOxTeF0fB18uj/us6lvrgGHJxvaQL4d/W",  # "test-admin-password"

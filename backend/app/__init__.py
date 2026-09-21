@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.infrastructure.config import settings
 from app.presentation.admin.router import public_router as admin_public_router
 from app.presentation.admin.router import router as admin_router
 from app.presentation.analytics.router import router as analytics_router
@@ -34,6 +35,10 @@ router.include_router(analytics_router)
 router.include_router(sync_router)
 router.include_router(storefront_router)
 router.include_router(reviews_router)
-router.include_router(marketplace_router)
+# Маркетплейс (общая витрина всех магазинов) выключен по умолчанию — при
+# settings.marketplace_enabled=False роутер не подключается вовсе, и все
+# /api/marketplace/* отдают обычный 404 (см. infrastructure/config.py).
+if settings.marketplace_enabled:
+    router.include_router(marketplace_router)
 router.include_router(admin_public_router)
 router.include_router(admin_router)
