@@ -32,6 +32,7 @@ class CustomerMapper:
             password_hash=model.password_hash,
             phone_verified=model.phone_verified,
             phone_verified_at=model.phone_verified_at,
+            created_at=model.created_at,
             token_version=model.token_version,
         )
 

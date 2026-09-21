@@ -19,6 +19,7 @@ async def test_customer_profile_default_empty_name(client, customer_headers):
     assert body["name"] == ""
     assert body["stats"] == {
         "requests_total": 0, "requests_accepted": 0, "requests_rejected": 0,
+        "requests_active": 0, "shops_count": 0,
     }
 
 
@@ -114,4 +115,67 @@ async def test_customer_profile_stats_across_shops(client, owner_headers, custom
     assert response.status_code == 200, response.text
     assert response.json()["stats"] == {
         "requests_total": 3, "requests_accepted": 1, "requests_rejected": 1,
+        # третья заявка осталась новой, все три — в одном магазине
+        "requests_active": 1, "shops_count": 1,
     }
+
+
+async def test_profile_returns_extended_fields(client, customer_headers):
+    """A4: профиль отдаёт всё, что нужно личному кабинету."""
+    headers, phone = await customer_headers()
+    response = await client.get("/api/auth/customer/me", headers=headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+
+    assert body["phone"] == phone
+    assert body["phone_verified"] is False
+    assert body["phone_verified_at"] is None
+    assert body["created_at"]  # проставляется БД
+    assert body["has_password"] is False  # аккаунт из Telegram-входа
+    assert body["stats"]["requests_active"] == 0
+    assert body["stats"]["shops_count"] == 0
+
+
+async def test_changing_phone_resets_verification(client, customer_headers, make_uow, random_phone):
+    """A4: подтверждён был старый номер — новый подтверждать заново."""
+    from datetime import datetime, timezone
+
+    headers, _ = await customer_headers()
+    profile = (await client.get("/api/auth/customer/me", headers=headers)).json()
+
+    async with make_uow() as uow:
+        customer = await uow.customers.get(profile["id"])
+        customer.mark_phone_verified(datetime.now(timezone.utc))
+        await uow.customers.save(customer)
+        await uow.commit()
+
+    assert (await client.get("/api/auth/customer/me", headers=headers)).json()["phone_verified"]
+
+    new_phone = random_phone()
+    updated = await client.put(
+        "/api/auth/customer/me", headers=headers, json={"name": "Имя", "phone": new_phone}
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["phone"] == new_phone
+    assert updated.json()["phone_verified"] is False
+
+    # имя без телефона — подтверждение не трогаем
+    async with make_uow() as uow:
+        customer = await uow.customers.get(profile["id"])
+        customer.mark_phone_verified(datetime.now(timezone.utc))
+        await uow.customers.save(customer)
+        await uow.commit()
+    same = await client.put("/api/auth/customer/me", headers=headers, json={"name": "Другое"})
+    assert same.status_code == 200, same.text
+    assert same.json()["phone_verified"] is True
+
+
+async def test_changing_phone_rejects_occupied(client, customer_headers):
+    headers_a, _ = await customer_headers()
+    _, phone_b = await customer_headers()
+
+    response = await client.put(
+        "/api/auth/customer/me", headers=headers_a, json={"name": "Имя", "phone": phone_b}
+    )
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == "Этот телефон уже занят другим аккаунтом"

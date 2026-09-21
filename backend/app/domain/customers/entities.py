@@ -54,6 +54,8 @@ class Customer:
     # продавец перезванивает, и он же отличает реальную заявку от мусорной
     phone_verified: bool = False
     phone_verified_at: datetime | None = None
+    # проставляется БД (TimestampMixin) — в профиле показывается как «с нами с …»
+    created_at: datetime | None = None
     # инкрементируется при отзыве всех токенов (logout-all) — тот же паттерн,
     # что и у User.token_version
     token_version: int = 0

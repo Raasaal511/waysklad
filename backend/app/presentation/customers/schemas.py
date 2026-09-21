@@ -40,12 +40,19 @@ class CustomerProfileStatsResponse(BaseModel):
     requests_total: int
     requests_accepted: int
     requests_rejected: int
+    requests_active: int = 0
+    shops_count: int = 0
 
 
 class CustomerProfileResponse(BaseModel):
     id: int
     phone: str
     name: str
+    username: str
+    phone_verified: bool
+    phone_verified_at: datetime | None
+    created_at: datetime | None
+    has_password: bool
     stats: CustomerProfileStatsResponse
 
     @classmethod
@@ -55,20 +62,33 @@ class CustomerProfileResponse(BaseModel):
             id=customer.id,
             phone=str(customer.phone),
             name=customer.name,
+            username=customer.username,
+            phone_verified=customer.phone_verified,
+            phone_verified_at=customer.phone_verified_at,
+            created_at=customer.created_at,
+            has_password=customer.has_password,
             stats=CustomerProfileStatsResponse(
                 requests_total=result.stats.requests_total,
                 requests_accepted=result.stats.requests_accepted,
                 requests_rejected=result.stats.requests_rejected,
+                requests_active=result.stats.requests_active,
+                shops_count=result.stats.shops_count,
             ),
         )
 
 class UpdateCustomerProfileRequest(BaseModel):
+    """phone необязателен: не передан — номер не трогаем. Смена номера
+    сбрасывает phone_verified (подтверждён был старый номер)."""
+
     name: str = Field(min_length=1, max_length=200)
+    phone: str | None = None
 
     model_config = {"extra": "forbid"}
 
     def to_command(self, customer_id: int) -> UpdateCustomerProfileCommand:
-        return UpdateCustomerProfileCommand(customer_id=customer_id, name=self.name)
+        return UpdateCustomerProfileCommand(
+            customer_id=customer_id, name=self.name, phone=self.phone
+        )
 
 
 class CustomerResponse(BaseModel):
@@ -77,10 +97,20 @@ class CustomerResponse(BaseModel):
     id: int
     phone: str
     name: str
+    username: str = ""
+    phone_verified: bool = False
 
     @classmethod
     def from_entity(cls, customer: Customer) -> "CustomerResponse":
-        return cls(id=customer.id, phone=str(customer.phone), name=customer.name)
+        return cls(
+            id=customer.id,
+            phone=str(customer.phone),
+            name=customer.name,
+            username=customer.username,
+            # после смены телефона сбрасывается — фронт должен увидеть это
+            # сразу в ответе, не перезапрашивая профиль
+            phone_verified=customer.phone_verified,
+        )
 
 
 class RegisterCustomerRequest(BaseModel):
