@@ -18,6 +18,7 @@ import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
 import { StarRating } from '../../shared/ui/StarRating'
 import { Button } from '../../shared/ui/Button'
 import { formatMoney, formatQuantity, isLowStock, isOutOfStock } from '../../shared/lib/format'
+import { useFeature } from '../../shared/lib/useFeature'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './ProductDetailPage.module.css'
 import {
@@ -62,6 +63,7 @@ export function ProductDetailPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const canManage = user?.role === 'owner' || user?.role === 'manager'
+  const storefrontEnabled = useFeature('storefront')
 
   const {
     categories,
@@ -192,7 +194,7 @@ export function ProductDetailPage() {
                   <div className={styles.heroTags}>
                     {categoryName && <span className="badge accent">{categoryName}</span>}
                     {product.sku && <span className={styles.skuChip}>Артикул {product.sku}</span>}
-                    {product.show_on_storefront && (
+                    {storefrontEnabled && product.show_on_storefront && (
                       <span className={styles.storefrontChip}>
                         <IconShoppingBag size={13} stroke={1.8} /> На витрине
                       </span>
@@ -394,7 +396,8 @@ export function ProductDetailPage() {
             </section>
           )}
 
-          {(product.description ||
+          {storefrontEnabled &&
+            (product.description ||
             product.storefront_photos?.length ||
             product.storefront_min_qty ||
             product.storefront_step_qty) && (
@@ -423,7 +426,7 @@ export function ProductDetailPage() {
             </section>
           )}
 
-          {canManage && (
+          {canManage && storefrontEnabled && (
             <section className={`${styles.section} ${styles.reveal}`} style={{ '--reveal-delay': '190ms' } as CSSProperties}>
               <ProductReviewsSection productId={product.id} />
             </section>
