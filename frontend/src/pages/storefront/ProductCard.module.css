@@ -238,6 +238,9 @@
 .quickAdd {
   position: relative;
   z-index: 2;
+  /* всегда у правого края строки: без этого кнопка липнет вплотную к цене
+     (когда рейтинга нет) или к рейтингу (у него margin-left: auto) */
+  margin-left: auto;
   flex-shrink: 0;
   width: 32px;
   height: 32px;
@@ -261,13 +264,71 @@
   transform: scale(1.06);
 }
 
+.quickAdd:active {
+  transform: scale(0.92);
+}
+
+/* подтверждение добавления: кнопка «пульсирует» и на ней проступает галочка
+   (::after), плюс сам значок + на это время прячется */
+.quickAddAdded {
+  animation: quickAddPop 0.42s ease-out;
+}
+
+.quickAddAdded svg {
+  opacity: 0;
+}
+
+.quickAddAdded::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 5px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(-45deg) translate(1px, -1px);
+  animation: quickAddCheck 0.42s ease-out;
+}
+
+@keyframes quickAddPop {
+  0% {
+    transform: scale(0.92);
+  }
+  45% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes quickAddCheck {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .quickAdd {
     transition: none;
   }
 
-  .quickAdd:hover {
+  .quickAdd:hover,
+  .quickAdd:active {
     transform: none;
+  }
+
+  /* галочку оставляем — это подтверждение действия, а не украшение */
+  .quickAddAdded,
+  .quickAddAdded::after {
+    animation: none;
   }
 }
 

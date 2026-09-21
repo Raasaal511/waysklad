@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { IconHeart, IconHeartFilled, IconPlus, IconShieldCheck } from '@tabler/icons-react'
 import { formatMoney, formatPriceOrRequest, formatQuantity } from '../../shared/lib/format'
@@ -35,6 +36,21 @@ interface ProductCardProps {
 
 /** Общая карточка товара — каталог магазина, маркетплейс, похожие товары, недавно просмотренные, избранное. */
 export function ProductCard({ item, href, showShop, favorite, onToggleFavorite, onQuickAdd }: ProductCardProps) {
+  // подтверждение добавления в корзину: класс снимается по таймеру, поэтому
+  // таймер чистится при размонтировании (карточка живёт в виртуальном списке)
+  const [justAdded, setJustAdded] = useState(false)
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    if (addedTimer.current) clearTimeout(addedTimer.current)
+  }, [])
+
+  function flashAdded() {
+    if (addedTimer.current) clearTimeout(addedTimer.current)
+    setJustAdded(true)
+    addedTimer.current = setTimeout(() => setJustAdded(false), 600)
+  }
+
   const hasRating = (item.reviews_count ?? 0) > 0
   const hasSold = Number(item.sold_count ?? 0) > 0
   const hasOldPrice = item.old_price != null && Number(item.old_price) > Number(item.retail_price)
@@ -88,11 +104,12 @@ export function ProductCard({ item, href, showShop, favorite, onToggleFavorite, 
           {item.in_stock && onQuickAdd && (
             <button
               type="button"
-              className={styles.quickAdd}
+              className={`${styles.quickAdd} ${justAdded ? styles.quickAddAdded : ''}`}
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
                 onQuickAdd()
+                flashAdded()
               }}
               aria-label="Добавить в корзину"
             >
