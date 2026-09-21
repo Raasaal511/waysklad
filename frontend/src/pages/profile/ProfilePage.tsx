@@ -139,7 +139,23 @@ function PersonalizationTab() {
 }
 
 function StorefrontSettings({ shop }: { shop: Tenant }) {
+  const { setShop } = useShop()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const storeUrl = shop.slug ? `${window.location.origin}/store/${shop.slug}` : null
+
+  async function handleToggle(enabled: boolean) {
+    setError(null)
+    setSaving(true)
+    try {
+      const updated = await updateShop({ name: shop.name, storefront_enabled: enabled })
+      setShop(updated)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось сохранить')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className={[layoutStyles.stack, layoutStyles.card, layoutStyles.cardFull].join(' ')}>
@@ -149,16 +165,31 @@ function StorefrontSettings({ shop }: { shop: Tenant }) {
           Включение, товары и заявки — в отдельном разделе меню.
         </p>
       </div>
-      <div className={layoutStyles.row} style={{ gap: 8, flexWrap: 'wrap' }}>
-        <Link to="/storefront">
-          <Button>Открыть раздел «Витрина»</Button>
-        </Link>
-        {shop.storefront_enabled && storeUrl && (
-          <a href={storeUrl} target="_blank" rel="noreferrer" className={styles.storefrontLink}>
-            {storeUrl}
-          </a>
-        )}
-      </div>
+      <label className="sale-checkbox">
+        <input
+          type="checkbox"
+          checked={shop.storefront_enabled}
+          disabled={saving}
+          onChange={(e) => handleToggle(e.target.checked)}
+        />
+        Онлайн-витрина
+      </label>
+      <p className={layoutStyles.textMuted} style={{ margin: '-6px 0 0', fontSize: 13, lineHeight: 1.4 }}>
+        Бета: каталог магазина по публичной ссылке
+      </p>
+      {error && <span className={layoutStyles.textDanger}>{error}</span>}
+      {shop.storefront_enabled && (
+        <div className={layoutStyles.row} style={{ gap: 8, flexWrap: 'wrap' }}>
+          <Link to="/storefront">
+            <Button>Открыть раздел «Витрина»</Button>
+          </Link>
+          {storeUrl && (
+            <a href={storeUrl} target="_blank" rel="noreferrer" className={styles.storefrontLink}>
+              {storeUrl}
+            </a>
+          )}
+        </div>
+      )}
     </div>
   )
 }
