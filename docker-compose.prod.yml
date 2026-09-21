@@ -62,6 +62,19 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Dockerfile уже объявляет HEALTHCHECK — Docker учёл бы его и без этого
+    # блока (frontend ниже уже ждёт backend: condition: service_healthy),
+    # но явный блок здесь делает это видимым в самом compose-файле, тем же
+    # стилем, что у db/redis выше, а не полагается на то, что кто-то откроет
+    # Dockerfile, чтобы узнать, чем backend вообще проверяется. GET /api/health
+    # теперь реально проверяет БД и Redis (раньше был статичный {"status":"ok"}) —
+    # контейнер больше не может быть "up" и healthy, если БД/Redis отвалились.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   frontend:
     build: ./frontend

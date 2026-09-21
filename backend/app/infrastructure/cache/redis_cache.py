@@ -48,3 +48,8 @@ class RedisCache(ICache):
         except Exception:
             # неудалённые ключи просто доживут до TTL — устаревание, не поломка
             _logger.exception("Redis SCAN/DEL по префиксу не удался prefix=%s", prefix)
+
+    async def ping(self) -> bool:
+        # единственное место, где ошибка Redis не проглатывается — health-check
+        # должен реально узнать, что Redis недоступен, а не тихо продолжить
+        return bool(await self._redis.ping())
