@@ -50,6 +50,10 @@ class Customer:
     username: str = ""
     # "" — пароль не задан (вход только через Telegram), см. set_password
     password_hash: str = ""
+    # телефон подтверждён кодом (не просто указан при регистрации): по нему
+    # продавец перезванивает, и он же отличает реальную заявку от мусорной
+    phone_verified: bool = False
+    phone_verified_at: datetime | None = None
     # инкрементируется при отзыве всех токенов (logout-all) — тот же паттерн,
     # что и у User.token_version
     token_version: int = 0
@@ -69,6 +73,19 @@ class Customer:
         """Хранится как ввёл покупатель, сравнивается без учёта регистра
         (нормализацию для поиска делает репозиторий)."""
         self.username = validate_username(username)
+
+    def mark_phone_verified(self, at: datetime) -> None:
+        self.phone_verified = True
+        self.phone_verified_at = at
+
+    def change_phone(self, phone: Phone) -> None:
+        """Смена номера сбрасывает подтверждение: подтверждён был старый
+        номер, новый ещё никто не проверял."""
+        if str(phone) == str(self.phone):
+            return
+        self.phone = phone
+        self.phone_verified = False
+        self.phone_verified_at = None
 
     def update_name(self, name: str) -> None:
         name = name.strip()
@@ -131,3 +148,56 @@ class CustomerLoginLink:
     def confirm(self, customer_id: int) -> None:
         self.customer_id = customer_id
         self.confirmed_at = datetime.now(timezone.utc)
+
+
+CODE_TTL = timedelta(minutes=5)
+CODE_MAX_ATTEMPTS = 5
+CODE_RESEND_COOLDOWN = timedelta(seconds=60)
+CODE_MAX_PER_HOUR = 5
+CODE_LENGTH = 6
+
+
+@dataclass
+class PhoneVerificationCode:
+    """Код подтверждения телефона покупателя.
+
+    Сам код не хранится — только хеш (как пароль): в логах, дампах и у того,
+    кто читает БД, шестизначного кода быть не должно. Сверка — в
+    infrastructure.security.verify_password, как у пароля.
+
+    phone фиксируется в момент выпуска: если покупатель успеет сменить номер,
+    старый код не подтвердит новый телефон.
+    """
+
+    id: int | None
+    customer_id: int
+    phone: Phone
+    code_hash: str
+    expires_at: datetime
+    created_at: datetime
+    sent_via: str  # telegram | console | sms — чем отправляли, для диагностики
+    attempts: int = 0
+
+    @classmethod
+    def issue(
+        cls, customer_id: int, phone: Phone, code_hash: str, sent_via: str, now: datetime
+    ) -> "PhoneVerificationCode":
+        return cls(
+            id=None,
+            customer_id=customer_id,
+            phone=phone,
+            code_hash=code_hash,
+            expires_at=now + CODE_TTL,
+            created_at=now,
+            sent_via=sent_via,
+        )
+
+    def is_expired(self, now: datetime) -> bool:
+        return now >= self.expires_at
+
+    @property
+    def attempts_left(self) -> int:
+        return max(CODE_MAX_ATTEMPTS - self.attempts, 0)
+
+    def register_failed_attempt(self) -> None:
+        self.attempts += 1

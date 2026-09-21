@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from app.domain.customers.repository import (
         ICustomerLoginLinkRepository,
         ICustomerRepository,
+        IPhoneVerificationCodeRepository,
     )
     from app.domain.debts.repository import IDebtRepository
     from app.domain.identity.repository import (
@@ -61,6 +62,7 @@ class IUnitOfWork(ABC):
     suppliers: ISupplierRepository
     customers: ICustomerRepository
     customer_login_links: ICustomerLoginLinkRepository
+    customer_phone_codes: IPhoneVerificationCodeRepository
     stock: IStockRepository
     stock_documents: IStockDocumentRepository
     sales: ISaleRepository

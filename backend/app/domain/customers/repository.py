@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Protocol
 
-from app.domain.customers.entities import Customer, CustomerLoginLink
+from app.domain.customers.entities import Customer, CustomerLoginLink, PhoneVerificationCode
 
 
 class ICustomerRepository(Protocol):
@@ -26,4 +26,21 @@ class ICustomerLoginLinkRepository(Protocol):
         """Удаляет ссылки старше cutoff (созданные до этого момента) — и
         неподтверждённые (протухшие черновики входа), и уже подтверждённые
         (своё дело сделали, дальше не нужны). Возвращает число удалённых."""
+        ...
+
+
+class IPhoneVerificationCodeRepository(Protocol):
+    async def add(self, code: PhoneVerificationCode) -> PhoneVerificationCode: ...
+    async def get_active(self, customer_id: int, now: datetime) -> PhoneVerificationCode | None:
+        """Последний непросроченный код покупателя, если он есть."""
+        ...
+
+    async def get_last(self, customer_id: int) -> PhoneVerificationCode | None:
+        """Последний выпущенный код независимо от срока — для cooldown."""
+        ...
+
+    async def count_since(self, customer_id: int, since: datetime) -> int: ...
+    async def save(self, code: PhoneVerificationCode) -> PhoneVerificationCode: ...
+    async def delete_for_customer(self, customer_id: int) -> None:
+        """Гасит все коды покупателя — при выпуске нового и после успеха."""
         ...
