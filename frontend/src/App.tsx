@@ -15,12 +15,11 @@ import { StorefrontMyOrdersPage } from './pages/storefront/StorefrontMyOrdersPag
 import { StorefrontCatalogPage } from './pages/storefront/StorefrontCatalogPage'
 import { StorefrontProductPage } from './pages/storefront/StorefrontProductPage'
 import { StorefrontCartPage } from './pages/storefront/StorefrontCartPage'
-import { MarketplacePage } from './pages/marketplace/MarketplacePage'
-import { MarketplaceShopsPage } from './pages/marketplace/MarketplaceShopsPage'
+import { MarketplaceComingSoonPage } from './pages/marketplace/MarketplaceComingSoonPage'
 import { PublicLayout } from './widgets/public-header/PublicLayout'
 
 // Кабинет владельца и админка не нужны покупателю на публичных страницах —
-// вынесены в отдельные чанки, чтобы /marketplace не тянул их JS первой загрузкой (P7 п.2).
+// вынесены в отдельные чанки, чтобы публичные страницы (/store/*) не тянули их JS первой загрузкой (P7 п.2).
 const SalePage = lazy(() => import('./pages/sales/SalePage').then((m) => ({ default: m.SalePage })))
 const SaleNewPage = lazy(() => import('./pages/sales/SaleNewPage').then((m) => ({ default: m.SaleNewPage })))
 const SaleDetailPage = lazy(() =>
@@ -89,19 +88,16 @@ export function App() {
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/admin/*" element={<AdminPage />} />
+              {/* Маркетплейс (общая витрина всех магазинов) отключён: backend отдаёт
+                  404 на /api/marketplace/*, ссылок в интерфейсе нет. Роут оставлен
+                  заглушкой — по старым ссылкам должна открываться внятная страница,
+                  а не белый экран. Готовые страницы лежат рядом, см.
+                  MarketplaceComingSoonPage. */}
               <Route
-                path="/marketplace"
+                path="/marketplace/*"
                 element={
                   <PublicLayout>
-                    <MarketplacePage />
-                  </PublicLayout>
-                }
-              />
-              <Route
-                path="/marketplace/shops"
-                element={
-                  <PublicLayout>
-                    <MarketplaceShopsPage />
+                    <MarketplaceComingSoonPage />
                   </PublicLayout>
                 }
               />

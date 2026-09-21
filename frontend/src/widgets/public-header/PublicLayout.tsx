@@ -5,8 +5,8 @@ import styles from './PublicLayout.module.css'
 
 /**
  * Общий каркас публичных страниц: шапка + контейнер 1280px + подвал.
- * Применяется к /marketplace, /store/:slug, /store/:slug/products/:id,
- * /store/:slug/cart.
+ * Применяется к /store/:slug, /store/:slug/products/:id, /store/:slug/cart
+ * и к заглушке /marketplace.
  */
 export function PublicLayout({ children }: { children: ReactNode }) {
   return (
