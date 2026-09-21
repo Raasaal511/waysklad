@@ -64,8 +64,14 @@ async def test_customer_profile_stats_across_shops(client, owner_headers, custom
                 "name": "Товар",
                 "purchase_price": "50",
                 "retail_price": "120",
-                "show_on_storefront": True,
             },
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     await client.post(

@@ -14,8 +14,14 @@ async def _setup_accepted_request(client, owner_headers, buyer_headers, slug="ma
                 "name": "Товар с отзывом",
                 "purchase_price": "50",
                 "retail_price": "120",
-                "show_on_storefront": True,
             },
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     await client.post(
@@ -113,7 +119,14 @@ async def test_review_requires_accepted_request(client, owner_headers, customer_
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Товар", "purchase_price": "50", "retail_price": "120", "show_on_storefront": True},
+            json={"name": "Товар", "purchase_price": "50", "retail_price": "120"},
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     response = await client.post(
@@ -144,8 +157,14 @@ async def test_review_rejects_product_not_in_request(client, owner_headers, cust
                 "name": "Другой товар",
                 "purchase_price": "10",
                 "retail_price": "20",
-                "show_on_storefront": True,
             },
+        )
+    ).json()
+    other_product = (
+        await client.put(
+            f"/api/products/{other_product['id']}",
+            headers=owner_headers,
+            json={**other_product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
 

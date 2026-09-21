@@ -26,14 +26,28 @@ async def _setup_shop_with_two_products(client, owner_headers, buyer_headers, sl
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Товар А", "purchase_price": "50", "retail_price": "120", "show_on_storefront": True},
+            json={"name": "Товар А", "purchase_price": "50", "retail_price": "120"},
+        )
+    ).json()
+    product_a = (
+        await client.put(
+            f"/api/products/{product_a['id']}",
+            headers=owner_headers,
+            json={**product_a, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     product_b = (
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Товар Б", "purchase_price": "60", "retail_price": "150", "show_on_storefront": True},
+            json={"name": "Товар Б", "purchase_price": "60", "retail_price": "150"},
+        )
+    ).json()
+    product_b = (
+        await client.put(
+            f"/api/products/{product_b['id']}",
+            headers=owner_headers,
+            json={**product_b, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     for p in (product_a, product_b):
@@ -464,7 +478,14 @@ async def test_review_eligibility(client, owner_headers, customer_headers):
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Товар", "purchase_price": "50", "retail_price": "120", "show_on_storefront": True},
+            json={"name": "Товар", "purchase_price": "50", "retail_price": "120"},
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
 
@@ -528,7 +549,14 @@ async def test_review_eligibility_requires_auth(client, owner_headers):
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Товар", "purchase_price": "50", "retail_price": "120", "show_on_storefront": True},
+            json={"name": "Товар", "purchase_price": "50", "retail_price": "120"},
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     response = await client.get(f"/api/storefront/{slug}/products/{product['id']}/reviews/eligibility")

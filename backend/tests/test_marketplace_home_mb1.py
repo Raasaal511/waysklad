@@ -63,12 +63,18 @@ async def _add_product(client, headers, warehouse_id, name, price, qty="10", **e
             "name": name,
             "purchase_price": "10",
             "retail_price": price,
-            "show_on_storefront": True,
             **extra,
         },
     )
     assert response.status_code == 201, response.text
     product = response.json()
+    update_response = await client.put(
+        f"/api/products/{product['id']}",
+        headers=headers,
+        json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
+    )
+    assert update_response.status_code == 200, update_response.text
+    product = update_response.json()
     if qty != "0":
         receive_response = await client.post(
             "/api/inventory/receive",
@@ -539,6 +545,7 @@ async def test_compare_at_price_hidden_when_retail_price_raised_above_it(client,
         json={
             "name": "Товар с плавающей ценой", "purchase_price": "10", "retail_price": "200",
             "compare_at_price": "150", "show_on_storefront": True,
+            "photo": "https://example.com/test.jpg",
         },
     )
     assert update_response.status_code == 200, update_response.text
@@ -561,8 +568,14 @@ async def test_discount_percent_rounds_down_and_hides_below_3_percent(client, ow
         headers=owner_headers,
         json={
             "name": "Товар с маленькой скидкой", "purchase_price": "10",
-            "retail_price": "195", "compare_at_price": "200", "show_on_storefront": True,
+            "retail_price": "195", "compare_at_price": "200",
         },
+    )
+    product = response.json()
+    response = await client.put(
+        f"/api/products/{product['id']}",
+        headers=owner_headers,
+        json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
     )
     product_id = response.json()["id"]
     detail = await client.get(f"/api/products/{product_id}", headers=owner_headers)
@@ -656,8 +669,13 @@ async def test_shop_logo_upload(client, owner_headers, random_phone):
         headers=owner_headers,
         json={
             "name": "Товар с логотипом магазина", "purchase_price": "10", "retail_price": "100",
-            "show_on_storefront": True,
         },
+    )
+    product = product_response.json()
+    product_response = await client.put(
+        f"/api/products/{product['id']}",
+        headers=owner_headers,
+        json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
     )
     marketplace_response = await client.get(
         "/api/marketplace/products", params={"shop_slug": slug}
@@ -798,8 +816,14 @@ async def test_storefront_sort_popular_rating_discount(client, owner_headers):
         headers=owner_headers,
         json={
             "name": "Витринный товар со скидкой", "purchase_price": "10",
-            "retail_price": "100", "compare_at_price": "150", "show_on_storefront": True,
+            "retail_price": "100", "compare_at_price": "150",
         },
+    )
+    product = response.json()
+    response = await client.put(
+        f"/api/products/{product['id']}",
+        headers=owner_headers,
+        json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
     )
     product_id = response.json()["id"]
 

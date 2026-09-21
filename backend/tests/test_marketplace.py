@@ -91,12 +91,18 @@ async def _add_product(client, headers, warehouse_id, name, price, qty="10", **e
             "name": name,
             "purchase_price": "10",
             "retail_price": price,
-            "show_on_storefront": True,
             **extra,
         },
     )
     assert response.status_code == 201, response.text
     product = response.json()
+    update_response = await client.put(
+        f"/api/products/{product['id']}",
+        headers=headers,
+        json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
+    )
+    assert update_response.status_code == 200, update_response.text
+    product = update_response.json()
 
     if qty != "0":  # без приёмки товар остаётся без остатка — эквивалент qty=0
         receive_response = await client.post(

@@ -161,7 +161,14 @@ async def test_storefront_profile_full_fields_via_api(client, owner_headers, cus
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Товар", "purchase_price": "10", "retail_price": "20", "show_on_storefront": True},
+            json={"name": "Товар", "purchase_price": "10", "retail_price": "20"},
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
 
@@ -232,8 +239,14 @@ async def _setup_accepted_request(client, owner_headers, buyer_headers, slug="ma
                 "name": "Товар с отзывом",
                 "purchase_price": "50",
                 "retail_price": price,
-                "show_on_storefront": True,
             },
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     await client.post(
@@ -315,7 +328,14 @@ async def test_storefront_profile_orders_count_shown_above_threshold_via_api(
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Товар", "purchase_price": "10", "retail_price": "20", "show_on_storefront": True},
+            json={"name": "Товар", "purchase_price": "10", "retail_price": "20"},
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     await client.post(
@@ -379,7 +399,14 @@ async def test_storefront_product_page_includes_shop_via_api(client, owner_heade
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Товар", "purchase_price": "10", "retail_price": "20", "show_on_storefront": True},
+            json={"name": "Товар", "purchase_price": "10", "retail_price": "20"},
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
 
@@ -420,7 +447,14 @@ async def test_storefront_request_below_min_order_total_rejected_via_api(client,
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Дешёвый товар", "purchase_price": "50", "retail_price": "100", "show_on_storefront": True},
+            json={"name": "Дешёвый товар", "purchase_price": "50", "retail_price": "100"},
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
 
@@ -446,7 +480,14 @@ async def test_storefront_request_exact_min_order_total_passes_via_api(client, o
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Товар ровно на минимум", "purchase_price": "500", "retail_price": "1000", "show_on_storefront": True},
+            json={"name": "Товар ровно на минимум", "purchase_price": "500", "retail_price": "1000"},
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
 
@@ -476,9 +517,15 @@ async def test_storefront_request_min_order_total_uses_variant_price_via_api(cli
                 "name": "Товар с дорогим вариантом",
                 "purchase_price": "100",
                 "retail_price": "100",  # низкая базовая цена
-                "show_on_storefront": True,
                 "variants": [{"size": "L", "color": "Синий", "price": "1200"}],  # цена варианта выше минимума
             },
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     variant_id = product["variants"][0]["id"]
@@ -506,7 +553,14 @@ async def test_storefront_request_no_min_order_total_not_enforced_via_api(client
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Дешёвый товар", "purchase_price": "1", "retail_price": "1", "show_on_storefront": True},
+            json={"name": "Дешёвый товар", "purchase_price": "1", "retail_price": "1"},
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
 
