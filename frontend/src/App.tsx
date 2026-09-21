@@ -7,6 +7,7 @@ import { CatalogProvider } from './app/CatalogContext'
 import { OnboardingProvider } from './app/OnboardingContext'
 import { OnboardingOverlay } from './app/OnboardingOverlay'
 import { RequireAuth } from './app/RequireAuth'
+import { RequireFeature } from './app/RequireFeature'
 import { AppLayout } from './app/AppLayout'
 import { LoginPage } from './pages/auth/LoginPage'
 import { StorefrontRequestPage } from './pages/storefront/StorefrontRequestPage'
@@ -157,9 +158,23 @@ export function App() {
                 <Route path="/stock/:id" element={<WarehouseDetailPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/orders/new" element={<OrderNewPage />} />
-                <Route path="/orders/storefront-requests" element={<StorefrontRequestsPage />} />
+                <Route
+                  path="/orders/storefront-requests"
+                  element={
+                    <RequireFeature feature="storefront">
+                      <StorefrontRequestsPage />
+                    </RequireFeature>
+                  }
+                />
                 <Route path="/orders/:id" element={<OrderDetailPage />} />
-                <Route path="/storefront" element={<StorefrontManagePage />} />
+                <Route
+                  path="/storefront"
+                  element={
+                    <RequireFeature feature="storefront">
+                      <StorefrontManagePage />
+                    </RequireFeature>
+                  }
+                />
                 <Route path="/tasks" element={<TasksPage />} />
                 <Route path="/debts" element={<DebtsPage />} />
                 <Route path="/debts/new" element={<DebtNewPage />} />

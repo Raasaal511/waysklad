@@ -22,6 +22,7 @@ import { NotificationBell } from './NotificationBell'
 import { Button } from '../shared/ui/Button'
 import { IconButton } from '../shared/ui/IconButton'
 import { useOfflineSync } from '../shared/offline/useOfflineSync'
+import { useFeature } from '../shared/lib/useFeature'
 import type { Role } from '../entities/auth/api'
 import styles from './AppLayout.module.css'
 
@@ -30,6 +31,7 @@ interface NavItem {
   label: string
   icon: TablerIcon
   roles?: Role[]
+  feature?: 'storefront'
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -42,7 +44,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     to: '/storefront', label: 'Витрина', icon: IconBuildingStore,
-    roles: ['owner', 'manager', 'seller'],
+    roles: ['owner', 'manager', 'seller'], feature: 'storefront',
   },
   { to: '/tasks', label: 'Задачи', icon: IconChecklist },
   {
@@ -76,7 +78,12 @@ function NavItems({
   collapsed?: boolean
   role?: Role
 }) {
-  const items = NAV_ITEMS.filter((item) => !item.roles || (role && item.roles.includes(role)))
+  const storefrontEnabled = useFeature('storefront')
+  const items = NAV_ITEMS.filter(
+    (item) =>
+      (!item.roles || (role && item.roles.includes(role))) &&
+      (item.feature !== 'storefront' || storefrontEnabled),
+  )
   return (
     <>
       {items.map((item) => (
