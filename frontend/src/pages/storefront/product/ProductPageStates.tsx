@@ -42,9 +42,6 @@ export function ProductPageError({ status, slug }: ProductPageErrorProps) {
       <div className={styles.stateWrap}>
         <img src="/illustrations/error-403-blocked.png" alt="" />
         <p className={styles.stateTitle}>Магазин временно недоступен</p>
-        <Link to="/marketplace">
-          <Button>На маркетплейс</Button>
-        </Link>
       </div>
     )
   }

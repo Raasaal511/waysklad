@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   getStorefrontCatalog,
   getStorefrontShopProfileCached,
@@ -15,7 +15,6 @@ import {
 import { ApiError } from '../../shared/api/client'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { useScrollRestore } from '../../shared/lib/useScrollRestore'
-import { MARKETPLACE_PATH } from '../../shared/config'
 import { Chip } from '../../shared/ui/Chip'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { ErrorState } from '../../shared/ui/ErrorState'
@@ -50,7 +49,6 @@ const SORT_OPTIONS: { value: StorefrontSort; label: string }[] = [
 
 export function StorefrontCatalogPage() {
   const { slug = '' } = useParams<{ slug: string }>()
-  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const warehouseId = searchParams.get('warehouse_id')
     ? Number(searchParams.get('warehouse_id'))
@@ -280,10 +278,8 @@ export function StorefrontCatalogPage() {
           description={
             errorStatus === 403
               ? 'Продавец временно заблокирован платформой.'
-              : 'Проверьте ссылку или загляните в другие магазины.'
+              : 'Проверьте ссылку — возможно, в ней опечатка.'
           }
-          actionLabel="Все магазины"
-          onAction={() => navigate(MARKETPLACE_PATH)}
         />
       </div>
     )
@@ -353,8 +349,7 @@ export function StorefrontCatalogPage() {
           <EmptyState
             illustration="empty-shelf"
             title="В магазине пока нет товаров"
-            actionLabel="Все магазины"
-            onAction={() => navigate(MARKETPLACE_PATH)}
+            description="Продавец ещё не выложил товары — загляните позже."
           />
         ) : filtersEmpty ? (
           <EmptyState
