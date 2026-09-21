@@ -1,5 +1,6 @@
 import dataclasses
 from dataclasses import asdict
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 
@@ -14,7 +15,17 @@ from app.application.admin.get_server_status import (
     get_server_status,
 )
 from app.application.admin.get_tenant_detail import get_tenant_detail
-from app.application.admin.list_tenants import list_tenants
+from app.application.admin.list_tenants import (
+    CACHE_TTL_SECONDS as TENANTS_CACHE_TTL_SECONDS,
+)
+from app.application.admin.list_tenants import (
+    DEFAULT_LIMIT as TENANTS_DEFAULT_LIMIT,
+)
+from app.application.admin.list_tenants import (
+    TenantListItem,
+    TenantListResult,
+    list_tenants,
+)
 from app.application.admin.platform_banners import (
     create_platform_banner,
     delete_platform_banner,
@@ -133,9 +144,60 @@ async def admin_error_logs(error_log: ErrorLogDep, limit: int = 50) -> ErrorLogR
 
 
 @router.get("/tenants")
-async def admin_list_tenants(factory: SessionFactoryDep) -> TenantListResponse:
-    items = await list_tenants(factory)
-    return TenantListResponse(tenants=[TenantListItemResponse.from_item(i) for i in items])
+async def admin_list_tenants(
+    factory: SessionFactoryDep,
+    cache: CacheDep,
+    query: str = "",
+    status: str = "all",
+    storefront: str | None = None,
+    sort: str = "last_activity",
+    limit: int = TENANTS_DEFAULT_LIMIT,
+    offset: int = 0,
+) -> TenantListResponse:
+    """Агрегаты по всем магазинам — кросс-тенантные запросы, см.
+    application/admin/list_tenants.py. Кеш общий на набор параметров."""
+    key = f"admin:tenants:{query}:{status}:{storefront}:{sort}:{limit}:{offset}"
+    result = await cached(
+        cache,
+        key,
+        TENANTS_CACHE_TTL_SECONDS,
+        lambda: list_tenants(
+            factory,
+            query=query,
+            status=status,
+            storefront=storefront,
+            sort=sort,
+            limit=min(max(limit, 1), 200),
+            offset=max(offset, 0),
+        ),
+        to_json=lambda r: {
+            "items": [_tenant_item_json(i) for i in r.items],
+            "total": r.total,
+            "counts_by_health": r.counts_by_health,
+        },
+        from_json=lambda d: TenantListResult(
+            items=[TenantListItem(**_tenant_item_from_json(i)) for i in d["items"]],
+            total=d["total"],
+            counts_by_health=d["counts_by_health"],
+        ),
+    )
+    return TenantListResponse(
+        tenants=[TenantListItemResponse.from_item(i) for i in result.items],
+        total=result.total,
+        counts_by_health=result.counts_by_health,
+    )
+
+
+def _tenant_item_json(item: TenantListItem) -> dict:
+    d = asdict(item)
+    d["sales_sum_30d"] = str(d["sales_sum_30d"])  # Decimal не сериализуется в JSON
+    return d
+
+
+def _tenant_item_from_json(d: dict) -> dict:
+    d = dict(d)
+    d["sales_sum_30d"] = Decimal(d["sales_sum_30d"])
+    return d
 
 
 @router.get("/tenants/{tenant_id}")

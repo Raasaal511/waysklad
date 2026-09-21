@@ -30,29 +30,40 @@ class AdminTokenResponse(BaseModel):
 
 
 class TenantListItemResponse(BaseModel):
+    """Строка списка магазинов. Только счётчики, даты и статусы — содержимого
+    чужого бизнеса (суммы долгов по клиентам, закупочные цены) здесь нет."""
+
     id: int
     name: str
     slug: str | None
-    storefront_enabled: bool
+    city: str | None
+    created_at: str
     is_suspended: bool
     is_verified: bool
-    created_at: str
+    storefront_enabled: bool
+    owner_name: str
+    users_count: int
+    warehouses_count: int
+    products_count: int
+    last_sale_at: str | None
+    last_login_at: str | None
+    sales_7d: int
+    sales_30d: int
+    sales_sum_30d: Decimal
+    debts_open_count: int
+    storefront_requests_30d: int
+    health: str
 
     @classmethod
     def from_item(cls, item: TenantListItem) -> "TenantListItemResponse":
-        return cls(
-            id=item.id,
-            name=item.name,
-            slug=item.slug,
-            storefront_enabled=item.storefront_enabled,
-            is_suspended=item.is_suspended,
-            is_verified=item.is_verified,
-            created_at=item.created_at,
-        )
+        return cls(**asdict(item))
 
 
 class TenantListResponse(BaseModel):
     tenants: list[TenantListItemResponse]
+    total: int = 0
+    # счётчики для чипов фильтра — по всей платформе, а не по странице
+    counts_by_health: dict[str, int] = {}
 
 
 class TenantOwnerResponse(BaseModel):
