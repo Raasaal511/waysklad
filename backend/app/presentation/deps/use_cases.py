@@ -43,6 +43,11 @@ from app.application.customers.change_password import (
     ChangeCustomerPasswordUseCase,
     LogoutAllCustomerUseCase,
 )
+from app.application.customers.my_chats import (
+    ListCustomerChatMessagesUseCase,
+    ListCustomerChatsUseCase,
+    SendCustomerChatMessageUseCase,
+)
 from app.application.customers.verify_phone_code import VerifyPhoneCodeUseCase
 from app.infrastructure.config import settings
 from app.infrastructure.notifications.code_senders import build_code_sender
@@ -229,6 +234,22 @@ def get_change_customer_password(factory: SessionFactoryDep) -> ChangeCustomerPa
 
 def get_logout_all_customer(factory: SessionFactoryDep) -> LogoutAllCustomerUseCase:
     return LogoutAllCustomerUseCase(factory)
+
+
+def get_list_customer_chats(factory: SessionFactoryDep) -> ListCustomerChatsUseCase:
+    return ListCustomerChatsUseCase(factory)
+
+
+def get_list_customer_chat_messages(
+    factory: SessionFactoryDep,
+) -> ListCustomerChatMessagesUseCase:
+    return ListCustomerChatMessagesUseCase(factory)
+
+
+def get_send_customer_chat_message(
+    factory: SessionFactoryDep, notifier: NotifierDep
+) -> SendCustomerChatMessageUseCase:
+    return SendCustomerChatMessageUseCase(factory, notifier)
 
 
 def get_customer_login_status(uow: PublicUowDep) -> GetCustomerLoginStatusUseCase:
@@ -548,6 +569,13 @@ ChangeCustomerPasswordDep = Annotated[
     ChangeCustomerPasswordUseCase, Depends(get_change_customer_password)
 ]
 LogoutAllCustomerDep = Annotated[LogoutAllCustomerUseCase, Depends(get_logout_all_customer)]
+ListCustomerChatsDep = Annotated[ListCustomerChatsUseCase, Depends(get_list_customer_chats)]
+ListCustomerChatMessagesDep = Annotated[
+    ListCustomerChatMessagesUseCase, Depends(get_list_customer_chat_messages)
+]
+SendCustomerChatMessageDep = Annotated[
+    SendCustomerChatMessageUseCase, Depends(get_send_customer_chat_message)
+]
 LoginCustomerDep = Annotated[LoginCustomerUseCase, Depends(get_login_customer)]
 GetCustomerLoginStatusDep = Annotated[
     GetCustomerLoginStatusUseCase, Depends(get_customer_login_status)

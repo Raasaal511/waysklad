@@ -51,6 +51,21 @@ class SqlAlchemyStorefrontRequestRepository(SqlAlchemyRepository, IStorefrontReq
             raise NotFoundError(f"Заявка {request_id} не найдена")
         return StorefrontRequestMapper.to_entity(model)
 
+    async def get_by_id_any_tenant(self, request_id: int) -> StorefrontRequest | None:
+        # без tenant-фильтра, как и get_by_token: покупатель — сущность
+        # платформы и не знает tenant своей заявки. Право доступа проверяется
+        # по customer_id выше (см. customers/my_chats.py), не здесь.
+        model = (
+            await self._session.execute(
+                select(StorefrontRequestModel).where(StorefrontRequestModel.id == request_id)
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            return None
+        entity = StorefrontRequestMapper.to_entity(model)
+        entity.tenant_id = model.tenant_id
+        return entity
+
     async def get_by_token(self, access_token: str) -> StorefrontRequest | None:
         # без tenant-фильтра: вызывается анонимным покупателем ДО того, как
         # известен tenant — токен сам по себе доказательство владения заявкой,

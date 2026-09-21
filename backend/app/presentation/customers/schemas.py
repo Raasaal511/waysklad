@@ -9,7 +9,9 @@ from app.application.customers.request_login_link import RequestCustomerLoginLin
 from app.application.customers.request_phone_code import RequestPhoneCodeResult
 from app.application.customers.register_with_password import RegisterCustomerResult
 from app.application.customers.update_profile import UpdateCustomerProfileCommand
+from app.application.customers.my_chats import CustomerChatSummary
 from app.domain.customers.entities import Customer
+from app.domain.storefront.entities import StorefrontMessage
 
 
 class RequestCustomerLoginLinkRequest(BaseModel):
@@ -193,3 +195,53 @@ class CustomerTokenResponse(BaseModel):
     нового токена покупатель разлогинил бы сам себя этим же запросом."""
 
     access_token: str
+
+
+class CustomerChatSummaryResponse(BaseModel):
+    """Строка вкладки «Чаты»: заявка и превью последнего сообщения."""
+
+    request_id: int
+    shop_name: str
+    shop_slug: str
+    shop_logo: str
+    request_status: str
+    last_message: str
+    last_message_at: datetime | None
+    last_message_from_shop: bool
+    messages_count: int
+
+    @classmethod
+    def from_summary(cls, summary: CustomerChatSummary) -> "CustomerChatSummaryResponse":
+        return cls(
+            request_id=summary.request_id,
+            shop_name=summary.shop_name,
+            shop_slug=summary.shop_slug,
+            shop_logo=summary.shop_logo,
+            request_status=summary.request_status,
+            last_message=summary.last_message,
+            last_message_at=summary.last_message_at,
+            last_message_from_shop=summary.last_message_from_shop,
+            messages_count=summary.messages_count,
+        )
+
+
+class CustomerChatMessageResponse(BaseModel):
+    id: int | None
+    request_id: int
+    author: str
+    text: str
+    created_at: datetime | None
+
+    @classmethod
+    def from_entity(cls, message: StorefrontMessage) -> "CustomerChatMessageResponse":
+        return cls(
+            id=message.id,
+            request_id=message.request_id,
+            author=message.author.value,
+            text=message.text,
+            created_at=message.created_at,
+        )
+
+
+class SendCustomerChatMessageRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)

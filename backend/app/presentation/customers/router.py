@@ -15,7 +15,10 @@ from app.presentation.customers.schemas import (
     CustomerResponse,
     LoginCustomerRequest,
     ChangeCustomerPasswordRequest,
+    CustomerChatMessageResponse,
+    CustomerChatSummaryResponse,
     CustomerTokenResponse,
+    SendCustomerChatMessageRequest,
     PhoneVerifiedResponse,
     RegisterCustomerRequest,
     RegisterCustomerResponse,
@@ -30,6 +33,9 @@ from app.presentation.deps import (
     LoginCustomerDep,
     RegisterCustomerDep,
     ChangeCustomerPasswordDep,
+    ListCustomerChatMessagesDep,
+    ListCustomerChatsDep,
+    SendCustomerChatMessageDep,
     LogoutAllCustomerDep,
     RequestPhoneCodeDep,
     VerifyPhoneCodeDep,
@@ -157,3 +163,33 @@ async def logout_all_customer(
 ) -> None:
     """Выйти на всех устройствах — включая то, с которого вызван запрос."""
     await use_case.execute(customer.id)
+
+
+@router.get("/chats")
+async def list_customer_chats(
+    customer: CurrentCustomerDep, use_case: ListCustomerChatsDep
+) -> list[CustomerChatSummaryResponse]:
+    """Диалоги по всем заказам покупателя — вкладка «Чаты» в профиле."""
+    summaries = await use_case.execute(customer.id)
+    return [CustomerChatSummaryResponse.from_summary(s) for s in summaries]
+
+
+@router.get("/chats/{request_id}")
+async def list_customer_chat_messages(
+    request_id: int, customer: CurrentCustomerDep, use_case: ListCustomerChatMessagesDep
+) -> list[CustomerChatMessageResponse]:
+    messages = await use_case.execute(customer.id, request_id)
+    return [CustomerChatMessageResponse.from_entity(m) for m in messages]
+
+
+@router.post("/chats/{request_id}", status_code=201)
+@limiter.limit("120/minute")
+async def send_customer_chat_message(
+    request: Request,
+    request_id: int,
+    body: SendCustomerChatMessageRequest,
+    customer: CurrentCustomerDep,
+    use_case: SendCustomerChatMessageDep,
+) -> CustomerChatMessageResponse:
+    message = await use_case.execute(customer.id, request_id, body.text)
+    return CustomerChatMessageResponse.from_entity(message)
