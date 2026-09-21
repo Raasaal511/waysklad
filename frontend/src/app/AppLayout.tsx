@@ -19,6 +19,7 @@ import { useAuth } from './AuthContext'
 import { useShop } from './ShopContext'
 import { useTheme } from './ThemeContext'
 import { NotificationBell } from './NotificationBell'
+import { GlobalSearch } from './GlobalSearch'
 import { Button } from '../shared/ui/Button'
 import { IconButton } from '../shared/ui/IconButton'
 import { useOfflineSync } from '../shared/offline/useOfflineSync'
@@ -240,6 +241,13 @@ export function AppLayout() {
           </div>
         )}
 
+        {/* в свёрнутом сайдбаре только иконки — строке поиска там негде жить */}
+        {!collapsed && (
+          <div className={styles['app-sidebar-search']}>
+            <GlobalSearch />
+          </div>
+        )}
+
         <nav className={styles['app-sidebar-nav']}>
           <NavItems variant="sidebar" collapsed={collapsed} role={user?.role} />
         </nav>
@@ -262,6 +270,7 @@ export function AppLayout() {
             <LogoMark />
             <ShopTitle shopName={shopName} />
           </div>
+          <GlobalSearch />
           <div className={styles['app-header-user']}>
             <NotificationBell />
             <UserBadge name={user?.name} role={user?.role} />

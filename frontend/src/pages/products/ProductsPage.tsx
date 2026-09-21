@@ -98,8 +98,12 @@ export function ProductsPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [searchParams] = useSearchParams()
+
+  // ?query= — переход из поиска в шапке/сайдбаре (GlobalSearch): список сразу
+  // открывается отфильтрованным, без второго ввода того же запроса
+  const [query, setQuery] = useState(() => searchParams.get('query') ?? '')
+  const [debouncedQuery, setDebouncedQuery] = useState(query)
   const [categoryId, setCategoryId] = useState<number | 'all'>('all')
   const [warehouseId, setWarehouseId] = useState<number | 'all'>('all')
   const [sortMode, setSortMode] = useState<SortMode>('name')
@@ -108,7 +112,6 @@ export function ProductsPage() {
   const [importFormat, setImportFormat] = useState<'xlsx' | 'csv' | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
 
-  const [searchParams] = useSearchParams()
 
   // Старые ссылки /products?open= / ?highlight= → страница товара
   useEffect(() => {

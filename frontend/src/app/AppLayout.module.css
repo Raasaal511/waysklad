@@ -442,3 +442,9 @@
     padding: 0;
   }
 }
+
+/* Поиск товаров в сайдбаре — на десктопе .app-header скрыта (min-width: 900px),
+   и шапочный GlobalSearch туда не попадает; в свёрнутом сайдбаре не рендерится. */
+.app-sidebar-search {
+  padding: 0 4px 10px;
+}
