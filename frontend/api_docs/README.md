@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-09-21 — Личный кабинет покупателя: профиль, подтверждение телефона, заказы, чаты
+
+Часть A задачи `docs/TASK_CUSTOMER_PROFILE.md`. Полное описание с TS-типами —
+**`customer_profile.md`**, здесь только сводка.
+
+**Ломающее изменение.** `GET /api/storefront/requests/my` раньше отдавал голый
+массив, теперь — `{ items, total }` с пагинацией (`limit`/`offset`, по
+умолчанию 20) и фильтром `status`. В каждой заявке добавились состав
+(`order_lines` с названием, фото, количеством и ценой), сумма, данные
+магазина (`shop_slug`, `shop_logo`) и для принятых — `due_date`,
+`accepted_total`, `prepayment`, `to_pay`, `order_status`.
+
+**Новое:**
+
+- `POST /api/auth/customer/phone/request-code` и `/phone/verify` —
+  подтверждение телефона кодом из Telegram-бота. Код 6 цифр, 5 минут, не чаще
+  раза в минуту, 5 попыток. Новый ответ `429` несёт `retry_after` в теле и в
+  заголовке `Retry-After` — по нему рисуется таймер «отправить повторно».
+- `GET/POST /api/auth/customer/chats[/{request_id}]` — чаты по JWT вместо
+  доступа по токену заявки. Старый путь с `?token=` остаётся для покупателей
+  без аккаунта.
+- `PATCH /api/auth/customer/me/password` и `POST /me/logout-all`. Смена пароля
+  возвращает свежий `access_token` — его нужно сохранить сразу, прежние
+  токены отозваны.
+
+**Изменилось:**
+
+- `GET /api/auth/customer/me` дополнен `username`, `phone_verified`,
+  `phone_verified_at`, `created_at`, `has_password`; в `stats` добавились
+  `requests_active` и `shops_count`.
+- `PUT /api/auth/customer/me` теперь принимает `phone`. Смена номера
+  сбрасывает `phone_verified` — предупредите покупателя в форме.
+
 ## 2026-09-20 — Публичные страницы P0–P7: витрина, карточка товара, маркетплейс доведены до конца
 
 Финальный шаг серии `docs/PUBLIC_PAGES_FINISH_PROMPTS.md` (P0–P7). Backend не
