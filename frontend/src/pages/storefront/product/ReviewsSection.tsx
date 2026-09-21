@@ -171,7 +171,7 @@ export function ReviewsSection({ slug, productId, onPhotosLoaded }: ReviewsSecti
       </h2>
 
       <div className={styles.layout} style={{ marginTop: 16 }}>
-        <div className={styles.list}>
+        <div className={reviewsCount === 0 ? `${styles.list} ${styles.listEmpty}` : styles.list}>
           {page && page.photos.length > 0 && (
             <div className={styles.photoStrip}>
               {page.photos.map((p, i) => (
