@@ -121,28 +121,8 @@
   color: var(--text-muted);
 }
 
-.divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 20px 0;
-  font-size: 13px;
-  color: var(--text-muted);
-}
 
-.divider::before,
-.divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
 
-.telegramForm {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
 
 .telegramBtn {
   display: inline-flex;

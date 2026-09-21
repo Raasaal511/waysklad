@@ -5,7 +5,6 @@ import {
   getCustomerLoginStatus,
   loginCustomerWithPassword,
   registerCustomer,
-  requestCustomerLoginLink,
   saveCustomerToken,
 } from '../../entities/auth/customerApi'
 import { ApiError } from '../../shared/api/client'
@@ -141,19 +140,6 @@ export function CustomerAuthPage() {
     }
   }
 
-  async function submitTelegramLogin(e: FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
-    try {
-      const result = await requestCustomerLoginLink(phone)
-      startTelegramWait(result.token, result.telegram_deep_link)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось отправить ссылку')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   // экран ожидания подтверждения — общий для обоих сценариев
   if (deepLink) {
@@ -215,7 +201,6 @@ export function CustomerAuthPage() {
         </div>
 
         {tab === 'login' ? (
-          <>
           <form className={styles.form} onSubmit={submitLogin}>
             <label className={styles.field}>
               <span className={styles.label}>Логин или телефон</span>
@@ -245,19 +230,6 @@ export function CustomerAuthPage() {
               {loading ? 'Входим…' : 'Войти'}
             </Button>
           </form>
-
-          {/* отдельная форма, не вложенная: <form> внутри <form> невалиден */}
-          <div className={styles.divider}>
-            <span>или</span>
-          </div>
-
-          <form className={styles.telegramForm} onSubmit={submitTelegramLogin}>
-            <PhoneInput value={phone} onChange={setPhone} />
-            <Button type="submit" variant="secondary" disabled={loading || !phone}>
-              Войти через Telegram
-            </Button>
-          </form>
-          </>
         ) : (
           <form className={styles.form} onSubmit={submitRegister}>
             <label className={styles.field}>
