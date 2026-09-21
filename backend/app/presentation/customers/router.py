@@ -4,6 +4,7 @@ from app.application.customers.get_login_status import GetCustomerLoginStatusCom
 from app.application.customers.login_with_password import LoginCustomerCommand
 from app.application.customers.register_with_password import RegisterCustomerCommand
 from app.application.customers.request_phone_code import RequestPhoneCodeCommand
+from app.application.customers.change_password import ChangeCustomerPasswordCommand
 from app.application.customers.verify_phone_code import VerifyPhoneCodeCommand
 from app.application.customers.request_login_link import RequestCustomerLoginLinkCommand
 from app.infrastructure.rate_limit import limiter
@@ -13,6 +14,8 @@ from app.presentation.customers.schemas import (
     CustomerProfileResponse,
     CustomerResponse,
     LoginCustomerRequest,
+    ChangeCustomerPasswordRequest,
+    CustomerTokenResponse,
     PhoneVerifiedResponse,
     RegisterCustomerRequest,
     RegisterCustomerResponse,
@@ -26,6 +29,8 @@ from app.presentation.deps import (
     GetCustomerLoginStatusDep,
     LoginCustomerDep,
     RegisterCustomerDep,
+    ChangeCustomerPasswordDep,
+    LogoutAllCustomerDep,
     RequestPhoneCodeDep,
     VerifyPhoneCodeDep,
     GetCustomerProfileDep,
@@ -128,3 +133,27 @@ async def verify_phone_code(
     return PhoneVerifiedResponse(
         phone_verified=updated.phone_verified, phone_verified_at=updated.phone_verified_at
     )
+
+
+@router.patch("/me/password")
+async def change_customer_password(
+    body: ChangeCustomerPasswordRequest,
+    customer: CurrentCustomerDep,
+    use_case: ChangeCustomerPasswordDep,
+) -> CustomerTokenResponse:
+    result = await use_case.execute(
+        ChangeCustomerPasswordCommand(
+            customer_id=customer.id,
+            new_password=body.new_password,
+            current_password=body.current_password,
+        )
+    )
+    return CustomerTokenResponse(access_token=result.access_token)
+
+
+@router.post("/me/logout-all", status_code=204)
+async def logout_all_customer(
+    customer: CurrentCustomerDep, use_case: LogoutAllCustomerDep
+) -> None:
+    """Выйти на всех устройствах — включая то, с которого вызван запрос."""
+    await use_case.execute(customer.id)

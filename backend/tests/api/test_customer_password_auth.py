@@ -188,3 +188,89 @@ async def test_register_rejects_phone_with_password(client, make_uow, random_pho
     )
     assert second.status_code == 400
     assert second.json()["detail"] == "Этот телефон уже зарегистрирован"
+
+
+PASSWORD_URL = "/api/auth/customer/me/password"
+LOGOUT_ALL_URL = "/api/auth/customer/me/logout-all"
+
+
+async def register_and_login(client, make_uow, random_phone, username: str) -> tuple[dict, str]:
+    """Зарегистрированный покупатель с паролем: (headers, phone)."""
+    phone = random_phone()
+    response = await client.post(
+        REGISTER_URL,
+        json={
+            "username": username,
+            "phone": phone,
+            "password": "secret12345",
+            "password_confirm": "secret12345",
+        },
+    )
+    await confirm_in_bot(make_uow, response.json()["token"], chat_id=username)
+    login = await client.post(LOGIN_URL, json={"login": username, "password": "secret12345"})
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}, phone
+
+
+async def test_change_password(client, make_uow, random_phone):
+    headers, _ = await register_and_login(client, make_uow, random_phone, "changer.one")
+
+    response = await client.patch(
+        PASSWORD_URL,
+        headers=headers,
+        json={"current_password": "secret12345", "new_password": "new-secret-123"},
+    )
+    assert response.status_code == 200, response.text
+    fresh = response.json()["access_token"]
+
+    # старый токен отозван (token_version вырос), новый работает
+    assert (await client.get("/api/auth/customer/me", headers=headers)).status_code == 401
+    assert (
+        await client.get(
+            "/api/auth/customer/me", headers={"Authorization": f"Bearer {fresh}"}
+        )
+    ).status_code == 200
+
+    # вход теперь по новому паролю
+    assert (
+        await client.post(LOGIN_URL, json={"login": "changer.one", "password": "secret12345"})
+    ).status_code == 400
+    assert (
+        await client.post(LOGIN_URL, json={"login": "changer.one", "password": "new-secret-123"})
+    ).status_code == 200
+
+
+async def test_change_password_rejects_wrong_current(client, make_uow, random_phone):
+    headers, _ = await register_and_login(client, make_uow, random_phone, "changer.two")
+    response = await client.patch(
+        PASSWORD_URL,
+        headers=headers,
+        json={"current_password": "not-my-password", "new_password": "new-secret-123"},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Текущий пароль неверен"
+
+
+async def test_set_password_without_current_for_telegram_account(client, customer_headers):
+    """Аккаунт из Telegram-входа пароля не имеет — задать его можно без текущего."""
+    headers, _ = await customer_headers()
+    response = await client.patch(
+        PASSWORD_URL, headers=headers, json={"new_password": "brand-new-pass"}
+    )
+    assert response.status_code == 200, response.text
+
+    profile = await client.get(
+        "/api/auth/customer/me",
+        headers={"Authorization": f"Bearer {response.json()['access_token']}"},
+    )
+    assert profile.json()["has_password"] is True
+
+
+async def test_logout_all(client, make_uow, random_phone):
+    headers, _ = await register_and_login(client, make_uow, random_phone, "logout.user")
+    assert (await client.get("/api/auth/customer/me", headers=headers)).status_code == 200
+
+    response = await client.post(LOGOUT_ALL_URL, headers=headers)
+    assert response.status_code == 204, response.text
+
+    # токен, которым вызвали выход, тоже отозван
+    assert (await client.get("/api/auth/customer/me", headers=headers)).status_code == 401

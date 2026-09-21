@@ -179,3 +179,17 @@ class VerifyPhoneCodeRequest(BaseModel):
 class PhoneVerifiedResponse(BaseModel):
     phone_verified: bool
     phone_verified_at: datetime | None
+
+
+class ChangeCustomerPasswordRequest(BaseModel):
+    """current_password не нужен, если пароля ещё нет (аккаунт из Telegram)."""
+
+    new_password: str = Field(min_length=1, max_length=128)
+    current_password: str | None = None
+
+
+class CustomerTokenResponse(BaseModel):
+    """Свежий токен после смены пароля: token_version инкрементируется, и без
+    нового токена покупатель разлогинил бы сам себя этим же запросом."""
+
+    access_token: str

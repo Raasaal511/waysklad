@@ -39,6 +39,10 @@ from app.application.customers.list_my_requests import ListMyStorefrontRequestsU
 from app.application.customers.login_with_password import LoginCustomerUseCase
 from app.application.customers.register_with_password import RegisterCustomerUseCase
 from app.application.customers.request_phone_code import RequestPhoneCodeUseCase
+from app.application.customers.change_password import (
+    ChangeCustomerPasswordUseCase,
+    LogoutAllCustomerUseCase,
+)
 from app.application.customers.verify_phone_code import VerifyPhoneCodeUseCase
 from app.infrastructure.config import settings
 from app.infrastructure.notifications.code_senders import build_code_sender
@@ -217,6 +221,14 @@ def get_request_phone_code(uow: PublicUowDep) -> RequestPhoneCodeUseCase:
 
 def get_verify_phone_code(uow: PublicUowDep) -> VerifyPhoneCodeUseCase:
     return VerifyPhoneCodeUseCase(uow)
+
+
+def get_change_customer_password(factory: SessionFactoryDep) -> ChangeCustomerPasswordUseCase:
+    return ChangeCustomerPasswordUseCase(factory)
+
+
+def get_logout_all_customer(factory: SessionFactoryDep) -> LogoutAllCustomerUseCase:
+    return LogoutAllCustomerUseCase(factory)
 
 
 def get_customer_login_status(uow: PublicUowDep) -> GetCustomerLoginStatusUseCase:
@@ -532,6 +544,10 @@ RequestCustomerLoginLinkDep = Annotated[
 RegisterCustomerDep = Annotated[RegisterCustomerUseCase, Depends(get_register_customer)]
 RequestPhoneCodeDep = Annotated[RequestPhoneCodeUseCase, Depends(get_request_phone_code)]
 VerifyPhoneCodeDep = Annotated[VerifyPhoneCodeUseCase, Depends(get_verify_phone_code)]
+ChangeCustomerPasswordDep = Annotated[
+    ChangeCustomerPasswordUseCase, Depends(get_change_customer_password)
+]
+LogoutAllCustomerDep = Annotated[LogoutAllCustomerUseCase, Depends(get_logout_all_customer)]
 LoginCustomerDep = Annotated[LoginCustomerUseCase, Depends(get_login_customer)]
 GetCustomerLoginStatusDep = Annotated[
     GetCustomerLoginStatusUseCase, Depends(get_customer_login_status)
