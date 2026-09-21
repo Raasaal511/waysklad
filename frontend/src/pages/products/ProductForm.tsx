@@ -45,6 +45,7 @@ import type { SelectOption } from '../../shared/ui/Select'
 import { InfoHint } from '../../shared/ui/InfoHint'
 import { isBarcodeScannerSupported } from '../../entities/barcode/barcodeSupport'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
+import { useFeature } from '../../shared/lib/useFeature'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import detail from './ProductDetailPage.module.css'
 import styles from './ProductForm.module.css'
@@ -217,6 +218,7 @@ export function ProductForm({
     warehouses[0]?.id ?? null,
   )
   const [initialStockQuantity, setInitialStockQuantity] = useState('')
+  const storefrontEnabled = useFeature('storefront')
   const [showOnStorefront, setShowOnStorefront] = useState(product?.show_on_storefront ?? false)
   const [storefrontMinQty, setStorefrontMinQty] = useState(product?.storefront_min_qty ?? '')
   const [storefrontStepQty, setStorefrontStepQty] = useState(product?.storefront_step_qty ?? '')
@@ -579,7 +581,7 @@ export function ProductForm({
                       <IconRefresh size={14} stroke={1.8} />
                     </IconButton>
                   </label>
-                  {showOnStorefront && (
+                  {storefrontEnabled && showOnStorefront && (
                     <span className={detail.storefrontChip}>
                       <IconShoppingBag size={13} stroke={1.8} /> На витрине
                     </span>
@@ -746,6 +748,7 @@ export function ProductForm({
           )}
         </section>
 
+        {storefrontEnabled && (
         <section className={`${styles.showcaseCard} ${detail.reveal}`} style={{ '--reveal-delay': '110ms' } as CSSProperties}>
           <div className={styles.showcaseHead}>
             <h3 className={detail.sectionTitle}>Витрина</h3>
@@ -908,6 +911,7 @@ export function ProductForm({
             )}
           </div>
         </section>
+        )}
 
         {!product && (
           <section className={`${detail.section} ${detail.reveal}`} style={{ '--reveal-delay': '100ms' } as CSSProperties}>
