@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     # use-case'ов и репозиториев остаётся на месте, возврат — одна переменная
     # MARKETPLACE_ENABLED=true в .env.
     marketplace_enabled: bool = False
+    # Чем слать код подтверждения телефона покупателю: telegram (бот витрины,
+    # работает и бесплатен) или console (код в лог — только dev и тесты).
+    # SMS появится здесь же, когда будет провайдер (см. code_senders.py).
+    verification_sender: str = "telegram"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

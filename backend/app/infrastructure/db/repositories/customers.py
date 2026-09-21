@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 
 from app.domain.common.exceptions import NotFoundError
 from app.domain.customers.entities import Customer, CustomerLoginLink, PhoneVerificationCode
@@ -79,6 +79,8 @@ class SqlAlchemyCustomerRepository(SqlAlchemyRepository, ICustomerRepository):
         model.telegram_chat_id = customer.telegram_chat_id
         model.username = customer.username
         model.password_hash = customer.password_hash
+        model.phone_verified = customer.phone_verified
+        model.phone_verified_at = customer.phone_verified_at
         model.token_version = customer.token_version
         await self._session.flush()
         return customer
@@ -178,9 +180,14 @@ class SqlAlchemyPhoneVerificationCodeRepository(
         await self._session.flush()
         return code
 
-    async def delete_for_customer(self, customer_id: int) -> None:
+    async def expire_active(self, customer_id: int, now: datetime) -> None:
+        # именно update, а не delete: created_at выпущенных кодов нужен
+        # для часового лимита, поэтому строки остаются
         await self._session.execute(
-            delete(CustomerPhoneCodeModel).where(
-                CustomerPhoneCodeModel.customer_id == customer_id
+            update(CustomerPhoneCodeModel)
+            .where(
+                CustomerPhoneCodeModel.customer_id == customer_id,
+                CustomerPhoneCodeModel.expires_at > now,
             )
+            .values(expires_at=now)
         )

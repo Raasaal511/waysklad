@@ -137,6 +137,8 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     RepayDebtDep,
     LoginCustomerDep,
     RegisterCustomerDep,
+    RequestPhoneCodeDep,
+    VerifyPhoneCodeDep,
     RequestCustomerLoginLinkDep,
     ReturnSaleDep,
     SearchClientsDep,

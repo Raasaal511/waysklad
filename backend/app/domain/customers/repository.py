@@ -41,6 +41,7 @@ class IPhoneVerificationCodeRepository(Protocol):
 
     async def count_since(self, customer_id: int, since: datetime) -> int: ...
     async def save(self, code: PhoneVerificationCode) -> PhoneVerificationCode: ...
-    async def delete_for_customer(self, customer_id: int) -> None:
-        """Гасит все коды покупателя — при выпуске нового и после успеха."""
+    async def expire_active(self, customer_id: int, now: datetime) -> None:
+        """Делает действующие коды покупателя недействительными, не удаляя
+        строки: по ним считается лимит «не больше N кодов в час»."""
         ...

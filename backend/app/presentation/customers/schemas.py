@@ -1,9 +1,12 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 from app.application.customers.get_login_status import CustomerLoginStatusResult
 from app.application.customers.get_profile import CustomerProfileResult
 from app.application.customers.login_with_password import LoginCustomerResult
 from app.application.customers.request_login_link import RequestCustomerLoginLinkResult
+from app.application.customers.request_phone_code import RequestPhoneCodeResult
 from app.application.customers.register_with_password import RegisterCustomerResult
 from app.application.customers.update_profile import UpdateCustomerProfileCommand
 from app.domain.customers.entities import Customer
@@ -120,3 +123,29 @@ class CustomerAuthResponse(BaseModel):
             access_token=result.access_token,
             customer=CustomerResponse.from_entity(result.customer),
         )
+
+
+class RequestPhoneCodeResponse(BaseModel):
+    """telegram_deep_link непуст, когда код слать некуда: покупателю сначала
+    нужно открыть бота и нажать «Старт»."""
+
+    sent_via: str
+    retry_after: int
+    telegram_deep_link: str = ""
+
+    @classmethod
+    def from_result(cls, result: RequestPhoneCodeResult) -> "RequestPhoneCodeResponse":
+        return cls(
+            sent_via=result.sent_via,
+            retry_after=result.retry_after,
+            telegram_deep_link=result.telegram_deep_link,
+        )
+
+
+class VerifyPhoneCodeRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=12)
+
+
+class PhoneVerifiedResponse(BaseModel):
+    phone_verified: bool
+    phone_verified_at: datetime | None
