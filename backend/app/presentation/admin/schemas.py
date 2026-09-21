@@ -71,6 +71,60 @@ class TenantOwnerResponse(BaseModel):
     phone: str
 
 
+class TenantUserResponse(BaseModel):
+    """Без телефона: это персональные данные сотрудника магазина."""
+
+    id: int
+    name: str
+    role: str
+    is_active: bool
+    last_login_at: str | None
+
+
+class TenantWarehouseResponse(BaseModel):
+    id: int
+    name: str
+    address: str
+    show_on_storefront: bool
+    positions_count: int
+
+
+class TenantTopProductResponse(BaseModel):
+    id: int
+    name: str
+    sold_30d: str
+
+
+class TenantStorefrontResponse(BaseModel):
+    enabled: bool
+    slug: str | None
+    products_on_storefront: int
+    requests_30d: int
+    reviews_count: int
+
+
+class TenantActivityResponse(BaseModel):
+    """Без details: там бывают суммы и имена клиентов магазина."""
+
+    at: str
+    actor_name: str
+    action: str
+    entity: str
+
+
+class TenantSalesSeriesResponse(BaseModel):
+    date: list[str]
+    count: list[int]
+    sum: list[str]
+
+
+class TenantTotalsResponse(BaseModel):
+    products: int
+    sales_all_time: int
+    debts_open_count: int
+    customers_served: int
+
+
 class TenantDetailResponse(BaseModel):
     id: int
     name: str
@@ -84,6 +138,20 @@ class TenantDetailResponse(BaseModel):
     products_count: int
     warehouses_count: int
     last_sale_at: str | None
+    city: str | None = None
+    logo: str = ""
+    last_login_at: str | None = None
+    health: str = ""
+    sales_7d: int = 0
+    sales_30d: int = 0
+    sales_sum_30d: str = "0"
+    sales_series_30d: TenantSalesSeriesResponse | None = None
+    users: list[TenantUserResponse] = []
+    warehouses: list[TenantWarehouseResponse] = []
+    top_products: list[TenantTopProductResponse] = []
+    storefront: TenantStorefrontResponse | None = None
+    recent_activity: list[TenantActivityResponse] = []
+    totals: TenantTotalsResponse | None = None
 
     @classmethod
     def from_detail(cls, d: TenantDetail) -> "TenantDetailResponse":
@@ -100,6 +168,26 @@ class TenantDetailResponse(BaseModel):
             products_count=d.products_count,
             warehouses_count=d.warehouses_count,
             last_sale_at=d.last_sale_at,
+            city=d.city,
+            logo=d.logo,
+            last_login_at=d.last_login_at,
+            health=d.health,
+            sales_7d=d.sales_7d,
+            sales_30d=d.sales_30d,
+            sales_sum_30d=d.sales_sum_30d,
+            sales_series_30d=(
+                TenantSalesSeriesResponse(**asdict(d.sales_series_30d))
+                if d.sales_series_30d
+                else None
+            ),
+            users=[TenantUserResponse(**asdict(u)) for u in d.users],
+            warehouses=[TenantWarehouseResponse(**asdict(w)) for w in d.warehouses],
+            top_products=[TenantTopProductResponse(**asdict(t)) for t in d.top_products],
+            storefront=(
+                TenantStorefrontResponse(**asdict(d.storefront)) if d.storefront else None
+            ),
+            recent_activity=[TenantActivityResponse(**asdict(a)) for a in d.recent_activity],
+            totals=TenantTotalsResponse(**asdict(d.totals)) if d.totals else None,
         )
 
 
