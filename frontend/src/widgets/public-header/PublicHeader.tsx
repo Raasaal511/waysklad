@@ -211,6 +211,15 @@ export function PublicHeader() {
             <span className={styles.iconAction} aria-disabled="true" title="Откройте магазин, чтобы посмотреть заказы">
               <IconUserCircle size={22} stroke={1.8} />
             </span>
+          ) : slug ? (
+            // отдельная страница входа/регистрации; next возвращает туда, откуда пришли.
+            // Модалка остаётся для входа по ходу действия (корзина, отзыв).
+            <Link
+              to={`/store/${slug}/login?next=${encodeURIComponent(location.pathname + location.search)}`}
+              className={styles.loginBtn}
+            >
+              Войти
+            </Link>
           ) : (
             <button type="button" className={styles.loginBtn} onClick={() => setShowLogin(true)}>
               Войти

@@ -15,6 +15,7 @@ import { StorefrontMyOrdersPage } from './pages/storefront/StorefrontMyOrdersPag
 import { StorefrontCatalogPage } from './pages/storefront/StorefrontCatalogPage'
 import { StorefrontProductPage } from './pages/storefront/StorefrontProductPage'
 import { StorefrontCartPage } from './pages/storefront/StorefrontCartPage'
+import { CustomerAuthPage } from './pages/storefront/CustomerAuthPage'
 import { MarketplaceComingSoonPage } from './pages/marketplace/MarketplaceComingSoonPage'
 import { PublicLayout } from './widgets/public-header/PublicLayout'
 
@@ -122,6 +123,14 @@ export function App() {
                 element={
                   <PublicLayout>
                     <StorefrontCartPage />
+                  </PublicLayout>
+                }
+              />
+              <Route
+                path="/store/:slug/login"
+                element={
+                  <PublicLayout>
+                    <CustomerAuthPage />
                   </PublicLayout>
                 }
               />
