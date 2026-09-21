@@ -250,7 +250,7 @@ export function ReviewsSection({ slug, productId, onPhotosLoaded }: ReviewsSecti
             <p style={{ color: 'var(--text-muted)' }}>Загрузка отзывов…</p>
           ) : reviewsCount === 0 ? (
             <div className={styles.empty}>
-              <img src="/illustrations/empty-box.png" alt="" />
+              <img src="/illustrations/empty-reviews.png" alt="" />
               <p>Пока нет отзывов</p>
               {writeButtonLabel && (
                 <button type="button" className={styles.showMoreBtn} onClick={handleWriteReview} disabled={writeButtonDisabled}>
