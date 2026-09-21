@@ -302,6 +302,38 @@ async def sql_query_counter(db_session_factory) -> AsyncIterator[SqlQueryCounter
 
 
 @pytest.fixture
+def db_engine_queries(db_session_factory):
+    """Считает SQL-запросы за блок — для проверок на N+1.
+
+    Считаются только запросы к данным: BEGIN/COMMIT и прочая служебка
+    отфильтрованы, иначе счётчик зависел бы от транзакционных границ.
+    """
+    from contextlib import contextmanager
+
+    from sqlalchemy import event
+
+    engine = db_session_factory.kw["bind"].sync_engine
+
+    class Counter:
+        count = 0
+
+    @contextmanager
+    def collect():
+        counter = Counter()
+
+        def on_execute(conn, cursor, statement, parameters, context, executemany):
+            counter.count += 1
+
+        event.listen(engine, "before_cursor_execute", on_execute)
+        try:
+            yield counter
+        finally:
+            event.remove(engine, "before_cursor_execute", on_execute)
+
+    return collect
+
+
+@pytest.fixture
 async def customer_headers(make_uow, random_phone) -> Callable:
     """Authorization-заголовок авторизованного покупателя витрины — заводит
     Customer напрямую через репозиторий (минуя реальный Telegram-флоу входа,

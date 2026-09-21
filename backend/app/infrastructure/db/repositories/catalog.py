@@ -167,6 +167,26 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
             raise NotFoundError(f"Товар {product_id} не найден")
         return ProductMapper.to_entity(model, await self._units_map())
 
+    async def list_by_ids(self, product_ids: list[int]) -> list[Product]:
+        # один запрос на весь список — иначе карточки заказов покупателя
+        # дали бы по обращению на каждую позицию (N+1)
+        if not product_ids:
+            return []
+        models = (
+            (
+                await self._session.execute(
+                    select(ProductModel).where(
+                        ProductModel.tenant_id == self._tenant,
+                        ProductModel.id.in_(product_ids),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        units = await self._units_map()
+        return [ProductMapper.to_entity(m, units) for m in models]
+
     async def deactivate(self, product_id: int) -> None:
         model = await self._get_model(product_id)
         if model is None:

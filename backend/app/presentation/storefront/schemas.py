@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
@@ -518,17 +518,67 @@ class StorefrontRequestCreatedResponse(StorefrontRequestResponse):
         return cls(**base.model_dump(), access_token=request.access_token)
 
 
+class MyRequestLineResponse(BaseModel):
+    product_id: int
+    name: str
+    photo: str
+    quantity: Decimal
+    price: Decimal
+    total: Decimal
+
+
 class MyStorefrontRequestResponse(StorefrontRequestResponse):
     """Для авторизованного покупателя — список его заявок по всем магазинам
-    платформы, с названием магазина (владелец видит только свои, ему это
-    поле не нужно — см. StorefrontRequestResponse)."""
+    платформы, с данными магазина и составом (владелец видит только свои
+    заявки и знает свои товары — см. StorefrontRequestResponse)."""
 
     shop_name: str
+    shop_slug: str = ""
+    shop_logo: str = ""
+    created_at: datetime | None = None
+    order_lines: list[MyRequestLineResponse] = []
+    order_total: Decimal = Decimal("0")
+    # ниже — только у принятых заявок, у которых есть Order
+    due_date: date | None = None
+    accepted_total: Decimal | None = None
+    prepayment: Decimal | None = None
+    to_pay: Decimal | None = None
+    order_status: str | None = None
 
     @classmethod
     def from_item(cls, item: MyStorefrontRequestItem) -> "MyStorefrontRequestResponse":
         base = StorefrontRequestResponse.from_entity(item.request)
-        return cls(**base.model_dump(), shop_name=item.shop_name)
+        return cls(
+            **base.model_dump(),
+            shop_name=item.shop_name,
+            shop_slug=item.shop_slug,
+            shop_logo=item.shop_logo,
+            created_at=item.created_at,
+            order_lines=[
+                MyRequestLineResponse(
+                    product_id=line.product_id,
+                    name=line.name,
+                    photo=line.photo,
+                    quantity=line.quantity,
+                    price=line.price,
+                    total=line.total,
+                )
+                for line in item.lines
+            ],
+            order_total=item.total,
+            due_date=item.due_date,
+            accepted_total=item.order_total,
+            prepayment=item.prepayment,
+            to_pay=item.to_pay,
+            order_status=item.order_status,
+        )
+
+
+class MyStorefrontRequestsResponse(BaseModel):
+    """Постранично: total — сколько всего заявок подходит под фильтр."""
+
+    items: list[MyStorefrontRequestResponse]
+    total: int
 
 
 class AcceptStorefrontRequestRequest(BaseModel):

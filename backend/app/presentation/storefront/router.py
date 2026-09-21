@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSo
 from fastapi.responses import HTMLResponse
 from slowapi.util import get_remote_address
 
+from app.application.customers.list_my_requests import DEFAULT_LIMIT
 from app.application.storefront.get_product import GetStorefrontProductCommand
 from app.application.storefront.get_profile import GetStorefrontProfileCommand
 from app.application.storefront.get_request_status import GetStorefrontRequestStatusCommand
@@ -44,6 +45,7 @@ from app.presentation.storefront.schemas import (
     AcceptStorefrontRequestRequest,
     CreateStorefrontRequestRequest,
     MyStorefrontRequestResponse,
+    MyStorefrontRequestsResponse,
     SendStorefrontMessageRequest,
     StorefrontCatalogParams,
     StorefrontCatalogResponse,
@@ -218,10 +220,19 @@ async def list_new_storefront_requests(
 
 @router.get("/requests/my")
 async def list_my_storefront_requests(
-    customer: CurrentCustomerDep, use_case: ListMyStorefrontRequestsDep
-) -> list[MyStorefrontRequestResponse]:
-    items = await use_case.execute(customer.id)
-    return [MyStorefrontRequestResponse.from_item(i) for i in items]
+    customer: CurrentCustomerDep,
+    use_case: ListMyStorefrontRequestsDep,
+    status: str | None = None,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = 0,
+) -> MyStorefrontRequestsResponse:
+    result = await use_case.execute(
+        customer.id, status=status, limit=min(max(limit, 1), 100), offset=max(offset, 0)
+    )
+    return MyStorefrontRequestsResponse(
+        items=[MyStorefrontRequestResponse.from_item(i) for i in result.items],
+        total=result.total,
+    )
 
 
 @router.get("/requests/status")
