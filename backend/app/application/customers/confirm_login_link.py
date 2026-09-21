@@ -32,12 +32,34 @@ class ConfirmCustomerLoginLinkUseCase:
                 raise DomainError("Ссылка входа уже использована")
 
             customer = await uow.customers.get_by_phone(str(link.phone))
+
+            if link.is_registration:
+                # username мог занять кто-то другой, пока покупатель шёл в бота
+                taken = await uow.customers.get_by_username(link.username)
+                if taken is not None and taken.id != (customer.id if customer else None):
+                    raise DomainError("Имя пользователя уже занято — начните регистрацию заново")
+                if customer is not None and customer.has_password:
+                    raise DomainError("Этот телефон уже зарегистрирован")
+
             if customer is None:
                 customer = Customer(id=None, phone=link.phone, telegram_chat_id=cmd.telegram_chat_id)
+                if link.is_registration:
+                    customer.set_username(link.username)
+                    customer.set_password(link.password_hash)
                 await uow.customers.add(customer)
-            elif customer.telegram_chat_id != cmd.telegram_chat_id:
-                customer.telegram_chat_id = cmd.telegram_chat_id
-                await uow.customers.save(customer)
+            else:
+                changed = False
+                if customer.telegram_chat_id != cmd.telegram_chat_id:
+                    customer.telegram_chat_id = cmd.telegram_chat_id
+                    changed = True
+                if link.is_registration:
+                    # аккаунт был заведён входом через Telegram — регистрация
+                    # доводит его до парольного, второй с тем же номером не нужен
+                    customer.set_username(link.username)
+                    customer.set_password(link.password_hash)
+                    changed = True
+                if changed:
+                    await uow.customers.save(customer)
 
             link.confirm(customer.id)
             await uow.customer_login_links.save(link)

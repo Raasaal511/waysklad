@@ -135,6 +135,8 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     RegisterShopDep,
     RejectStorefrontRequestDep,
     RepayDebtDep,
+    LoginCustomerDep,
+    RegisterCustomerDep,
     RequestCustomerLoginLinkDep,
     ReturnSaleDep,
     SearchClientsDep,

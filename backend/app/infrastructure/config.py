@@ -79,6 +79,13 @@ class Settings(BaseSettings):
     model_config = {"env_file": ".env", "extra": "ignore"}
 
     @property
+    def telegram_bot_username_clean(self) -> str:
+        """username без ведущего "@" — в .env его легко вписать с собакой
+        (так бот показан в самом Telegram), а в ссылку t.me/<username> она
+        попасть не должна: t.me/@bot не открывается."""
+        return self.telegram_bot_username.strip().lstrip("@")
+
+    @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 

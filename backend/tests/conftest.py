@@ -24,6 +24,9 @@ os.environ.setdefault(
 # DB здесь бессмысленно, все воркеры получили бы один и тот же дефолт. Под
 # xdist DB выбирается позже, лениво, в фикстуре client (см. ниже).
 os.environ.setdefault("CACHE_REDIS_URL", "redis://localhost:6379/15")
+# вход и регистрация покупателя завязаны на Telegram-бота — без username бота
+# use-case отказывает ещё до обращения к БД (см. request_login_link.py)
+os.environ.setdefault("TELEGRAM_BOT_USERNAME", "waysklad_test_bot")
 # фиксированные логин/пароль — тесты admin-роутера логинятся через POST /api/admin/login
 os.environ.setdefault("ADMIN_LOGIN", "test-admin")
 # Маркетплейс выключен в проде (MARKETPLACE_ENABLED=false по умолчанию, см.

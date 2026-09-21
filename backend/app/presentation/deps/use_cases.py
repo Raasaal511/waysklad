@@ -36,6 +36,8 @@ from app.application.counterparties.update_client import UpdateClientUseCase
 from app.application.customers.get_login_status import GetCustomerLoginStatusUseCase
 from app.application.customers.get_profile import GetCustomerProfileUseCase
 from app.application.customers.list_my_requests import ListMyStorefrontRequestsUseCase
+from app.application.customers.login_with_password import LoginCustomerUseCase
+from app.application.customers.register_with_password import RegisterCustomerUseCase
 from app.application.customers.request_login_link import RequestCustomerLoginLinkUseCase
 from app.application.customers.update_profile import UpdateCustomerProfileUseCase
 from app.application.debts.create_installment import CreateInstallmentUseCase
@@ -195,6 +197,14 @@ def get_register_shop(uow: PublicUowDep, hasher: HasherDep) -> RegisterShopUseCa
 
 def get_request_customer_login_link(uow: PublicUowDep) -> RequestCustomerLoginLinkUseCase:
     return RequestCustomerLoginLinkUseCase(uow)
+
+
+def get_register_customer(uow: PublicUowDep) -> RegisterCustomerUseCase:
+    return RegisterCustomerUseCase(uow)
+
+
+def get_login_customer(uow: PublicUowDep) -> LoginCustomerUseCase:
+    return LoginCustomerUseCase(uow)
 
 
 def get_customer_login_status(uow: PublicUowDep) -> GetCustomerLoginStatusUseCase:
@@ -507,6 +517,8 @@ RegisterShopDep = Annotated[RegisterShopUseCase, Depends(get_register_shop)]
 RequestCustomerLoginLinkDep = Annotated[
     RequestCustomerLoginLinkUseCase, Depends(get_request_customer_login_link)
 ]
+RegisterCustomerDep = Annotated[RegisterCustomerUseCase, Depends(get_register_customer)]
+LoginCustomerDep = Annotated[LoginCustomerUseCase, Depends(get_login_customer)]
 GetCustomerLoginStatusDep = Annotated[
     GetCustomerLoginStatusUseCase, Depends(get_customer_login_status)
 ]

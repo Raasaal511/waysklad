@@ -2,7 +2,9 @@ from pydantic import BaseModel, Field
 
 from app.application.customers.get_login_status import CustomerLoginStatusResult
 from app.application.customers.get_profile import CustomerProfileResult
+from app.application.customers.login_with_password import LoginCustomerResult
 from app.application.customers.request_login_link import RequestCustomerLoginLinkResult
+from app.application.customers.register_with_password import RegisterCustomerResult
 from app.application.customers.update_profile import UpdateCustomerProfileCommand
 from app.domain.customers.entities import Customer
 
@@ -76,3 +78,45 @@ class CustomerResponse(BaseModel):
     @classmethod
     def from_entity(cls, customer: Customer) -> "CustomerResponse":
         return cls(id=customer.id, phone=str(customer.phone), name=customer.name)
+
+
+class RegisterCustomerRequest(BaseModel):
+    username: str
+    phone: str
+    password: str
+    password_confirm: str
+
+
+class RegisterCustomerResponse(BaseModel):
+    """Токена нет: аккаунт создаётся только после подтверждения номера в
+    Telegram-боте. Фронт опрашивает /login-status с этим token, как при
+    обычном входе."""
+
+    token: str
+    telegram_deep_link: str
+
+    @classmethod
+    def from_result(cls, result: RegisterCustomerResult) -> "RegisterCustomerResponse":
+        return cls(token=result.token, telegram_deep_link=result.telegram_deep_link)
+
+
+class LoginCustomerRequest(BaseModel):
+    """login — username или телефон."""
+
+    login: str
+    password: str
+
+
+class CustomerAuthResponse(BaseModel):
+    """Ответ входа по паролю — токен плюс сам покупатель, чтобы фронту не
+    делать отдельный GET /me сразу после входа."""
+
+    access_token: str
+    customer: CustomerResponse
+
+    @classmethod
+    def from_result(cls, result: LoginCustomerResult) -> "CustomerAuthResponse":
+        return cls(
+            access_token=result.access_token,
+            customer=CustomerResponse.from_entity(result.customer),
+        )
