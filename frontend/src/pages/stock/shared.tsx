@@ -48,6 +48,13 @@ export const MODE_LABELS: Record<MovementMode, string> = {
   stocktake: 'Инвентаризация',
 }
 
+export const MODE_ACTIONS: Record<MovementMode, string> = {
+  receive: 'Принять',
+  write_off: 'Списать',
+  transfer: 'Переместить',
+  stocktake: 'Записать остатки',
+}
+
 export const MODE_ICONS: Record<MovementMode, Icon> = {
   receive: IconArrowBarToDown,
   write_off: IconArrowBarUp,
@@ -675,7 +682,7 @@ export function MovementForm({
           lines.some((l) => Number(l.quantity) <= 0)
         }
       >
-        {saving ? 'Проведение…' : `Провести: ${MODE_LABELS[mode]}`}
+        {saving ? 'Сохраняем…' : MODE_ACTIONS[mode]}
       </Button>
     </form>
   )

@@ -500,6 +500,13 @@ export function NewSaleForm({
     }
   }
 
+  const submitButtonLabel = (() => {
+    if (saving) return 'Продаём…'
+    if (cart.length === 0) return 'Продать'
+    if (payment === 'credit') return `В долг · ${formatMoney(total)} ₽`
+    return `Продать · ${formatMoney(total)} ₽`
+  })()
+
   const checkoutActions = (
     <>
       <div className={styles.salePageActionsTotal}>
@@ -523,7 +530,7 @@ export function NewSaleForm({
           onClick={handleCheckout}
           disabled={saving || !warehouseId || cart.length === 0}
         >
-          {saving ? 'Проведение…' : 'Провести продажу'}
+          {submitButtonLabel}
         </Button>
       </div>
     </>
