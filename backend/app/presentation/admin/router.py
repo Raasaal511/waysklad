@@ -20,7 +20,21 @@ from app.application.admin.get_server_status import (
     ServerStatusResult,
     get_server_status,
 )
-from app.application.admin.get_tenant_detail import get_tenant_detail
+from app.application.admin.get_tenant_detail import (
+    CACHE_TTL_SECONDS as TENANT_DETAIL_CACHE_TTL_SECONDS,
+)
+from app.application.admin.get_tenant_detail import (
+    TenantActivityEntry,
+    TenantDetail,
+    TenantOwnerInfo,
+    TenantSalesSeries,
+    TenantStorefrontInfo,
+    TenantTopProduct,
+    TenantTotals,
+    TenantUserInfo,
+    TenantWarehouseInfo,
+    get_tenant_detail,
+)
 from app.application.admin.list_tenants import (
     CACHE_TTL_SECONDS as TENANTS_CACHE_TTL_SECONDS,
 )
@@ -264,11 +278,43 @@ def _tenant_item_from_json(d: dict) -> dict:
 
 
 @router.get("/tenants/{tenant_id}")
-async def admin_get_tenant(tenant_id: int, factory: SessionFactoryDep) -> TenantDetailResponse:
-    detail = await get_tenant_detail(factory, tenant_id)
+async def admin_get_tenant(
+    tenant_id: int, factory: SessionFactoryDep, cache: CacheDep
+) -> TenantDetailResponse:
+    """Карточка магазина: счётчики, даты и статусы. Закупочных цен, сумм
+    долгов по клиентам, телефонов покупателей и текстов чатов здесь нет —
+    см. раздел о приватности в задаче."""
+    detail = await cached(
+        cache,
+        f"admin:tenant:{tenant_id}",
+        TENANT_DETAIL_CACHE_TTL_SECONDS,
+        lambda: get_tenant_detail(factory, tenant_id),
+        to_json=lambda d: asdict(d) if d is not None else None,
+        from_json=_tenant_detail_from_json,
+    )
     if detail is None:
         raise HTTPException(status_code=404, detail="Магазин не найден")
     return TenantDetailResponse.from_detail(detail)
+
+
+def _tenant_detail_from_json(d: dict | None) -> TenantDetail | None:
+    """Вложенные dataclass'ы asdict() разворачивает в словари — собираем обратно."""
+    if d is None:
+        return None
+    d = dict(d)
+    if d.get("owner"):
+        d["owner"] = TenantOwnerInfo(**d["owner"])
+    if d.get("sales_series_30d"):
+        d["sales_series_30d"] = TenantSalesSeries(**d["sales_series_30d"])
+    if d.get("storefront"):
+        d["storefront"] = TenantStorefrontInfo(**d["storefront"])
+    if d.get("totals"):
+        d["totals"] = TenantTotals(**d["totals"])
+    d["users"] = [TenantUserInfo(**u) for u in d.get("users", [])]
+    d["warehouses"] = [TenantWarehouseInfo(**w) for w in d.get("warehouses", [])]
+    d["top_products"] = [TenantTopProduct(**p) for p in d.get("top_products", [])]
+    d["recent_activity"] = [TenantActivityEntry(**a) for a in d.get("recent_activity", [])]
+    return TenantDetail(**d)
 
 
 @router.post("/tenants/{tenant_id}/suspend")

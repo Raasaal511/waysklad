@@ -15,6 +15,9 @@ from app.infrastructure.db.models.catalog import ProductModel
 from app.infrastructure.db.models.identity import TenantModel, UserModel, WarehouseModel
 from app.infrastructure.db.models.sales import SaleLineModel, SaleModel
 
+# кеш живёт на роуте (см. presentation/admin/router.py), как у /status и /overview
+CACHE_TTL_SECONDS = 30
+
 
 @dataclass(frozen=True)
 class TenantOwnerInfo:
