@@ -8,8 +8,9 @@
 }
 
 @media (max-width: 767px) {
-  .page {
-    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  /* PublicLayout уже учитывает нижнюю навигацию; +высота dock, пока он виден */
+  .pageWithDock {
+    padding-bottom: calc(72px + 32px);
   }
 }
 

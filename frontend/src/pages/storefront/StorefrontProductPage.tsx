@@ -237,17 +237,18 @@ export function StorefrontProductPage() {
       // кладёт его в корзину, для товара с вариантами берёт первый доступный
       // и подсвечивает его в списке, чтобы покупатель видел, что именно добавлено
       if (product.variants.length === 0) {
+        const qty = initialOrderQty(product.min_order_qty, product.order_step_qty)
         addToCart(slug, {
           product_id: product.id,
           name: product.name,
           retail_price: product.retail_price,
           photo: product.photo,
-          quantity: String(initialOrderQty(product.min_order_qty, product.order_step_qty)),
+          quantity: String(qty),
           variant_id: null,
         })
         setCartItems(loadCart(slug))
         setAdded(true)
-        setToast('Добавлено: 1 товар')
+        setToast(`Добавлено: ${qty} шт`)
         setTimeout(() => setAdded(false), 1600)
         return
       }
@@ -265,7 +266,7 @@ export function StorefrontProductPage() {
         })
         setCartItems(loadCart(slug))
         setAdded(true)
-        setToast(`Добавлено: ${firstAvailable.display_name}`)
+        setToast(`Добавлено: ${qty} шт`)
         setFlashVariantKey(firstAvailable.id)
         setTimeout(() => setAdded(false), 1600)
         setTimeout(() => setFlashVariantKey(null), 1700)
@@ -296,7 +297,7 @@ export function StorefrontProductPage() {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page}${dockVisible ? ` ${styles.pageWithDock}` : ''}`}>
       <div className={styles.container}>
         <div className={shellStyles.crumbRow}>
           <Breadcrumbs items={buildProductBreadcrumbs(slug, product.category, product.name)} />

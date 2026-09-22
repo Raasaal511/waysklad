@@ -14,6 +14,14 @@
   animation: slideUp 0.2s ease;
 }
 
+@media (max-width: 767px) {
+  .dock {
+    /* Над PublicBottomNav (z-index 90), не под ней */
+    bottom: calc(var(--public-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 10px;
+  }
+}
+
 @keyframes slideUp {
   from {
     transform: translateY(100%);
