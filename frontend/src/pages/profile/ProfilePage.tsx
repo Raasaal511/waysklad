@@ -412,12 +412,22 @@ function TelegramSettings() {
       )}
 
       {!loading && !connectedChatId && (
-        <Button onClick={() => setShowForm(true)}>
-          Подключить
-        </Button>
+        <>
+          <p className={styles.telegramWarning} role="status">
+            Сводки сейчас никуда не уходят: Telegram не подключён. Подключите chat_id и
+            нажмите «Старт» у бота ВайСклад в Telegram — иначе ежедневный отчёт не придёт.
+          </p>
+          <Button onClick={() => setShowForm(true)}>Подключить</Button>
+        </>
       )}
 
-      {!loading && connectedChatId && shop && <SummaryScheduleSettings shop={shop} onSaved={setShop} />}
+      {!loading && shop && (
+        <SummaryScheduleSettings
+          shop={shop}
+          onSaved={setShop}
+          disabled={!connectedChatId}
+        />
+      )}
 
       {showForm && (
         <Modal title="Telegram-сводка" onClose={() => setShowForm(false)}>
@@ -441,14 +451,18 @@ const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
 function SummaryScheduleSettings({
   shop,
   onSaved,
+  disabled = false,
 }: {
   shop: Tenant
   onSaved: (shop: Tenant) => void
+  /** Пока chat_id не подключён — расписание видно, но менять нельзя. */
+  disabled?: boolean
 }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function toggle(patch: Partial<UpdateShopInput>) {
+    if (disabled) return
     setError(null)
     setSaving(true)
     try {
@@ -461,16 +475,23 @@ function SummaryScheduleSettings({
     }
   }
 
+  const locked = disabled || saving
+
   return (
     <div className={[layoutStyles.stack, styles.summarySchedule].join(' ')}>
       <span className={layoutStyles.fieldLabel}>Когда присылать сводку</span>
+      {disabled && (
+        <p className={layoutStyles.textMuted}>
+          Сначала подключите Telegram — иначе расписание не сработает.
+        </p>
+      )}
 
       <div className={styles.summaryRow}>
         <label className={styles.summaryCheckbox}>
           <input
             type="checkbox"
             checked={shop.summary_daily_enabled}
-            disabled={saving}
+            disabled={locked}
             onChange={(e) => toggle({ summary_daily_enabled: e.target.checked })}
           />
           Ежедневно
@@ -481,7 +502,7 @@ function SummaryScheduleSettings({
             value={String(shop.summary_daily_hour_msk)}
             onChange={(v) => toggle({ summary_daily_hour_msk: Number(v) })}
             options={HOUR_OPTIONS}
-            disabled={saving}
+            disabled={locked}
           />
         )}
       </div>
@@ -490,7 +511,7 @@ function SummaryScheduleSettings({
         <input
           type="checkbox"
           checked={shop.summary_weekly_enabled}
-          disabled={saving}
+          disabled={locked}
           onChange={(e) => toggle({ summary_weekly_enabled: e.target.checked })}
         />
         Еженедельно, по воскресеньям
@@ -500,7 +521,7 @@ function SummaryScheduleSettings({
         <input
           type="checkbox"
           checked={shop.summary_monthly_enabled}
-          disabled={saving}
+          disabled={locked}
           onChange={(e) => toggle({ summary_monthly_enabled: e.target.checked })}
         />
         Ежемесячно, в последний день месяца
@@ -550,6 +571,13 @@ function TelegramConnectForm({ onDone }: { onDone: () => void }) {
         <div className={[layoutStyles.row, styles.telegramStep].join(' ')}>
           <span className={styles.telegramStepNumber}>3</span>
           <span>Вставьте это число ниже и нажмите «Подключить»</span>
+        </div>
+        <div className={[layoutStyles.row, styles.telegramStep].join(' ')}>
+          <span className={styles.telegramStepNumber}>4</span>
+          <span>
+            Откройте бота ВайСклад (тот же, что в ссылках витрины) и нажмите «Старт» —
+            иначе сообщения до вас не дойдут
+          </span>
         </div>
       </div>
 

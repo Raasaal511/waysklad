@@ -116,3 +116,14 @@
   flex: 0 0 auto;
   width: 190px;
 }
+
+.telegramWarning {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--warning);
+  background: var(--warning-bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+}
