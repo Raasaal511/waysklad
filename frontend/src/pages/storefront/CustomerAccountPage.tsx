@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link, Navigate, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   IconCheck,
-  IconChevronDown,
   IconChevronRight,
   IconLogout,
   IconMessage,
@@ -33,6 +32,7 @@ import { Button } from '../../shared/ui/Button'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Modal } from '../../shared/ui/Modal'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
+import { loadLastStoreSlug } from '../../shared/lib/lastStore'
 import { notifyCustomerAuthChanged } from './customerAuthEvents'
 import styles from './CustomerAccountPage.module.css'
 
@@ -42,12 +42,13 @@ const STATUS_LABEL: Record<MyRequest['status'], string> = {
   rejected: 'Отклонён',
 }
 
-type Tab = 'overview' | 'orders' | 'chats' | 'reviews'
+type Tab = 'overview' | 'orders' | 'chats' | 'reviews' | 'shops'
 
 function tabFromPath(pathname: string): Tab {
   if (pathname.includes('/account/orders')) return 'orders'
   if (pathname.includes('/account/chats')) return 'chats'
   if (pathname.includes('/account/reviews')) return 'reviews'
+  if (pathname.includes('/account/shops')) return 'shops'
   return 'overview'
 }
 
@@ -69,13 +70,13 @@ function formatDate(iso: string | null): string {
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function OrderCard({ req, currentSlug }: { req: MyRequest; currentSlug: string }) {
+function OrderCard({ req }: { req: MyRequest }) {
   const [open, setOpen] = useState(false)
   const total =
     req.status === 'accepted' && req.accepted_total != null
       ? req.accepted_total
       : req.order_total
-  const inThisShop = req.shop_slug === currentSlug
+  const shopSlug = req.shop_slug
 
   return (
     <li className={styles.orderCard}>
@@ -116,13 +117,13 @@ function OrderCard({ req, currentSlug }: { req: MyRequest; currentSlug: string }
             </p>
           )}
           <div className={styles.orderActions}>
-            {inThisShop && (
-              <Link to={`/store/${currentSlug}/account/chats/${req.id}`} className={styles.textLink}>
+            {shopSlug && (
+              <Link to={`/account/chats/${req.id}`} className={styles.textLink}>
                 Чат с магазином
               </Link>
             )}
-            {!inThisShop && req.shop_slug && (
-              <Link to={`/store/${req.shop_slug}`} className={styles.textLink}>
+            {shopSlug && (
+              <Link to={`/store/${shopSlug}`} className={styles.textLink}>
                 В магазин «{req.shop_name}»
               </Link>
             )}
@@ -134,14 +135,13 @@ function OrderCard({ req, currentSlug }: { req: MyRequest; currentSlug: string }
 }
 
 /**
- * Профиль покупателя внутри магазина: данные, заказы, чаты, отзывы.
+ * Общий кабинет покупателя (/account): данные, заказы, чаты, отзывы, витрины.
  */
 export function CustomerAccountPage() {
-  const { slug = '' } = useParams<{ slug: string }>()
   const location = useLocation()
   const navigate = useNavigate()
   const tab = tabFromPath(location.pathname)
-  const shopName = peekCachedStorefrontShopProfile(slug)?.name
+  const lastSlug = loadLastStoreSlug()
 
   const [token, setToken] = useState(() => loadCustomerToken())
   const [profile, setProfile] = useState<CustomerProfile | null>(null)
@@ -149,7 +149,6 @@ export function CustomerAccountPage() {
   const [chats, setChats] = useState<CustomerChatSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [othersOpen, setOthersOpen] = useState(false)
 
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
@@ -170,10 +169,9 @@ export function CustomerAccountPage() {
   const [passwordError, setPasswordError] = useState<string | null>(null)
 
   useEffect(() => {
-    const title = shopName ? `${shopName} — Профиль` : 'Профиль'
-    setPageMeta({ title })
+    setPageMeta({ title: 'Профиль' })
     return () => resetPageMeta()
-  }, [shopName])
+  }, [])
 
   useEffect(() => {
     if (!token) {
@@ -221,43 +219,56 @@ export function CustomerAccountPage() {
     return () => clearTimeout(t)
   }, [retryAfter])
 
-  const { here, others } = useMemo(() => {
-    const hereList: MyRequest[] = []
-    const otherList: MyRequest[] = []
-    for (const o of orders) {
-      if (o.shop_slug === slug) hereList.push(o)
-      else otherList.push(o)
-    }
-    return { here: hereList, others: otherList }
-  }, [orders, slug])
+  const unreadCount = useMemo(() => countUnreadCustomerChats(chats), [chats])
 
-  const shopChats = useMemo(
-    () => chats.filter((c) => !c.shop_slug || c.shop_slug === slug),
-    [chats, slug],
-  )
-  const unreadCount = useMemo(() => countUnreadCustomerChats(shopChats), [shopChats])
+  const shops = useMemo(() => {
+    const map = new Map<string, { slug: string; name: string; logo: string; orders: number }>()
+    for (const o of orders) {
+      if (!o.shop_slug) continue
+      const cur = map.get(o.shop_slug)
+      if (cur) cur.orders += 1
+      else map.set(o.shop_slug, { slug: o.shop_slug, name: o.shop_name, logo: o.shop_logo, orders: 1 })
+    }
+    for (const c of chats) {
+      if (!c.shop_slug || map.has(c.shop_slug)) continue
+      map.set(c.shop_slug, { slug: c.shop_slug, name: c.shop_name, logo: c.shop_logo, orders: 0 })
+    }
+    if (lastSlug && !map.has(lastSlug)) {
+      const cached = peekCachedStorefrontShopProfile(lastSlug)
+      map.set(lastSlug, {
+        slug: lastSlug,
+        name: cached?.name ?? lastSlug,
+        logo: cached?.logo ?? '',
+        orders: 0,
+      })
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+  }, [orders, chats, lastSlug])
 
   const reviewables = useMemo(() => {
-    const map = new Map<number, { productId: number; name: string; photo: string; requestId: number }>()
-    for (const req of here) {
+    const map = new Map<string, { productId: number; name: string; photo: string; requestId: number; shopSlug: string }>()
+    for (const req of orders) {
       if (req.status !== 'accepted') continue
       for (const line of req.order_lines) {
-        if (!map.has(line.product_id)) {
-          map.set(line.product_id, {
+        const key = `${req.shop_slug}:${line.product_id}`
+        if (!map.has(key)) {
+          map.set(key, {
             productId: line.product_id,
             name: line.name,
             photo: line.photo,
+            shopSlug: req.shop_slug,
             requestId: req.id,
           })
         }
       }
     }
     return [...map.values()]
-  }, [here])
+  }, [orders])
 
   if (!token) {
     const next = encodeURIComponent(location.pathname + location.search)
-    return <Navigate to={`/store/${slug}/login?next=${next}`} replace />
+    const loginSlug = lastSlug || 'waysklad'
+    return <Navigate to={`/store/${loginSlug}/login?next=${next}`} replace />
   }
 
   async function saveProfile(e: FormEvent) {
@@ -364,35 +375,42 @@ export function CustomerAccountPage() {
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>Профиль</h1>
-      {shopName && <p className={styles.subtitle}>в магазине «{shopName}»</p>}
+      <p className={styles.subtitle}>личный кабинет покупателя</p>
 
       <nav className={styles.tabs} aria-label="Разделы профиля">
         <NavLink
-          to={`/store/${slug}/account`}
+          to="/account"
           end
           className={({ isActive }) => `${styles.tab} ${isActive || tab === 'overview' ? styles.tabActive : ''}`}
         >
           Обзор
         </NavLink>
         <NavLink
-          to={`/store/${slug}/account/orders`}
+          to="/account/orders"
           className={({ isActive }) => `${styles.tab} ${isActive ? styles.tabActive : ''}`}
         >
           Заказы
-          {here.length > 0 && <span className={styles.tabCount}>{here.length}</span>}
+          {orders.length > 0 && <span className={styles.tabCount}>{orders.length}</span>}
         </NavLink>
         <NavLink
-          to={`/store/${slug}/account/chats`}
+          to="/account/chats"
           className={({ isActive }) => `${styles.tab} ${isActive ? styles.tabActive : ''}`}
         >
           Чаты
           {unreadCount > 0 && <span className={styles.tabBadge}>{unreadCount}</span>}
         </NavLink>
         <NavLink
-          to={`/store/${slug}/account/reviews`}
+          to="/account/reviews"
           className={({ isActive }) => `${styles.tab} ${isActive ? styles.tabActive : ''}`}
         >
           Отзывы
+        </NavLink>
+        <NavLink
+          to="/account/shops"
+          className={({ isActive }) => `${styles.tab} ${isActive ? styles.tabActive : ''}`}
+        >
+          Витрины
+          {shops.length > 0 && <span className={styles.tabCount}>{shops.length}</span>}
         </NavLink>
       </nav>
 
@@ -474,6 +492,7 @@ export function CustomerAccountPage() {
               {[
                 formatSince(profile.created_at),
                 `Заказов: ${profile.stats.requests_total}, активных: ${profile.stats.requests_active}`,
+                profile.stats.shops_count ? `Витрин: ${profile.stats.shops_count}` : '',
               ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -491,18 +510,20 @@ export function CustomerAccountPage() {
                     : `Новых сообщений: ${unreadCount}`}
                 </p>
               </div>
-              <Link to={`/store/${slug}/account/chats`} className={styles.textLink}>
+              <Link to="/account/chats" className={styles.textLink}>
                 Открыть
               </Link>
             </section>
           )}
 
-          <section className={styles.section}>
-            <Link to={`/store/${slug}/favorites`} className={styles.navRow}>
-              Избранное
-              <IconChevronRight size={18} />
-            </Link>
-          </section>
+          {shops.length > 0 && (
+            <section className={styles.section}>
+              <Link to="/account/shops" className={styles.navRow}>
+                Мои витрины ({shops.length})
+                <IconChevronRight size={18} />
+              </Link>
+            </section>
+          )}
 
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>Настройки</h2>
@@ -525,68 +546,47 @@ export function CustomerAccountPage() {
       {!loading && !error && profile && tab === 'orders' && (
         <section className={styles.section} id="orders">
           <h2 className={styles.sectionTitle}>Мои заказы</h2>
-          {here.length === 0 ? (
+          {orders.length === 0 ? (
             <EmptyState
               illustration="empty-archive"
               title="Здесь появятся ваши заказы"
-              description={shopName ? `в магазине «${shopName}»` : undefined}
-              actionLabel="Перейти к покупкам"
-              onAction={() => navigate(`/store/${slug}`)}
+              description="Оформите заказ в любом магазине — он отобразится здесь."
+              actionLabel={lastSlug ? 'К последней витрине' : 'К витринам'}
+              onAction={() => navigate(lastSlug ? `/store/${lastSlug}` : '/account/shops')}
             />
           ) : (
             <ul className={styles.orderList}>
-              {here.map((req) => (
-                <OrderCard key={req.id} req={req} currentSlug={slug} />
+              {orders.map((req) => (
+                <OrderCard key={req.id} req={req} />
               ))}
             </ul>
-          )}
-
-          {others.length > 0 && (
-            <div className={styles.others}>
-              <button
-                type="button"
-                className={styles.othersToggle}
-                onClick={() => setOthersOpen((v) => !v)}
-                aria-expanded={othersOpen}
-              >
-                {othersOpen ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}
-                Заказы в других магазинах ({others.length})
-              </button>
-              {othersOpen && (
-                <ul className={styles.orderList}>
-                  {others.map((req) => (
-                    <OrderCard key={req.id} req={req} currentSlug={slug} />
-                  ))}
-                </ul>
-              )}
-            </div>
           )}
         </section>
       )}
 
       {!loading && !error && profile && tab === 'chats' && (
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Чаты с магазином</h2>
-          {shopChats.length === 0 ? (
+          <h2 className={styles.sectionTitle}>Чаты</h2>
+          {chats.length === 0 ? (
             <EmptyState
               title="Пока нет переписки"
               description="Напишите магазину из заказа — диалог появится здесь."
               actionLabel="К заказам"
-              onAction={() => navigate(`/store/${slug}/account/orders`)}
+              onAction={() => navigate('/account/orders')}
             />
           ) : (
             <ul className={styles.chatList}>
-              {shopChats.map((chat) => {
+              {chats.map((chat) => {
                 const unread = isCustomerChatUnread(chat)
                 return (
                   <li key={chat.request_id}>
                     <Link
-                      to={`/store/${slug}/account/chats/${chat.request_id}`}
+                      to={`/account/chats/${chat.request_id}`}
                       className={`${styles.chatRow} ${unread ? styles.chatRowUnread : ''}`}
                     >
                       <span className={styles.chatMain}>
                         <strong>
-                          Заказ #{chat.request_id}
+                          {chat.shop_name || `Заказ #${chat.request_id}`}
                           {unread && <span className={styles.dot} aria-label="Новое сообщение" />}
                         </strong>
                         <span className={styles.chatPreview}>
@@ -611,20 +611,20 @@ export function CustomerAccountPage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Отзывы</h2>
           <p className={styles.muted}>
-            Отзыв можно оставить на товары из подтверждённых заказов этого магазина.
+            Отзыв можно оставить на товары из подтверждённых заказов.
           </p>
           {reviewables.length === 0 ? (
             <EmptyState
               illustration="empty-reviews"
               title="Пока нечего оценивать"
               description="Когда магазин подтвердит заказ, товары появятся здесь."
-              actionLabel="В каталог"
-              onAction={() => navigate(`/store/${slug}`)}
+              actionLabel="К заказам"
+              onAction={() => navigate('/account/orders')}
             />
           ) : (
             <ul className={styles.reviewList}>
               {reviewables.map((item) => (
-                <li key={item.productId} className={styles.reviewRow}>
+                <li key={`${item.shopSlug}-${item.productId}`} className={styles.reviewRow}>
                   {item.photo ? (
                     <img src={item.photo} alt="" className={styles.reviewPhoto} width={48} height={48} />
                   ) : (
@@ -632,10 +632,47 @@ export function CustomerAccountPage() {
                   )}
                   <span className={styles.reviewName}>{item.name}</span>
                   <Link
-                    to={`/store/${slug}/products/${item.productId}?writeReview=1#reviews`}
+                    to={`/store/${item.shopSlug}/products/${item.productId}?writeReview=1#reviews`}
                     className={styles.textLink}
                   >
                     Написать отзыв
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {!loading && !error && profile && tab === 'shops' && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Витрины</h2>
+          <p className={styles.muted}>Магазины, где вы заказывали или которые недавно открывали.</p>
+          {shops.length === 0 ? (
+            <EmptyState
+              title="Пока нет витрин"
+              description="Откройте магазин по ссылке продавца — он появится здесь."
+            />
+          ) : (
+            <ul className={styles.shopList}>
+              {shops.map((shop) => (
+                <li key={shop.slug}>
+                  <Link to={`/store/${shop.slug}`} className={styles.shopRow}>
+                    {shop.logo ? (
+                      <img src={shop.logo} alt="" className={styles.shopLogo} width={40} height={40} />
+                    ) : (
+                      <span className={styles.shopLogoFallback} aria-hidden="true">
+                        {shop.name.charAt(0)}
+                      </span>
+                    )}
+                    <span className={styles.shopMain}>
+                      <strong>{shop.name}</strong>
+                      <span className={styles.muted}>
+                        /store/{shop.slug}
+                        {shop.orders > 0 ? ` · заказов: ${shop.orders}` : ''}
+                      </span>
+                    </span>
+                    <IconChevronRight size={18} />
                   </Link>
                 </li>
               ))}

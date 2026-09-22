@@ -12,6 +12,7 @@ import {
   loadCustomerToken,
 } from '../../entities/auth/customerApi'
 import { FAVORITES_EVENT } from '../../shared/lib/favorites'
+import { loadLastStoreSlug } from '../../shared/lib/lastStore'
 import { cartCountForSlug, favoritesCountForSlug } from '../../shared/lib/storefrontCounters'
 import styles from './PublicBottomNav.module.css'
 
@@ -27,10 +28,16 @@ interface NavItemProps {
 
 function NavItem({ to, label, active, count, children }: NavItemProps) {
   return (
-    <Link to={to} className={`${styles.item} ${active ? styles.itemActive : ''}`} aria-current={active ? 'page' : undefined}>
+    <Link
+      to={to}
+      className={`${styles.item} ${active ? styles.itemActive : ''}`}
+      aria-current={active ? 'page' : undefined}
+    >
       <span className={styles.iconWrap}>
         {children}
-        {count != null && count > 0 && <span className={styles.badge}>{count > 99 ? '99+' : count}</span>}
+        {count != null && count > 0 && (
+          <span className={styles.badge}>{count > 99 ? '99+' : count}</span>
+        )}
       </span>
       <span className={styles.label}>{label}</span>
     </Link>
@@ -38,13 +45,15 @@ function NavItem({ to, label, active, count, children }: NavItemProps) {
 }
 
 /**
- * Нижняя панель публичных страниц — только мобильная (<768px).
- * Четыре пункта в контексте магазина: Каталог, Избранное, Корзина, Профиль.
+ * Нижняя панель публичных страниц — мобильная (<768px).
+ * В магазине: Каталог / Избранное / Корзина / Профиль.
+ * В общем кабинете /account: те же пункты через последний магазин.
  */
 export function PublicBottomNav() {
   const location = useLocation()
   const storeMatch = matchPath(STORE_ROUTE, location.pathname)
-  const slug = storeMatch?.params.slug ?? null
+  const slug = storeMatch?.params.slug ?? loadLastStoreSlug()
+  const onAccount = location.pathname === '/account' || location.pathname.startsWith('/account/')
 
   const [favoritesCount, setFavoritesCount] = useState(0)
   const [cartCountValue, setCartCountValue] = useState(0)
@@ -85,16 +94,14 @@ export function PublicBottomNav() {
   }, [])
 
   useEffect(() => {
-    if (!authed || !slug) {
+    if (!authed) {
       setUnreadChats(0)
       return
     }
     let cancelled = false
     listCustomerChats()
       .then((chats) => {
-        if (cancelled) return
-        const here = chats.filter((c) => !c.shop_slug || c.shop_slug === slug)
-        setUnreadChats(countUnreadCustomerChats(here))
+        if (!cancelled) setUnreadChats(countUnreadCustomerChats(chats))
       })
       .catch(() => {
         if (!cancelled) setUnreadChats(0)
@@ -102,45 +109,50 @@ export function PublicBottomNav() {
     return () => {
       cancelled = true
     }
-  }, [authed, slug, location.pathname])
+  }, [authed, location.pathname])
 
-  if (!slug) return null
+  if (!slug && !onAccount) return null
 
   const path = location.pathname
-  const accountActive =
-    path === `/store/${slug}/account` ||
-    path.startsWith(`/store/${slug}/account/`) ||
-    path === `/store/${slug}/login`
+  const accountActive = onAccount || path.includes('/login')
 
   return (
     <nav className={styles.bar} aria-label="Основная навигация">
-      <NavItem to={`/store/${slug}`} label="Каталог" active={path === `/store/${slug}`}>
-        <IconLayoutGrid size={22} stroke={1.8} />
-      </NavItem>
-
-      <NavItem
-        to={`/store/${slug}/favorites`}
-        label="Избранное"
-        active={path === `/store/${slug}/favorites`}
-        count={favoritesCount}
-      >
-        <IconHeart size={22} stroke={1.8} />
-      </NavItem>
-
-      <NavItem
-        to={`/store/${slug}/cart`}
-        label="Корзина"
-        active={path === `/store/${slug}/cart`}
-        count={cartCountValue}
-      >
-        <IconShoppingCart size={22} stroke={1.8} />
-      </NavItem>
+      {slug ? (
+        <>
+          <NavItem to={`/store/${slug}`} label="Каталог" active={path === `/store/${slug}`}>
+            <IconLayoutGrid size={22} stroke={1.8} />
+          </NavItem>
+          <NavItem
+            to={`/store/${slug}/favorites`}
+            label="Избранное"
+            active={path === `/store/${slug}/favorites`}
+            count={favoritesCount}
+          >
+            <IconHeart size={22} stroke={1.8} />
+          </NavItem>
+          <NavItem
+            to={`/store/${slug}/cart`}
+            label="Корзина"
+            active={path === `/store/${slug}/cart`}
+            count={cartCountValue}
+          >
+            <IconShoppingCart size={22} stroke={1.8} />
+          </NavItem>
+        </>
+      ) : (
+        <NavItem to="/account/shops" label="Витрины" active={path.startsWith('/account/shops')}>
+          <IconLayoutGrid size={22} stroke={1.8} />
+        </NavItem>
+      )}
 
       <NavItem
         to={
           authed
-            ? `/store/${slug}/account`
-            : `/store/${slug}/login?next=${encodeURIComponent(path + location.search)}`
+            ? '/account'
+            : slug
+              ? `/store/${slug}/login?next=${encodeURIComponent('/account')}`
+              : '/account'
         }
         label={authed ? 'Профиль' : 'Войти'}
         active={accountActive}

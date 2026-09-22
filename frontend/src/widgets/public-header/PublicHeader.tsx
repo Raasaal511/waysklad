@@ -133,11 +133,11 @@ export function PublicHeader() {
     ? `Искать в магазине «${shopName}»`
     : 'Искать в магазине…'
   const catalogTo = slug ? `/store/${slug}` : '/'
-  const accountTo = slug
-    ? authed
-      ? `/store/${slug}/account`
-      : `/store/${slug}/login?next=${encodeURIComponent(location.pathname + location.search)}`
-    : null
+  const accountTo = authed
+    ? '/account'
+    : slug
+      ? `/store/${slug}/login?next=${encodeURIComponent('/account')}`
+      : '/account'
 
   return (
     <header className={`${styles.header} ${scrolled ? styles.headerScrolled : ''}`}>
@@ -191,26 +191,30 @@ export function PublicHeader() {
           </form>
         )}
 
-        {slug && (
+        {(slug || authed || location.pathname.startsWith('/account')) && (
           <div className={styles.actions}>
-            <Link
-              to={`/store/${slug}/favorites`}
-              className={styles.iconAction}
-              aria-label="Избранное"
-            >
-              <IconHeart size={22} stroke={1.8} />
-              <CountBadge count={favoritesCount} />
-            </Link>
-            <Link to={`/store/${slug}/cart`} className={styles.iconAction} aria-label="Корзина">
-              <IconShoppingCart size={22} stroke={1.8} />
-              <CountBadge count={cartCountValue} />
-            </Link>
+            {slug && (
+              <>
+                <Link
+                  to={`/store/${slug}/favorites`}
+                  className={styles.iconAction}
+                  aria-label="Избранное"
+                >
+                  <IconHeart size={22} stroke={1.8} />
+                  <CountBadge count={favoritesCount} />
+                </Link>
+                <Link to={`/store/${slug}/cart`} className={styles.iconAction} aria-label="Корзина">
+                  <IconShoppingCart size={22} stroke={1.8} />
+                  <CountBadge count={cartCountValue} />
+                </Link>
+              </>
+            )}
             {authed ? (
-              <Link to={accountTo!} className={styles.iconAction} aria-label="Профиль">
+              <Link to={accountTo} className={styles.iconAction} aria-label="Профиль">
                 <IconUserCircle size={22} stroke={1.8} />
               </Link>
             ) : (
-              <Link to={accountTo!} className={styles.loginBtn}>
+              <Link to={accountTo} className={styles.loginBtn}>
                 Войти
               </Link>
             )}

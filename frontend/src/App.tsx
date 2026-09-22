@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import { BrowserRouter, Navigate, Routes, Route, useParams } from 'react-router-dom'
+import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom'
 import { AuthProvider } from './app/AuthContext'
 import { ThemeProvider } from './app/ThemeContext'
 import { ShopProvider } from './app/ShopContext'
@@ -85,8 +85,13 @@ const EmployeesPage = lazy(() =>
 const AdminPage = lazy(() => import('./pages/admin/AdminPage').then((m) => ({ default: m.AdminPage })))
 
 function RedirectMyOrdersToAccount() {
-  const { slug = '' } = useParams<{ slug: string }>()
-  return <Navigate to={`/store/${slug}/account/orders`} replace />
+  return <Navigate to="/account/orders" replace />
+}
+
+function RedirectStoreAccountToGlobal() {
+  const location = useLocation()
+  const rest = location.pathname.replace(/^\/store\/[^/]+\/account/, '') || ''
+  return <Navigate to={`/account${rest}${location.search}${location.hash}`} replace />
 }
 
 export function App() {
@@ -103,7 +108,54 @@ export function App() {
                   магазину или на /login. Маркетплейс для покупателя закрыт. */}
               <Route path="/cart" element={<RedirectToLastStore suffix="/cart" />} />
               <Route path="/favorites" element={<RedirectToLastStore suffix="/favorites" />} />
-              <Route path="/account" element={<RedirectToLastStore suffix="/account" />} />
+              <Route
+                path="/account"
+                element={
+                  <PublicLayout>
+                    <CustomerAccountPage />
+                  </PublicLayout>
+                }
+              />
+              <Route
+                path="/account/orders"
+                element={
+                  <PublicLayout>
+                    <CustomerAccountPage />
+                  </PublicLayout>
+                }
+              />
+              <Route
+                path="/account/chats"
+                element={
+                  <PublicLayout>
+                    <CustomerAccountPage />
+                  </PublicLayout>
+                }
+              />
+              <Route
+                path="/account/chats/:requestId"
+                element={
+                  <PublicLayout>
+                    <CustomerChatPage />
+                  </PublicLayout>
+                }
+              />
+              <Route
+                path="/account/reviews"
+                element={
+                  <PublicLayout>
+                    <CustomerAccountPage />
+                  </PublicLayout>
+                }
+              />
+              <Route
+                path="/account/shops"
+                element={
+                  <PublicLayout>
+                    <CustomerAccountPage />
+                  </PublicLayout>
+                }
+              />
               <Route
                 path="/marketplace/*"
                 element={
@@ -144,46 +196,8 @@ export function App() {
                   </PublicLayout>
                 }
               />
-              <Route
-                path="/store/:slug/account"
-                element={
-                  <PublicLayout>
-                    <CustomerAccountPage />
-                  </PublicLayout>
-                }
-              />
-              <Route
-                path="/store/:slug/account/orders"
-                element={
-                  <PublicLayout>
-                    <CustomerAccountPage />
-                  </PublicLayout>
-                }
-              />
-              <Route
-                path="/store/:slug/account/chats"
-                element={
-                  <PublicLayout>
-                    <CustomerAccountPage />
-                  </PublicLayout>
-                }
-              />
-              <Route
-                path="/store/:slug/account/chats/:requestId"
-                element={
-                  <PublicLayout>
-                    <CustomerChatPage />
-                  </PublicLayout>
-                }
-              />
-              <Route
-                path="/store/:slug/account/reviews"
-                element={
-                  <PublicLayout>
-                    <CustomerAccountPage />
-                  </PublicLayout>
-                }
-              />
+              <Route path="/store/:slug/account/*" element={<RedirectStoreAccountToGlobal />} />
+              <Route path="/store/:slug/account" element={<RedirectStoreAccountToGlobal />} />
               <Route
                 path="/store/:slug/login"
                 element={

@@ -10,6 +10,7 @@ import {
 } from '../../entities/auth/customerApi'
 import { ApiError } from '../../shared/api/client'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
+import { loadLastStoreSlug } from '../../shared/lib/lastStore'
 import { IconButton } from '../../shared/ui/IconButton'
 import styles from './Storefront.module.css'
 
@@ -18,10 +19,7 @@ import styles from './Storefront.module.css'
  * не по токену заявки.
  */
 export function CustomerChatPage() {
-  const { slug = '', requestId: requestIdParam = '' } = useParams<{
-    slug: string
-    requestId: string
-  }>()
+  const { requestId: requestIdParam = '' } = useParams<{ requestId: string }>()
   const location = useLocation()
   const requestId = Number(requestIdParam)
   const token = loadCustomerToken()
@@ -72,11 +70,12 @@ export function CustomerChatPage() {
 
   if (!token) {
     const next = encodeURIComponent(location.pathname)
-    return <Navigate to={`/store/${slug}/login?next=${next}`} replace />
+    const loginSlug = loadLastStoreSlug() || 'waysklad'
+    return <Navigate to={`/store/${loginSlug}/login?next=${next}`} replace />
   }
 
   if (!Number.isFinite(requestId)) {
-    return <Navigate to={`/store/${slug}/account/chats`} replace />
+    return <Navigate to="/account/chats" replace />
   }
 
   async function handleSend(e: FormEvent) {
@@ -99,7 +98,7 @@ export function CustomerChatPage() {
   return (
     <div className={styles.shell}>
       <header className={styles.headerCompact}>
-        <Link to={`/store/${slug}/account/chats`} className={styles.back}>
+        <Link to={"/account/chats"} className={styles.back}>
           <IconChevronLeft size={16} /> К чатам
         </Link>
       </header>

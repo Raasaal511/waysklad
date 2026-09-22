@@ -298,14 +298,14 @@ export function CustomerAuthPage() {
               />
             </label>
 
-            <label className={styles.field} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+            <label className={styles.consent}>
               <input
                 type="checkbox"
                 checked={personalDataConsent}
                 onChange={(e) => setPersonalDataConsent(e.target.checked)}
                 required
               />
-              <span className={styles.fieldHint}>
+              <span>
                 Согласен на обработку телефона.{' '}
                 <a href="/privacy" target="_blank" rel="noreferrer">
                   Подробнее

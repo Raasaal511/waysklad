@@ -119,7 +119,7 @@ class SendStaffStorefrontMessageUseCase:
             preview = cmd.text.strip()
             if len(preview) > 120:
                 preview = preview[:117] + "…"
-            path = f"/store/{shop_slug}/account/chats/{cmd.request_id}" if shop_slug else ""
+            path = f"/account/chats/{cmd.request_id}"
             link = f"{settings.public_base_url.rstrip('/')}{path}" if settings.public_base_url and path else path
             text = (
                 f"Магазин «{shop_name}» ответил по заказу:\n{preview}"
