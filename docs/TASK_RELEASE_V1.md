@@ -173,7 +173,7 @@ z-index: 40`) и `widgets/public-header/PublicBottomNav.module.css`
 схемой: запросы к новым колонкам падают с 500, пока миграция не догонит.
 Если `up` поднял сломанный контейнер, джоба всё равно зелёная.
 
-- [ ] Новый порядок в шаге деплоя:
+- [x] Новый порядок в шаге деплоя:
   ```
   git pull origin main
   docker compose -f docker-compose.prod.yml build
@@ -185,11 +185,11 @@ z-index: 40`) и `widgets/public-header/PublicBottomNav.module.css`
   Если какой-то сервис в compose одноразовый и завершается сам (проверить
   `certbot`), `--wait` упадёт на нём — тогда перечислить сервисы явно:
   `up -d --wait db redis backend frontend scheduler storefront_bot`.
-- [ ] Перед `git pull` запомнить текущий коммит (`git rev-parse HEAD`) и
+- [x] Перед `git pull` запомнить текущий коммит (`git rev-parse HEAD`) и
   вывести его в лог джобы — чтобы откат был одной командой
   (`git checkout <sha>` + те же шаги). Записать эту команду в
   `docs/server-setup.md`, раздел «Откат».
-- [ ] Обновить команду в `authorized_keys` (раздел `command=` в
+- [x] Обновить команду в `authorized_keys` (раздел `command=` в
   `docs/server-setup.md`), если деплой ограничен ей.
 
 ### 2.2 Бэкап фото и проверенное восстановление
@@ -198,16 +198,16 @@ z-index: 40`) и `widgets/public-header/PublicBottomNav.module.css`
 `uploads_data`) не копируются никуда — потеря сервера = потеря фото всех
 магазинов. Восстановление ни разу не проверялось.
 
-- [ ] В `backup.sh`: рядом с дампом — архив фото. Проще всего через уже
+- [x] В `backup.sh`: рядом с дампом — архив фото. Проще всего через уже
   смонтированный volume backend’а, без имени volume:
   `docker compose -f docker-compose.prod.yml exec -T backend tar czf - -C /app uploads > backups/waysklad-uploads-${stamp}.tgz`.
   Та же ротация (30 локально), тот же `rclone copy`, если задан
   `BACKUP_RCLONE_REMOTE`. В `backup.json` — размер обоих файлов.
-- [ ] Новый `deploy/restore.sh <dump.sql.gz> [uploads.tgz]`: восстанавливает
+- [x] Новый `deploy/restore.sh <dump.sql.gz> [uploads.tgz]`: восстанавливает
   в **отдельную** БД `waysklad_restore_check` (не в боевую!), считает строки
   в ключевых таблицах (tenants, products, sales, debts) и печатает их. Флаг
   `--into-prod` — только с явным подтверждением ввода «ДА».
-- [ ] `docs/RESTORE.md`: пошагово, как восстановиться после потери сервера
+- [x] `docs/RESTORE.md`: пошагово, как восстановиться после потери сервера
   (новый VPS → docker → `.env` → restore → DNS). Кратко, командами.
 
 **Проверка:** локально в docker: `backup.sh` → `restore.sh` → числа строк
