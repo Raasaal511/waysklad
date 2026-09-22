@@ -1,0 +1,142 @@
+/* TimeSeriesChart — график по дням на инлайновом SVG (B2, B4). */
+
+.wrap {
+  position: relative;
+  width: 100%;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendBar {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.legendLine {
+  width: 14px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--board-new);
+}
+
+.grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.axisLabel {
+  font-size: 11px;
+  fill: var(--text-muted);
+}
+
+.axisLabelSecondary {
+  font-size: 11px;
+  fill: var(--board-new);
+}
+
+.bar {
+  fill: var(--accent);
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+}
+
+.barActive {
+  opacity: 1;
+}
+
+.line {
+  fill: none;
+  stroke: var(--board-new);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.cursor {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.tooltip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: tooltipIn 0.12s ease-out;
+}
+
+@keyframes tooltipIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.tooltipDate {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tooltipRow {
+  color: var(--text-muted);
+}
+
+.tooltipRow b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.empty {
+  margin: 0;
+  padding: 32px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar,
+  .tooltip {
+    transition: none;
+    animation: none;
+  }
+}
