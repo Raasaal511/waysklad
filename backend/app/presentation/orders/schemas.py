@@ -98,8 +98,9 @@ class IssueOrderRequest(BaseModel):
     cash_received: Decimal | None = None
     change_kept: Decimal = Decimal("0")  # клиент не забрал (часть) сдачи
     debt_due_date: date | None = None
+    paid_now: Decimal = Decimal("0")  # оплачено сразу при credit
 
-    @field_validator("change_kept", mode="before")
+    @field_validator("change_kept", "paid_now", mode="before")
     @classmethod
     def _null_change_kept_to_zero(cls, value: object) -> object:
         return Decimal("0") if value is None else value
@@ -111,6 +112,7 @@ class IssueOrderRequest(BaseModel):
             cash_received=self.cash_received,
             change_kept=self.change_kept,
             debt_due_date=self.debt_due_date,
+            paid_now=self.paid_now,
         )
 
 

@@ -37,6 +37,7 @@ class OfflineSaleRequest(BaseModel):
     # debt_due_date при payment_method=CREDIT и раньше просто отклонял такую
     # синхронизацию с ошибкой, вместо того чтобы применить её как остальные.
     debt_due_date: date | None = None
+    paid_now: Decimal = Decimal("0")  # отсутствует в старых записях IndexedDB → 0
 
     def to_command(self) -> CreateSaleCommand:
         return CreateSaleCommand(
@@ -56,6 +57,7 @@ class OfflineSaleRequest(BaseModel):
             cash_received=self.cash_received,
             client_op_id=self.client_op_id,
             debt_due_date=self.debt_due_date,
+            paid_now=self.paid_now,
         )
 
 

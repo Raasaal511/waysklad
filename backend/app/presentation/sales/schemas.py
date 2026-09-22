@@ -35,8 +35,9 @@ class SaleCreateRequest(BaseModel):
     change_kept: Decimal = Decimal("0")  # клиент не забрал (часть) сдачи
     client_op_id: str | None = None  # id операции с устройства — для повтора из офлайн-очереди
     debt_due_date: date | None = None  # «долг до» — обязателен при payment_method=credit
+    paid_now: Decimal = Decimal("0")  # оплачено сразу при credit
 
-    @field_validator("change_kept", "discount", mode="before")
+    @field_validator("change_kept", "discount", "paid_now", mode="before")
     @classmethod
     def _null_decimal_to_zero(cls, value: object) -> object:
         # фронт шлёт null, когда сдачи нет — дефолт поля срабатывает только при отсутствии ключа
@@ -61,6 +62,7 @@ class SaleCreateRequest(BaseModel):
             change_kept=self.change_kept,
             client_op_id=self.client_op_id,
             debt_due_date=self.debt_due_date,
+            paid_now=self.paid_now,
         )
 
 
@@ -81,6 +83,8 @@ class SaleResponse(BaseModel):
     subtotal: Decimal
     discount: Decimal
     prepayment: Decimal  # предоплата, уже полученная раньше (продажа из выдачи заказа)
+    paid_now: Decimal  # оплачено сразу при credit
+    debt_amount: Decimal  # остаток в долг (total − paid_now при credit, иначе 0)
     total: Decimal
     change: Decimal | None  # сдача, реально выданная на руки
     cash_received: Decimal | None  # сколько внёс клиент наличными
@@ -113,6 +117,8 @@ class SaleResponse(BaseModel):
             subtotal=sale.subtotal.amount,
             discount=sale.discount.amount,
             prepayment=sale.prepayment.amount,
+            paid_now=sale.paid_now.amount,
+            debt_amount=sale.debt_amount.amount,
             total=sale.total.amount,
             change=change,
             cash_received=sale.cash_received.amount if sale.cash_received is not None else None,
@@ -174,6 +180,7 @@ class SaleReturnResponse(BaseModel):
     sale_id: int
     note: str
     refund: Decimal
+    cash_to_client: Decimal  # наличными клиенту (сверх погашения долга при credit)
     created_at: datetime
     lines: list[SaleReturnLineResponse]
 
@@ -185,6 +192,7 @@ class SaleReturnResponse(BaseModel):
             sale_id=sale_return.sale_id,
             note=sale_return.note,
             refund=result.refund.amount,
+            cash_to_client=result.cash_to_client.amount,
             created_at=sale_return.created_at,
             lines=[
                 SaleReturnLineResponse(sale_line_id=line.sale_line_id, quantity=line.quantity.value)

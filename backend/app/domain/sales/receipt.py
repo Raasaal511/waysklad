@@ -28,8 +28,13 @@ def render_receipt_text(
     lines.append("")
     if sale.discount.amount:
         lines.append(f"Скидка: {format_rub(sale.discount)}")
+    if sale.prepayment.amount:
+        lines.append(f"Предоплата: {format_rub(sale.prepayment)}")
     lines.append(f"Итого: {format_rub(sale.total)}")
     lines.append(f"Оплата: {_PAYMENT_LABELS[sale.payment_method]}")
+    if sale.payment_method is PaymentMethod.CREDIT and sale.paid_now.amount:
+        lines.append(f"Оплачено сразу: {format_rub(sale.paid_now)}")
+        lines.append(f"В долг: {format_rub(sale.debt_amount)}")
     lines.append("Спасибо за покупку!")
     return "\n".join(lines)
 

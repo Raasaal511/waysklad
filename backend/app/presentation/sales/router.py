@@ -152,6 +152,7 @@ async def list_sale_returns(
                  for line in r.lines),
                 Decimal("0"),
             ),
+            cash_to_client=Decimal("0"),  # история не хранит разбивку; видно в ответе create
             created_at=r.created_at,
             lines=[
                 SaleReturnLineResponse(
