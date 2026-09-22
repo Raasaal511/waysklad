@@ -39,6 +39,7 @@ import {
   IconThumbDown,
   IconEye,
   IconEyeOff,
+  IconShoppingCart,
   type Icon as TablerIcon,
 } from '@tabler/icons-react'
 
@@ -63,6 +64,7 @@ export function ProductDetailPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const canManage = user?.role === 'owner' || user?.role === 'manager'
+  const canSell = user?.role === 'owner' || user?.role === 'manager' || user?.role === 'seller'
   const storefrontEnabled = useFeature('storefront')
 
   const {
@@ -201,26 +203,41 @@ export function ProductDetailPage() {
                     )}
                   </div>
                 </div>
-                {canManage && (
+                {(canSell || canManage) && (
                   <div className={styles.heroActions}>
-                    <IconButton
-                      variant="muted"
-                      size="lg"
-                      tooltip="Редактировать товар"
-                      aria-label="Редактировать товар"
-                      onClick={() => navigate(`/products/${product.id}/edit`)}
-                    >
-                      <IconPencil size={22} stroke={1.8} />
-                    </IconButton>
-                    <IconButton
-                      variant="danger"
-                      size="lg"
-                      tooltip="Удалить товар"
-                      aria-label="Удалить товар"
-                      onClick={() => setShowDeleteConfirm(true)}
-                    >
-                      <IconTrash size={20} stroke={1.8} />
-                    </IconButton>
+                    {canSell && (
+                      <IconButton
+                        variant="accent"
+                        size="lg"
+                        tooltip="Оформить продажу"
+                        aria-label="Оформить продажу этого товара"
+                        onClick={() => navigate(`/sales/new?product=${product.id}`)}
+                      >
+                        <IconShoppingCart size={22} stroke={1.8} />
+                      </IconButton>
+                    )}
+                    {canManage && (
+                      <>
+                        <IconButton
+                          variant="muted"
+                          size="lg"
+                          tooltip="Редактировать товар"
+                          aria-label="Редактировать товар"
+                          onClick={() => navigate(`/products/${product.id}/edit`)}
+                        >
+                          <IconPencil size={22} stroke={1.8} />
+                        </IconButton>
+                        <IconButton
+                          variant="danger"
+                          size="lg"
+                          tooltip="Удалить товар"
+                          aria-label="Удалить товар"
+                          onClick={() => setShowDeleteConfirm(true)}
+                        >
+                          <IconTrash size={20} stroke={1.8} />
+                        </IconButton>
+                      </>
+                    )}
                   </div>
                 )}
               </div>

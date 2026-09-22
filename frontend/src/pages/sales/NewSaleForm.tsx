@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { listProducts, getByBarcode, type Product } from '../../entities/product/api'
+import { listProducts, getByBarcode, getProduct, type Product } from '../../entities/product/api'
 import { type Client, createClient } from '../../entities/counterparty/api'
 import { useCatalog } from '../../app/CatalogContext'
 import {
@@ -67,11 +67,14 @@ export function NewSaleForm({
   onClientsChange,
   onClose,
   onDone,
+  initialProductId = null,
 }: {
   clients: Client[]
   onClientsChange: (clients: Client[]) => void
   onClose: () => void
   onDone: (sale: Sale) => void
+  /** Товар сразу в корзину — ссылка с карточки товара `/sales/new?product=…`. */
+  initialProductId?: number | null
 }) {
   const draft = useMemo(() => loadDraft(), [])
   const {
@@ -189,6 +192,26 @@ export function NewSaleForm({
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // С карточки товара: `/sales/new?product=id` — сразу кладём в корзину
+  const initialProductAddedRef = useRef(false)
+  useEffect(() => {
+    if (!initialProductId || initialProductAddedRef.current) return
+    let cancelled = false
+    getProduct(initialProductId)
+      .then((product) => {
+        if (cancelled) return
+        initialProductAddedRef.current = true
+        setCart((prev) => {
+          if (prev.some((l) => l.product.id === product.id)) return prev
+          return [...prev, { product, quantity: '1', price: product.retail_price }]
+        })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [initialProductId])
 
   // Черновик переживает закрытие модалки/перезагрузку страницы, пока продажа не проведена
   useEffect(() => {
