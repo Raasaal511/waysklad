@@ -107,7 +107,7 @@ chmod 600 ~/.ssh/authorized_keys
 в `~/.ssh/authorized_keys` перед публичным ключом можно добавить restriction:
 
 ```
-command="cd /home/deploy/apps/waysklad && git pull origin main && docker compose -f docker-compose.prod.yml up -d --build && docker compose -f docker-compose.prod.yml exec -T backend alembic upgrade head",no-port-forwarding,no-X11-forwarding,no-agent-forwarding ssh-ed25519 AAAA...
+command="cd /home/deploy/apps/waysklad && PREV=\$(git rev-parse HEAD) && echo Deploy previous SHA: \$PREV && git pull origin main && docker compose -f docker-compose.prod.yml build && docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head && docker compose -f docker-compose.prod.yml up -d --wait db redis backend frontend scheduler storefront_bot && docker compose -f docker-compose.prod.yml up -d certbot",no-port-forwarding,no-X11-forwarding,no-agent-forwarding ssh-ed25519 AAAA...
 ```
 
 Это жёстко ограничивает ключ одной командой — даже если приватный ключ
@@ -160,8 +160,10 @@ repository secret**. Добавить:
 
 ```bash
 cd /home/deploy/apps/waysklad
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+docker compose -f docker-compose.prod.yml up -d --wait db redis backend frontend scheduler storefront_bot
+docker compose -f docker-compose.prod.yml up -d certbot
 ```
 
 Проверить:
@@ -205,12 +207,21 @@ rclone lsd <имя-remote>:
 BACKUP_RCLONE_REMOTE=<имя-remote>:<бакет-или-путь>
 ```
 
-После этого `backup.sh` при каждом запуске копирует свежий дамп на remote, а
-по воскресеньям дополнительно кладёт его в `<remote>/weekly` с хранением 90
-дней — так локальная ежедневная ротация (30 копий) не единственная защита от
-порчи БД, которую заметили не сразу. Если `BACKUP_RCLONE_REMOTE` не задан,
-скрипт не падает, но пишет предупреждение в лог cron — не должно молчать об
-этом до первого реального инцидента.
+После этого `backup.sh` при каждом запуске копирует свежий дамп и архив
+фото на remote, а по воскресеньям дополнительно кладёт их в `<remote>/weekly`
+с хранением 90 дней — так локальная ежедневная ротация (30 копий) не
+единственная защита от порчи БД, которую заметили не сразу. Если
+`BACKUP_RCLONE_REMOTE` не задан, скрипт не падает, но пишет предупреждение
+в лог cron — не должно молчать об этом до первого реального инцидента.
+
+Проверка восстановления (в отдельную БД, не в бой):
+
+```bash
+./deploy/backup.sh
+./deploy/restore.sh backups/waysklad-….sql.gz backups/waysklad-uploads-….tgz
+```
+
+Полный сценарий после потери сервера — `docs/RESTORE.md`.
 
 ## 9. Проверка автодеплоя
 
@@ -236,3 +247,23 @@ docker compose -f docker-compose.prod.yml logs -f backend
 - GitHub Actions запускает деплои по очереди для одного и того же workflow
   (не параллельно), так что два пуша подряд не столкнутся друг с другом на
   сервере.
+
+## Откат
+
+В логе джобы деплоя печатается `Deploy previous SHA: <sha>` — коммит до
+`git pull`. Откат на сервере одной серией команд:
+
+```bash
+cd /home/deploy/apps/waysklad
+git checkout <sha>
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+docker compose -f docker-compose.prod.yml up -d --wait db redis backend frontend scheduler storefront_bot
+docker compose -f docker-compose.prod.yml up -d certbot
+```
+
+Миграции в этом релизе только добавляющие — старый код совместим с новой
+схемой, откат кода без downgrade миграций безопасен. Если откатываетесь
+через коммит, где схемы ещё нет нужных колонок, и уже накатили миграции
+вперёд — не делайте `alembic downgrade`; оставьте схему, откатитесь только
+код на совместимый SHA.
