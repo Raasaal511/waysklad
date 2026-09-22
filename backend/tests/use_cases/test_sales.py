@@ -539,3 +539,285 @@ async def test_stocktake_detects_and_corrects_discrepancy(
 
     async with make_uow(tenant_id) as uow:
         assert await uow.stock.get(product.id, warehouse_id) == Decimal("46")
+
+
+async def test_credit_sale_with_paid_now_creates_residual_debt(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    """Долг = total − paid_now; выручка по полной сумме (total не уменьшается)."""
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Куртка")
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("10"))],
+        ),
+    )
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Ахмед", debt_limit=Decimal("10000"))
+    )
+
+    result = await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CREDIT,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("5000"))],
+            client_id=client.id,
+            debt_due_date=date.today() + timedelta(days=7),
+            paid_now=Decimal("3000"),
+        ),
+    )
+    assert result.sale.total == Money.of("5000")
+    assert result.sale.paid_now == Money.of("3000")
+    assert result.sale.debt_amount == Money.of("2000")
+
+    async with make_uow(tenant_id) as uow:
+        debts = await uow.debts.list_by_client(client.id)
+        assert len(debts) == 1
+        assert debts[0].amount == Money.of("2000")
+        assert debts[0].balance == Money.of("2000")
+
+
+async def test_paid_now_rejects_when_covers_full_total(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id)
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("5"))],
+        ),
+    )
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Клиент")
+    )
+
+    with pytest.raises(DomainError, match="заплатил всю сумму"):
+        await CreateSaleUseCase(make_uow(tenant_id)).execute(
+            owner,
+            CreateSaleCommand(
+                warehouse_id=warehouse_id,
+                payment_method=PaymentMethod.CREDIT,
+                items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("500"))],
+                client_id=client.id,
+                debt_due_date=date.today() + timedelta(days=7),
+                paid_now=Decimal("500"),
+            ),
+        )
+
+
+async def test_paid_now_rejects_on_cash_payment(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id)
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("5"))],
+        ),
+    )
+
+    with pytest.raises(DomainError, match="Заплатил сейчас"):
+        await CreateSaleUseCase(make_uow(tenant_id)).execute(
+            owner,
+            CreateSaleCommand(
+                warehouse_id=warehouse_id,
+                payment_method=PaymentMethod.CASH,
+                items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("500"))],
+                paid_now=Decimal("100"),
+            ),
+        )
+
+
+async def test_debt_limit_checked_against_residual_not_full_total(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    """Лимит 2500: продажа 5000 с paid_now 3000 → долг 2000 — проходит."""
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id)
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("10"))],
+        ),
+    )
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Лимит", debt_limit=Decimal("2500"))
+    )
+
+    result = await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CREDIT,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("5000"))],
+            client_id=client.id,
+            debt_due_date=date.today() + timedelta(days=7),
+            paid_now=Decimal("3000"),
+        ),
+    )
+    assert result.sale.debt_amount == Money.of("2000")
+
+    # без paid_now полная сумма 3000 превысила бы лимит 2500
+    with pytest.raises(DomainError, match="лимит долга"):
+        await CreateSaleUseCase(make_uow(tenant_id)).execute(
+            owner,
+            CreateSaleCommand(
+                warehouse_id=warehouse_id,
+                payment_method=PaymentMethod.CREDIT,
+                items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("3000"))],
+                client_id=client.id,
+                debt_due_date=date.today() + timedelta(days=7),
+            ),
+        )
+
+
+async def test_return_after_partial_paid_now_refunds_cash_excess(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    """Продажа 5000, paid_now 3000, долг 2000. Возврат на 1000 → только долг, клиенту 0."""
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Товар")
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("10"))],
+        ),
+    )
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Клиент", debt_limit=Decimal("50000"))
+    )
+    sale_result = await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CREDIT,
+            items=[SaleItemInput(product_id=product.id, quantity=Decimal("5"), price=Decimal("1000"))],
+            client_id=client.id,
+            debt_due_date=date.today() + timedelta(days=7),
+            paid_now=Decimal("3000"),
+        ),
+    )
+    sale_line_id = sale_result.sale.lines[0].id
+
+    partial = await ReturnSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReturnSaleCommand(
+            sale_id=sale_result.sale.id,
+            items=[ReturnItemInput(sale_line_id=sale_line_id, quantity=Decimal("1"))],
+        ),
+    )
+    assert partial.refund == Money.of("1000")
+    assert partial.cash_to_client == Money.zero()
+    async with make_uow(tenant_id) as uow:
+        debts = await uow.debts.list_by_client(client.id)
+        assert debts[0].balance == Money.of("1000")
+
+
+async def test_return_full_goods_after_paid_now_gives_cash_to_client(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    """Продажа 5000 (paid_now 3000, долг 2000). Возврат на 4000 → долг 0, клиенту 2000."""
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Большой")
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("10"))],
+        ),
+    )
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Клиент2", debt_limit=Decimal("50000"))
+    )
+    p2 = await create_product(tenant_id, name="Малый")
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=p2.id, quantity=Decimal("10"))],
+        ),
+    )
+    sale_result = await CreateSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        CreateSaleCommand(
+            warehouse_id=warehouse_id,
+            payment_method=PaymentMethod.CREDIT,
+            items=[
+                SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("3000")),
+                SaleItemInput(product_id=p2.id, quantity=Decimal("2"), price=Decimal("1000")),
+            ],
+            client_id=client.id,
+            debt_due_date=date.today() + timedelta(days=7),
+            paid_now=Decimal("3000"),
+        ),
+    )
+    lines = {line.product_id: line for line in sale_result.sale.lines}
+    ret = await ReturnSaleUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReturnSaleCommand(
+            sale_id=sale_result.sale.id,
+            items=[
+                ReturnItemInput(sale_line_id=lines[product.id].id, quantity=Decimal("1")),  # 3000
+                ReturnItemInput(sale_line_id=lines[p2.id].id, quantity=Decimal("1")),  # 1000
+            ],
+        ),
+    )
+    assert ret.refund == Money.of("4000")
+    assert ret.cash_to_client == Money.of("2000")
+    async with make_uow(tenant_id) as uow:
+        debts = await uow.debts.list_by_client(client.id)
+        assert debts[0].balance == Money.zero()
+
+
+async def test_edit_sale_client_note_after_paid_now(
+    make_uow, registered_shop, warehouse_id, create_product
+):
+    """edit_sale по-прежнему только клиент/заметка — суммы и paid_now не трогает."""
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id)
+    await ReceiveGoodsUseCase(make_uow(tenant_id)).execute(
+        owner,
+        ReceiveGoodsCommand(
+            warehouse_id=warehouse_id,
+            lines=[LineInput(product_id=product.id, quantity=Decimal("5"))],
+        ),
+    )
+    client = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="А", debt_limit=Decimal("10000"))
+    )
+    other = await CreateClientUseCase(make_uow(tenant_id)).execute(
+        owner, CreateClientCommand(name="Б")
+    )
+    sale = (
+        await CreateSaleUseCase(make_uow(tenant_id)).execute(
+            owner,
+            CreateSaleCommand(
+                warehouse_id=warehouse_id,
+                payment_method=PaymentMethod.CREDIT,
+                items=[SaleItemInput(product_id=product.id, quantity=Decimal("1"), price=Decimal("1000"))],
+                client_id=client.id,
+                debt_due_date=date.today() + timedelta(days=7),
+                paid_now=Decimal("400"),
+            ),
+        )
+    ).sale
+
+    await EditSaleUseCase(make_uow(tenant_id)).execute(
+        owner, EditSaleCommand(sale_id=sale.id, client_id=other.id, note="правка")
+    )
+    async with make_uow(tenant_id) as uow:
+        updated = await uow.sales.get(sale.id)
+        assert updated.client_id == other.id
+        assert updated.note == "правка"
+        assert updated.paid_now == Money.of("400")
+        debts = await uow.debts.list_by_client(client.id)
+        assert debts[0].balance == Money.of("600")

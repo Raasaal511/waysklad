@@ -47,6 +47,17 @@ def test_receipt_text_labels_credit_payment():
     assert "в долг" in text
 
 
+def test_receipt_text_shows_paid_now_breakdown():
+    sale = _sale(
+        payment_method=PaymentMethod.CREDIT,
+        client_id=5,
+        paid_now=Money.of("300"),
+    )
+    text = render_receipt_text("Магазин Беркат", sale, {100: "Товар"})
+    assert "Оплачено сразу: 300 ₽" in text
+    assert "В долг: 200 ₽" in text
+
+
 def test_whatsapp_link_strips_plus_and_encodes_text():
     link = build_whatsapp_link(Phone("+79280001122"), "Привет! Ваш чек")
     assert link.startswith("https://wa.me/79280001122?text=")

@@ -331,9 +331,12 @@ async def test_order_issue_creates_sale_and_settles_debt(
             order_id=order.id,
             payment_method=PaymentMethod.CREDIT,
             debt_due_date=date.today() + timedelta(days=5),
+            paid_now=Decimal("500"),
         ),
     )
     assert result.sale.total == Money.of("2000")  # доплата (3000 - 1000), не полная сумма
+    assert result.sale.paid_now == Money.of("500")
+    assert result.sale.debt_amount == Money.of("1500")
     assert result.order.status is OrderStatus.ISSUED
     assert result.order.sale_id == result.sale.id
     assert result.sale.order_id == order.id
@@ -343,7 +346,7 @@ async def test_order_issue_creates_sale_and_settles_debt(
         assert await uow.stock.get_reserved(product.id, warehouse_id) == Decimal("0")
         debts = await uow.debts.list_by_client(client.id)
         assert len(debts) == 1
-        assert debts[0].balance == Money.of("2000")
+        assert debts[0].balance == Money.of("1500")
         assert debts[0].sale_id == result.sale.id
 
     # аналитика считает выручку по полной сумме заказа, а не по доплате —

@@ -364,3 +364,53 @@ async def test_sync_error_has_typed_code_via_api(client, owner_headers):
     assert error["op_type"] == "sale"
     assert error["code"] == "InsufficientStockError"
     assert error["client_op_id"] == "op-insufficient-stock"
+
+
+async def test_sync_credit_sale_with_paid_now_via_api(client, owner_headers):
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Офлайн частичный", "purchase_price": "50", "retail_price": "500"},
+    )
+    product_id = response.json()["id"]
+    await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={"warehouse_id": 1, "lines": [{"product_id": product_id, "quantity": "10"}]},
+    )
+    response = await client.post(
+        "/api/counterparties/clients", headers=owner_headers, json={"name": "Офлайн долг"}
+    )
+    client_id = response.json()["id"]
+
+    batch = {
+        "sales": [
+            {
+                "client_op_id": "paid-now-offline-1",
+                "warehouse_id": 1,
+                "payment_method": "credit",
+                "items": [{"product_id": product_id, "quantity": "1", "price": "5000"}],
+                "client_id": client_id,
+                "debt_due_date": str(date.today() + timedelta(days=7)),
+                "paid_now": "3000",
+            }
+        ]
+    }
+    response = await client.post("/api/sync/sales", headers=owner_headers, json=batch)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert len(result["applied"]) == 1
+    assert result["applied"][0]["total"] == "5000.00"
+
+    response = await client.get(f"/api/debts/client/{client_id}", headers=owner_headers)
+    debts = response.json()["debts"]
+    assert len(debts) == 1
+    assert debts[0]["amount"] == "2000.00"
+    assert debts[0]["balance"] == "2000.00"
+
+    # повтор той же client_op_id не задваивает
+    response = await client.post("/api/sync/sales", headers=owner_headers, json=batch)
+    assert response.status_code == 200
+    assert len(response.json()["applied"]) == 1
+    response = await client.get(f"/api/debts/client/{client_id}", headers=owner_headers)
+    assert len(response.json()["debts"]) == 1

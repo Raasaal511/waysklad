@@ -77,6 +77,11 @@ from app.presentation.deps.security import get_file_storage
 from app.presentation.deps.uow import get_session_factory
 
 _ADMIN_DB_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/postgres"
+_TEST_DB_HOST = "localhost"
+# в docker compose Postgres доступен как хост `db`, а не localhost контейнера
+if "@db:" in os.environ.get("DATABASE_URL", ""):
+    _ADMIN_DB_URL = "postgresql+psycopg://postgres:postgres@db:5432/postgres"
+    _TEST_DB_HOST = "db"
 
 
 def _worker_db_name() -> str:
@@ -137,7 +142,7 @@ async def _db_engine(_test_db_ready) -> AsyncIterator:
     pytest-asyncio создаёт на каждый тест — соединение из пула пережило бы
     свой loop и упало бы при повторном использовании. Замер показал, что пул
     здесь экономит меньше секунды на прогоне, так что менять смысла нет."""
-    db_url = f"postgresql+psycopg://postgres:postgres@localhost:5432/{_test_db_ready}"
+    db_url = f"postgresql+psycopg://postgres:postgres@{_TEST_DB_HOST}:5432/{_test_db_ready}"
     engine = create_async_engine(db_url, poolclass=NullPool)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
@@ -275,7 +280,9 @@ def _worker_redis_url() -> str:
     воркер видит запись/закешированный результат другого."""
     worker = os.environ.get("PYTEST_XDIST_WORKER", "").removeprefix("gw")
     db = 15 - (int(worker) % 16) if worker.isdigit() else 15
-    return f"redis://localhost:6379/{db}"
+    # docker compose: Redis как хост `redis`; CI/локально — localhost
+    host = "redis" if "://redis:" in os.environ.get("CACHE_REDIS_URL", "") else "localhost"
+    return f"redis://{host}:6379/{db}"
 
 
 @pytest.fixture
