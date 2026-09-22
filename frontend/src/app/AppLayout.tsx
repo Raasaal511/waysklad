@@ -168,7 +168,9 @@ function LogoMark() {
 function ShopTitle({ shopName }: { shopName: string }) {
   return (
     <div className={styles['app-shop-title']}>
-      <span className={styles['app-shop-name']}>{shopName}</span>
+      <span className={styles['app-shop-name']} title={shopName}>
+        {shopName}
+      </span>
       <span className={styles['app-brand-tag']}>WaySklad</span>
     </div>
   )
@@ -306,10 +308,21 @@ export function AppLayout() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1')
   const [moreOpen, setMoreOpen] = useState(false)
   const [offlineTip, setOfflineTip] = useState(false)
+  const [narrowHeader, setNarrowHeader] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 599px)').matches,
+  )
   const headerRef = useRef<HTMLElement>(null)
   /** История для «назад» закрывает шторку только если её открыл пользователь (не онбординг). */
   const moreHistoryPushed = useRef(false)
   const { pendingCount, notice, dismissNotice } = useOfflineSync()
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 599px)')
+    const onChange = () => setNarrowHeader(mq.matches)
+    onChange()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
 
   const canSell = user?.role != null && SELL_ROLES.includes(user.role)
   const navItems = useMemo(
@@ -477,7 +490,7 @@ export function AppLayout() {
             <LogoMark />
             <ShopTitle shopName={shopName} />
           </div>
-          <GlobalSearch />
+          <GlobalSearch compact={narrowHeader} />
           <div className={styles['app-header-user']}>
             {pendingCount > 0 && (
               <div className={styles['app-offline-badge-wrap']}>
@@ -498,7 +511,7 @@ export function AppLayout() {
               </div>
             )}
             <NotificationBell />
-            <UserBadge name={user?.name} role={user?.role} />
+            <UserBadge name={user?.name} role={user?.role} collapsed={narrowHeader} />
           </div>
         </header>
 
@@ -535,6 +548,10 @@ export function AppLayout() {
                 data-nav={item.to === '/tasks' ? 'tasks' : undefined}
                 data-onboarding={item.to}
                 aria-label={item.label}
+                onClick={(e) => {
+                  /* После тапа WebKit иногда оставляет outline — снимаем фокус. */
+                  ;(e.currentTarget as HTMLElement).blur()
+                }}
               >
                 <span className={styles['app-nav-icon']}>
                   <item.icon size={21} stroke={1.8} />

@@ -7,6 +7,31 @@
   max-width: 420px;
 }
 
+.wrapExpanded {
+  flex: 1 1 auto;
+  max-width: none;
+}
+
+.iconOnly {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.iconOnly:hover {
+  background: var(--bg-muted);
+  color: var(--accent);
+}
+
 .field {
   display: flex;
   align-items: center;

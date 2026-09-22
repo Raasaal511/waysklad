@@ -43,15 +43,20 @@ function findExactMatch(items: Product[], query: string): Product | null {
  * Enter: при точном совпадении (полное название/артикул/штрихкод) — сразу
  * карточка товара, иначе — список товаров с этим запросом.
  */
-export function GlobalSearch() {
+export function GlobalSearch({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [items, setItems] = useState<Product[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
+  const [expanded, setExpanded] = useState(!compact)
   const [highlighted, setHighlighted] = useState(-1)
   const wrapRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!compact) setExpanded(true)
+  }, [compact])
 
   const trimmed = query.trim()
 
@@ -126,7 +131,7 @@ export function GlobalSearch() {
     navigate(target)
   }
 
-  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setOpen(true)
@@ -138,6 +143,11 @@ export function GlobalSearch() {
       e.preventDefault()
       submit()
     } else if (e.key === 'Escape') {
+      if (compact) {
+        reset()
+        setExpanded(false)
+        return
+      }
       setOpen(false)
       setHighlighted(-1)
     }
@@ -146,8 +156,24 @@ export function GlobalSearch() {
   const showDropdown = open && trimmed.length >= MIN_QUERY_LENGTH
   const nothingFound = showDropdown && !loading && items.length === 0
 
+  if (compact && !expanded) {
+    return (
+      <button
+        type="button"
+        className={styles.iconOnly}
+        aria-label="Поиск товаров"
+        onClick={() => {
+          setExpanded(true)
+          window.setTimeout(() => inputRef.current?.focus(), 0)
+        }}
+      >
+        <IconSearch size={22} stroke={1.8} />
+      </button>
+    )
+  }
+
   return (
-    <div className={styles.wrap} ref={wrapRef}>
+    <div className={[styles.wrap, compact && styles.wrapExpanded].filter(Boolean).join(' ')} ref={wrapRef}>
       <form
         className={styles.field}
         role="search"
@@ -165,7 +191,7 @@ export function GlobalSearch() {
             setOpen(true)
           }}
           onFocus={() => setOpen(true)}
-          onKeyDown={onKeyDown}
+          onKeyDown={handleKeyDown}
           placeholder="Поиск по названию, артикулу, штрихкоду…"
           aria-label="Поиск товаров"
           aria-expanded={showDropdown}
@@ -173,8 +199,16 @@ export function GlobalSearch() {
           role="combobox"
           aria-controls="global-search-results"
         />
-        {query && (
-          <button type="button" className={styles.clear} onClick={reset} aria-label="Очистить поиск">
+        {(query || compact) && (
+          <button
+            type="button"
+            className={styles.clear}
+            onClick={() => {
+              reset()
+              if (compact) setExpanded(false)
+            }}
+            aria-label={query ? 'Очистить поиск' : 'Закрыть поиск'}
+          >
             <IconX size={16} stroke={2} />
           </button>
         )}

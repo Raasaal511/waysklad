@@ -57,8 +57,8 @@
 
 @media (max-width: 1023px) {
   .backBtn {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
   }
 }
 
@@ -76,6 +76,7 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  min-height: 44px;
   color: var(--text);
   border-radius: var(--radius-sm);
 }
@@ -282,13 +283,6 @@
   transition: background 150ms ease-out;
 }
 
-@media (max-width: 1023px) {
-  .iconAction {
-    width: 40px;
-    height: 40px;
-  }
-}
-
 .iconAction:hover {
   background: var(--bg-muted);
 }
@@ -337,13 +331,6 @@
   font-weight: 600;
   white-space: nowrap;
   transition: background 150ms ease-out, transform 150ms ease-out;
-}
-
-@media (max-width: 1023px) {
-  .loginBtn {
-    height: 40px;
-    padding: 0 14px;
-  }
 }
 
 .loginBtn:hover {

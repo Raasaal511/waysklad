@@ -193,8 +193,33 @@ select {
 
 input:not([type='checkbox']):not([type='radio']):focus,
 select:focus {
+  outline: none;
+}
+
+input:not([type='checkbox']):not([type='radio']):focus-visible,
+select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* iOS зумит страницу, если font-size инпута < 16px */
+@media (max-width: 899px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+a:focus,
+button:focus {
+  outline: none;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 input[type='checkbox'],
@@ -226,6 +251,34 @@ button {
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Телефон: зона касания ≥ 44px и шрифт инпутов ≥ 16px (иначе iOS зумит). */
+@media (max-width: 899px) {
+  button:not(:disabled),
+  a.btn,
+  [role='button'] {
+    min-height: 44px;
+  }
+
+  /* Исключения: компактные степперы/крестики внутри карточек */
+  button.product-tile-remove,
+  button.cart-qty-step,
+  [class*='nav-sell-btn'],
+  [class*='icon-button']:not([class*='icon-button-lg']),
+  [class*='password-toggle'],
+  [class*='clear'],
+  [class*='iconOnly'] {
+    min-height: 0;
+  }
+
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px;
+    min-height: 44px;
+    box-sizing: border-box;
+  }
 }
 
 /* Button variants — перенесены в src/shared/ui/Button.module.css */
@@ -408,7 +461,8 @@ tbody tr:not(:last-child) {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .data-table-head,

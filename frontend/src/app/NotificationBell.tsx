@@ -139,7 +139,7 @@ export function NotificationBell({ align = 'right' }: { align?: 'left' | 'right'
         aria-label="Уведомления"
         onClick={() => setOpen((v) => !v)}
       >
-        <IconBell size={19} stroke={1.8} />
+        <IconBell size={24} stroke={1.8} />
         {unread > 0 && <span className={styles['app-bell-badge']}>{unread > 9 ? '9+' : unread}</span>}
       </button>
 

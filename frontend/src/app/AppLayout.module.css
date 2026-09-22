@@ -44,13 +44,12 @@
   line-height: 1.25;
   color: var(--text);
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-brand-tag {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-muted);
   letter-spacing: 0.02em;
@@ -76,12 +75,54 @@
 .app-header-user {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
-.app-header-user button {
+/* Не трогаем колокольчик/иконки — им задан свой 44×44. */
+.app-header-user > button:not([class*='bell']):not([aria-label]) {
   padding: 7px 12px;
   font-size: 13px;
+}
+
+@media (max-width: 599px) {
+  .app-header {
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .app-shop-brand {
+    flex: 1 1 auto;
+    max-width: calc(100% - 100px);
+  }
+
+  .app-shop-name {
+    max-width: 100%;
+  }
+
+  .app-brand-tag {
+    display: none;
+  }
+
+  .app-header-user {
+    gap: 0;
+  }
+
+  .app-header-user .app-user-info {
+    display: none;
+  }
+
+  .app-header-user .app-user-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .app-header-user .app-user-badge {
+    width: 44px;
+    height: 44px;
+    justify-content: center;
+    gap: 0;
+  }
 }
 
 .app-content {
@@ -110,6 +151,18 @@
   font-size: 13px;
   max-width: min(90vw, 420px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 899px) {
+  .app-offline-toast {
+    top: auto;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+
+  .app-content-with-sell ~ .app-offline-toast,
+  .app-layout:has(.app-content-with-sell) .app-offline-toast {
+    bottom: calc(88px + env(safe-area-inset-bottom));
+  }
 }
 
 .app-offline-toast-success {
@@ -211,12 +264,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 2px;
   padding: 6px 2px;
   text-decoration: none;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.1;
   background: none;
@@ -245,16 +298,22 @@
 .app-nav-sell {
   flex: 1;
   min-width: 0;
+  min-height: 52px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-end;
   gap: 2px;
-  padding: 0 2px 6px;
-  margin-top: -18px;
+  padding: 6px 2px;
+  margin-top: 0;
+  position: relative;
 }
 
 .app-nav-sell-btn {
+  position: absolute;
+  left: 50%;
+  bottom: calc(6px + 1.1em + 2px);
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -271,11 +330,11 @@
 
 .app-nav-sell-btn:active {
   background: var(--accent-hover);
-  transform: scale(0.96);
+  transform: translateX(-50%) scale(0.96);
 }
 
 .app-nav-sell-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--accent);
   line-height: 1.1;
@@ -283,6 +342,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.app-nav-item:focus,
+.app-nav-sell-btn:focus {
+  outline: none;
+}
+
+.app-nav-item:focus-visible,
+.app-nav-sell-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .app-more-overlay {
@@ -306,15 +376,16 @@
 }
 
 .app-more-sheet {
-  width: 100%;
+  width: min(100%, calc(100vw - 32px));
   max-width: 480px;
-  max-height: min(80svh, 560px);
+  max-height: min(calc(100dvh - 32px), 560px);
   display: flex;
   flex-direction: column;
   border-radius: var(--radius) var(--radius) 0 0;
   background: var(--bg);
   box-shadow: 0 -8px 32px rgba(20, 24, 19, 0.18);
   padding: 0 0 max(12px, env(safe-area-inset-bottom));
+  margin: 0 16px;
   animation: app-more-slide 0.18s ease;
   overflow: hidden;
 }
