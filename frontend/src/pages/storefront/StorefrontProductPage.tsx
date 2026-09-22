@@ -1,6 +1,7 @@
 import { useParams, useSearchParams } from 'react-router-dom'
 import { IconHeart, IconHeartFilled } from '@tabler/icons-react'
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
+import { FAVORITES_EVENT, loadFavorites, toggleFavorite } from '../../shared/lib/favorites'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { formatMoney, plural } from '../../shared/lib/format'
 import {
@@ -38,23 +39,9 @@ const RecentlyViewedSection = lazy(() =>
   import('./product/RecentlyViewedSection').then((m) => ({ default: m.RecentlyViewedSection })),
 )
 
-const FAVORITES_KEY = 'waysklad:storefront-favorites'
 // Окно защиты от двойного клика по «В корзину» — короче анимации «Добавлено» (1600ms),
 // чтобы не мешать намеренным быстрым повторным добавлениям, но перекрыть double-click.
 const ADD_GUARD_MS = 500
-
-function loadFavorites(slug: string): number[] {
-  try {
-    const raw = localStorage.getItem(`${FAVORITES_KEY}:${slug}`)
-    return raw ? (JSON.parse(raw) as number[]) : []
-  } catch {
-    return []
-  }
-}
-
-function saveFavorites(slug: string, ids: number[]) {
-  localStorage.setItem(`${FAVORITES_KEY}:${slug}`, JSON.stringify(ids))
-}
 
 export function StorefrontProductPage() {
   const { slug = '', productId = '' } = useParams<{ slug: string; productId: string }>()
@@ -178,13 +165,22 @@ export function StorefrontProductPage() {
     }
   }, [product])
 
-  function toggleFavorite() {
+  // избранное меняется и вне карточки — на /favorites и в другой вкладке
+  useEffect(() => {
+    function sync() {
+      setFavorites(loadFavorites(slug))
+    }
+    window.addEventListener(FAVORITES_EVENT, sync)
+    window.addEventListener('storage', sync)
+    return () => {
+      window.removeEventListener(FAVORITES_EVENT, sync)
+      window.removeEventListener('storage', sync)
+    }
+  }, [slug])
+
+  function handleToggleFavorite() {
     if (!product) return
-    setFavorites((prev) => {
-      const next = prev.includes(product.id) ? prev.filter((id) => id !== product.id) : [...prev, product.id]
-      saveFavorites(slug, next)
-      return next
-    })
+    setFavorites(toggleFavorite(slug, product.id))
   }
 
   if (loading) {
@@ -307,7 +303,7 @@ export function StorefrontProductPage() {
           <button
             type="button"
             className={shellStyles.iconGhost}
-            onClick={toggleFavorite}
+            onClick={handleToggleFavorite}
             aria-label={isFavorite ? 'Убрать из избранного' : 'В избранное'}
           >
             {isFavorite ? <IconHeartFilled size={20} /> : <IconHeart size={20} stroke={1.8} />}

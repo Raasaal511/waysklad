@@ -1,4 +1,5 @@
 import { cartCount, type StorefrontCartItem } from '../../pages/storefront/cart'
+import { FAVORITES_PREFIX } from './favorites'
 
 /**
  * Избранное и корзина хранятся в localStorage отдельным ключом на каждый
@@ -7,21 +8,25 @@ import { cartCount, type StorefrontCartItem } from '../../pages/storefront/cart'
  * показывает один счётчик на весь сайт, поэтому здесь считаем сумму по всем
  * ключам такого вида, а не по одному конкретному магазину.
  */
-const FAVORITES_PREFIX = 'waysklad:storefront-favorites:'
 const CART_PREFIX = 'waysklad:storefront-cart:'
 
 function sumAcrossKeys(prefix: string, countFor: (raw: string) => number): number {
   let total = 0
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (!key || !key.startsWith(prefix)) continue
-    const raw = localStorage.getItem(key)
-    if (!raw) continue
-    try {
-      total += countFor(raw)
-    } catch {
-      // повреждённая запись — пропускаем, не валим счётчик всей шапки
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (!key || !key.startsWith(prefix)) continue
+      const raw = localStorage.getItem(key)
+      if (!raw) continue
+      try {
+        total += countFor(raw)
+      } catch {
+        // повреждённая запись — пропускаем, не валим счётчик всей шапки
+      }
     }
+  } catch {
+    // localStorage недоступен (приватный режим) — счётчик просто нулевой
+    return 0
   }
   return total
 }
