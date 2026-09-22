@@ -8,7 +8,7 @@ const PAGE_SIZE = 20
 
 /** «Все товары» внизу главной — sort=popular, 20 штук; «Показать ещё» уводит в режим
  * каталога и прокручивает к сетке (M-F4 п.2). */
-export function AllProducts({ city }: { city: string | null }) {
+export function AllProducts() {
   const navigate = useNavigate()
   const [items, setItems] = useState<MarketplaceProduct[]>([])
   const [loading, setLoading] = useState(true)
@@ -16,7 +16,7 @@ export function AllProducts({ city }: { city: string | null }) {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    listMarketplaceProducts({ sort: 'popular', city: city || undefined, limit: PAGE_SIZE, offset: 0 })
+    listMarketplaceProducts({ sort: 'popular', limit: PAGE_SIZE, offset: 0 })
       .then((data) => {
         if (!cancelled) setItems(data.products)
       })
@@ -29,12 +29,10 @@ export function AllProducts({ city }: { city: string | null }) {
     return () => {
       cancelled = true
     }
-  }, [city])
+  }, [])
 
   function goToCatalog() {
-    const params = new URLSearchParams({ sort: 'popular' })
-    if (city) params.set('city', city)
-    navigate(`/marketplace?${params.toString()}`)
+    navigate('/marketplace?sort=popular')
   }
 
   return (

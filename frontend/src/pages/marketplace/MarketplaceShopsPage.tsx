@@ -29,7 +29,6 @@ function ShopCard({ shop }: { shop: ShopChip }) {
       </span>
       <span className={styles.meta}>
         {hasReviews ? `★ ${shop.average_rating.toFixed(1)} · ${shop.reviews_count} ${plural(shop.reviews_count, ['отзыв', 'отзыва', 'отзывов'])}` : 'Новый магазин'}
-        {shop.city && ` · ${shop.city}`}
       </span>
       <span className={styles.meta}>
         {shop.products_count} {plural(shop.products_count, ['товар', 'товара', 'товаров'])}

@@ -8,14 +8,14 @@ interface State {
   error: string | null
 }
 
-/** Один запрос GET /api/marketplace/home; перезагружается при смене города. M-F2. */
-export function useMarketplaceHome(city: string | null) {
+/** Один запрос GET /api/marketplace/home. M-F2. */
+export function useMarketplaceHome() {
   const [state, setState] = useState<State>({ data: null, loading: true, error: null })
 
   useEffect(() => {
     let cancelled = false
     setState((s) => ({ ...s, loading: true, error: null }))
-    getMarketplaceHome(city || undefined)
+    getMarketplaceHome()
       .then((data) => {
         if (!cancelled) setState({ data, loading: false, error: null })
       })
@@ -31,7 +31,7 @@ export function useMarketplaceHome(city: string | null) {
     return () => {
       cancelled = true
     }
-  }, [city])
+  }, [])
 
   return state
 }

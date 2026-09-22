@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   getMarketplaceCategories,
-  getMarketplaceCities,
   listMarketplaceProducts,
   type MarketplaceProduct,
   type MarketplaceSort,
@@ -66,7 +65,6 @@ export function MarketplaceCatalog() {
       ? Number(searchParams.get('min_rating'))
       : preset?.minRating ?? null,
     withDiscount: searchParams.get('with_discount') === 'true' || !!preset?.withDiscount,
-    city: searchParams.get('city') ?? '',
   }
 
   const [products, setProducts] = useState<MarketplaceProduct[]>([])
@@ -74,7 +72,6 @@ export function MarketplaceCatalog() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [cities, setCities] = useState<{ name: string; shops_count: number }[]>([])
   const [categories, setCategories] = useState<PlatformCategory[]>([])
   const [categoriesLoading, setCategoriesLoading] = useState(true)
 
@@ -82,9 +79,6 @@ export function MarketplaceCatalog() {
   useScrollRestore(!loading)
 
   useEffect(() => {
-    getMarketplaceCities()
-      .then((data) => setCities(data.cities))
-      .catch(() => setCities([]))
     getMarketplaceCategories()
       .then((data) => setCategories(data.categories))
       .catch(() => setCategories([]))
@@ -95,7 +89,6 @@ export function MarketplaceCatalog() {
     () => ({
       query: query || undefined,
       platformCategory: pcat || undefined,
-      city: filters.city || undefined,
       priceMin: filters.minPrice || undefined,
       priceMax: filters.maxPrice || undefined,
       inStockOnly: filters.inStockOnly || undefined,
@@ -107,7 +100,6 @@ export function MarketplaceCatalog() {
     [
       query,
       pcat,
-      filters.city,
       filters.minPrice,
       filters.maxPrice,
       filters.inStockOnly,
@@ -177,7 +169,6 @@ export function MarketplaceCatalog() {
       in_stock_only: 'inStockOnly' in patch ? (patch.inStockOnly ? 'true' : null) : undefined,
       min_rating: 'minRating' in patch ? (patch.minRating ? String(patch.minRating) : null) : undefined,
       with_discount: 'withDiscount' in patch ? (patch.withDiscount ? 'true' : null) : undefined,
-      city: 'city' in patch ? patch.city || null : undefined,
       // ручное изменение фильтра рейтинга/скидки выходит за рамки предустановки подборки —
       // подборка остаётся в URL просто как ярлык истории захода, дальше рулят явные параметры
     })
@@ -190,13 +181,12 @@ export function MarketplaceCatalog() {
       in_stock_only: null,
       min_rating: null,
       with_discount: null,
-      city: null,
     })
   }
 
   function clearFiltersAndSearch() {
     const next = new URLSearchParams(searchParams)
-    for (const key of ['price_min', 'price_max', 'in_stock_only', 'min_rating', 'with_discount', 'city', 'q', 'section', 'pcat', 'category']) {
+    for (const key of ['price_min', 'price_max', 'in_stock_only', 'min_rating', 'with_discount', 'q', 'section', 'pcat', 'category']) {
       next.delete(key)
     }
     setSearchParams(next, { replace: true })
@@ -208,7 +198,6 @@ export function MarketplaceCatalog() {
     filters.inStockOnly ||
     !!filters.minRating ||
     !!filters.withDiscount ||
-    !!filters.city ||
     !!query ||
     !!pcat
 
@@ -244,7 +233,7 @@ export function MarketplaceCatalog() {
         value={filters}
         onChange={applyFilters}
         onClear={clearAllFilters}
-        cityOptions={cities.map((c) => ({ value: c.name, label: c.name }))}
+        showWithDiscount
         categories={categories.map((c) => ({ id: c.slug, name: c.name, count: c.products_count }))}
         categoriesLoading={categoriesLoading}
         activeCategoryId={pcat || null}

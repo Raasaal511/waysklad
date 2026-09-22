@@ -12,14 +12,9 @@ import { SectionChips } from './SectionChips'
 import { ShopsRow, ShopsRowSkeleton } from './ShopsRow'
 import { useMarketplaceHome } from './useMarketplaceHome'
 
-interface MarketplaceHomeProps {
-  city: string | null
-  onNearMe: () => void
-}
-
 /** Главная маркетплейса (режим без параметров в URL) — порядок блоков по M-F3 п.4. */
-export function MarketplaceHome({ city, onNearMe }: MarketplaceHomeProps) {
-  const { data, loading, error } = useMarketplaceHome(city)
+export function MarketplaceHome() {
+  const { data, loading, error } = useMarketplaceHome()
 
   // позиция скролла при «назад» из карточки товара (см. shared/lib/useScrollRestore.ts, P6)
   useScrollRestore(!loading)
@@ -45,7 +40,6 @@ export function MarketplaceHome({ city, onNearMe }: MarketplaceHomeProps) {
     )
   }
 
-  // Ни одного магазина на платформе (не только в выбранном городе) — общий empty-shelf.
   if (!loading && data && data.stats.shops_count === 0) {
     return (
       <div className={styles.page}>
@@ -60,9 +54,9 @@ export function MarketplaceHome({ city, onNearMe }: MarketplaceHomeProps) {
 
   return (
     <div className={styles.page}>
-      <SectionChips onNearMe={onNearMe} />
+      <SectionChips />
 
-      {loading || !data ? <HeroCarouselSkeleton /> : <HeroCarousel banners={data.banners.hero} city={city} />}
+      {loading || !data ? <HeroCarouselSkeleton /> : <HeroCarousel banners={data.banners.hero} />}
 
       {loading || !data ? <CategoryTilesSkeleton /> : <CategoryTiles categories={data.categories} />}
 
@@ -74,12 +68,11 @@ export function MarketplaceHome({ city, onNearMe }: MarketplaceHomeProps) {
         data &&
         data.sections.map((section) => <ProductSection key={section.key} section={section} />)}
 
-      <AllProducts city={city} />
+      <AllProducts />
 
       {!loading && data && (
         <p className={styles.stats}>
-          {data.stats.shops_count} магазинов · {data.stats.products_count} товаров ·{' '}
-          {data.stats.cities_count} городов
+          {data.stats.shops_count} магазинов · {data.stats.products_count} товаров
         </p>
       )}
     </div>

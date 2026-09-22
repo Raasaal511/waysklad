@@ -41,7 +41,6 @@ export interface MarketplaceParams {
   query?: string
   category?: string
   platformCategory?: string
-  city?: string
   priceMin?: string
   priceMax?: string
   inStockOnly?: boolean
@@ -60,7 +59,6 @@ export function listMarketplaceProducts(params: MarketplaceParams = {}) {
   if (params.query) search.set('query', params.query)
   if (params.category) search.set('category', params.category)
   if (params.platformCategory) search.set('platform_category', params.platformCategory)
-  if (params.city) search.set('city', params.city)
   if (params.priceMin) search.set('price_min', params.priceMin)
   if (params.priceMax) search.set('price_max', params.priceMax)
   if (params.inStockOnly) search.set('in_stock_only', 'true')
@@ -129,26 +127,15 @@ export interface MarketplaceHomeResponse {
   stats: { shops_count: number; products_count: number; cities_count: number }
 }
 
-export function getMarketplaceHome(city?: string) {
-  const qs = city ? `?city=${encodeURIComponent(city)}` : ''
-  return api.get<MarketplaceHomeResponse>(`/marketplace/home${qs}`)
+export function getMarketplaceHome() {
+  return api.get<MarketplaceHomeResponse>('/marketplace/home')
 }
 
-export interface MarketplaceCitiesResponse {
-  cities: { name: string; shops_count: number }[]
-}
-
-export function getMarketplaceCities() {
-  return api.get<MarketplaceCitiesResponse>('/marketplace/cities')
-}
-
-export function getMarketplaceCategories(city?: string) {
-  const qs = city ? `?city=${encodeURIComponent(city)}` : ''
-  return api.get<{ categories: PlatformCategory[] }>(`/marketplace/categories${qs}`)
+export function getMarketplaceCategories() {
+  return api.get<{ categories: PlatformCategory[] }>('/marketplace/categories')
 }
 
 export interface MarketplaceShopsParams {
-  city?: string
   query?: string
   sort?: 'popular' | 'rating' | 'new'
   limit?: number
@@ -157,7 +144,6 @@ export interface MarketplaceShopsParams {
 
 export function listMarketplaceShops(params: MarketplaceShopsParams = {}) {
   const search = new URLSearchParams()
-  if (params.city) search.set('city', params.city)
   if (params.query) search.set('query', params.query)
   if (params.sort) search.set('sort', params.sort)
   if (params.limit != null) search.set('limit', String(params.limit))

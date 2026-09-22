@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { IconDiscount2, IconFlame, IconMapPin, IconSparkles, IconStar } from '@tabler/icons-react'
+import { IconDiscount2, IconFlame, IconSparkles, IconStar } from '@tabler/icons-react'
 import styles from './SectionChips.module.css'
 
 const CHIPS: { key: string; label: string; icon: typeof IconDiscount2; section?: string }[] = [
@@ -9,12 +9,8 @@ const CHIPS: { key: string; label: string; icon: typeof IconDiscount2; section?:
   { key: 'top_rated', label: 'Высокий рейтинг', icon: IconStar, section: 'top_rated' },
 ]
 
-interface SectionChipsProps {
-  onNearMe: () => void
-}
-
 /** Чипы-подборки под шапкой — переход в режим каталога по section=<key>. M-F2 п.1. */
-export function SectionChips({ onNearMe }: SectionChipsProps) {
+export function SectionChips() {
   return (
     <nav className={styles.row} aria-label="Быстрые подборки">
       {CHIPS.map((chip) => (
@@ -25,12 +21,6 @@ export function SectionChips({ onNearMe }: SectionChipsProps) {
           {chip.label}
         </Link>
       ))}
-      <button type="button" className={styles.chip} onClick={onNearMe}>
-        <span className={styles.iconWrap}>
-          <IconMapPin size={16} stroke={1.8} />
-        </span>
-        Рядом со мной
-      </button>
     </nav>
   )
 }

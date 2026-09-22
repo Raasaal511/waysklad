@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
 import type { Banner } from '../../../entities/marketplace/api'
-import { cityGenitive } from '../../../shared/lib/cities'
 import { Button } from '../../../shared/ui/Button'
 import styles from './HeroCarousel.module.css'
 
@@ -37,7 +36,7 @@ function isExternalLink(link: string) {
 
 const AUTOPLAY_MS = 6000
 
-export function HeroCarousel({ banners, city }: { banners: Banner[]; city: string | null }) {
+export function HeroCarousel({ banners }: { banners: Banner[] }) {
   const slides: Slide[] =
     banners.length > 0
       ? banners.map((b) => ({
@@ -53,7 +52,7 @@ export function HeroCarousel({ banners, city }: { banners: Banner[]; city: strin
       : [
           {
             key: 'default',
-            title: `Магазины [${cityGenitive(city)}] в одном месте`,
+            title: 'Магазины [рядом] в одном месте',
             subtitle: 'Заказывайте онлайн — забирайте в магазине',
             buttonText: 'Смотреть магазины',
             link: '/marketplace/shops',

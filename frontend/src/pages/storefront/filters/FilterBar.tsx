@@ -16,8 +16,6 @@ export interface FilterBarValue {
   minRating: number | null
   /** Только маркетплейс: «Со скидкой» (M-F4 §1). */
   withDiscount?: boolean
-  /** Только маркетплейс: город магазина, синхронизирован с шапкой (M-F4 §1). */
-  city?: string
 }
 
 const EMPTY_FILTERS: FilterBarValue = {
@@ -28,7 +26,6 @@ const EMPTY_FILTERS: FilterBarValue = {
   variantColor: '',
   minRating: null,
   withDiscount: false,
-  city: '',
 }
 
 export interface FilterBarCategory {
@@ -57,8 +54,8 @@ interface FilterBarProps {
   onCategoryChange?: (id: number | string | null) => void
   totalCount?: number
   resultCount: number
-  /** Только маркетплейс: список городов для селекта «Город» — скрыт, если не передан. */
-  cityOptions?: SelectOption[]
+  /** Только маркетплейс: чип «Со скидкой». */
+  showWithDiscount?: boolean
 }
 
 const RATING_OPTIONS = [5, 4, 3] as const
@@ -72,7 +69,6 @@ function countActive(v: FilterBarValue): number {
   if (v.variantColor) n++
   if (v.minRating) n++
   if (v.withDiscount) n++
-  if (v.city) n++
   return n
 }
 
@@ -92,7 +88,7 @@ export function FilterBar({
   onCategoryChange,
   totalCount,
   resultCount,
-  cityOptions,
+  showWithDiscount = false,
 }: FilterBarProps) {
   const [sheetOpen, setSheetOpen] = useState(false)
   // черновик цены — применяется по blur/Enter, чтобы не бить URL/каталог на каждый символ
@@ -121,10 +117,6 @@ export function FilterBar({
   if (value.variantColor) activeChips.push({ key: 'color', label: value.variantColor, clear: { variantColor: '' } })
   if (value.minRating) activeChips.push({ key: 'rating', label: `от ${value.minRating}★`, clear: { minRating: null } })
   if (value.withDiscount) activeChips.push({ key: 'discount', label: 'Со скидкой', clear: { withDiscount: false } })
-  if (value.city) {
-    const cityLabel = cityOptions?.find((o) => o.value === value.city)?.label ?? value.city
-    activeChips.push({ key: 'city', label: cityLabel, clear: { city: '' } })
-  }
 
   return (
     <div className={styles.wrap}>
@@ -184,18 +176,10 @@ export function FilterBar({
           <Chip active={!!value.minRating} onClick={() => onChange({ minRating: value.minRating ? null : 4 })}>
             от 4★
           </Chip>
-          {cityOptions && (
+          {showWithDiscount && (
             <Chip active={!!value.withDiscount} onClick={() => onChange({ withDiscount: !value.withDiscount })}>
               Со скидкой
             </Chip>
-          )}
-          {cityOptions && (
-            <Select
-              value={value.city ?? ''}
-              onChange={(v) => onChange({ city: v })}
-              options={[{ value: '', label: 'Все города' }, ...cityOptions]}
-              aria-label="Город"
-            />
           )}
         </div>
       </div>
@@ -331,24 +315,13 @@ export function FilterBar({
               ))}
             </div>
 
-            {cityOptions && (
-              <>
-                <Chip
-                  active={!!sheetDraft.withDiscount}
-                  onClick={() => setSheetDraft((d) => ({ ...d, withDiscount: !d.withDiscount }))}
-                >
-                  Со скидкой
-                </Chip>
-                <label className={styles.sheetField}>
-                  Город
-                  <Select
-                    value={sheetDraft.city ?? ''}
-                    onChange={(v) => setSheetDraft((d) => ({ ...d, city: v }))}
-                    options={[{ value: '', label: 'Все города' }, ...cityOptions]}
-                    aria-label="Город"
-                  />
-                </label>
-              </>
+            {showWithDiscount && (
+              <Chip
+                active={!!sheetDraft.withDiscount}
+                onClick={() => setSheetDraft((d) => ({ ...d, withDiscount: !d.withDiscount }))}
+              >
+                Со скидкой
+              </Chip>
             )}
           </div>
         </Modal>
