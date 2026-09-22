@@ -40,6 +40,10 @@ class Sale:
     # товар продан по полной цене строк, просто оплата в два приёма.
     # Отдельно от discount (уступка клиенту, которая выручку уменьшает)
     prepayment: Money = field(default_factory=Money.zero)
+    # сколько клиент отдал сразу при продаже «в долг» (остальное → Debt).
+    # Не путать с prepayment: то — уже полученная раньше (заказ), это —
+    # часть чека, оплаченная в момент продажи. Не уменьшает total/выручку.
+    paid_now: Money = field(default_factory=Money.zero)
     client_id: int | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
@@ -64,6 +68,13 @@ class Sale:
         """Сумма к доплате: после скидки и уже полученной предоплаты."""
         return self.subtotal - self.discount - self.prepayment
 
+    @property
+    def debt_amount(self) -> Money:
+        """Остаток в долг при credit: total − paid_now. Иначе 0."""
+        if self.payment_method is not PaymentMethod.CREDIT:
+            return Money.zero()
+        return self.total - self.paid_now
+
     def change_for(self, cash_received: Money) -> Money:
         """Сдача, реально выдаваемая на руки — за вычетом change_kept
         (клиент добровольно не забрал часть/всю сдачу)."""
@@ -80,6 +91,16 @@ class Sale:
             raise DomainError("Скидка и предоплата вместе больше суммы чека")
         if self.payment_method is PaymentMethod.CREDIT and self.client_id is None:
             raise DomainError("Для продажи в долг нужно указать клиента")
+        if self.paid_now > Money.zero() and self.payment_method is not PaymentMethod.CREDIT:
+            raise DomainError(
+                "Поле «Заплатил сейчас» доступно только при оплате «В долг»"
+            )
+        if self.paid_now < Money.zero():
+            raise DomainError("«Заплатил сейчас» не может быть отрицательным")
+        if self.payment_method is PaymentMethod.CREDIT and self.paid_now >= self.total:
+            raise DomainError(
+                "Клиент заплатил всю сумму — выберите „Наличные“ или „Перевод“"
+            )
         if self.change_kept > Money.zero():
             if self.cash_received is None:
                 raise DomainError("«Сдача не взята» указывается только вместе с суммой наличных")
