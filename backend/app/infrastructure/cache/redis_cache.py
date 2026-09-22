@@ -26,6 +26,13 @@ class RedisCache(ICache):
             retry_on_error=[RedisConnectionError, RedisTimeoutError],
         )
 
+    @property
+    def raw(self):
+        """Соединение Redis напрямую — для того, что не выражается через ICache
+        (счётчики api_metrics, INFO для админки). Обычный код должен ходить
+        через методы интерфейса."""
+        return self._redis
+
     async def get(self, key: str) -> bytes | None:
         try:
             return await self._redis.get(key)

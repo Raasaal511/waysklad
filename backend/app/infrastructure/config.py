@@ -79,6 +79,15 @@ class Settings(BaseSettings):
     # работает и бесплатен) или console (код в лог — только dev и тесты).
     # SMS появится здесь же, когда будет провайдер (см. code_senders.py).
     verification_sender: str = "telegram"
+    # Каталог, куда внешние скрипты кладут метаданные для админки:
+    # tls.json (certbot-хук) и backup.json (deploy/backup.sh). Backend только
+    # читает эти файлы и никуда больше не лезет — ни в /etc/letsencrypt, ни в
+    # чужие каталоги. Файлов нет — соответствующие блоки отдают null.
+    status_dir: str = "/app/status"
+    # Проставляются при сборке образа (ARG GIT_SHA / BUILD_TIME в Dockerfile).
+    # "dev" — локальная сборка без аргументов, чтобы она не падала.
+    git_sha: str = "dev"
+    build_time: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

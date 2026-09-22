@@ -231,6 +231,17 @@ class ServerStatusResponse(BaseModel):
     disk_total_gb: float
     recent_tenants: list[RecentTenantResponse]
     history: list[MetricsPointResponse]
+    # v2: None там, где значение недоступно (нет расширения БД, нет файла
+    # статуса) — фронт показывает «нет данных», а не ноль
+    load_avg: list[float] | None = None
+    disk_free_percent: float | None = None
+    app: dict | None = None
+    db: dict | None = None
+    redis: dict | None = None
+    uploads: dict | None = None
+    api: dict | None = None
+    backup: dict | None = None
+    tls: dict | None = None
 
     @classmethod
     def from_result(cls, result: ServerStatusResult) -> "ServerStatusResponse":
@@ -249,6 +260,15 @@ class ServerStatusResponse(BaseModel):
             disk_total_gb=result.disk_total_gb,
             recent_tenants=[RecentTenantResponse.from_entity(t) for t in result.recent_tenants],
             history=[MetricsPointResponse.from_entity(p) for p in result.history],
+            load_avg=result.load_avg,
+            disk_free_percent=result.disk_free_percent,
+            app=asdict(result.app) if result.app else None,
+            db=asdict(result.db) if result.db else None,
+            redis=asdict(result.redis) if result.redis else None,
+            uploads=asdict(result.uploads) if result.uploads else None,
+            api=asdict(result.api) if result.api else None,
+            backup=result.backup,
+            tls=result.tls,
         )
 
 

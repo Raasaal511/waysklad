@@ -1,5 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +13,10 @@ from starlette.staticfiles import StaticFiles
 from app import router as main_router
 from app.infrastructure.config import settings
 from app.infrastructure.files import UPLOAD_DIR
+from app.infrastructure.observability.api_metrics import (
+    ApiMetricsCollector,
+    metrics_middleware,
+)
 from app.infrastructure.observability.logging import configure_logging, get_logger
 from app.infrastructure.rate_limit import limiter
 from app.infrastructure.notifications.ws_broadcast import broadcaster
@@ -25,6 +30,12 @@ configure_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await broadcaster.start()
+    # коллектор метрик на общем Redis кеша: своего соединения не заводим
+    if settings.cache_redis_url:
+        from app.infrastructure.cache.redis_cache import RedisCache
+
+        app.state.api_metrics = ApiMetricsCollector(RedisCache(settings.cache_redis_url).raw)
+    app.state.started_at = datetime.now(timezone.utc)
     yield
     await broadcaster.stop()
 
@@ -41,6 +52,9 @@ app = FastAPI(title="ВайСклад API", version="0.1.0", lifespan=lifespan, 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+# счётчик RPS/p50/p95/ошибок для админки — данные в Redis, общие для всех
+# uvicorn-воркеров (см. observability/api_metrics.py)
+app.middleware("http")(metrics_middleware)
 
 # Свой фронт всегда на том же origin (прод — nginx проксирует /api на тот же
 # домен, dev — Vite proxy), поэтому дефолт "не подключать CORS вовсе"

@@ -56,6 +56,10 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips=*
     volumes:
       - uploads_data:/app/uploads
+      # Метаданные от внешних скриптов (deploy/backup.sh, certbot-хук) для
+      # раздела «Эксплуатация» в админке. Только чтение: backend сам сюда
+      # ничего не пишет и в /etc/letsencrypt не ходит.
+      - ${STATUS_DIR:-/opt/waysklad/status}:/app/status:ro
     restart: unless-stopped
     depends_on:
       db:

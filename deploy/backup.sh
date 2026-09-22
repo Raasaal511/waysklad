@@ -39,3 +39,19 @@ if [ -n "${BACKUP_RCLONE_REMOTE:-}" ]; then
 else
   echo "WARNING: BACKUP_RCLONE_REMOTE не задан — бэкап только локальный, не переживёт потерю сервера" >&2
 fi
+
+# Метаданные для админ-панели: backend их только читает и сам никуда не лезет
+# (см. infrastructure/observability/status_files.py). offsite_ok честно false,
+# пока BACKUP_RCLONE_REMOTE не задан — админ должен видеть, что внешней копии
+# нет, а не догадываться об этом после потери сервера.
+STATUS_DIR="${BACKUP_STATUS_DIR:-/opt/waysklad/status}"
+mkdir -p "$STATUS_DIR"
+offsite="false"
+[ -n "${BACKUP_RCLONE_REMOTE:-}" ] && offsite="true"
+cat > "$STATUS_DIR/backup.json" <<JSON
+{
+  "last_at": "$(date -u +%Y-%m-%dT%H:%M:%S+00:00)",
+  "size_bytes": $(stat -c%s "$file" 2>/dev/null || stat -f%z "$file"),
+  "offsite_ok": $offsite
+}
+JSON
