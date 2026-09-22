@@ -15,9 +15,14 @@ from app.application.admin.get_overview import (
 )
 from app.application.admin.get_overview import PlatformOverview, get_platform_overview
 from app.application.admin.get_server_status import (
+    ApiInfo,
+    AppInfo,
+    DbInfo,
     MetricsPoint,
     RecentTenant,
+    RedisInfo,
     ServerStatusResult,
+    UploadsInfo,
     get_server_status,
 )
 from app.application.admin.get_tenant_detail import (
@@ -127,6 +132,17 @@ async def admin_status(
         d = dict(d)
         d["recent_tenants"] = [RecentTenant(**t) for t in d["recent_tenants"]]
         d["history"] = [MetricsPoint(**p) for p in d["history"]]
+        # вложенные блоки v2: asdict() развернул их в словари, и без обратной
+        # сборки ответ из кеша падал на asdict() уже в схеме ответа
+        for key, cls in (
+            ("app", AppInfo),
+            ("db", DbInfo),
+            ("redis", RedisInfo),
+            ("uploads", UploadsInfo),
+            ("api", ApiInfo),
+        ):
+            if d.get(key) is not None:
+                d[key] = cls(**d[key])
         return ServerStatusResult(**d)
 
     cached_result = await cached(
