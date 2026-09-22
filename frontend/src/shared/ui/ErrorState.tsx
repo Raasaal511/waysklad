@@ -11,7 +11,7 @@ interface ErrorStateProps {
   onAction?: () => void
 }
 
-/** Общий экран ошибки: 404/403/сетевая — иллюстрация + текст + кнопка «Повторить»/«Все магазины». */
+/** Общий экран ошибки: 404/403/сетевая — иллюстрация + текст + опциональная кнопка. */
 export function ErrorState({ illustration, title, description, actionLabel, onAction }: ErrorStateProps) {
   return (
     <div className={styles.wrap}>
