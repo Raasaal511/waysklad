@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Navigate, Routes, Route, useParams } from 'react-router-dom'
 import { AuthProvider } from './app/AuthContext'
 import { ThemeProvider } from './app/ThemeContext'
 import { ShopProvider } from './app/ShopContext'
@@ -17,7 +17,8 @@ import { StorefrontProductPage } from './pages/storefront/StorefrontProductPage'
 import { StorefrontCartPage } from './pages/storefront/StorefrontCartPage'
 import { CustomerAuthPage } from './pages/storefront/CustomerAuthPage'
 import { FavoritesPage } from './pages/storefront/FavoritesPage'
-import { MarketplaceComingSoonPage } from './pages/marketplace/MarketplaceComingSoonPage'
+import { PublicNotFoundPage } from './pages/storefront/PublicNotFoundPage'
+import { RedirectToLastStore } from './pages/storefront/RedirectToLastStore'
 import { PublicLayout } from './widgets/public-header/PublicLayout'
 
 // Кабинет владельца и админка не нужны покупателю на публичных страницах —
@@ -81,6 +82,11 @@ const EmployeesPage = lazy(() =>
 )
 const AdminPage = lazy(() => import('./pages/admin/AdminPage').then((m) => ({ default: m.AdminPage })))
 
+function RedirectMyOrdersToAccount() {
+  const { slug = '' } = useParams<{ slug: string }>()
+  return <Navigate to={`/store/${slug}/account/orders`} replace />
+}
+
 export function App() {
   return (
     <ThemeProvider>
@@ -90,27 +96,16 @@ export function App() {
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/admin/*" element={<AdminPage />} />
-              {/* Маркетплейс (общая витрина всех магазинов) отключён: backend отдаёт
-                  404 на /api/marketplace/*, ссылок в интерфейсе нет. Роут оставлен
-                  заглушкой — по старым ссылкам должна открываться внятная страница,
-                  а не белый экран. Готовые страницы лежат рядом, см.
-                  MarketplaceComingSoonPage. */}
+              {/* Старые глобальные URL: без магазина в контексте — к последнему
+                  магазину или на /login. Маркетплейс для покупателя закрыт. */}
+              <Route path="/cart" element={<RedirectToLastStore suffix="/cart" />} />
+              <Route path="/favorites" element={<RedirectToLastStore suffix="/favorites" />} />
+              <Route path="/account" element={<RedirectToLastStore suffix="/account" />} />
               <Route
                 path="/marketplace/*"
                 element={
                   <PublicLayout>
-                    <MarketplaceComingSoonPage />
-                  </PublicLayout>
-                }
-              />
-              {/* Избранное — одна страница на все магазины: списки лежат в
-                  localStorage по ключу на каждый магазин, общего аккаунта
-                  покупателя нет, поэтому страница вне /store/:slug. */}
-              <Route
-                path="/favorites"
-                element={
-                  <PublicLayout>
-                    <FavoritesPage />
+                    <PublicNotFoundPage />
                   </PublicLayout>
                 }
               />
@@ -139,6 +134,30 @@ export function App() {
                 }
               />
               <Route
+                path="/store/:slug/favorites"
+                element={
+                  <PublicLayout>
+                    <FavoritesPage />
+                  </PublicLayout>
+                }
+              />
+              <Route
+                path="/store/:slug/account"
+                element={
+                  <PublicLayout>
+                    <StorefrontMyOrdersPage />
+                  </PublicLayout>
+                }
+              />
+              <Route
+                path="/store/:slug/account/orders"
+                element={
+                  <PublicLayout>
+                    <StorefrontMyOrdersPage />
+                  </PublicLayout>
+                }
+              />
+              <Route
                 path="/store/:slug/login"
                 element={
                   <PublicLayout>
@@ -147,7 +166,7 @@ export function App() {
                 }
               />
               <Route path="/store/:slug/request" element={<StorefrontRequestPage />} />
-              <Route path="/store/:slug/my-orders" element={<StorefrontMyOrdersPage />} />
+              <Route path="/store/:slug/my-orders" element={<RedirectMyOrdersToAccount />} />
               <Route
                 element={
                   <RequireAuth>
