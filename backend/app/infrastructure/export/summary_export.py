@@ -6,7 +6,7 @@ from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 
 from app.domain.analytics.repository import PeriodTotals, ProductSales
-from app.domain.common.money import Money
+from app.domain.common.money import format_rub
 from app.domain.debts.entities import Debt
 from app.domain.sales.entities import Sale
 from app.domain.sales.payment import PaymentMethod
@@ -23,7 +23,7 @@ _PAYMENT_METHOD_LABELS = {
 
 def _rub(value: Decimal) -> str:
     """SQL-агрегаты (SUM) отдают Decimal с произвольным числом знаков — округляем до копеек."""
-    return f"{Money.of(value).amount} ₽"
+    return format_rub(value)
 
 
 def _qty(value: Decimal, fractional: bool) -> str:
@@ -141,16 +141,16 @@ def render_summary_xlsx(
                 sales_sheet.cell(row=row, column=5, value=client)
                 sales_sheet.cell(row=row, column=6, value=product_name.get(line.product_id, "—"))
                 sales_sheet.cell(row=row, column=7, value=_qty(line.quantity.value, line.quantity.unit.fractional)).alignment = Alignment(horizontal="right")
-                sales_sheet.cell(row=row, column=8, value=f"{line.price.amount} ₽").alignment = Alignment(horizontal="right")
-                sales_sheet.cell(row=row, column=9, value=f"{line.total.amount} ₽").alignment = Alignment(horizontal="right")
+                sales_sheet.cell(row=row, column=8, value=format_rub(line.price)).alignment = Alignment(horizontal="right")
+                sales_sheet.cell(row=row, column=9, value=format_rub(line.total)).alignment = Alignment(horizontal="right")
                 sales_sheet.cell(row=row, column=10, value=payment_label)
-                sales_sheet.cell(row=row, column=11, value=f"{sale.total.amount} ₽").alignment = Alignment(horizontal="right")
+                sales_sheet.cell(row=row, column=11, value=format_rub(sale.total)).alignment = Alignment(horizontal="right")
                 row += 1
             if sale.id not in seen_sale_ids:
                 checks_total_sum += sale.total.amount
                 seen_sale_ids.add(sale.id)
         sales_sheet.cell(row=row, column=10, value="Итого").font = _HEADER_FONT
-        sales_sheet.cell(row=row, column=11, value=f"{checks_total_sum} ₽").font = _HEADER_FONT
+        sales_sheet.cell(row=row, column=11, value=format_rub(checks_total_sum)).font = _HEADER_FONT
         _autosize(sales_sheet, [16, 8, 16, 16, 18, 28, 10, 12, 14, 12, 12])
 
     debts_sheet = workbook.create_sheet("Долги")
@@ -159,14 +159,14 @@ def render_summary_xlsx(
     for debt in debts:
         key = ("client", debt.client_id) if debt.client_id else ("supplier", debt.supplier_id)
         debts_sheet.cell(row=row, column=1, value=counterparty_name.get(key, "—"))
-        debts_sheet.cell(row=row, column=2, value=f"{debt.amount.amount} ₽").alignment = Alignment(horizontal="right")
-        debts_sheet.cell(row=row, column=3, value=f"{debt.balance.amount} ₽").alignment = Alignment(horizontal="right")
+        debts_sheet.cell(row=row, column=2, value=format_rub(debt.amount)).alignment = Alignment(horizontal="right")
+        debts_sheet.cell(row=row, column=3, value=format_rub(debt.balance)).alignment = Alignment(horizontal="right")
         debts_sheet.cell(row=row, column=4, value=debt.issued_at.strftime("%d.%m.%Y"))
         debts_sheet.cell(row=row, column=5, value=debt.due_date.strftime("%d.%m.%Y") if debt.due_date else "—")
         row += 1
     debts_sheet.cell(row=row, column=1, value="Итого").font = _HEADER_FONT
-    debts_sheet.cell(row=row, column=2, value=f"{sum((d.amount.amount for d in debts), Decimal(0))} ₽").font = _HEADER_FONT
-    debts_sheet.cell(row=row, column=3, value=f"{sum((d.balance.amount for d in debts), Decimal(0))} ₽").font = _HEADER_FONT
+    debts_sheet.cell(row=row, column=2, value=format_rub(sum((d.amount.amount for d in debts), Decimal(0)))).font = _HEADER_FONT
+    debts_sheet.cell(row=row, column=3, value=format_rub(sum((d.balance.amount for d in debts), Decimal(0)))).font = _HEADER_FONT
     _autosize(debts_sheet, [28, 14, 14, 12, 12])
 
     buffer = BytesIO()

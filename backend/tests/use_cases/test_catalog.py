@@ -88,13 +88,13 @@ async def test_register_shop_generates_unique_slug_on_name_collision(
     first = await RegisterShopUseCase(make_uow(), hasher).execute(
         RegisterShopCommand(
             shop_name="Магазин Беркат", owner_name="Ахмед",
-            phone=random_phone(, personal_data_consent=True), password="secret123",
+            phone=random_phone(), personal_data_consent=True, password="secret123",
         )
     )
     second = await RegisterShopUseCase(make_uow(), hasher).execute(
         RegisterShopCommand(
             shop_name="Магазин Беркат", owner_name="Муса",
-            phone=random_phone(, personal_data_consent=True), password="secret123",
+            phone=random_phone(), personal_data_consent=True, password="secret123",
         )
     )
     assert first.shop_slug == "magazin-berkat"

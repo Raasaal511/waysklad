@@ -18,7 +18,7 @@ async def notify_debt_issued(uow: IUnitOfWork, notifier: INotifier | None, debt:
         supplier = await uow.suppliers.get(debt.supplier_id)
         who = f"поставщику «{supplier.name}»"
 
-    text = f"Новый долг {who} на {debt.balance} ₽"
+    text = f"Новый долг {who} на {debt.balance}"
     recipients = [u for u in await uow.users.list_by_tenant() if u.role in (Role.OWNER, Role.MANAGER)]
     for user in recipients:
         await notify_user(

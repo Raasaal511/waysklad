@@ -1,5 +1,6 @@
 from urllib.parse import quote
 
+from app.domain.common.money import format_rub
 from app.domain.common.phone import Phone
 from app.domain.sales.entities import Sale
 from app.domain.sales.payment import PaymentMethod
@@ -21,11 +22,13 @@ def render_receipt_text(
     lines.append("")
     for line in sale.lines:
         name = product_names.get(line.product_id, f"Товар #{line.product_id}")
-        lines.append(f"{name} — {line.quantity.formatted} x {line.price.amount} = {line.total.amount}")
+        lines.append(
+            f"{name} — {line.quantity.formatted} x {format_rub(line.price)} = {format_rub(line.total)}"
+        )
     lines.append("")
     if sale.discount.amount:
-        lines.append(f"Скидка: {sale.discount.amount}")
-    lines.append(f"Итого: {sale.total.amount} ₽")
+        lines.append(f"Скидка: {format_rub(sale.discount)}")
+    lines.append(f"Итого: {format_rub(sale.total)}")
     lines.append(f"Оплата: {_PAYMENT_LABELS[sale.payment_method]}")
     lines.append("Спасибо за покупку!")
     return "\n".join(lines)

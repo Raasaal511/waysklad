@@ -6,6 +6,7 @@ from app.application.storefront.reservation import reserve_request_stock
 from app.application.tasks.notify import notify_user
 from app.domain.catalog.entities import Product
 from app.domain.common.exceptions import DomainError
+from app.domain.common.money import format_rub
 from app.domain.identity.entities import Role
 from app.domain.notifications.entities import NotificationKind
 from app.domain.storefront.entities import StorefrontRequest, StorefrontRequestLine
@@ -126,7 +127,7 @@ class CreateStorefrontRequestUseCase:
                 # разделителя тысяч, общего хелпера форматирования денег в
                 # кодовой базе нет, не изобретаем его здесь)
                 min_total = tenant.storefront_min_order_total.normalize()
-                raise DomainError(f"Минимальная сумма заказа в этом магазине — {min_total:f} ₽")
+                raise DomainError(f"Минимальная сумма заказа в этом магазине — {format_rub(min_total)}")
 
             request = StorefrontRequest(
                 id=None,
@@ -166,7 +167,7 @@ class CreateStorefrontRequestUseCase:
                     kind=NotificationKind.STOREFRONT_REQUEST_NEW,
                     text=(
                         f"Новая заявка с витрины: {request.customer_name}, "
-                        f"{len(request.lines)} товаров на сумму {total_amount} ₽"
+                        f"{len(request.lines)} товаров на сумму {format_rub(total_amount)}"
                     ),
                     link="/orders/storefront-requests",
                     entity_id=request.id,
