@@ -102,3 +102,69 @@ export function plural(count: number, forms: [string, string, string]): string {
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return forms[1]
   return forms[2]
 }
+
+/** Разряды тонким пробелом: 1 234 567. Для счётчиков, не для денег (см. formatMoney). */
+export function formatCount(value: number): string {
+  return new Intl.NumberFormat('ru-RU').format(value).replace(/ /g, ' ')
+}
+
+const BYTE_UNITS = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ']
+
+/** Размер файла или памяти: 1.5 ГБ. null → «нет данных» решает вызывающий. */
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return '—'
+  let value = bytes
+  let unit = 0
+  while (value >= 1024 && unit < BYTE_UNITS.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  // байты и килобайты дробными показывать незачем
+  const digits = unit < 2 ? 0 : value < 10 ? 1 : 0
+  return `${value.toFixed(digits).replace('.', ',')} ${BYTE_UNITS[unit]}`
+}
+
+const MINUTE = 60
+const HOUR = MINUTE * 60
+const DAY = HOUR * 24
+
+/**
+ * «2 часа назад», «5 дней назад» — одна функция на весь проект, чтобы
+ * одинаковый промежуток везде назывался одинаково. Точную дату показывает
+ * вызывающий (обычно в title), здесь только относительная форма.
+ */
+export function formatRelativeTime(value: string | Date | null | undefined): string {
+  if (!value) return 'никогда'
+  const date = typeof value === 'string' ? new Date(value) : value
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (!Number.isFinite(seconds)) return '—'
+  if (seconds < 0) return 'только что'
+  if (seconds < MINUTE) return 'только что'
+  if (seconds < HOUR) {
+    const minutes = Math.floor(seconds / MINUTE)
+    return `${minutes} ${plural(minutes, ['минуту', 'минуты', 'минут'])} назад`
+  }
+  if (seconds < DAY) {
+    const hours = Math.floor(seconds / HOUR)
+    return `${hours} ${plural(hours, ['час', 'часа', 'часов'])} назад`
+  }
+  const days = Math.floor(seconds / DAY)
+  if (days < 30) return `${days} ${plural(days, ['день', 'дня', 'дней'])} назад`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months} ${plural(months, ['месяц', 'месяца', 'месяцев'])} назад`
+  const years = Math.floor(days / 365)
+  return `${years} ${plural(years, ['год', 'года', 'лет'])} назад`
+}
+
+/** Полная дата и время для тултипа рядом с относительным временем. */
+export function formatExactDateTime(value: string | Date | null | undefined): string {
+  if (!value) return ''
+  const date = typeof value === 'string' ? new Date(value) : value
+  return date.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
