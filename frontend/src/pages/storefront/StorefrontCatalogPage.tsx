@@ -152,7 +152,7 @@ export function StorefrontCatalogPage() {
     return () => resetPageMeta()
   }, [profile])
 
-  // избранное меняется и вне каталога — на странице /favorites и в другой
+  // избранное меняется и вне каталога — на /store/:slug/favorites и в другой
   // вкладке; перечитываем, чтобы сердечки на карточках не разъезжались
   useEffect(() => {
     function sync() {
