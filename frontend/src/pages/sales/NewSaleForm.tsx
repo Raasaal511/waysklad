@@ -431,7 +431,9 @@ export function NewSaleForm({
     const cashReceivedValue =
       payment === 'cash' && cashReceived && cashReceivedCents >= totalCents ? cashReceived : null
     const changeKeptValue =
-      cashReceivedValue && changeKeptCents > 0 ? centsToMoney(changeKeptCents).toFixed(2) : null
+      cashReceivedValue && changeKeptCents > 0
+        ? centsToMoney(changeKeptCents).toFixed(2)
+        : '0'
     try {
       const sale = await createSale({
         warehouse_id: warehouseId,

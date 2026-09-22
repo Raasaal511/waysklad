@@ -54,7 +54,9 @@ export function IssueOrderModal({
         payment_method: payment,
         cash_received: cashReceivedValue,
         change_kept:
-          cashReceivedValue && changeKeptCents > 0 ? centsToMoney(changeKeptCents).toFixed(2) : null,
+          cashReceivedValue && changeKeptCents > 0
+            ? centsToMoney(changeKeptCents).toFixed(2)
+            : '0',
         debt_due_date: payment === 'credit' ? debtDueDate : null,
       })
       refreshCatalog(['stock']).catch(() => {})

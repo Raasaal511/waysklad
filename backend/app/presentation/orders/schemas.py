@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.application.orders.cancel_order import CancelOrderCommand
 from app.application.orders.change_status import ChangeOrderStatusCommand
@@ -98,6 +98,11 @@ class IssueOrderRequest(BaseModel):
     cash_received: Decimal | None = None
     change_kept: Decimal = Decimal("0")  # клиент не забрал (часть) сдачи
     debt_due_date: date | None = None
+
+    @field_validator("change_kept", mode="before")
+    @classmethod
+    def _null_change_kept_to_zero(cls, value: object) -> object:
+        return Decimal("0") if value is None else value
 
     def to_command(self, order_id: int) -> IssueOrderCommand:
         return IssueOrderCommand(

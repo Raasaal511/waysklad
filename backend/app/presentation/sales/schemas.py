@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.application.sales.create_sale import (
     CreateSaleCommand,
@@ -35,6 +35,12 @@ class SaleCreateRequest(BaseModel):
     change_kept: Decimal = Decimal("0")  # клиент не забрал (часть) сдачи
     client_op_id: str | None = None  # id операции с устройства — для повтора из офлайн-очереди
     debt_due_date: date | None = None  # «долг до» — обязателен при payment_method=credit
+
+    @field_validator("change_kept", "discount", mode="before")
+    @classmethod
+    def _null_decimal_to_zero(cls, value: object) -> object:
+        # фронт шлёт null, когда сдачи нет — дефолт поля срабатывает только при отсутствии ключа
+        return Decimal("0") if value is None else value
 
     def to_command(self) -> CreateSaleCommand:
         return CreateSaleCommand(
