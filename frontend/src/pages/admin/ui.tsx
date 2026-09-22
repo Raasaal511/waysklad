@@ -26,9 +26,10 @@ export function Card({ title, action, children, className }: CardProps) {
 
 interface MetricProps {
   label: string
-  value: string
+  /** null/undefined → «нет данных», а не «0». */
+  value: string | null | undefined
   /** Вторая строка под значением — сумма, доля, уточнение. */
-  note?: string
+  note?: string | null
   /** Изменение к прошлому периоду в процентах; null — сравнивать не с чем. */
   delta?: number | null
   /** Для метрик, где рост — это плохо (ошибки, заблокированные). */
@@ -38,12 +39,13 @@ interface MetricProps {
 /** Крупный показатель: значение 32/700, подпись 13/600, дельта к периоду. */
 export function Metric({ label, value, note, delta, invertDelta }: MetricProps) {
   const good = delta == null ? null : invertDelta ? delta <= 0 : delta >= 0
+  const display = value == null || value === '' ? 'нет данных' : value
   return (
     <div className={styles.metric}>
       <span className={styles.metricLabel}>{label}</span>
-      <span className={styles.metricValue}>{value}</span>
+      <span className={styles.metricValue}>{display}</span>
       <div className={styles.metricFoot}>
-        {note && <span className={styles.metricNote}>{note}</span>}
+        {note != null && note !== '' && <span className={styles.metricNote}>{note}</span>}
         {delta != null && Number.isFinite(delta) && (
           <span
             className={`${styles.delta} ${good ? styles.deltaUp : styles.deltaDown}`}

@@ -18,9 +18,21 @@ const TOKEN_TTL_MS = 10 * 60 * 1000
 interface CustomerLoginModalProps {
   onClose: () => void
   onSuccess: (accessToken: string) => void
+  /** Зачем вход: влияет только на текст подсказки. */
+  reason?: 'checkout' | 'review' | 'account'
 }
 
-export function CustomerLoginModal({ onClose, onSuccess }: CustomerLoginModalProps) {
+const HINTS: Record<NonNullable<CustomerLoginModalProps['reason']>, string> = {
+  checkout: 'Чтобы оформить заказ, подтвердите номер через Telegram — тот же бот, что и у витрины.',
+  review: 'Чтобы оставить отзыв, подтвердите номер через Telegram — тот же бот, что и у витрины.',
+  account: 'Чтобы войти в профиль, подтвердите номер через Telegram — тот же бот, что и у витрины.',
+}
+
+export function CustomerLoginModal({
+  onClose,
+  onSuccess,
+  reason = 'checkout',
+}: CustomerLoginModalProps) {
   const [phone, setPhone] = useState('')
   const [deepLink, setDeepLink] = useState<string | null>(null)
   const [loginToken, setLoginToken] = useState<string | null>(null)
@@ -96,9 +108,7 @@ export function CustomerLoginModal({ onClose, onSuccess }: CustomerLoginModalPro
     <Modal title="Вход покупателя" onClose={onClose}>
       {!deepLink ? (
         <form className={styles.form} onSubmit={handleRequestLink}>
-          <p className={styles.hint}>
-            Чтобы оформить заказ, подтвердите номер через Telegram — тот же бот, что и у витрины.
-          </p>
+          <p className={styles.hint}>{HINTS[reason]}</p>
           <label className={styles.field}>
             Телефон
             <PhoneInput value={phone} onChange={setPhone} required />

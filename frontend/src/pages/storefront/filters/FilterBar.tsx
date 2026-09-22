@@ -121,16 +121,29 @@ export function FilterBar({
   return (
     <div className={styles.wrap}>
       <div className={styles.toolbar}>
-        <Select value={sort} onChange={onSortChange} options={sortOptions} aria-label="Сортировка" />
-        <Button
-          variant="secondary"
-          active={activeCount > 0}
-          className={styles.filtersToggle}
-          onClick={() => setSheetOpen(true)}
-        >
-          <IconAdjustments size={18} stroke={1.8} />
-          Фильтры{activeCount > 0 ? ` (${activeCount})` : ''}
-        </Button>
+        {typeof resultCount === 'number' && (
+          <p className={styles.foundCount}>
+            Найдено {resultCount} {plural(resultCount, ['товар', 'товара', 'товаров'])}
+          </p>
+        )}
+        <div className={styles.toolbarControls}>
+          <Select
+            value={sort}
+            onChange={onSortChange}
+            options={sortOptions}
+            aria-label="Сортировка"
+            className={styles.sortSelect}
+          />
+          <Button
+            variant="secondary"
+            active={activeCount > 0}
+            className={styles.filtersToggle}
+            onClick={() => setSheetOpen(true)}
+          >
+            <IconAdjustments size={18} stroke={1.8} />
+            Фильтры{activeCount > 0 ? ` · ${activeCount}` : ''}
+          </Button>
+        </div>
 
         {/* ≥1024 — поля раскрыты в строке (п.2), скрыты в DOM на <1024 через CSS,
             чтобы не дублировать разметку между строкой и нижним шитом. */}

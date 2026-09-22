@@ -7,6 +7,7 @@
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+import logging
 
 import httpx
 
@@ -18,6 +19,8 @@ from app.domain.sales.entities import Sale
 from app.infrastructure.config import settings
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.export.summary_export import render_summary_xlsx
+
+_logger = logging.getLogger(__name__)
 
 _PERIOD_FILENAME = {
     SummaryPeriod.DAY: "сводка-за-день.xlsx",
@@ -34,16 +37,24 @@ def _msk_hour(now_utc: datetime) -> int:
 
 class TelegramNotifier:
     def send(self, chat_id: str, text: str) -> None:
-        httpx.post(
+        response = httpx.post(
             f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage",
             json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
             timeout=10,
         )
+        if response.status_code >= 400:
+            _logger.error(
+                "Telegram sendMessage failed chat_id=%s status=%s body=%s",
+                chat_id,
+                response.status_code,
+                response.text[:300],
+            )
+            response.raise_for_status()
 
     def send_with_buttons(
         self, chat_id: str, text: str, buttons: list[tuple[str, str]]
     ) -> None:
-        httpx.post(
+        response = httpx.post(
             f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage",
             json={
                 "chat_id": chat_id,
@@ -57,20 +68,41 @@ class TelegramNotifier:
             },
             timeout=10,
         )
+        if response.status_code >= 400:
+            _logger.error(
+                "Telegram sendMessage(buttons) failed chat_id=%s status=%s body=%s",
+                chat_id,
+                response.status_code,
+                response.text[:300],
+            )
+            response.raise_for_status()
 
     def send_document(self, chat_id: str, filename: str, content: bytes, caption: str = "") -> None:
-        httpx.post(
+        response = httpx.post(
             f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendDocument",
             data={"chat_id": chat_id, "caption": caption},
             files={"document": (filename, content)},
             timeout=20,
         )
+        if response.status_code >= 400:
+            _logger.error(
+                "Telegram sendDocument failed chat_id=%s status=%s body=%s",
+                chat_id,
+                response.status_code,
+                response.text[:300],
+            )
+            response.raise_for_status()
 
 
 async def _send_summary_for_tenant(
     tenant: Tenant, period: SummaryPeriod, notifier: TelegramNotifier
 ) -> None:
     if not tenant.owner_telegram_chat_id:
+        _logger.info(
+            "skip summary tenant_id=%s period=%s reason=no_owner_telegram_chat_id",
+            tenant.id,
+            period.value,
+        )
         return
 
     rng = period_range(period)
@@ -151,8 +183,19 @@ async def _send_summaries_async(
 
     for tenant in tenants:
         if not _is_due(tenant, period, now):
+            _logger.debug(
+                "skip summary tenant_id=%s period=%s reason=not_due hour_msk=%s",
+                tenant.id,
+                period.value,
+                _msk_hour(now),
+            )
             continue
-        await _send_summary_for_tenant(tenant, period, notifier)
+        try:
+            await _send_summary_for_tenant(tenant, period, notifier)
+        except Exception:
+            _logger.exception(
+                "summary failed tenant_id=%s period=%s", tenant.id, period.value
+            )
 
 
 def send_summaries_for(period: SummaryPeriod, now: datetime | None = None) -> None:

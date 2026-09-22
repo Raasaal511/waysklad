@@ -321,6 +321,7 @@ export function ReviewsSection({ slug, productId, onPhotosLoaded }: ReviewsSecti
 
       {showLogin && (
         <CustomerLoginModal
+          reason="review"
           onClose={() => setShowLogin(false)}
           onSuccess={() => {
             notifyCustomerAuthChanged()

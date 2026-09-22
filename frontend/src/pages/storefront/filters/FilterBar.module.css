@@ -10,7 +10,52 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
+}
+
+.foundCount {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.toolbarControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.sortSelect {
+  width: 200px;
+  max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .foundCount {
+    order: 2;
+  }
+
+  .toolbarControls {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .sortSelect {
+    flex: 1;
+    width: auto;
+  }
+
+  .filtersToggle {
+    flex: 1;
+  }
 }
 
 /* Кнопка «Фильтры (N)» — единственный вход на <1024 (открывает шит). На ≥1024
