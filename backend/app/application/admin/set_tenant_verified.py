@@ -1,7 +1,11 @@
 from sqlalchemy import select, update
 
 from app.domain.common.cache import ICache
-from app.infrastructure.cache.cache_aside import invalidate_marketplace_cache, shop_prefix
+from app.infrastructure.cache.cache_aside import (
+    invalidate_admin_cache,
+    invalidate_marketplace_cache,
+    shop_prefix,
+)
 from app.infrastructure.db.models.identity import TenantModel
 
 
@@ -29,4 +33,6 @@ async def set_tenant_verified(
     if cache is not None and row.slug is not None:
         await cache.delete_prefix(shop_prefix(row.slug))
     await invalidate_marketplace_cache(cache)
+    # список и обзор админки кешируются — без сброса админ увидит старое
+    await invalidate_admin_cache(cache)
     return True

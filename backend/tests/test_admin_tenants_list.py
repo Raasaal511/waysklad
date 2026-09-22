@@ -144,3 +144,35 @@ async def second_shop(client, random_phone) -> dict:
     )
     assert response.status_code == 201, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+async def test_admin_actions_invalidate_list_cache(
+    client, admin_client_headers, owner_headers
+):
+    """Список кешируется на 30 секунд — действия админа должны сбрасывать кеш,
+    иначе после «Проверенный» список ещё полминуты показывает старое."""
+    tenant_id = (await client.get(TENANTS_URL, headers=admin_client_headers)).json()[
+        "tenants"
+    ][0]["id"]
+
+    # прогреваем кеш
+    before = (await client.get(TENANTS_URL, headers=admin_client_headers)).json()
+    assert any(t["id"] == tenant_id and not t["is_verified"] for t in before["tenants"])
+
+    verified = await client.post(
+        f"{TENANTS_URL}/{tenant_id}/verify", headers=admin_client_headers
+    )
+    assert verified.status_code == 200, verified.text
+
+    after = (await client.get(TENANTS_URL, headers=admin_client_headers)).json()
+    listed = next(t for t in after["tenants"] if t["id"] == tenant_id)
+    assert listed["is_verified"] is True, "список отдал закешированное значение"
+
+    suspended = await client.post(
+        f"{TENANTS_URL}/{tenant_id}/suspend", headers=admin_client_headers
+    )
+    assert suspended.status_code == 200, suspended.text
+    after_suspend = (await client.get(TENANTS_URL, headers=admin_client_headers)).json()
+    assert next(
+        t for t in after_suspend["tenants"] if t["id"] == tenant_id
+    )["is_suspended"] is True
