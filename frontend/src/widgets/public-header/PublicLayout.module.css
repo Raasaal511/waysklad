@@ -26,4 +26,10 @@
   .main {
     padding: 20px 16px 32px;
   }
+
+  /* нижняя навигация fixed — освобождаем под неё место, иначе она
+     перекрывает конец подвала (PublicBottomNav.module.css) */
+  .page {
+    padding-bottom: calc(var(--public-bottom-nav-height) + env(safe-area-inset-bottom));
+  }
 }

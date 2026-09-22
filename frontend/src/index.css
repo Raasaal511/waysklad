@@ -101,6 +101,9 @@
   /* Слабее --accent-soft (фон вторичных кнопок) и полупрозрачная акцентная граница */
   --accent-soft-weak: color-mix(in srgb, var(--accent-soft) 55%, var(--bg));
   --accent-border: color-mix(in srgb, var(--accent) 35%, transparent);
+  /* высота нижней навигации публичных страниц (только <768px) —
+     под неё резервируют место сам каркас и всплывающие элементы (тосты) */
+  --public-bottom-nav-height: 56px;
 }
 
 * {

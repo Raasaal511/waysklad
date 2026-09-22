@@ -12,6 +12,7 @@ import { getStorefrontShopProfileCached, peekCachedStorefrontShopProfile } from 
 import { loadCustomerToken } from '../../entities/auth/customerApi'
 import { useTheme } from '../../app/ThemeContext'
 import { totalCartCount, totalFavoritesCount } from '../../shared/lib/storefrontCounters'
+import { FAVORITES_EVENT } from '../../shared/lib/favorites'
 import { CustomerLoginModal, notifyCustomerAuthChanged } from '../../pages/storefront/CustomerLoginModal'
 import styles from './PublicHeader.module.css'
 
@@ -88,22 +89,13 @@ export function PublicHeader() {
     syncCounters()
     window.addEventListener('storage', syncCounters)
     window.addEventListener('waysklad:storefront-cart', syncCounters)
-    // избранное меняется без кастомного события — слушаем ту же точку роста,
-    // что и корзина, плюс перечитываем при каждой навигации (см. ниже)
-    window.addEventListener('waysklad:storefront-favorites', syncCounters)
+    window.addEventListener(FAVORITES_EVENT, syncCounters)
     return () => {
       window.removeEventListener('storage', syncCounters)
       window.removeEventListener('waysklad:storefront-cart', syncCounters)
-      window.removeEventListener('waysklad:storefront-favorites', syncCounters)
+      window.removeEventListener(FAVORITES_EVENT, syncCounters)
     }
   }, [])
-
-  // избранное не диспатчит событие при изменении (в отличие от корзины) —
-  // перечитываем счётчик при каждой смене страницы, этого достаточно для шапки
-  useEffect(() => {
-    setFavoritesCount(totalFavoritesCount())
-    setCartCountValue(totalCartCount())
-  }, [location.pathname])
 
   useEffect(() => {
     function syncAuth() {
@@ -176,19 +168,12 @@ export function PublicHeader() {
         </form>
 
         <div className={styles.actions}>
-          {slug ? (
-            <Link to={`/store/${slug}?favorites=1`} className={styles.iconAction} aria-label="Избранное">
-              <IconHeart size={22} stroke={1.8} />
-              <CountBadge count={favoritesCount} />
-            </Link>
-          ) : (
-            // вне магазина нет общей страницы избранного по всем магазинам —
-            // иконка показывает суммарный счётчик, но неактивна (см. отчёт P1)
-            <span className={styles.iconAction} aria-disabled="true" title="Откройте магазин, чтобы посмотреть избранное">
-              <IconHeart size={22} stroke={1.8} />
-              <CountBadge count={favoritesCount} />
-            </span>
-          )}
+          {/* избранное общее для всех магазинов — отдельная страница /favorites,
+              счётчик тоже суммарный (см. shared/lib/favorites.ts) */}
+          <Link to="/favorites" className={styles.iconAction} aria-label="Избранное">
+            <IconHeart size={22} stroke={1.8} />
+            <CountBadge count={favoritesCount} />
+          </Link>
           {slug ? (
             <Link to={`/store/${slug}/cart`} className={styles.iconAction} aria-label="Корзина">
               <IconShoppingCart size={22} stroke={1.8} />
