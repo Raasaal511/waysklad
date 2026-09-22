@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import styles from './TimeSeriesChart.module.css'
 
 export interface ChartSeries {
@@ -61,9 +61,23 @@ export function TimeSeriesChart({
   emptyLabel = 'Нет данных за период',
 }: TimeSeriesChartProps) {
   const [hover, setHover] = useState<number | null>(null)
+  const [containerWidth, setContainerWidth] = useState(720)
+  const wrapRef = useRef<HTMLDivElement>(null)
   const clipId = useId()
 
-  const width = 720
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) => {
+      setContainerWidth(Math.max(320, Math.round(entry.contentRect.width)))
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  // viewBox по фактической ширине контейнера: при фиксированных 720 единицах
+  // на телефоне SVG сжимается вдвое вместе с подписями осей
+  const width = containerWidth
   const innerWidth = width - PADDING.left - PADDING.right
   const innerHeight = height - PADDING.top - PADDING.bottom
 
@@ -98,7 +112,7 @@ export function TimeSeriesChart({
   const tickStep = Math.max(1, Math.round(dates.length / 6))
 
   return (
-    <div className={styles.wrap}>
+    <div className={styles.wrap} ref={wrapRef}>
       {series.length > 1 && (
         <div className={styles.legend}>
           {series.map((s) => (

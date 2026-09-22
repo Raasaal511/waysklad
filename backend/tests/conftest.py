@@ -29,6 +29,11 @@ os.environ.setdefault("CACHE_REDIS_URL", "redis://localhost:6379/15")
 os.environ.setdefault("TELEGRAM_BOT_USERNAME", "waysklad_test_bot")
 # фиксированные логин/пароль — тесты admin-роутера логинятся через POST /api/admin/login
 os.environ.setdefault("ADMIN_LOGIN", "test-admin")
+# bcrypt с прод-фактором 12 стоит ~0.17s на хеш и ~0.19s на проверку. Фикстуры
+# owner_headers/registered_shop регистрируют магазин в сотнях тестов, и эта
+# цена, умноженная на число тестов, была основной статьёй времени прогона.
+# Криптостойкость здесь ничего не защищает — БД живёт один тест.
+os.environ.setdefault("BCRYPT_ROUNDS", "4")
 # Маркетплейс выключен в проде (MARKETPLACE_ENABLED=false по умолчанию, см.
 # app/infrastructure/config.py), но его код жив и покрыт тестами — включаем
 # флаг здесь, до импорта app.main, иначе роутер просто не подключится.
@@ -37,7 +42,9 @@ os.environ.setdefault("ADMIN_LOGIN", "test-admin")
 os.environ.setdefault("MARKETPLACE_ENABLED", "true")
 os.environ.setdefault(
     "ADMIN_PASSWORD_HASH",
-    "$2b$12$hVd0LRFO6SZp0qzOTV3pAOxTeF0fB18uj/us6lvrgGHJxvaQL4d/W",  # "test-admin-password"
+    # фактор 4 в тон BCRYPT_ROUNDS выше — проверка пароля с фактором 12 стоила
+    # бы 0.19s в каждом тесте admin-роутера
+    "$2b$04$Jrj4Ec92zrIx8po/D/s6kelfq8aBBpOfXMwyaG2Fti0TCbJ5Nqra6",  # "test-admin-password"
 )
 
 import pytest
