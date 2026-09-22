@@ -139,5 +139,3 @@ export function TenantDetailSection({ logout, refreshKey, onLoaded }: SectionPro
     </div>
   )
 }
-
-const ERROR_AUTO_REFRESH_MS = 15000

@@ -14,7 +14,7 @@ interface SectionProps {
   period: AdminPeriod
 }
 
-export function OverviewSection({ logout, refreshKey, onLoaded }: SectionProps) {
+export function OverviewSection({ logout, refreshKey, onLoaded, period: _period }: SectionProps) {
   const [data, setData] = useState<AdminOverview | null>(null)
   const [error, setError] = useState<string | null>(null)
 

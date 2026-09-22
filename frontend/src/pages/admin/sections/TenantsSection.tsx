@@ -1,13 +1,11 @@
-/**
- * Раздел «Магазины». Перенесён из прежней страницы; таблица с сортировкой и
- * фильтрами — следующий шаг (B3).
- */
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { listAdminTenants, type AdminTenantListItem } from '../../../entities/admin/api'
 import layoutStyles from '../../../shared/ui/Layout.module.css'
 import { handleAdminError } from '../shared'
 import styles from '../AdminPage.module.css'
+
+type TenantStatusFilter = 'all' | 'active' | 'suspended'
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString('ru-RU', {

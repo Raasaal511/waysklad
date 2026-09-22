@@ -1,8 +1,4 @@
-/**
- * Раздел «Ошибки». Перенесён из прежней страницы; группировка и пометка
- * «решено» — следующий шаг (B6).
- */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { getAdminErrorLogs, type AdminErrorLog } from '../../../entities/admin/api'
 import layoutStyles from '../../../shared/ui/Layout.module.css'
 import { handleAdminError } from '../shared'
@@ -147,4 +143,20 @@ function formatLogTime(value: string): string {
     minute: '2-digit',
     second: '2-digit',
   })
+}
+
+function FilterTab({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button type="button" className={styles.filterTab} data-active={active} onClick={onClick}>
+      {children}
+    </button>
+  )
 }

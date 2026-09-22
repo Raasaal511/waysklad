@@ -208,5 +208,3 @@ function StatusCard({
     </div>
   )
 }
-
-type TenantStatusFilter = 'all' | 'active' | 'suspended'

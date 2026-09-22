@@ -65,7 +65,7 @@ export function AdminPage() {
         <Route path="tenants" element={<TenantsSection {...sectionProps} />} />
         <Route path="tenants/:id" element={<TenantDetailSection {...sectionProps} />} />
         <Route path="server" element={<ServerSection {...sectionProps} />} />
-        <Route path="errors" element={<ErrorsSection {...sectionProps} period={period} />} />
+        <Route path="errors" element={<ErrorsSection {...sectionProps} />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </AdminLayout>
