@@ -82,8 +82,13 @@
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
-    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
     padding: 14px;
+  }
+
+  .salePageActionsButtons button,
+  .salePageActionsButtons a {
+    min-height: 44px;
   }
 
   .salePageActionsTotal {
@@ -458,6 +463,14 @@ input.saleClientSearch:not([type='checkbox']):not([type='radio']) {
   white-space: nowrap;
 }
 
+@media (max-width: 899px) {
+  input.saleClientSearch:not([type='checkbox']):not([type='radio']),
+  .saleSortField select,
+  .saleSortField .selectTrigger {
+    font-size: 16px;
+  }
+}
+
 .saleFiltersScroll input.saleFilterActive:not([type='checkbox']):not([type='radio']),
 .saleFiltersScroll select.saleFilterActive {
   border-color: var(--accent);
@@ -679,6 +692,12 @@ input.saleSearchInput:not([type='checkbox']):not([type='radio']) {
   border: 1px solid color-mix(in srgb, var(--text) 16%, var(--border));
   border-radius: var(--radius);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+@media (max-width: 899px) {
+  input.saleSearchInput:not([type='checkbox']):not([type='radio']) {
+    font-size: 16px;
+  }
 }
 
 .saleSearchInput:hover {

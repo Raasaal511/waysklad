@@ -46,6 +46,12 @@ input.saleSearchInput:not([type='checkbox']):not([type='radio']) {
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
+@media (max-width: 899px) {
+  input.saleSearchInput:not([type='checkbox']):not([type='radio']) {
+    font-size: 16px;
+  }
+}
+
 .saleSearchInput:hover {
   border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
   background: var(--bg);
