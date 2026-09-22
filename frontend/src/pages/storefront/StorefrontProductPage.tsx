@@ -165,7 +165,7 @@ export function StorefrontProductPage() {
     }
   }, [product])
 
-  // избранное меняется и вне карточки — на /favorites и в другой вкладке
+  // избранное меняется и вне карточки — на /store/:slug/favorites и в другой вкладке
   useEffect(() => {
     function sync() {
       setFavorites(loadFavorites(slug))

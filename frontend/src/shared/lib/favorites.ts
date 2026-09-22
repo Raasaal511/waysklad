@@ -1,22 +1,12 @@
 /**
- * Избранное покупателя. У покупателя нет единого аккаунта на все магазины,
- * поэтому список id хранится в localStorage отдельным ключом на каждый магазин
- * (waysklad:storefront-favorites:<slug>) — так же, как корзина (pages/storefront/cart.ts).
- *
- * Страница /favorites собирает избранное по всем магазинам сразу, поэтому вся
- * работа с ключами живёт здесь, а не внутри страницы каталога.
+ * Избранное покупателя по магазину.
+ * Ключ: waysklad:storefront-favorites:<slug> — как корзина (pages/storefront/cart.ts).
+ * Страница /store/:slug/favorites читает только свой slug.
  */
 export const FAVORITES_PREFIX = 'waysklad:storefront-favorites:'
 
-/** Событие «избранное изменилось» — как 'waysklad:storefront-cart' у корзины.
- *  Шапка и страница избранного подписаны на него, чтобы счётчик обновлялся
- *  мгновенно, без ожидания смены роута. */
+/** Событие «избранное изменилось» — счётчик в шапке и нижняя навигация. */
 export const FAVORITES_EVENT = 'waysklad:storefront-favorites'
-
-export interface FavoritesEntry {
-  slug: string
-  ids: number[]
-}
 
 function parseIds(raw: string | null): number[] {
   if (!raw) return []
@@ -25,7 +15,6 @@ function parseIds(raw: string | null): number[] {
     if (!Array.isArray(parsed)) return []
     return parsed.filter((id): id is number => typeof id === 'number')
   } catch {
-    // повреждённая запись — считаем, что избранного нет, а не валим экран
     return []
   }
 }
@@ -43,12 +32,10 @@ export function saveFavorites(slug: string, ids: number[]) {
     if (ids.length > 0) {
       localStorage.setItem(`${FAVORITES_PREFIX}${slug}`, JSON.stringify(ids))
     } else {
-      // пустой список не храним — иначе в localStorage копятся ключи магазинов,
-      // из которых покупатель всё убрал, и страница /favorites ходит за ними зря
       localStorage.removeItem(`${FAVORITES_PREFIX}${slug}`)
     }
   } catch {
-    // приватный режим / переполненное хранилище — интерфейс продолжает работать
+    // приватный режим / переполненное хранилище
   }
   notifyFavoritesChanged()
 }
@@ -80,23 +67,4 @@ export function removeFavorite(slug: string, productId: number) {
     slug,
     prev.filter((id) => id !== productId),
   )
-}
-
-/** Избранное по всем магазинам сразу — источник данных страницы /favorites. */
-export function loadAllFavorites(): FavoritesEntry[] {
-  const entries: FavoritesEntry[] = []
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (!key || !key.startsWith(FAVORITES_PREFIX)) continue
-      const slug = key.slice(FAVORITES_PREFIX.length)
-      if (!slug) continue
-      const ids = parseIds(localStorage.getItem(key))
-      if (ids.length > 0) entries.push({ slug, ids })
-    }
-  } catch {
-    // localStorage недоступен — считаем, что избранного нет
-    return []
-  }
-  return entries
 }

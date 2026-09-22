@@ -61,7 +61,7 @@ export function StorefrontCatalogPage() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
-  // избранное отдельной страницей (/favorites) — здесь только сердечко на карточке
+  // избранное — /store/:slug/favorites; здесь только сердечко на карточке
   const [favorites, setFavorites] = useState<number[]>(() => loadFavorites(slug))
   const requestToken = loadRequestToken(slug)
 
