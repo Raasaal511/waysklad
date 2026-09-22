@@ -16,6 +16,7 @@ import { StorefrontCatalogPage } from './pages/storefront/StorefrontCatalogPage'
 import { StorefrontProductPage } from './pages/storefront/StorefrontProductPage'
 import { StorefrontCartPage } from './pages/storefront/StorefrontCartPage'
 import { CustomerAuthPage } from './pages/storefront/CustomerAuthPage'
+import { FavoritesPage } from './pages/storefront/FavoritesPage'
 import { MarketplaceComingSoonPage } from './pages/marketplace/MarketplaceComingSoonPage'
 import { PublicLayout } from './widgets/public-header/PublicLayout'
 
@@ -99,6 +100,17 @@ export function App() {
                 element={
                   <PublicLayout>
                     <MarketplaceComingSoonPage />
+                  </PublicLayout>
+                }
+              />
+              {/* Избранное — одна страница на все магазины: списки лежат в
+                  localStorage по ключу на каждый магазин, общего аккаунта
+                  покупателя нет, поэтому страница вне /store/:slug. */}
+              <Route
+                path="/favorites"
+                element={
+                  <PublicLayout>
+                    <FavoritesPage />
                   </PublicLayout>
                 }
               />
