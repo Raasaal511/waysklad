@@ -35,7 +35,7 @@ export function ShopCard({ profile }: ShopCardProps) {
             <p className={styles.shopRatingMuted}>Новый магазин</p>
           )}
           {profile.on_platform_since && (
-            <p className={styles.shopSince}>На ВайСклад с {formatMonthYearGenitive(profile.on_platform_since)}</p>
+            <p className={styles.shopSince}>С {formatMonthYearGenitive(profile.on_platform_since)}</p>
           )}
         </div>
       </Link>
