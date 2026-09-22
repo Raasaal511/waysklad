@@ -47,6 +47,7 @@ export function CustomerAuthPage() {
   const [phone, setPhone] = useState('')
   const [regPassword, setRegPassword] = useState('')
   const [regPasswordConfirm, setRegPasswordConfirm] = useState('')
+  const [personalDataConsent, setPersonalDataConsent] = useState(false)
 
   // подтверждение в Telegram — общее для регистрации и входа через бота
   const [deepLink, setDeepLink] = useState<string | null>(null)
@@ -146,6 +147,10 @@ export function CustomerAuthPage() {
 
   async function submitRegister(e: FormEvent) {
     e.preventDefault()
+    if (!personalDataConsent) {
+      setError('Нужно согласие на обработку персональных данных')
+      return
+    }
     setError(null)
     setLoading(true)
     try {
@@ -154,6 +159,7 @@ export function CustomerAuthPage() {
         phone,
         password: regPassword,
         password_confirm: regPasswordConfirm,
+        personal_data_consent: true,
       })
       startTelegramWait(result.token, result.telegram_deep_link)
     } catch (err) {
@@ -297,9 +303,24 @@ export function CustomerAuthPage() {
               />
             </label>
 
+            <label className={styles.field} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={personalDataConsent}
+                onChange={(e) => setPersonalDataConsent(e.target.checked)}
+                required
+              />
+              <span className={styles.fieldHint}>
+                Согласен на обработку телефона.{' '}
+                <a href="/privacy" target="_blank" rel="noreferrer">
+                  Подробнее
+                </a>
+              </span>
+            </label>
+
             {error && <p className={styles.error}>{error}</p>}
 
-            <Button type="submit" disabled={loading || !phone}>
+            <Button type="submit" disabled={loading || !phone || !personalDataConsent}>
               {loading ? 'Отправляем…' : 'Зарегистрироваться'}
             </Button>
           </form>

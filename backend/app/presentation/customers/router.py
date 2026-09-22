@@ -72,6 +72,7 @@ async def register_customer(
             phone=body.phone,
             password=body.password,
             password_confirm=body.password_confirm,
+            personal_data_consent=body.personal_data_consent,
         )
     )
     return RegisterCustomerResponse.from_result(result)

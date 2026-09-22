@@ -10,6 +10,7 @@ async def test_register_login_flow(client, random_phone):
             "owner_name": "Муса",
             "phone": phone,
             "password": "secret123",
+            "personal_data_consent": True,
         },
     )
     assert response.status_code == 201
@@ -17,7 +18,7 @@ async def test_register_login_flow(client, random_phone):
     assert response.json()["shop_slug"] == "lavka"
 
     response = await client.post(
-        "/api/auth/login", json={"phone": phone, "password": "secret123"}
+        "/api/auth/login", json={"phone": phone, "password": "secret123", "personal_data_consent": True}
     )
     assert response.status_code == 200
     assert response.json()["shop_slug"] is None  # слаг возвращается только при регистрации
@@ -31,7 +32,20 @@ async def test_register_login_flow(client, random_phone):
     assert response.status_code == 401  # без токена
 
 
-async def test_validation_error_returns_422(client, random_phone):
+async def test_register_requires_personal_data_consent(client, random_phone):
+    response = await client.post(
+        "/api/auth/register",
+        json={
+            "shop_name": "Лавка",
+            "owner_name": "Муса",
+            "phone": random_phone(),
+            "password": "secret123",
+            "personal_data_consent": False,
+        },
+    )
+    assert response.status_code == 400
+    assert "согласи" in response.json()["detail"].lower()
+
     response = await client.post(
         "/api/auth/register",
         json={
@@ -39,6 +53,7 @@ async def test_validation_error_returns_422(client, random_phone):
             "owner_name": "Муса",
             "phone": random_phone(),
             "password": "123",  # короче 6 символов
+            "personal_data_consent": True,
         },
     )
     assert response.status_code == 422
@@ -63,7 +78,7 @@ async def test_notifications_websocket_push(client, owner_headers, random_phone,
         json={"name": "Хеда", "phone": phone, "password": "secret123", "role": "seller"},
     )
     employee_id = response.json()["id"]
-    login = await client.post("/api/auth/login", json={"phone": phone, "password": "secret123"})
+    login = await client.post("/api/auth/login", json={"phone": phone, "password": "secret123", "personal_data_consent": True})
     employee_token = login.json()["access_token"]
 
     sync_client = TestClient(fastapi_app)
@@ -107,7 +122,7 @@ async def test_connect_telegram_via_api(client, owner_headers, random_phone):
         json={"name": "Продавец", "phone": seller_phone, "password": "secret123", "role": "seller"},
     )
     login = await client.post(
-        "/api/auth/login", json={"phone": seller_phone, "password": "secret123"}
+        "/api/auth/login", json={"phone": seller_phone, "password": "secret123", "personal_data_consent": True}
     )
     seller_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
 

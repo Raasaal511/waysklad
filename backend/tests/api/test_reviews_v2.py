@@ -638,6 +638,7 @@ async def test_vote_isolated_across_shops(client, owner_headers, random_phone, c
             "owner_name": "Другой",
             "phone": random_phone(),
             "password": "secret123",
+            "personal_data_consent": True,
         },
     )
     other_owner_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}

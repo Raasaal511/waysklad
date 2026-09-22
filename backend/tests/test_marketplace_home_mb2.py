@@ -24,6 +24,7 @@ async def _register_shop(client, random_phone, shop_name: str, city: str | None 
             "owner_name": "Продавец",
             "phone": random_phone(),
             "password": "secret123",
+            "personal_data_consent": True,
         },
     )
     assert response.status_code == 201, response.text
@@ -503,6 +504,7 @@ async def test_home_excludes_suspended_and_hidden_shops(client, random_phone):
         json={
             "shop_name": "Скрытый магазин", "owner_name": "Продавец",
             "phone": random_phone(), "password": "secret123",
+            "personal_data_consent": True,
         },
     )
     hidden_headers = {"Authorization": f"Bearer {hidden_response.json()['access_token']}"}

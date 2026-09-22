@@ -82,6 +82,7 @@ class SqlAlchemyCustomerRepository(SqlAlchemyRepository, ICustomerRepository):
         model.phone_verified = customer.phone_verified
         model.phone_verified_at = customer.phone_verified_at
         model.token_version = customer.token_version
+        model.personal_data_consent_at = customer.personal_data_consent_at
         await self._session.flush()
         return customer
 

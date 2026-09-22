@@ -27,6 +27,7 @@ export function registerShop(input: {
   owner_name: string
   phone: string
   password: string
+  personal_data_consent: boolean
 }) {
   return api.post<TokenResponse>('/auth/register', input)
 }

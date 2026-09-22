@@ -581,6 +581,7 @@ async def test_storefront_profile_tenant_isolation_via_api(client, owner_headers
             "owner_name": "Другой владелец",
             "phone": random_phone(),
             "password": "secret123",
+            "personal_data_consent": True,
         },
     )
     other_headers = {"Authorization": f"Bearer {other_response.json()['access_token']}"}

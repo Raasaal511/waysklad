@@ -71,6 +71,7 @@ class UserMapper:
             password_hash=user.password_hash,
             role=user.role,
             is_active=user.is_active,
+            personal_data_consent_at=user.personal_data_consent_at,
         )
 
     @staticmethod
@@ -85,6 +86,7 @@ class UserMapper:
             tenant_id=model.tenant_id,
             token_version=model.token_version,
             last_login_at=model.last_login_at,
+            personal_data_consent_at=model.personal_data_consent_at,
         )
 
 

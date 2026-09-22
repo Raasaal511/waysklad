@@ -59,6 +59,8 @@ class Customer:
     # инкрементируется при отзыве всех токенов (logout-all) — тот же паттерн,
     # что и у User.token_version
     token_version: int = 0
+    # согласие на обработку телефона при регистрации; NULL у старых аккаунтов
+    personal_data_consent_at: datetime | None = None
 
     @property
     def has_password(self) -> bool:

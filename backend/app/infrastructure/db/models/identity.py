@@ -68,6 +68,8 @@ class UserModel(Base, TenantMixin, TimestampMixin):
     # последний успешный вход — нужен админке платформы, чтобы отличать
     # живой магазин от заброшенного (NULL = ни разу не входил после введения поля)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # согласие на обработку телефона (152-ФЗ); NULL — зарегистрирован до введения поля
+    personal_data_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class WarehouseAssignmentModel(Base):

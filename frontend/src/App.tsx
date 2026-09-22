@@ -10,6 +10,7 @@ import { RequireAuth } from './app/RequireAuth'
 import { RequireFeature } from './app/RequireFeature'
 import { AppLayout } from './app/AppLayout'
 import { LoginPage } from './pages/auth/LoginPage'
+import { PrivacyPage } from './pages/auth/PrivacyPage'
 import { StorefrontRequestPage } from './pages/storefront/StorefrontRequestPage'
 import { CustomerAccountPage } from './pages/storefront/CustomerAccountPage'
 import { StorefrontCatalogPage } from './pages/storefront/StorefrontCatalogPage'
@@ -95,6 +96,7 @@ export function App() {
           <Suspense fallback={null}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/admin/*" element={<AdminPage />} />
               {/* Старые глобальные URL: без магазина в контексте — к последнему
                   магазину или на /login. Маркетплейс для покупателя закрыт. */}

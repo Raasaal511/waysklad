@@ -25,6 +25,7 @@ async def _register_shop(client, random_phone, shop_name: str, storefront_enable
             "owner_name": "Продавец",
             "phone": random_phone(),
             "password": "secret123",
+            "personal_data_consent": True,
         },
     )
     assert response.status_code == 201, response.text
@@ -404,6 +405,7 @@ async def test_admin_verify_unverify_tenant(client, random_phone):
             "owner_name": "Владелец",
             "phone": random_phone(),
             "password": "secret123",
+            "personal_data_consent": True,
         },
     )
     tenant_name = "Магазин для проверки"

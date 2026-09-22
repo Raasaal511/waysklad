@@ -16,6 +16,7 @@ class RegisterCustomerCommand:
     phone: str
     password: str
     password_confirm: str
+    personal_data_consent: bool
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,8 @@ class RegisterCustomerUseCase:
         self._uow = uow
 
     async def execute(self, cmd: RegisterCustomerCommand) -> RegisterCustomerResult:
+        if not cmd.personal_data_consent:
+            raise DomainError("Нужно согласие на обработку персональных данных")
         if not settings.telegram_bot_username_clean:
             raise DomainError("Регистрация недоступна: не настроен Telegram-бот")
 

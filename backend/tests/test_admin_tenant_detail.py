@@ -61,6 +61,7 @@ async def second_shop_headers(client, random_phone) -> dict:
             "owner_name": "Магомед",
             "phone": random_phone(),
             "password": "secret123",
+            "personal_data_consent": True,
         },
     )
     assert response.status_code == 201, response.text

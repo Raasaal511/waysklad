@@ -36,6 +36,7 @@ export function registerCustomer(input: {
   phone: string
   password: string
   password_confirm: string
+  personal_data_consent: boolean
 }) {
   return api.post<{ token: string; telegram_deep_link: string }>('/auth/customer/register', input)
 }

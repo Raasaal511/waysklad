@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from app.domain.common.exceptions import DomainError
 from app.domain.common.uow import IUnitOfWork
@@ -42,7 +43,14 @@ class ConfirmCustomerLoginLinkUseCase:
                     raise DomainError("Этот телефон уже зарегистрирован")
 
             if customer is None:
-                customer = Customer(id=None, phone=link.phone, telegram_chat_id=cmd.telegram_chat_id)
+                customer = Customer(
+                    id=None,
+                    phone=link.phone,
+                    telegram_chat_id=cmd.telegram_chat_id,
+                    personal_data_consent_at=(
+                        datetime.now(timezone.utc) if link.is_registration else None
+                    ),
+                )
                 if link.is_registration:
                     customer.set_username(link.username)
                     customer.set_password(link.password_hash)
@@ -57,6 +65,8 @@ class ConfirmCustomerLoginLinkUseCase:
                     # доводит его до парольного, второй с тем же номером не нужен
                     customer.set_username(link.username)
                     customer.set_password(link.password_hash)
+                    if customer.personal_data_consent_at is None:
+                        customer.personal_data_consent_at = datetime.now(timezone.utc)
                     changed = True
                 if changed:
                     await uow.customers.save(customer)

@@ -120,6 +120,7 @@ class RegisterCustomerRequest(BaseModel):
     phone: str
     password: str
     password_confirm: str
+    personal_data_consent: bool = False
 
 
 class RegisterCustomerResponse(BaseModel):

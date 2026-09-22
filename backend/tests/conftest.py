@@ -119,14 +119,24 @@ async def _test_db_ready() -> AsyncIterator[str]:
     yield db_name
 
 
-@pytest.fixture
-async def db_session_factory(_test_db_ready) -> AsyncIterator[async_sessionmaker]:
-    """Чистая схема на каждый тест, в БД, выделенной текущему xdist-воркеру.
+@pytest.fixture(scope="session")
+async def _db_engine(_test_db_ready) -> AsyncIterator:
+    """Один движок на сессию воркера, со схемой, созданной один раз.
+
+    Раньше схема пересоздавалась на КАЖДЫЙ тест (drop_all + create_all, 42
+    таблицы) — это и было основной статьёй времени прогона, дороже самих
+    тестов. Теперь схема создаётся один раз, а изоляцию даёт TRUNCATE в
+    db_session_factory: тот же «пустая БД на тест» результат в разы дешевле.
 
     Схема создаётся из моделей (Base.metadata.create_all), не через Alembic —
     поэтому сид platform_categories, который в проде накатывается сид-миграцией
     (migrations/versions/2026-09-18_platform_categories.py), здесь сеется вручную
-    тем же списком (app.domain.platform.category_synonyms.SEED_PLATFORM_CATEGORIES)."""
+    тем же списком (app.domain.platform.category_synonyms.SEED_PLATFORM_CATEGORIES).
+
+    NullPool сохранён: движок теперь живёт всю сессию, а event loop
+    pytest-asyncio создаёт на каждый тест — соединение из пула пережило бы
+    свой loop и упало бы при повторном использовании. Замер показал, что пул
+    здесь экономит меньше секунды на прогоне, так что менять смысла нет."""
     db_url = f"postgresql+psycopg://postgres:postgres@localhost:5432/{_test_db_ready}"
     engine = create_async_engine(db_url, poolclass=NullPool)
     async with engine.begin() as conn:
@@ -137,8 +147,32 @@ async def db_session_factory(_test_db_ready) -> AsyncIterator[async_sessionmaker
         for slug, name, sort_order in SEED_PLATFORM_CATEGORIES:
             session.add(PlatformCategoryModel(name=name, slug=slug, sort_order=sort_order))
         await session.commit()
-    yield factory
+    yield engine
     await engine.dispose()
+
+
+# platform_categories — справочник, а не данные теста: в проде он приезжает
+# сид-миграцией и дальше не меняется, тесты его только читают. Поэтому он
+# сеется один раз на сессию (в _db_engine) и переживает очистку между тестами,
+# вместо того чтобы вычищаться и пересеваться 12 строками на каждый тест.
+_MUTABLE_TABLES = [t for t in Base.metadata.tables if t != PlatformCategoryModel.__tablename__]
+
+# TRUNCATE всех таблиц разом: один оператор дешевле, чем DROP/CREATE схемы, а
+# RESTART IDENTITY возвращает последовательности к 1 — тесты, которые ждут
+# id=1 у первой созданной записи, продолжают работать как при чистой схеме.
+# CASCADE нужен из-за внешних ключей между таблицами.
+_TRUNCATE_ALL = text(
+    "TRUNCATE " + ", ".join(f'"{table}"' for table in _MUTABLE_TABLES) + " RESTART IDENTITY CASCADE"
+)
+
+
+@pytest.fixture
+async def db_session_factory(_db_engine) -> AsyncIterator[async_sessionmaker]:
+    """Пустая БД на каждый тест, в БД, выделенной текущему xdist-воркеру."""
+    engine = _db_engine
+    async with engine.begin() as conn:
+        await conn.execute(_TRUNCATE_ALL)
+    yield async_sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
 @pytest.fixture
@@ -187,7 +221,11 @@ async def registered_shop(make_uow, random_phone, hasher) -> tuple[int, str, Act
     phone = random_phone()
     result = await RegisterShopUseCase(make_uow(), hasher).execute(
         RegisterShopCommand(
-            shop_name="Магазин Беркат", owner_name="Ахмед", phone=phone, password="secret123"
+            shop_name="Магазин Беркат",
+            owner_name="Ахмед",
+            phone=phone,
+            password="secret123",
+            personal_data_consent=True,
         )
     )
     owner = result.owner
@@ -374,6 +412,7 @@ async def owner_headers(client, random_phone) -> dict:
             "owner_name": "Ахмед",
             "phone": random_phone(),
             "password": "secret123",
+            "personal_data_consent": True,
         },
     )
     assert response.status_code == 201, response.text

@@ -19,6 +19,7 @@ class CustomerMapper:
             phone_verified=customer.phone_verified,
             phone_verified_at=customer.phone_verified_at,
             token_version=customer.token_version,
+            personal_data_consent_at=customer.personal_data_consent_at,
         )
 
     @staticmethod
@@ -34,6 +35,7 @@ class CustomerMapper:
             phone_verified_at=model.phone_verified_at,
             created_at=model.created_at,
             token_version=model.token_version,
+            personal_data_consent_at=model.personal_data_consent_at,
         )
 
 

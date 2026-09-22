@@ -26,6 +26,7 @@ class CustomerModel(Base, TimestampMixin):
     )
     phone_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     token_version: Mapped[int] = mapped_column(Integer, default=0)
+    personal_data_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class CustomerLoginLinkModel(Base):
