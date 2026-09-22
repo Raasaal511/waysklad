@@ -369,8 +369,6 @@ export function StorefrontProductPage() {
               <AboutSection product={product} />
               <WarrantySection warrantyText={product.warranty_text} />
               <Suspense fallback={null}>
-                {/* только товары этого же магазина: межмагазинный блок (scope="marketplace")
-                    убран вместе с маркетплейсом — backend отдаёт на него 404 */}
                 <SimilarSection slug={slug} productId={productId} shopName={shopName} />
               </Suspense>
               <Suspense fallback={null}>

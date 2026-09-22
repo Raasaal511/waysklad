@@ -12,9 +12,7 @@ interface SimilarSectionProps {
 
 /**
  * «Ещё в магазине» — ленивая загрузка по IntersectionObserver.
- * Второй вариант секции (scope="marketplace", похожие товары в других
- * магазинах) убран вместе с маркетплейсом: backend отдаёт на него 404.
- * Сам API-контракт с обоими scope жив — см. entities/storefront/api.ts.
+ * Только товары этого магазина (scope=shop).
  */
 export function SimilarSection({ slug, productId, shopName }: SimilarSectionProps) {
   const { setRef, data, loading } = useSimilar(slug, productId, 'shop')
