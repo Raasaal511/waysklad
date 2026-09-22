@@ -90,18 +90,11 @@
   min-width: 0;
 }
 
+/* обёртка панели фильтров — только вертикальные отступы (чип «Избранное»
+   уехал на отдельную страницу /favorites, второго ребёнка здесь больше нет) */
 .header {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
   padding-top: 14px;
   padding-bottom: 8px;
-}
-
-/* «Избранное · N» — локальное для каталога магазина состояние (localStorage,
-   без сервера), поэтому не часть общего FilterBar — просто чип рядом с ним. */
-.favoritesChip {
-  align-self: flex-start;
 }
 
 .resultMeta {

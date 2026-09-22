@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   getStorefrontCatalog,
@@ -13,9 +13,9 @@ import {
   type StorefrontSort,
 } from '../../entities/storefront/api'
 import { ApiError } from '../../shared/api/client'
+import { FAVORITES_EVENT, loadFavorites, toggleFavorite } from '../../shared/lib/favorites'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { useScrollRestore } from '../../shared/lib/useScrollRestore'
-import { Chip } from '../../shared/ui/Chip'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { ErrorState } from '../../shared/ui/ErrorState'
 import { ShopHeader, ShopHeaderSkeleton } from './ShopHeader'
@@ -24,21 +24,7 @@ import { addToCart } from './cart'
 import { ProductGrid } from './ProductGrid'
 import styles from './Storefront.module.css'
 
-const FAVORITES_KEY = 'waysklad:storefront-favorites'
 const PAGE_SIZE = 24
-
-function loadFavorites(slug: string): number[] {
-  try {
-    const raw = localStorage.getItem(`${FAVORITES_KEY}:${slug}`)
-    return raw ? (JSON.parse(raw) as number[]) : []
-  } catch {
-    return []
-  }
-}
-
-function saveFavorites(slug: string, ids: number[]) {
-  localStorage.setItem(`${FAVORITES_KEY}:${slug}`, JSON.stringify(ids))
-}
 
 const SORT_OPTIONS: { value: StorefrontSort; label: string }[] = [
   { value: 'name', label: 'По названию' },
@@ -75,10 +61,8 @@ export function StorefrontCatalogPage() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
+  // избранное отдельной страницей (/favorites) — здесь только сердечко на карточке
   const [favorites, setFavorites] = useState<number[]>(() => loadFavorites(slug))
-  // ?favorites=1 — используется ссылкой «Избранное» в общей шапке (PublicHeader),
-  // чтобы попасть сразу в отфильтрованный вид каталога магазина
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(() => searchParams.get('favorites') === '1')
   const requestToken = loadRequestToken(slug)
 
   // позиция скролла при «назад» из карточки товара — восстанавливаем только когда список
@@ -168,10 +152,19 @@ export function StorefrontCatalogPage() {
     return () => resetPageMeta()
   }, [profile])
 
-  const visibleProducts = useMemo(() => {
-    if (!showFavoritesOnly) return products
-    return products.filter((p) => favorites.includes(p.id))
-  }, [products, showFavoritesOnly, favorites])
+  // избранное меняется и вне каталога — на странице /favorites и в другой
+  // вкладке; перечитываем, чтобы сердечки на карточках не разъезжались
+  useEffect(() => {
+    function sync() {
+      setFavorites(loadFavorites(slug))
+    }
+    window.addEventListener(FAVORITES_EVENT, sync)
+    window.addEventListener('storage', sync)
+    return () => {
+      window.removeEventListener(FAVORITES_EVENT, sync)
+      window.removeEventListener('storage', sync)
+    }
+  }, [slug])
 
   /** undefined в значении патча — «не трогать ключ» (в отличие от null — «удалить ключ»). */
   function patchParams(patch: Record<string, string | null | undefined>) {
@@ -214,14 +207,8 @@ export function StorefrontCatalogPage() {
     setSearchParams(next, { replace: true })
   }
 
-  function toggleFavorite(productId: number) {
-    setFavorites((prev) => {
-      const next = prev.includes(productId)
-        ? prev.filter((id) => id !== productId)
-        : [...prev, productId]
-      saveFavorites(slug, next)
-      return next
-    })
+  function handleToggleFavorite(productId: number) {
+    setFavorites(toggleFavorite(slug, productId))
   }
 
   function quickAdd(product: StorefrontProduct) {
@@ -296,7 +283,7 @@ export function StorefrontCatalogPage() {
     categoryId != null
 
   const shopEmpty = !loading && catalog && catalog.total === 0 && !hasActiveFilters
-  const filtersEmpty = !loading && catalog && visibleProducts.length === 0 && (hasActiveFilters || showFavoritesOnly)
+  const filtersEmpty = !loading && catalog && products.length === 0 && hasActiveFilters
 
   return (
     <div className={styles.shell}>
@@ -324,18 +311,10 @@ export function StorefrontCatalogPage() {
             categories={(catalog?.categories ?? []).map((c) => ({ id: c.id, name: c.name, count: c.product_count }))}
             categoriesLoading={loading}
             activeCategoryId={categoryId}
-            onCategoryChange={(id) => {
-              setShowFavoritesOnly(false)
-              patchParams({ category_id: id != null ? String(id) : null })
-            }}
+            onCategoryChange={(id) => patchParams({ category_id: id != null ? String(id) : null })}
             totalCount={catalog?.total}
             resultCount={catalog?.total ?? 0}
           />
-          {favorites.length > 0 && (
-            <Chip active={showFavoritesOnly} className={styles.favoritesChip} onClick={() => setShowFavoritesOnly((v) => !v)}>
-              Избранное · {favorites.length}
-            </Chip>
-          )}
         </div>
       )}
 
@@ -356,27 +335,22 @@ export function StorefrontCatalogPage() {
             title="Ничего не найдено"
             description="Попробуйте изменить фильтры"
             actionLabel="Сбросить фильтры"
-            onAction={() => {
-              setShowFavoritesOnly(false)
-              clearFiltersAndSearch()
-            }}
+            onAction={clearFiltersAndSearch}
           />
         ) : (
           <>
             <p className={styles.resultMeta}>
-              {showFavoritesOnly
-                ? `Избранное · ${visibleProducts.length}`
-                : `Показано ${products.length} из ${catalog?.total ?? products.length}`}
+              Показано {products.length} из {catalog?.total ?? products.length}
             </p>
             <ProductGrid
-              items={visibleProducts}
+              items={products}
               getHref={(item) => `/store/${slug}/products/${item.id}`}
               favorites={favorites}
-              onToggleFavorite={(item) => toggleFavorite(item.id)}
+              onToggleFavorite={(item) => handleToggleFavorite(item.id)}
               onQuickAdd={(item) => quickAdd(item)}
-              onLoadMore={!showFavoritesOnly ? loadMore : undefined}
+              onLoadMore={loadMore}
               loadingMore={loadingMore}
-              hasMore={!showFavoritesOnly && catalog != null && products.length < catalog.total}
+              hasMore={catalog != null && products.length < catalog.total}
             />
           </>
         )}
