@@ -1,0 +1,8 @@
+/* Раздел «Обзор» — сетка блоков. */
+
+.grid,
+.loading {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

@@ -32,6 +32,14 @@ function niceMax(value: number): number {
   return step * magnitude
 }
 
+/**
+ * Делений столько, чтобы подписи не повторялись: при максимуме 2 шкала
+ * «0 1 2», а не «0 1 1 2 2» — повторяющиеся числа выглядят как ошибка.
+ */
+function gridCount(max: number): number {
+  return Math.max(1, Math.min(GRID_LINES, Math.round(max)))
+}
+
 function formatTick(iso: string): string {
   const date = new Date(iso)
   return `${date.getDate()}.${String(date.getMonth() + 1).padStart(2, '0')}`
@@ -70,6 +78,9 @@ export function TimeSeriesChart({
     return <p className={styles.empty}>{emptyLabel}</p>
   }
 
+  // одно число делений на обе шкалы: у каждой свой максимум, но линии сетки
+  // общие, и разное число делений либо дублирует подписи, либо оставляет пустоты
+  const grid = Math.min(gridCount(barsMax), line ? gridCount(lineMax) : GRID_LINES)
   const stepX = innerWidth / Math.max(dates.length, 1)
   const barWidth = Math.max(2, stepX * 0.6)
 
@@ -117,8 +128,8 @@ export function TimeSeriesChart({
         </defs>
 
         {/* сетка и подписи левой шкалы (столбики) */}
-        {Array.from({ length: GRID_LINES + 1 }, (_, i) => {
-          const value = (barsMax / GRID_LINES) * i
+        {Array.from({ length: grid + 1 }, (_, i) => {
+          const value = (barsMax / grid) * i
           const y = yBar(value)
           return (
             <g key={i}>
@@ -139,7 +150,7 @@ export function TimeSeriesChart({
                   className={styles.axisLabelSecondary}
                   textAnchor="start"
                 >
-                  {Math.round((lineMax / GRID_LINES) * i)}
+                  {Math.round((lineMax / grid) * i)}
                 </text>
               )}
             </g>
