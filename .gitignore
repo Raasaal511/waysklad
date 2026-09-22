@@ -1,6 +1,6 @@
-/README.md
-
-docs/
+# Документация в git (md), тяжёлые артефакты — нет
+docs/screens/
+docs/lighthouse/
 
 /.claude
 # --- Python ---
