@@ -476,3 +476,35 @@ class PlatformOverviewResponse(BaseModel):
             storefront=OverviewStorefrontResponse(**asdict(result.storefront)),
             series_30d=OverviewSeriesResponse(**asdict(result.series_30d)),
         )
+
+
+class ErrorGroupResponse(BaseModel):
+    """Группа одинаковых ошибок: числовые сегменты пути схлопнуты, так что
+    /api/products/17 и /api/products/42 — одна строка, а не две."""
+
+    signature: str
+    type: str
+    path: str
+    method: str
+    count_24h: int
+    count_7d: int
+    first_at: str
+    last_at: str
+    sample_id: int
+    resolved: bool
+
+
+class ErrorEntryResponse(BaseModel):
+    """Отдельная запись. Персональных данных нет: ни тела запроса, ни
+    заголовков, ни параметров — только техническая информация."""
+
+    id: int
+    created_at: str
+    method: str
+    path: str
+    error_type: str
+    message: str
+    status_code: int | None
+    tenant_id: int | None
+    stack: str
+    resolved_at: str | None

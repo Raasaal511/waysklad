@@ -4,6 +4,12 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 
+from app.application.admin.error_groups import (
+    get_error_entry,
+    list_error_groups,
+    list_group_entries,
+    resolve_group,
+)
 from app.application.admin.get_overview import (
     CACHE_TTL_SECONDS as OVERVIEW_CACHE_TTL_SECONDS,
 )
@@ -49,6 +55,8 @@ from app.infrastructure.rate_limit import limiter
 from app.infrastructure.security import create_admin_access_token, verify_password
 from app.infrastructure.notifications.ws_broadcast import broadcaster
 from app.presentation.admin.schemas import (
+    ErrorEntryResponse,
+    ErrorGroupResponse,
     PlatformOverviewResponse,
     AdminLoginRequest,
     AdminTokenResponse,
@@ -149,6 +157,53 @@ async def admin_error_logs(error_log: ErrorLogDep, limit: int = 50) -> ErrorLogR
     limit = min(limit, 200)
     entries = await error_log.list_recent(limit)
     return ErrorLogResponse(errors=entries)
+
+
+@router.get("/error-groups")
+async def admin_error_groups(
+    factory: SessionFactoryDep,
+    period_days: int = 1,
+    only_unresolved: bool = True,
+    error_type: str | None = None,
+    path: str | None = None,
+) -> list[ErrorGroupResponse]:
+    """Сгруппированные ошибки, самые частые за сутки — сверху."""
+    groups = await list_error_groups(
+        factory,
+        period_days=min(max(period_days, 1), 30),
+        only_unresolved=only_unresolved,
+        error_type=error_type,
+        path=path,
+    )
+    return [ErrorGroupResponse(**asdict(g)) for g in groups]
+
+
+@router.get("/error-groups/{signature}/entries")
+async def admin_error_group_entries(
+    signature: str, factory: SessionFactoryDep, limit: int = 20
+) -> list[ErrorEntryResponse]:
+    entries = await list_group_entries(factory, signature, limit=min(max(limit, 1), 100))
+    return [ErrorEntryResponse(**asdict(e)) for e in entries]
+
+
+@router.post("/error-groups/{signature}/resolve")
+async def admin_resolve_error_group(
+    signature: str, factory: SessionFactoryDep, resolved: bool = True
+) -> dict:
+    """Группа уходит из основного списка во вкладку «Решённые». Записи не
+    удаляются — вернувшаяся ошибка должна быть видна как рецидив."""
+    affected = await resolve_group(factory, signature, resolved=resolved)
+    if affected == 0:
+        raise HTTPException(status_code=404, detail="Группа ошибок не найдена")
+    return {"signature": signature, "resolved": resolved, "affected": affected}
+
+
+@router.get("/error-logs/{entry_id}")
+async def admin_error_entry(entry_id: int, factory: SessionFactoryDep) -> ErrorEntryResponse:
+    entry = await get_error_entry(factory, entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+    return ErrorEntryResponse(**asdict(entry))
 
 
 @router.get("/tenants")
