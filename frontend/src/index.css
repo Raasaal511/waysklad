@@ -1320,6 +1320,12 @@ input.sale-search-input:not([type='checkbox']):not([type='radio']) {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+@media (max-width: 899px) {
+  input.sale-search-input:not([type='checkbox']):not([type='radio']) {
+    font-size: 16px;
+  }
+}
+
 .sale-search-input:hover {
   border-color: var(--accent);
 }

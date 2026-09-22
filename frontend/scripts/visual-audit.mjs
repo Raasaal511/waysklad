@@ -198,6 +198,8 @@ async function collectIssues(page, { mobile }) {
       // Skip non-interactive chrome: svg guts, pure text wrappers inside buttons
       if (tagName === 'PATH' || tagName === 'CIRCLE' || tagName === 'LINE' || tagName === 'POLYLINE') continue
       if (tagName === 'SVG' && el.closest('button, a, [role="button"]')) continue
+      // Login/register carousel: две формы рядом в треке — намеренный overflow
+      if (el.closest('[class*="auth-form-track"], [class*="auth-form-viewport"]')) continue
 
       // 2) horizontal out of viewport only (vertical page scroll is normal)
       if (r.right > vw + 2 || r.left < -2) {

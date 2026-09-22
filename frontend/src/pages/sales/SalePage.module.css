@@ -809,6 +809,7 @@ input.saleSearchInput:not([type='checkbox']):not([type='radio']):focus {
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
+  min-height: 44px;
   background: var(--bg);
   color: var(--text-muted);
   border: 1px solid var(--border);
