@@ -64,7 +64,7 @@ export function ShopHeader({ profile }: ShopHeaderProps) {
               {profile.products_count} {plural(profile.products_count, ['товар', 'товара', 'товаров'])}
             </span>
             {profile.on_platform_since && (
-              <span className={styles.metaItem}>На ВайСклад с {formatMonthYearGenitive(profile.on_platform_since)}</span>
+              <span className={styles.metaItem}>С {formatMonthYearGenitive(profile.on_platform_since)}</span>
             )}
           </p>
 

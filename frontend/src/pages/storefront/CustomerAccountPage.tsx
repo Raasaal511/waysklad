@@ -40,7 +40,7 @@ function formatSince(iso: string | null): string {
     'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
     'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
   ]
-  return `С нами с ${months[d.getMonth()]} ${d.getFullYear()}`
+  return `С ${months[d.getMonth()]} ${d.getFullYear()}`
 }
 
 function formatDate(iso: string | null): string {

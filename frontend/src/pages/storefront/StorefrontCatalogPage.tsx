@@ -146,8 +146,8 @@ export function StorefrontCatalogPage() {
   useEffect(() => {
     if (!profile) return
     setPageMeta({
-      title: `${profile.name} — онлайн-витрина`,
-      description: profile.description || `Каталог магазина «${profile.name}» на ВайСклад`,
+      title: `${profile.name} — каталог`,
+      description: profile.description || `Каталог магазина «${profile.name}»`,
     })
     return () => resetPageMeta()
   }, [profile])
@@ -264,7 +264,7 @@ export function StorefrontCatalogPage() {
           title={errorStatus === 403 ? 'Магазин заблокирован' : 'Витрина не найдена или выключена'}
           description={
             errorStatus === 403
-              ? 'Продавец временно заблокирован платформой.'
+              ? 'Магазин временно недоступен. Загляните позже.'
               : 'Проверьте ссылку — возможно, в ней опечатка.'
           }
         />
