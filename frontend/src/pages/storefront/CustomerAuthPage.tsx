@@ -12,7 +12,7 @@ import { ApiError } from '../../shared/api/client'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { Button } from '../../shared/ui/Button'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
-import { notifyCustomerAuthChanged } from './CustomerLoginModal'
+import { notifyCustomerAuthChanged } from './customerAuthEvents'
 import styles from './CustomerAuthPage.module.css'
 
 const POLL_MS = 2000
@@ -21,14 +21,9 @@ const TOKEN_TTL_MS = 10 * 60 * 1000
 type Tab = 'login' | 'register'
 
 /**
- * Отдельная страница входа и регистрации покупателя (/store/:slug/login).
- * Модалка CustomerLoginModal остаётся там, где вход случается по ходу
- * действия — в корзине и под формой отзыва, откуда уводить со страницы нельзя.
- *
- * Регистрация: username + телефон + пароль, номер подтверждается в
- * Telegram-боте — аккаунт создаётся только после этого, поэтому после
- * отправки формы страница так же опрашивает /login-status, как и вход
- * через Telegram.
+ * Страница входа и регистрации покупателя (/store/:slug/login).
+ * Вход — логин/пароль. Регистрация подтверждает номер в Telegram-боте
+ * (тот же /confirm и deep-link, что и для кода в профиле).
  */
 export function CustomerAuthPage() {
   const navigate = useNavigate()

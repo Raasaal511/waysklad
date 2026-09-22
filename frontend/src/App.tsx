@@ -13,6 +13,7 @@ import { LoginPage } from './pages/auth/LoginPage'
 import { PrivacyPage } from './pages/auth/PrivacyPage'
 import { StorefrontRequestPage } from './pages/storefront/StorefrontRequestPage'
 import { CustomerAccountPage } from './pages/storefront/CustomerAccountPage'
+import { CustomerChatPage } from './pages/storefront/CustomerChatPage'
 import { StorefrontCatalogPage } from './pages/storefront/StorefrontCatalogPage'
 import { StorefrontProductPage } from './pages/storefront/StorefrontProductPage'
 import { StorefrontCartPage } from './pages/storefront/StorefrontCartPage'
@@ -153,6 +154,30 @@ export function App() {
               />
               <Route
                 path="/store/:slug/account/orders"
+                element={
+                  <PublicLayout>
+                    <CustomerAccountPage />
+                  </PublicLayout>
+                }
+              />
+              <Route
+                path="/store/:slug/account/chats"
+                element={
+                  <PublicLayout>
+                    <CustomerAccountPage />
+                  </PublicLayout>
+                }
+              />
+              <Route
+                path="/store/:slug/account/chats/:requestId"
+                element={
+                  <PublicLayout>
+                    <CustomerChatPage />
+                  </PublicLayout>
+                }
+              />
+              <Route
+                path="/store/:slug/account/reviews"
                 element={
                   <PublicLayout>
                     <CustomerAccountPage />

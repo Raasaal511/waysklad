@@ -164,3 +164,91 @@ export function listMyStorefrontRequests(params: {
     { headers: customerAuthHeader() },
   )
 }
+
+export interface CustomerChatSummary {
+  request_id: number
+  shop_name: string
+  shop_slug: string
+  shop_logo: string
+  request_status: string
+  last_message: string
+  last_message_at: string | null
+  last_message_from_shop: boolean
+  messages_count: number
+}
+
+export interface CustomerChatMessage {
+  id: number | null
+  request_id: number
+  author: 'customer' | 'staff'
+  text: string
+  created_at: string | null
+}
+
+export function listCustomerChats() {
+  return api.get<CustomerChatSummary[]>('/auth/customer/chats', {
+    headers: customerAuthHeader(),
+  })
+}
+
+export function listCustomerChatMessages(requestId: number) {
+  return api.get<CustomerChatMessage[]>(`/auth/customer/chats/${requestId}`, {
+    headers: customerAuthHeader(),
+  })
+}
+
+export function sendCustomerChatMessage(requestId: number, text: string) {
+  return api.post<CustomerChatMessage>(
+    `/auth/customer/chats/${requestId}`,
+    { text },
+    { headers: customerAuthHeader() },
+  )
+}
+
+/** Локально помечаем чат прочитанным — для бейджа «магазин ответил». */
+const CHAT_SEEN_PREFIX = 'waysklad:chat-seen:'
+
+export function markCustomerChatSeen(requestId: number, atIso: string | null) {
+  if (!atIso) return
+  try {
+    localStorage.setItem(`${CHAT_SEEN_PREFIX}${requestId}`, atIso)
+  } catch {
+    /* ignore */
+  }
+}
+
+export function isCustomerChatUnread(chat: CustomerChatSummary): boolean {
+  if (!chat.last_message_from_shop || !chat.last_message_at) return false
+  try {
+    const seen = localStorage.getItem(`${CHAT_SEEN_PREFIX}${chat.request_id}`)
+    if (!seen) return true
+    return new Date(chat.last_message_at).getTime() > new Date(seen).getTime()
+  } catch {
+    return chat.last_message_from_shop
+  }
+}
+
+export function countUnreadCustomerChats(chats: CustomerChatSummary[]): number {
+  return chats.filter(isCustomerChatUnread).length
+}
+
+const PENDING_CHECKOUT_PREFIX = 'waysklad:pending-checkout:'
+
+export function savePendingCheckout(slug: string, data: { name: string; note: string }) {
+  try {
+    sessionStorage.setItem(`${PENDING_CHECKOUT_PREFIX}${slug}`, JSON.stringify(data))
+  } catch {
+    /* ignore */
+  }
+}
+
+export function takePendingCheckout(slug: string): { name: string; note: string } | null {
+  try {
+    const raw = sessionStorage.getItem(`${PENDING_CHECKOUT_PREFIX}${slug}`)
+    if (!raw) return null
+    sessionStorage.removeItem(`${PENDING_CHECKOUT_PREFIX}${slug}`)
+    return JSON.parse(raw) as { name: string; note: string }
+  } catch {
+    return null
+  }
+}

@@ -5,6 +5,7 @@ export type EmptyIllustrationName =
   | 'empty-archive'
   | 'empty-box'
   | 'empty-cart'
+  | 'empty-reviews'
   | 'empty-shelf'
   | 'state-telegram-confirm'
 

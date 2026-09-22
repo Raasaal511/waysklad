@@ -1,7 +1,7 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 24px;
   max-width: 720px;
 }
 
@@ -12,10 +12,61 @@
   line-height: 1.2;
 }
 
+.subtitle {
+  margin: -12px 0 0;
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
 @media (max-width: 767px) {
   .title {
     font-size: 24px;
   }
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--bg-muted);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.tabActive {
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.tabCount {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.tabBadge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
 }
 
 .card,
@@ -37,7 +88,7 @@
   border: 1px solid var(--border);
 }
 
-.avatarRow {
+.profileRow {
   display: flex;
   gap: 16px;
   align-items: flex-start;
@@ -58,14 +109,19 @@
   flex-shrink: 0;
 }
 
-.name {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
+.profileInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
 }
 
-.phone {
-  margin: 4px 0 0;
+.profileName {
+  font-size: 18px;
+}
+
+.phoneLine {
   font-size: 15px;
 }
 
@@ -77,40 +133,52 @@
 
 .verified {
   margin: 8px 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 14px;
   color: var(--accent);
   font-weight: 600;
 }
 
 .unverified {
-  margin: 0;
+  margin: 8px 0 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
   color: var(--warning);
   font-weight: 600;
 }
 
-.verifyRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  margin-top: 8px;
+.textBtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .stats {
-  margin: 0 0 16px;
+  margin: 0;
   font-size: 13px;
   color: var(--text-muted);
 }
 
-.editForm {
+.editForm,
+.modalBody {
   display: flex;
   flex-direction: column;
   gap: 12px;
   margin-top: 12px;
 }
 
-.editForm label {
+.field {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -118,7 +186,8 @@
   font-weight: 500;
 }
 
-.editForm input {
+.editForm input,
+.modalBody input {
   height: 44px;
   padding: 0 12px;
   border: 1px solid var(--border);
@@ -128,13 +197,7 @@
   font: inherit;
 }
 
-.editActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.warning {
+.warn {
   margin: 0;
   font-size: 13px;
   color: var(--warning);
@@ -146,32 +209,63 @@
   font-size: 14px;
 }
 
-.sectionHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.sectionHead h2,
-.section > h2 {
+.sectionTitle {
   margin: 0 0 16px;
   font-size: 20px;
   font-weight: 700;
-}
-
-.sectionHead h2 {
-  margin-bottom: 0;
 }
 
 .textLink {
   font-size: 14px;
   color: var(--accent);
   font-weight: 600;
+  text-decoration: none;
 }
 
-.orderList {
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.notice strong {
+  display: block;
+  color: var(--text);
+}
+
+.navRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.navRow:last-child {
+  border-bottom: 0;
+}
+
+.dangerRow {
+  color: var(--danger);
+}
+
+.orderList,
+.chatList,
+.reviewList {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -189,7 +283,7 @@
   gap: 8px;
 }
 
-.orderMain {
+.orderHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -201,6 +295,7 @@
   cursor: pointer;
   color: inherit;
   font: inherit;
+  width: 100%;
 }
 
 .orderShop {
@@ -228,6 +323,13 @@
   font-weight: 700;
 }
 
+.orderMeta {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
 .orderStatus {
   font-size: 12px;
   font-weight: 600;
@@ -246,11 +348,10 @@
   color: var(--accent);
 }
 
-.orderMeta {
+.orderBody {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 14px;
+  gap: 8px;
 }
 
 .orderLines {
@@ -285,24 +386,81 @@
   margin-bottom: 12px;
 }
 
-.chevronOpen {
-  transform: rotate(180deg);
-}
-
-.securityActions {
+.chatRow {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--bg-muted);
+  text-decoration: none;
+  color: inherit;
 }
 
-.dangerLink {
-  background: none;
-  border: 0;
-  padding: 0;
-  font: inherit;
-  font-size: 14px;
-  color: var(--danger);
-  cursor: pointer;
-  text-decoration: underline;
+.chatRowUnread {
+  background: var(--accent-soft);
+}
+
+.chatMain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.chatMain strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.chatPreview {
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 420px;
+}
+
+.chatMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.reviewRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg-muted);
+}
+
+.reviewPhoto,
+.reviewPhotoFallback {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--border);
+}
+
+.reviewName {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
 }

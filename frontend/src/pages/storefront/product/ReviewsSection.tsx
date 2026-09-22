@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { IconCalendar, IconStar, IconArrowUp, IconArrowDown, IconRefresh } from '@tabler/icons-react'
 import { useProductReviews } from './useProductPageData'
 import { ReviewCard } from './ReviewCard'
 import { RatingPanel } from './RatingPanel'
 import { ReviewFormModal } from './ReviewFormModal'
 import { Lightbox } from '../../../shared/ui/Lightbox'
-import { CustomerLoginModal, notifyCustomerAuthChanged } from '../CustomerLoginModal'
 import { loadCustomerToken } from '../../../entities/auth/customerApi'
 import {
   voteReview,
@@ -29,6 +28,7 @@ interface ReviewsSectionProps {
 const PAGE_SIZE = 10
 
 export function ReviewsSection({ slug, productId, onPhotosLoaded }: ReviewsSectionProps) {
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const sort = (searchParams.get('rsort') as ReviewSort) || 'date_desc'
   const withPhotos = searchParams.get('rphoto') === '1'
@@ -49,7 +49,6 @@ export function ReviewsSection({ slug, productId, onPhotosLoaded }: ReviewsSecti
   }, [page])
 
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!loadCustomerToken())
-  const [showLogin, setShowLogin] = useState(false)
   const [lightbox, setLightbox] = useState<{ photos: string[]; index: number; review: Review } | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [eligibility, setEligibility] = useState<{
@@ -128,11 +127,24 @@ export function ReviewsSection({ slug, productId, onPhotosLoaded }: ReviewsSecti
 
   function handleWriteReview() {
     if (!isLoggedIn) {
-      setShowLogin(true)
+      const next = encodeURIComponent(
+        `/store/${slug}/products/${productId}?writeReview=1#reviews`,
+      )
+      navigate(`/store/${slug}/login?next=${next}`)
       return
     }
     setShowForm(true)
   }
+
+  useEffect(() => {
+    if (!isLoggedIn) return
+    if (searchParams.get('writeReview') !== '1') return
+    if (!eligibility?.can_review) return
+    setShowForm(true)
+    const params = new URLSearchParams(searchParams)
+    params.delete('writeReview')
+    setSearchParams(params, { replace: true })
+  }, [isLoggedIn, eligibility, searchParams, setSearchParams])
 
   if (error && !page) {
     return (
@@ -274,7 +286,12 @@ export function ReviewsSection({ slug, productId, onPhotosLoaded }: ReviewsSecti
                     isOwn={false}
                     onVote={handleVote}
                     onOpenPhoto={(photos, index, rv) => setLightbox({ photos, index, review: rv })}
-                    onRequireLogin={() => setShowLogin(true)}
+                    onRequireLogin={() => {
+                      const next = encodeURIComponent(
+                        `/store/${slug}/products/${productId}#review-${r.id}`,
+                      )
+                      navigate(`/store/${slug}/login?next=${next}`)
+                    }}
                     isLoggedIn={isLoggedIn}
                   />
                 )
@@ -316,18 +333,6 @@ export function ReviewsSection({ slug, productId, onPhotosLoaded }: ReviewsSecti
             text: lightbox.review.text?.slice(0, 120),
             reviewAnchor: `#review-${lightbox.review.id}`,
           }))}
-        />
-      )}
-
-      {showLogin && (
-        <CustomerLoginModal
-          reason="review"
-          onClose={() => setShowLogin(false)}
-          onSuccess={() => {
-            notifyCustomerAuthChanged()
-            setIsLoggedIn(true)
-            setShowLogin(false)
-          }}
         />
       )}
 

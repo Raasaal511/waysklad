@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { IconCheck, IconChevronDown, IconChevronRight, IconLogout } from '@tabler/icons-react'
+import { Link, Navigate, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
+import {
+  IconCheck,
+  IconChevronDown,
+  IconChevronRight,
+  IconLogout,
+  IconMessage,
+} from '@tabler/icons-react'
 import {
   changeCustomerPassword,
   clearCustomerToken,
+  countUnreadCustomerChats,
   getCustomerProfile,
+  isCustomerChatUnread,
+  listCustomerChats,
   listMyStorefrontRequests,
   loadCustomerToken,
   logoutCustomerEverywhere,
@@ -12,6 +21,7 @@ import {
   saveCustomerToken,
   updateCustomerProfile,
   verifyCustomerPhoneCode,
+  type CustomerChatSummary,
   type CustomerProfile,
   type MyRequest,
 } from '../../entities/auth/customerApi'
@@ -23,13 +33,22 @@ import { Button } from '../../shared/ui/Button'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Modal } from '../../shared/ui/Modal'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
-import { notifyCustomerAuthChanged } from './CustomerLoginModal'
+import { notifyCustomerAuthChanged } from './customerAuthEvents'
 import styles from './CustomerAccountPage.module.css'
 
 const STATUS_LABEL: Record<MyRequest['status'], string> = {
   new: 'Новый',
   accepted: 'Подтверждён',
   rejected: 'Отклонён',
+}
+
+type Tab = 'overview' | 'orders' | 'chats' | 'reviews'
+
+function tabFromPath(pathname: string): Tab {
+  if (pathname.includes('/account/orders')) return 'orders'
+  if (pathname.includes('/account/chats')) return 'chats'
+  if (pathname.includes('/account/reviews')) return 'reviews'
+  return 'overview'
 }
 
 function formatSince(iso: string | null): string {
@@ -98,7 +117,7 @@ function OrderCard({ req, currentSlug }: { req: MyRequest; currentSlug: string }
           )}
           <div className={styles.orderActions}>
             {inThisShop && (
-              <Link to={`/store/${currentSlug}/request`} className={styles.textLink}>
+              <Link to={`/store/${currentSlug}/account/chats/${req.id}`} className={styles.textLink}>
                 Чат с магазином
               </Link>
             )}
@@ -115,18 +134,19 @@ function OrderCard({ req, currentSlug }: { req: MyRequest; currentSlug: string }
 }
 
 /**
- * Профиль покупателя внутри магазина: данные, заказы этого магазина,
- * свёрнутый блок заказов в других, избранное, безопасность.
+ * Профиль покупателя внутри магазина: данные, заказы, чаты, отзывы.
  */
 export function CustomerAccountPage() {
   const { slug = '' } = useParams<{ slug: string }>()
   const location = useLocation()
   const navigate = useNavigate()
+  const tab = tabFromPath(location.pathname)
   const shopName = peekCachedStorefrontShopProfile(slug)?.name
 
   const [token, setToken] = useState(() => loadCustomerToken())
   const [profile, setProfile] = useState<CustomerProfile | null>(null)
   const [orders, setOrders] = useState<MyRequest[]>([])
+  const [chats, setChats] = useState<CustomerChatSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [othersOpen, setOthersOpen] = useState(false)
@@ -165,13 +185,15 @@ export function CustomerAccountPage() {
       setLoading(true)
       setError(null)
       try {
-        const [me, reqs] = await Promise.all([
+        const [me, reqs, chatList] = await Promise.all([
           getCustomerProfile(),
           listMyStorefrontRequests({ limit: 100 }),
+          listCustomerChats().catch(() => [] as CustomerChatSummary[]),
         ])
         if (cancelled) return
         setProfile(me)
         setOrders(reqs.items)
+        setChats(chatList)
         setEditName(me.name)
         setEditPhone(me.phone)
       } catch (err) {
@@ -199,11 +221,6 @@ export function CustomerAccountPage() {
     return () => clearTimeout(t)
   }, [retryAfter])
 
-  useEffect(() => {
-    if (!location.pathname.endsWith('/orders')) return
-    document.getElementById('orders')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [location.pathname, loading])
-
   const { here, others } = useMemo(() => {
     const hereList: MyRequest[] = []
     const otherList: MyRequest[] = []
@@ -213,6 +230,30 @@ export function CustomerAccountPage() {
     }
     return { here: hereList, others: otherList }
   }, [orders, slug])
+
+  const shopChats = useMemo(
+    () => chats.filter((c) => !c.shop_slug || c.shop_slug === slug),
+    [chats, slug],
+  )
+  const unreadCount = useMemo(() => countUnreadCustomerChats(shopChats), [shopChats])
+
+  const reviewables = useMemo(() => {
+    const map = new Map<number, { productId: number; name: string; photo: string; requestId: number }>()
+    for (const req of here) {
+      if (req.status !== 'accepted') continue
+      for (const line of req.order_lines) {
+        if (!map.has(line.product_id)) {
+          map.set(line.product_id, {
+            productId: line.product_id,
+            name: line.name,
+            photo: line.photo,
+            requestId: req.id,
+          })
+        }
+      }
+    }
+    return [...map.values()]
+  }, [here])
 
   if (!token) {
     const next = encodeURIComponent(location.pathname + location.search)
@@ -323,9 +364,37 @@ export function CustomerAccountPage() {
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>Профиль</h1>
-      {shopName && (
-        <p className={styles.subtitle}>в магазине «{shopName}»</p>
-      )}
+      {shopName && <p className={styles.subtitle}>в магазине «{shopName}»</p>}
+
+      <nav className={styles.tabs} aria-label="Разделы профиля">
+        <NavLink
+          to={`/store/${slug}/account`}
+          end
+          className={({ isActive }) => `${styles.tab} ${isActive || tab === 'overview' ? styles.tabActive : ''}`}
+        >
+          Обзор
+        </NavLink>
+        <NavLink
+          to={`/store/${slug}/account/orders`}
+          className={({ isActive }) => `${styles.tab} ${isActive ? styles.tabActive : ''}`}
+        >
+          Заказы
+          {here.length > 0 && <span className={styles.tabCount}>{here.length}</span>}
+        </NavLink>
+        <NavLink
+          to={`/store/${slug}/account/chats`}
+          className={({ isActive }) => `${styles.tab} ${isActive ? styles.tabActive : ''}`}
+        >
+          Чаты
+          {unreadCount > 0 && <span className={styles.tabBadge}>{unreadCount}</span>}
+        </NavLink>
+        <NavLink
+          to={`/store/${slug}/account/reviews`}
+          className={({ isActive }) => `${styles.tab} ${isActive ? styles.tabActive : ''}`}
+        >
+          Отзывы
+        </NavLink>
+      </nav>
 
       {loading && <p className={styles.muted}>Загрузка…</p>}
       {error && (
@@ -337,7 +406,7 @@ export function CustomerAccountPage() {
         />
       )}
 
-      {!loading && !error && profile && (
+      {!loading && !error && profile && tab === 'overview' && (
         <>
           <section className={styles.card}>
             <div className={styles.profileRow}>
@@ -355,11 +424,15 @@ export function CustomerAccountPage() {
                 ) : (
                   <span className={styles.unverified}>
                     Телефон не подтверждён
-                    <button type="button" className={styles.textBtn} onClick={() => {
-                      setVerifyOpen(true)
-                      setVerifyStep('send')
-                      setVerifyError(null)
-                    }}>
+                    <button
+                      type="button"
+                      className={styles.textBtn}
+                      onClick={() => {
+                        setVerifyOpen(true)
+                        setVerifyStep('send')
+                        setVerifyError(null)
+                      }}
+                    >
                       Подтвердить
                     </button>
                   </span>
@@ -398,51 +471,31 @@ export function CustomerAccountPage() {
             )}
 
             <p className={styles.stats}>
-              {[formatSince(profile.created_at), `Заказов: ${profile.stats.requests_total}, активных: ${profile.stats.requests_active}`]
+              {[
+                formatSince(profile.created_at),
+                `Заказов: ${profile.stats.requests_total}, активных: ${profile.stats.requests_active}`,
+              ]
                 .filter(Boolean)
                 .join(' · ')}
             </p>
           </section>
 
-          <section className={styles.section} id="orders">
-            <h2 className={styles.sectionTitle}>Мои заказы</h2>
-            {here.length === 0 ? (
-              <EmptyState
-                illustration="empty-archive"
-                title="Здесь появятся ваши заказы"
-                description={shopName ? `в магазине «${shopName}»` : undefined}
-                actionLabel="Перейти к покупкам"
-                onAction={() => navigate(`/store/${slug}`)}
-              />
-            ) : (
-              <ul className={styles.orderList}>
-                {here.map((req) => (
-                  <OrderCard key={req.id} req={req} currentSlug={slug} />
-                ))}
-              </ul>
-            )}
-
-            {others.length > 0 && (
-              <div className={styles.others}>
-                <button
-                  type="button"
-                  className={styles.othersToggle}
-                  onClick={() => setOthersOpen((v) => !v)}
-                  aria-expanded={othersOpen}
-                >
-                  {othersOpen ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}
-                  Заказы в других магазинах ({others.length})
-                </button>
-                {othersOpen && (
-                  <ul className={styles.orderList}>
-                    {others.map((req) => (
-                      <OrderCard key={req.id} req={req} currentSlug={slug} />
-                    ))}
-                  </ul>
-                )}
+          {unreadCount > 0 && (
+            <section className={styles.notice}>
+              <IconMessage size={18} stroke={1.8} />
+              <div>
+                <strong>Магазин ответил</strong>
+                <p className={styles.muted}>
+                  {unreadCount === 1
+                    ? 'Есть новое сообщение в чате'
+                    : `Новых сообщений: ${unreadCount}`}
+                </p>
               </div>
-            )}
-          </section>
+              <Link to={`/store/${slug}/account/chats`} className={styles.textLink}>
+                Открыть
+              </Link>
+            </section>
+          )}
 
           <section className={styles.section}>
             <Link to={`/store/${slug}/favorites`} className={styles.navRow}>
@@ -469,11 +522,136 @@ export function CustomerAccountPage() {
         </>
       )}
 
+      {!loading && !error && profile && tab === 'orders' && (
+        <section className={styles.section} id="orders">
+          <h2 className={styles.sectionTitle}>Мои заказы</h2>
+          {here.length === 0 ? (
+            <EmptyState
+              illustration="empty-archive"
+              title="Здесь появятся ваши заказы"
+              description={shopName ? `в магазине «${shopName}»` : undefined}
+              actionLabel="Перейти к покупкам"
+              onAction={() => navigate(`/store/${slug}`)}
+            />
+          ) : (
+            <ul className={styles.orderList}>
+              {here.map((req) => (
+                <OrderCard key={req.id} req={req} currentSlug={slug} />
+              ))}
+            </ul>
+          )}
+
+          {others.length > 0 && (
+            <div className={styles.others}>
+              <button
+                type="button"
+                className={styles.othersToggle}
+                onClick={() => setOthersOpen((v) => !v)}
+                aria-expanded={othersOpen}
+              >
+                {othersOpen ? <IconChevronDown size={18} /> : <IconChevronRight size={18} />}
+                Заказы в других магазинах ({others.length})
+              </button>
+              {othersOpen && (
+                <ul className={styles.orderList}>
+                  {others.map((req) => (
+                    <OrderCard key={req.id} req={req} currentSlug={slug} />
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
+      {!loading && !error && profile && tab === 'chats' && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Чаты с магазином</h2>
+          {shopChats.length === 0 ? (
+            <EmptyState
+              title="Пока нет переписки"
+              description="Напишите магазину из заказа — диалог появится здесь."
+              actionLabel="К заказам"
+              onAction={() => navigate(`/store/${slug}/account/orders`)}
+            />
+          ) : (
+            <ul className={styles.chatList}>
+              {shopChats.map((chat) => {
+                const unread = isCustomerChatUnread(chat)
+                return (
+                  <li key={chat.request_id}>
+                    <Link
+                      to={`/store/${slug}/account/chats/${chat.request_id}`}
+                      className={`${styles.chatRow} ${unread ? styles.chatRowUnread : ''}`}
+                    >
+                      <span className={styles.chatMain}>
+                        <strong>
+                          Заказ #{chat.request_id}
+                          {unread && <span className={styles.dot} aria-label="Новое сообщение" />}
+                        </strong>
+                        <span className={styles.chatPreview}>
+                          {chat.last_message_from_shop ? 'Магазин: ' : 'Вы: '}
+                          {chat.last_message}
+                        </span>
+                      </span>
+                      <span className={styles.chatMeta}>
+                        {formatDate(chat.last_message_at)}
+                        <IconChevronRight size={16} />
+                      </span>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {!loading && !error && profile && tab === 'reviews' && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Отзывы</h2>
+          <p className={styles.muted}>
+            Отзыв можно оставить на товары из подтверждённых заказов этого магазина.
+          </p>
+          {reviewables.length === 0 ? (
+            <EmptyState
+              illustration="empty-reviews"
+              title="Пока нечего оценивать"
+              description="Когда магазин подтвердит заказ, товары появятся здесь."
+              actionLabel="В каталог"
+              onAction={() => navigate(`/store/${slug}`)}
+            />
+          ) : (
+            <ul className={styles.reviewList}>
+              {reviewables.map((item) => (
+                <li key={item.productId} className={styles.reviewRow}>
+                  {item.photo ? (
+                    <img src={item.photo} alt="" className={styles.reviewPhoto} width={48} height={48} />
+                  ) : (
+                    <span className={styles.reviewPhotoFallback} aria-hidden="true" />
+                  )}
+                  <span className={styles.reviewName}>{item.name}</span>
+                  <Link
+                    to={`/store/${slug}/products/${item.productId}?writeReview=1#reviews`}
+                    className={styles.textLink}
+                  >
+                    Написать отзыв
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       {verifyOpen && (
         <Modal title="Подтверждение телефона" onClose={() => setVerifyOpen(false)}>
           {verifyStep === 'send' && (
             <div className={styles.modalBody}>
-              <p className={styles.muted}>Отправим код в Telegram</p>
+              <p className={styles.muted}>
+                Отправим код в Telegram. Можно ввести его здесь или командой{' '}
+                <code>/confirm 123456</code> в боте.
+              </p>
               {verifyError && <p className={styles.error}>{verifyError}</p>}
               <Button type="button" onClick={sendCode}>
                 Отправить код
@@ -482,7 +660,10 @@ export function CustomerAccountPage() {
           )}
           {verifyStep === 'bot' && (
             <div className={styles.modalBody}>
-              <p>Откройте бота и нажмите Старт — после этого запросите код снова.</p>
+              <p>
+                Откройте бота и нажмите «Старт» — после этого запросите код снова. Позже код можно
+                подтвердить командой <code>/confirm</code>.
+              </p>
               {botLink && (
                 <a href={botLink} target="_blank" rel="noreferrer" className={styles.textLink}>
                   Открыть бота
@@ -508,6 +689,9 @@ export function CustomerAccountPage() {
                   minLength={6}
                 />
               </label>
+              <p className={styles.muted}>
+                Или отправьте боту: <code>/confirm {verifyCode || '123456'}</code>
+              </p>
               {verifyError && <p className={styles.error}>{verifyError}</p>}
               <Button type="submit">Подтвердить</Button>
               <button

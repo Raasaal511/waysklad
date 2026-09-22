@@ -6,7 +6,11 @@ import {
   IconShoppingCart,
   IconUserCircle,
 } from '@tabler/icons-react'
-import { loadCustomerToken } from '../../entities/auth/customerApi'
+import {
+  countUnreadCustomerChats,
+  listCustomerChats,
+  loadCustomerToken,
+} from '../../entities/auth/customerApi'
 import { FAVORITES_EVENT } from '../../shared/lib/favorites'
 import { cartCountForSlug, favoritesCountForSlug } from '../../shared/lib/storefrontCounters'
 import styles from './PublicBottomNav.module.css'
@@ -45,6 +49,7 @@ export function PublicBottomNav() {
   const [favoritesCount, setFavoritesCount] = useState(0)
   const [cartCountValue, setCartCountValue] = useState(0)
   const [authed, setAuthed] = useState(() => !!loadCustomerToken())
+  const [unreadChats, setUnreadChats] = useState(0)
 
   useEffect(() => {
     if (!slug) {
@@ -78,6 +83,26 @@ export function PublicBottomNav() {
       window.removeEventListener('waysklad:customer-auth', syncAuth)
     }
   }, [])
+
+  useEffect(() => {
+    if (!authed || !slug) {
+      setUnreadChats(0)
+      return
+    }
+    let cancelled = false
+    listCustomerChats()
+      .then((chats) => {
+        if (cancelled) return
+        const here = chats.filter((c) => !c.shop_slug || c.shop_slug === slug)
+        setUnreadChats(countUnreadCustomerChats(here))
+      })
+      .catch(() => {
+        if (!cancelled) setUnreadChats(0)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [authed, slug, location.pathname])
 
   if (!slug) return null
 
@@ -119,6 +144,7 @@ export function PublicBottomNav() {
         }
         label={authed ? 'Профиль' : 'Войти'}
         active={accountActive}
+        count={authed ? unreadChats : undefined}
       >
         <IconUserCircle size={22} stroke={1.8} />
       </NavItem>

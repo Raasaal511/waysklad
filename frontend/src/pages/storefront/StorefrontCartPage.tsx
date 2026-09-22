@@ -4,6 +4,8 @@ import { IconTrash } from '@tabler/icons-react'
 import {
   clearCustomerToken,
   loadCustomerToken,
+  savePendingCheckout,
+  takePendingCheckout,
 } from '../../entities/auth/customerApi'
 import {
   createStorefrontRequest,
@@ -19,7 +21,7 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { IconButton } from '../../shared/ui/IconButton'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { loadCart, saveCart, type StorefrontCartItem } from './cart'
-import { CustomerLoginModal, notifyCustomerAuthChanged } from './CustomerLoginModal'
+import { notifyCustomerAuthChanged } from './customerAuthEvents'
 import styles from './Storefront.module.css'
 
 export function StorefrontCartPage() {
@@ -31,13 +33,63 @@ export function StorefrontCartPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [customerToken, setCustomerToken] = useState(() => loadCustomerToken())
-  const [showLogin, setShowLogin] = useState(false)
-  const [pendingSubmit, setPendingSubmit] = useState(false)
   const [shopName, setShopName] = useState(() => peekCachedStorefrontShopProfile(slug)?.name ?? null)
 
   useEffect(() => {
     setCart(loadCart(slug))
   }, [slug])
+
+  useEffect(() => {
+    function syncAuth() {
+      setCustomerToken(loadCustomerToken())
+    }
+    window.addEventListener('waysklad:customer-auth', syncAuth)
+    window.addEventListener('storage', syncAuth)
+    return () => {
+      window.removeEventListener('waysklad:customer-auth', syncAuth)
+      window.removeEventListener('storage', syncAuth)
+    }
+  }, [])
+
+  useEffect(() => {
+    const pending = takePendingCheckout(slug)
+    if (!pending) return
+    setName(pending.name)
+    setNote(pending.note)
+    const token = loadCustomerToken()
+    if (token && pending.name.trim() && loadCart(slug).length > 0) {
+      // вернулись с логина — оформляем заказ с сохранёнными полями
+      void (async () => {
+        setCustomerToken(token)
+        setSaving(true)
+        setError(null)
+        try {
+          const created = await createStorefrontRequest(
+            slug,
+            {
+              customer_name: pending.name.trim(),
+              note: pending.note || undefined,
+              items: loadCart(slug).map((i) => ({
+                product_id: i.product_id,
+                quantity: i.quantity,
+                variant_id: i.variant_id,
+              })),
+            },
+            token,
+          )
+          saveRequestToken(slug, created.access_token)
+          saveCart(slug, [])
+          navigate(`/store/${slug}/request`, {
+            state: { insufficientStock: created.insufficient_stock_at_request },
+          })
+        } catch (err) {
+          setError(err instanceof ApiError ? err.message : 'Не удалось отправить заказ')
+        } finally {
+          setSaving(false)
+        }
+      })()
+    }
+  }, [slug, navigate])
 
   useEffect(() => {
     const cached = peekCachedStorefrontShopProfile(slug)
@@ -83,6 +135,12 @@ export function StorefrontCartPage() {
     updateCart(cart.filter((_, i) => i !== index))
   }
 
+  function goLogin() {
+    savePendingCheckout(slug, { name: name.trim(), note })
+    const next = encodeURIComponent(`/store/${slug}/cart`)
+    navigate(`/store/${slug}/login?next=${next}`)
+  }
+
   async function submitWithToken(token: string) {
     setError(null)
     setSaving(true)
@@ -110,9 +168,8 @@ export function StorefrontCartPage() {
         clearCustomerToken()
         notifyCustomerAuthChanged()
         setCustomerToken(null)
-        setPendingSubmit(true)
-        setShowLogin(true)
         setError('Сессия истекла — войдите снова')
+        goLogin()
         return
       }
       setError(err instanceof ApiError ? err.message : 'Не удалось отправить заказ')
@@ -126,8 +183,7 @@ export function StorefrontCartPage() {
     if (cart.length === 0 || !name.trim()) return
     const token = loadCustomerToken()
     if (!token) {
-      setPendingSubmit(true)
-      setShowLogin(true)
+      goLogin()
       return
     }
     await submitWithToken(token)
@@ -183,7 +239,7 @@ export function StorefrontCartPage() {
               <h2>Оформить заказ</h2>
               <p className={styles.muted}>
                 Это не мгновенный заказ — магазин подтвердит наличие и свяжется с вами.
-                {!customerToken && ' Перед отправкой нужно войти через Telegram.'}
+                {!customerToken && ' Перед отправкой нужно войти в аккаунт.'}
               </p>
               <label className={styles.field}>
                 Ваше имя *
@@ -210,24 +266,6 @@ export function StorefrontCartPage() {
           </>
         )}
       </main>
-
-      {showLogin && (
-        <CustomerLoginModal
-          onClose={() => {
-            setShowLogin(false)
-            setPendingSubmit(false)
-          }}
-          onSuccess={async (accessToken) => {
-            setCustomerToken(accessToken)
-            notifyCustomerAuthChanged()
-            setShowLogin(false)
-            if (pendingSubmit && name.trim() && cart.length > 0) {
-              setPendingSubmit(false)
-              await submitWithToken(accessToken)
-            }
-          }}
-        />
-      )}
     </div>
   )
 }
