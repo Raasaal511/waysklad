@@ -36,6 +36,7 @@ class CreateSaleCommand:
     change_kept: Decimal = Decimal("0")  # клиент не забрал (часть) сдачи
     client_op_id: str | None = None  # id операции с устройства — идемпотентность офлайн-очереди
     debt_due_date: date | None = None  # «долг до» — обязателен при payment_method=CREDIT
+    paid_now: Decimal = Decimal("0")  # оплачено сразу при credit; остаток → долг
 
 
 @dataclass(frozen=True)
@@ -85,6 +86,7 @@ class CreateSaleUseCase:
                 payment_method=cmd.payment_method,
                 lines=lines,
                 discount=Money.of(cmd.discount),
+                paid_now=Money.of(cmd.paid_now),
                 client_id=cmd.client_id,
                 client_op_id=cmd.client_op_id,
                 cash_received=Money.of(cmd.cash_received) if cmd.cash_received is not None else None,
@@ -119,7 +121,7 @@ class CreateSaleUseCase:
                     id=None,
                     warehouse_id=sale.warehouse_id,
                     client_id=sale.client_id,
-                    amount=sale.total,
+                    amount=sale.debt_amount,
                     issued_at=date.today(),
                     due_date=cmd.debt_due_date,
                     sale_id=sale.id,
@@ -150,7 +152,7 @@ class CreateSaleUseCase:
         client = await uow.clients.get(sale.client_id)
         if client.debt_limit is None:
             return
-        balance = sale.total + total_balance(await uow.debts.list_by_client(client.id))
+        balance = sale.debt_amount + total_balance(await uow.debts.list_by_client(client.id))
         if balance > client.debt_limit:
             raise DomainError(
                 f"Превышен лимит долга клиента «{client.name}»: "

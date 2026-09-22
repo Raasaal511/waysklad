@@ -31,7 +31,8 @@ class ReturnSaleCommand:
 @dataclass(frozen=True)
 class ReturnSaleResult:
     sale_return: SaleReturn
-    refund: Money  # сколько вернуть клиенту (наличными) или на сколько уменьшен долг
+    refund: Money  # сумма возврата по товарам
+    cash_to_client: Money  # сколько вернуть наличными (сверх погашения долга)
 
 
 class ReturnSaleUseCase:
@@ -46,7 +47,9 @@ class ReturnSaleUseCase:
             if cmd.client_op_id is not None:
                 existing = await uow.sale_returns.get_by_client_op_id(cmd.client_op_id)
                 if existing is not None:
-                    return ReturnSaleResult(sale_return=existing, refund=Money.zero())
+                    return ReturnSaleResult(
+                        sale_return=existing, refund=Money.zero(), cash_to_client=Money.zero()
+                    )
 
             sale = await uow.sales.get(cmd.sale_id)
             require_warehouse(actor, sale.warehouse_id)
@@ -90,18 +93,23 @@ class ReturnSaleUseCase:
 
             await uow.sale_returns.add(sale_return)
 
+            cash_to_client = refund
             if sale.payment_method is PaymentMethod.CREDIT:
-                await self._reduce_debt(uow, sale, refund)
+                cash_to_client = await self._reduce_debt(uow, sale, refund)
 
             await uow.audit.add(
                 AuditEntry.record(
                     actor, "sale.return", sale_return.id,
-                    sale_id=sale.id, refund=str(refund.amount),
+                    sale_id=sale.id,
+                    refund=str(refund.amount),
+                    cash_to_client=str(cash_to_client.amount),
                 )
             )
             await uow.commit()
             await invalidate_shop_cache(self._cache, uow)
-            return ReturnSaleResult(sale_return=sale_return, refund=refund)
+            return ReturnSaleResult(
+                sale_return=sale_return, refund=refund, cash_to_client=cash_to_client
+            )
 
     @staticmethod
     def _already_returned(returns: list[SaleReturn]) -> dict[int, Decimal]:
@@ -114,14 +122,20 @@ class ReturnSaleUseCase:
         return totals
 
     @staticmethod
-    async def _reduce_debt(uow: IUnitOfWork, sale: Sale, refund: Money) -> None:
+    async def _reduce_debt(uow: IUnitOfWork, sale: Sale, refund: Money) -> Money:
+        """Уменьшает долг по продаже; возвращает сумму, которую нужно отдать клиенту наличными.
+
+        Сначала гасим остаток долга; если возврат больше — разница уходит
+        клиенту (он платил часть сразу через paid_now или погашал раньше).
+        """
         debt = next(
             (d for d in await uow.debts.list_by_client(sale.client_id) if d.sale_id == sale.id),
             None,
         )
         if debt is None:
-            return
+            return refund
         reduction = refund if refund < debt.balance else debt.balance
         if reduction > Money.zero():
             debt.repay(reduction, date.today())
             await uow.debts.save(debt)
+        return refund - reduction

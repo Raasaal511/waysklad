@@ -22,6 +22,7 @@ class IssueOrderCommand:
     cash_received: Decimal | None = None  # для расчёта сдачи
     change_kept: Decimal = Decimal("0")   # клиент не забрал (часть) сдачи
     debt_due_date: date | None = None     # обязателен при payment_method=CREDIT
+    paid_now: Decimal = Decimal("0")      # оплачено сразу при credit; остаток → долг
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,7 @@ class IssueOrderUseCase:
                 payment_method=cmd.payment_method,
                 lines=lines,
                 prepayment=order.prepayment,
+                paid_now=Money.of(cmd.paid_now),
                 client_id=order.client_id,
                 cash_received=(
                     Money.of(cmd.cash_received) if cmd.cash_received is not None else None
@@ -114,7 +116,7 @@ class IssueOrderUseCase:
                     id=None,
                     warehouse_id=order.warehouse_id,
                     client_id=sale.client_id,
-                    amount=sale.total,
+                    amount=sale.debt_amount,
                     issued_at=date.today(),
                     due_date=cmd.debt_due_date,
                     sale_id=sale.id,
@@ -155,7 +157,7 @@ class IssueOrderUseCase:
         client = await uow.clients.get(sale.client_id)
         if client.debt_limit is None:
             return
-        balance = sale.total + total_balance(await uow.debts.list_by_client(client.id))
+        balance = sale.debt_amount + total_balance(await uow.debts.list_by_client(client.id))
         if balance > client.debt_limit:
             raise DomainError(
                 f"Превышен лимит долга клиента «{client.name}»: "
