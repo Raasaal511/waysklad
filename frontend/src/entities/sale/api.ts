@@ -18,6 +18,12 @@ export interface Sale {
   payment_method: PaymentMethod
   subtotal: string
   discount: string
+  /** Предоплата по заказу; на старых ответах может отсутствовать. */
+  prepayment?: string
+  /** Оплачено сразу при «В долг»; на старых ответах может отсутствовать. */
+  paid_now?: string
+  /** Остаток в долг (total − paid_now); на старых ответах может отсутствовать. */
+  debt_amount?: string
   total: string
   change: string | null
   cash_received: string | null
@@ -121,6 +127,7 @@ export function createSale(input: {
   cash_received?: string | null
   change_kept?: string | null
   debt_due_date?: string | null
+  paid_now?: string | null
 }) {
   return api.post<Sale>('/sales', input)
 }
@@ -130,6 +137,8 @@ export interface SaleReturn {
   sale_id: number
   note: string
   refund: string
+  /** Наличными клиенту сверх погашения долга; на старых ответах может отсутствовать. */
+  cash_to_client?: string
   created_at: string
   lines: { sale_line_id: number; quantity: string }[]
 }
@@ -169,6 +178,7 @@ export interface OfflineSaleInput {
   cash_received?: string | null
   change_kept?: string | null
   debt_due_date?: string | null
+  paid_now?: string | null
 }
 
 export interface AppliedOfflineSale {

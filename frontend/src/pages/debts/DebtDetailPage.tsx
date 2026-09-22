@@ -310,9 +310,18 @@ export function DebtDetailPage() {
           {(debt.sale_id != null || debt.receipt_document_id != null) && (
             <div className={`${styles.section} ${detail.reveal}`} style={{ '--reveal-delay': '100ms' } as CSSProperties}>
               {debt.sale_id != null ? (
-                <Link to={`/sales/${debt.sale_id}`} className={styles.sourceLink}>
-                  <IconReceipt size={15} stroke={1.8} /> Из продажи №{debt.sale_id}
-                </Link>
+                <>
+                  <Link to={`/sales/${debt.sale_id}`} className={styles.sourceLink}>
+                    <IconReceipt size={15} stroke={1.8} /> Из продажи №{debt.sale_id}
+                  </Link>
+                  {sale != null && Number(sale.paid_now ?? 0) > 0 && (
+                    <p className={layoutStyles.textMuted} style={{ margin: '8px 0 0' }}>
+                      Продажа на {formatMoney(sale.total)} ₽ · оплачено сразу{' '}
+                      {formatMoney(sale.paid_now ?? 0)} ₽ · в долг{' '}
+                      {formatMoney(sale.debt_amount ?? debt.amount)} ₽
+                    </p>
+                  )}
+                </>
               ) : (
                 <span className={styles.sourceLink} style={{ color: 'var(--text-muted)', cursor: 'default' }}>
                   <IconReceipt size={15} stroke={1.8} /> Из приёмки №

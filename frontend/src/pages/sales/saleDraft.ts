@@ -15,6 +15,7 @@ export interface SaleDraft {
   discount: string
   discountMode: 'amount' | 'percent'
   clientId: number | null
+  paidNow?: string
 }
 
 export function loadDraft(): SaleDraft | null {

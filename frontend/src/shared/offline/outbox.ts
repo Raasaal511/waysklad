@@ -21,6 +21,8 @@ export interface QueuedSale {
   cash_received: string | null
   change_kept: string | null
   debt_due_date: string | null
+  /** Оплачено сразу при credit; у старых записей IndexedDB поля нет → 0. */
+  paid_now?: string | null
   queued_at: string
 }
 

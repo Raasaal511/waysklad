@@ -124,6 +124,7 @@ export function SaleDetailView({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [done, setDone] = useState(false)
+  const [cashToClient, setCashToClient] = useState<string | null>(null)
   const [receiptError, setReceiptError] = useState<string | null>(null)
   const [sendingReceipt, setSendingReceipt] = useState(false)
   const [sharingReceipt, setSharingReceipt] = useState(false)
@@ -137,6 +138,7 @@ export function SaleDetailView({
 
   useEffect(() => {
     setDone(false)
+    setCashToClient(null)
   }, [initialSale.id])
 
   useEffect(() => {
@@ -242,7 +244,12 @@ export function SaleDetailView({
     setError(null)
     setSaving(true)
     try {
-      await returnSale(sale.id, { items })
+      const result = await returnSale(sale.id, { items })
+      if (Number(result.cash_to_client ?? 0) > 0) {
+        setCashToClient(result.cash_to_client ?? '0')
+      } else {
+        setCashToClient(null)
+      }
       setDone(true)
       refreshCatalog(['stock']).catch(() => {})
       onUpdated()
@@ -274,6 +281,11 @@ export function SaleDetailView({
           <IconCheck size={18} stroke={1.8} className={styles.iconAccent} />
           <p>Возврат по продаже №{sale.id} оформлен, остаток восстановлен</p>
         </div>
+        {cashToClient != null && Number(cashToClient) > 0 && (
+          <p>
+            Вернуть клиенту <strong>{formatMoney(cashToClient)} ₽</strong>
+          </p>
+        )}
         <Button onClick={onDone} style={{ alignSelf: 'flex-start' }}>К списку продаж</Button>
       </div>
     )
@@ -586,6 +598,18 @@ export function SaleDetailView({
           <span>Итого</span>
           <span>{formatMoney(sale.total)} ₽</span>
         </div>
+        {sale.payment_method === 'credit' && Number(sale.paid_now ?? 0) > 0 && (
+          <>
+            <div className="sale-detail-totals-row">
+              <span>Оплачено сразу</span>
+              <span>{formatMoney(sale.paid_now ?? 0)} ₽</span>
+            </div>
+            <div className="sale-detail-totals-row">
+              <span>В долг</span>
+              <span>{formatMoney(sale.debt_amount ?? sale.total)} ₽</span>
+            </div>
+          </>
+        )}
       </div>
 
       </section>

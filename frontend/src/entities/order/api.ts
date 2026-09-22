@@ -86,6 +86,7 @@ export function issueOrder(
     cash_received?: string | null
     change_kept?: string | null
     debt_due_date?: string | null
+    paid_now?: string | null
   },
 ) {
   return api.post<IssueOrderResult>(`/orders/${id}/issue`, input)

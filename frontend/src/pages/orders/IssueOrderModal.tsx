@@ -29,6 +29,7 @@ export function IssueOrderModal({
   const [cashReceived, setCashReceived] = useState('')
   const [keepChange, setKeepChange] = useState(false)
   const [debtDueDate, setDebtDueDate] = useState('')
+  const [paidNow, setPaidNow] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -39,6 +40,10 @@ export function IssueOrderModal({
   const changeCents = rawChangeCents - changeKeptCents
   const change = centsToMoney(Math.max(0, changeCents))
   const changeKept = centsToMoney(changeKeptCents)
+  const paidNowCents =
+    payment === 'credit' && paidNow ? Math.round(Number(paidNow || 0) * 100) : 0
+  const debtCents = Math.max(0, toPayCents - paidNowCents)
+  const debtAmount = centsToMoney(debtCents)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -46,10 +51,18 @@ export function IssueOrderModal({
       setError('Для выдачи в долг укажите срок «Долг до»')
       return
     }
+    if (payment === 'credit' && paidNowCents > 0 && paidNowCents >= toPayCents) {
+      setError('Клиент заплатил всю сумму — выберите „Наличные“ или „Перевод“')
+      return
+    }
     setError(null)
     setSaving(true)
     try {
       const cashReceivedValue = payment === 'cash' && cashReceived ? cashReceived : null
+      const paidNowValue =
+        payment === 'credit' && paidNowCents > 0
+          ? centsToMoney(paidNowCents).toFixed(2)
+          : '0'
       const result = await issueOrder(order.id, {
         payment_method: payment,
         cash_received: cashReceivedValue,
@@ -58,6 +71,7 @@ export function IssueOrderModal({
             ? centsToMoney(changeKeptCents).toFixed(2)
             : '0',
         debt_due_date: payment === 'credit' ? debtDueDate : null,
+        paid_now: payment === 'credit' ? paidNowValue : '0',
       })
       refreshCatalog(['stock']).catch(() => {})
       onIssued(result)
@@ -147,6 +161,25 @@ export function IssueOrderModal({
               min={new Date().toISOString().slice(0, 10)}
               onChange={setDebtDueDate}
             />
+          </label>
+        )}
+
+        {payment === 'credit' && (
+          <label className={layoutStyles.field}>
+            Заплатил сейчас
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="0"
+              value={paidNow}
+              onChange={(e) => {
+                const normalized = normalizeDecimalInput(e.target.value)
+                if (normalized !== null) setPaidNow(normalized)
+              }}
+            />
+            <span className={layoutStyles.textMuted}>
+              В долг: {formatMoney(debtAmount)} ₽
+            </span>
           </label>
         )}
 

@@ -106,6 +106,7 @@ export function NewSaleForm({
   useEffect(() => () => window.clearTimeout(maxReachedTimerRef.current), [])
   const [payment, setPayment] = useState<PaymentMethod>(draft?.payment ?? 'cash')
   const [debtDueDate, setDebtDueDate] = useState('')
+  const [paidNow, setPaidNow] = useState(draft?.paidNow ?? '')
   const [cashReceived, setCashReceived] = useState('')
   const [keepChange, setKeepChange] = useState(false)
   const [discount, setDiscount] = useState(draft?.discount ?? '0')
@@ -220,8 +221,8 @@ export function NewSaleForm({
       clearDraft()
       return
     }
-    saveDraft({ warehouseId, cart, payment, discount, discountMode, clientId })
-  }, [warehouseId, cart, payment, discount, discountMode, clientId, offlineQueued])
+    saveDraft({ warehouseId, cart, payment, discount, discountMode, clientId, paidNow })
+  }, [warehouseId, cart, payment, discount, discountMode, clientId, paidNow, offlineQueued])
 
   async function handleScan(code: string) {
     setShowScanner(false)
@@ -398,6 +399,7 @@ export function NewSaleForm({
     setClientId(null)
     setPayment('cash')
     setDebtDueDate('')
+    setPaidNow('')
     setCashReceived('')
     setError(null)
   }
@@ -419,6 +421,10 @@ export function NewSaleForm({
   const discountAmount = centsToMoney(discountAmountCents)
   const totalCents = Math.max(0, subtotalCents - discountAmountCents)
   const total = centsToMoney(totalCents)
+  const paidNowCents =
+    payment === 'credit' && paidNow ? Math.round(Number(paidNow || 0) * 100) : 0
+  const debtCents = Math.max(0, totalCents - paidNowCents)
+  const debtAmount = centsToMoney(debtCents)
   const cashReceivedCents = Math.round(Number(cashReceived || 0) * 100)
   const rawChangeCents = cashReceivedCents - totalCents
   const changeKeptCents = keepChange && rawChangeCents > 0 ? rawChangeCents : 0
@@ -434,6 +440,10 @@ export function NewSaleForm({
     }
     if (payment === 'credit' && !debtDueDate) {
       setError('Для продажи в долг укажите срок «Долг до»')
+      return
+    }
+    if (payment === 'credit' && paidNowCents > 0 && paidNowCents >= totalCents) {
+      setError('Клиент заплатил всю сумму — выберите „Наличные“ или „Перевод“')
       return
     }
     const overStockLine = cart.find((l) => {
@@ -457,6 +467,8 @@ export function NewSaleForm({
       cashReceivedValue && changeKeptCents > 0
         ? centsToMoney(changeKeptCents).toFixed(2)
         : '0'
+    const paidNowValue =
+      payment === 'credit' && paidNowCents > 0 ? centsToMoney(paidNowCents).toFixed(2) : '0'
     try {
       const sale = await createSale({
         warehouse_id: warehouseId,
@@ -467,6 +479,7 @@ export function NewSaleForm({
         cash_received: cashReceivedValue,
         change_kept: changeKeptValue,
         debt_due_date: payment === 'credit' ? debtDueDate : null,
+        paid_now: payment === 'credit' ? paidNowValue : '0',
       })
       clearDraft()
       refreshCatalog(['stock']).catch(() => {})
@@ -484,6 +497,7 @@ export function NewSaleForm({
           cash_received: cashReceivedValue,
           change_kept: changeKeptValue,
           debt_due_date: payment === 'credit' ? debtDueDate : null,
+          paid_now: payment === 'credit' ? paidNowValue : '0',
         })
         clearDraft()
         setOfflineQueued({ itemsCount: items.length, total: total.toFixed(2) })
@@ -491,6 +505,7 @@ export function NewSaleForm({
         setDiscount('0')
         setClientId(null)
         setDebtDueDate('')
+        setPaidNow('')
         setCashReceived('')
       } else {
         setError(err instanceof ApiError ? err.message : 'Не удалось провести продажу')
@@ -503,7 +518,7 @@ export function NewSaleForm({
   const submitButtonLabel = (() => {
     if (saving) return 'Продаём…'
     if (cart.length === 0) return 'Продать'
-    if (payment === 'credit') return `В долг · ${formatMoney(total)} ₽`
+    if (payment === 'credit') return `В долг · ${formatMoney(debtAmount)} ₽`
     return `Продать · ${formatMoney(total)} ₽`
   })()
 
@@ -982,6 +997,25 @@ export function NewSaleForm({
                   onChange={setDebtDueDate}
                 />
               </div>
+            )}
+
+            {payment === 'credit' && (
+              <label className={[layoutStyles.field, styles.saleReceivedField].join(' ')}>
+                Заплатил сейчас
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={paidNow}
+                  onChange={(e) => {
+                    const normalized = normalizeDecimalInput(e.target.value)
+                    if (normalized !== null) setPaidNow(normalized)
+                  }}
+                />
+                <span className={layoutStyles.textMuted}>
+                  В долг: {formatMoney(debtAmount)} ₽
+                </span>
+              </label>
             )}
           </div>
 
