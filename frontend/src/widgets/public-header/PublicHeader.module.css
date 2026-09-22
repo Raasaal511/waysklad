@@ -90,18 +90,35 @@
   height: 32px;
   border-radius: 8px;
   flex-shrink: 0;
+  object-fit: cover;
+}
+
+.logoFallback {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .brandName {
   font-size: 20px;
   font-weight: 700;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
 }
 
 @media (max-width: 767px) {
-  /* на мобильном — только знак, если рядом есть кнопка «назад» */
-  .backBtn ~ .brand .brandName {
-    display: none;
+  .brandName {
+    max-width: 140px;
   }
 }
 

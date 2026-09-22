@@ -8,7 +8,7 @@ import {
 } from '@tabler/icons-react'
 import { loadCustomerToken } from '../../entities/auth/customerApi'
 import { FAVORITES_EVENT } from '../../shared/lib/favorites'
-import { totalCartCount, totalFavoritesCount } from '../../shared/lib/storefrontCounters'
+import { cartCountForSlug, favoritesCountForSlug } from '../../shared/lib/storefrontCounters'
 import styles from './PublicBottomNav.module.css'
 
 const STORE_ROUTE = '/store/:slug/*'
@@ -35,9 +35,7 @@ function NavItem({ to, label, active, count, children }: NavItemProps) {
 
 /**
  * Нижняя панель публичных страниц — только мобильная (<768px).
- * Корзина, заказы и каталог привязаны к конкретному магазину (общего аккаунта
- * покупателя на все магазины нет), избранное — общее для всех, /favorites.
- * Вне магазина показываем только «Избранное».
+ * Четыре пункта в контексте магазина: Каталог, Избранное, Корзина, Профиль.
  */
 export function PublicBottomNav() {
   const location = useLocation()
@@ -49,9 +47,14 @@ export function PublicBottomNav() {
   const [authed, setAuthed] = useState(() => !!loadCustomerToken())
 
   useEffect(() => {
+    if (!slug) {
+      setFavoritesCount(0)
+      setCartCountValue(0)
+      return
+    }
     function syncCounters() {
-      setFavoritesCount(totalFavoritesCount())
-      setCartCountValue(totalCartCount())
+      setFavoritesCount(favoritesCountForSlug(slug!))
+      setCartCountValue(cartCountForSlug(slug!))
     }
     syncCounters()
     window.addEventListener('storage', syncCounters)
@@ -62,7 +65,7 @@ export function PublicBottomNav() {
       window.removeEventListener('waysklad:storefront-cart', syncCounters)
       window.removeEventListener(FAVORITES_EVENT, syncCounters)
     }
-  }, [])
+  }, [slug])
 
   useEffect(() => {
     function syncAuth() {
@@ -76,45 +79,49 @@ export function PublicBottomNav() {
     }
   }, [])
 
+  if (!slug) return null
+
   const path = location.pathname
-  const favoritesActive = path === '/favorites'
+  const accountActive =
+    path === `/store/${slug}/account` ||
+    path.startsWith(`/store/${slug}/account/`) ||
+    path === `/store/${slug}/login`
 
   return (
     <nav className={styles.bar} aria-label="Основная навигация">
-      {slug && (
-        <NavItem to={`/store/${slug}`} label="Каталог" active={path === `/store/${slug}`}>
-          <IconLayoutGrid size={22} stroke={1.8} />
-        </NavItem>
-      )}
+      <NavItem to={`/store/${slug}`} label="Каталог" active={path === `/store/${slug}`}>
+        <IconLayoutGrid size={22} stroke={1.8} />
+      </NavItem>
 
-      <NavItem to="/favorites" label="Избранное" active={favoritesActive} count={favoritesCount}>
+      <NavItem
+        to={`/store/${slug}/favorites`}
+        label="Избранное"
+        active={path === `/store/${slug}/favorites`}
+        count={favoritesCount}
+      >
         <IconHeart size={22} stroke={1.8} />
       </NavItem>
 
-      {slug && (
-        <NavItem
-          to={`/store/${slug}/cart`}
-          label="Корзина"
-          active={path === `/store/${slug}/cart`}
-          count={cartCountValue}
-        >
-          <IconShoppingCart size={22} stroke={1.8} />
-        </NavItem>
-      )}
+      <NavItem
+        to={`/store/${slug}/cart`}
+        label="Корзина"
+        active={path === `/store/${slug}/cart`}
+        count={cartCountValue}
+      >
+        <IconShoppingCart size={22} stroke={1.8} />
+      </NavItem>
 
-      {slug && (
-        <NavItem
-          to={
-            authed
-              ? `/store/${slug}/my-orders`
-              : `/store/${slug}/login?next=${encodeURIComponent(path + location.search)}`
-          }
-          label={authed ? 'Профиль' : 'Войти'}
-          active={path === `/store/${slug}/my-orders` || path === `/store/${slug}/login`}
-        >
-          <IconUserCircle size={22} stroke={1.8} />
-        </NavItem>
-      )}
+      <NavItem
+        to={
+          authed
+            ? `/store/${slug}/account`
+            : `/store/${slug}/login?next=${encodeURIComponent(path + location.search)}`
+        }
+        label={authed ? 'Профиль' : 'Войти'}
+        active={accountActive}
+      >
+        <IconUserCircle size={22} stroke={1.8} />
+      </NavItem>
     </nav>
   )
 }
