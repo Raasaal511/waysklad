@@ -165,7 +165,14 @@ export function App() {
                   </PublicLayout>
                 }
               />
-              <Route path="/store/:slug/request" element={<StorefrontRequestPage />} />
+              <Route
+                path="/store/:slug/request"
+                element={
+                  <PublicLayout>
+                    <StorefrontRequestPage />
+                  </PublicLayout>
+                }
+              />
               <Route path="/store/:slug/my-orders" element={<RedirectMyOrdersToAccount />} />
               <Route
                 element={

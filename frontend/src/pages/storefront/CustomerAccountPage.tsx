@@ -97,6 +97,11 @@ function OrderCard({ req, currentSlug }: { req: MyRequest; currentSlug: string }
             </p>
           )}
           <div className={styles.orderActions}>
+            {inThisShop && (
+              <Link to={`/store/${currentSlug}/request`} className={styles.textLink}>
+                Чат с магазином
+              </Link>
+            )}
             {!inThisShop && req.shop_slug && (
               <Link to={`/store/${req.shop_slug}`} className={styles.textLink}>
                 В магазин «{req.shop_name}»
@@ -193,6 +198,11 @@ export function CustomerAccountPage() {
     const t = setTimeout(() => setRetryAfter((s) => s - 1), 1000)
     return () => clearTimeout(t)
   }, [retryAfter])
+
+  useEffect(() => {
+    if (!location.pathname.endsWith('/orders')) return
+    document.getElementById('orders')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [location.pathname, loading])
 
   const { here, others } = useMemo(() => {
     const hereList: MyRequest[] = []
@@ -394,7 +404,7 @@ export function CustomerAccountPage() {
             </p>
           </section>
 
-          <section className={styles.section}>
+          <section className={styles.section} id="orders">
             <h2 className={styles.sectionTitle}>Мои заказы</h2>
             {here.length === 0 ? (
               <EmptyState

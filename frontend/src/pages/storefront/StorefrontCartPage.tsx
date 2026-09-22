@@ -7,10 +7,13 @@ import {
 } from '../../entities/auth/customerApi'
 import {
   createStorefrontRequest,
+  getStorefrontShopProfileCached,
+  peekCachedStorefrontShopProfile,
   saveRequestToken,
 } from '../../entities/storefront/api'
 import { ApiError } from '../../shared/api/client'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
+import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { Button } from '../../shared/ui/Button'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { IconButton } from '../../shared/ui/IconButton'
@@ -30,10 +33,35 @@ export function StorefrontCartPage() {
   const [customerToken, setCustomerToken] = useState(() => loadCustomerToken())
   const [showLogin, setShowLogin] = useState(false)
   const [pendingSubmit, setPendingSubmit] = useState(false)
+  const [shopName, setShopName] = useState(() => peekCachedStorefrontShopProfile(slug)?.name ?? null)
 
   useEffect(() => {
     setCart(loadCart(slug))
   }, [slug])
+
+  useEffect(() => {
+    const cached = peekCachedStorefrontShopProfile(slug)
+    if (cached) {
+      setShopName(cached.name)
+      return
+    }
+    let cancelled = false
+    getStorefrontShopProfileCached(slug)
+      .then((p) => {
+        if (!cancelled) setShopName(p.name)
+      })
+      .catch(() => {
+        if (!cancelled) setShopName(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [slug])
+
+  useEffect(() => {
+    setPageMeta({ title: shopName ? `${shopName} — Корзина` : 'Корзина' })
+    return () => resetPageMeta()
+  }, [shopName])
 
   const total = useMemo(
     () => cart.reduce((sum, i) => sum + Number(i.retail_price) * Number(i.quantity), 0),

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { IconBrandTelegram } from '@tabler/icons-react'
 import {
   getCustomerLoginStatus,
@@ -7,7 +7,9 @@ import {
   registerCustomer,
   saveCustomerToken,
 } from '../../entities/auth/customerApi'
+import { getStorefrontShopProfileCached, peekCachedStorefrontShopProfile } from '../../entities/storefront/api'
 import { ApiError } from '../../shared/api/client'
+import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { Button } from '../../shared/ui/Button'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
 import { notifyCustomerAuthChanged } from './CustomerLoginModal'
@@ -30,8 +32,9 @@ type Tab = 'login' | 'register'
  */
 export function CustomerAuthPage() {
   const navigate = useNavigate()
+  const { slug = '' } = useParams<{ slug: string }>()
   const [searchParams] = useSearchParams()
-  const redirectTo = searchParams.get('next') || '/'
+  const redirectTo = searchParams.get('next') || `/store/${slug}`
 
   const [tab, setTab] = useState<Tab>(searchParams.get('tab') === 'register' ? 'register' : 'login')
 
@@ -54,6 +57,26 @@ export function CustomerAuthPage() {
 
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const cached = peekCachedStorefrontShopProfile(slug)
+    if (cached) {
+      setPageMeta({ title: `${cached.name} — Вход` })
+      return () => resetPageMeta()
+    }
+    let cancelled = false
+    getStorefrontShopProfileCached(slug)
+      .then((p) => {
+        if (!cancelled) setPageMeta({ title: `${p.name} — Вход` })
+      })
+      .catch(() => {
+        if (!cancelled) setPageMeta({ title: 'Вход' })
+      })
+    return () => {
+      cancelled = true
+      resetPageMeta()
+    }
+  }, [slug])
 
   function finish(accessToken: string) {
     saveCustomerToken(accessToken)
