@@ -8,6 +8,8 @@ import layoutStyles from '../../../shared/ui/Layout.module.css'
 import { handleAdminError } from '../shared'
 import styles from '../AdminPage.module.css'
 
+const ERROR_AUTO_REFRESH_MS = 15000
+
 interface SectionProps {
   logout: () => void
   refreshKey: number

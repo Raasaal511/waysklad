@@ -3,6 +3,7 @@
  * редизайн метрик и блоков эксплуатации идёт отдельным шагом (B5).
  */
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { getAdminStatus, type AdminMetricsPoint, type AdminStatus } from '../../../entities/admin/api'
 import layoutStyles from '../../../shared/ui/Layout.module.css'
 import { handleAdminError } from '../shared'
