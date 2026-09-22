@@ -14,9 +14,29 @@ interface Rect {
   height: number
 }
 
+function isVisibleTarget(el: Element): boolean {
+  const style = getComputedStyle(el)
+  if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+    return false
+  }
+  // Сайдбар на телефоне display:none, но предки тоже могут скрывать узел.
+  let node: Element | null = el
+  while (node && node !== document.body) {
+    const s = getComputedStyle(node)
+    if (s.display === 'none' || s.visibility === 'hidden') return false
+    node = node.parentElement
+  }
+  const r = el.getBoundingClientRect()
+  return r.width > 0 && r.height > 0
+}
+
 function findTarget(selector: string | null): Element | null {
   if (!selector) return null
-  return document.querySelector(`[data-onboarding="${CSS.escape(selector)}"]`)
+  const nodes = document.querySelectorAll(`[data-onboarding="${CSS.escape(selector)}"]`)
+  for (const el of nodes) {
+    if (isVisibleTarget(el)) return el
+  }
+  return null
 }
 
 /** Подсвечивает нужный элемент интерфейса (spotlight-вырез в затемнении) и
@@ -43,7 +63,8 @@ export function OnboardingOverlay() {
     measure()
     // элемент может смонтироваться на тик позже (переход по роуту) — короткий поллинг
     const pollId = window.setInterval(measure, 150)
-    const stopPoll = window.setTimeout(() => window.clearInterval(pollId), 2000)
+    // шторка «Ещё» и роут могут появиться с задержкой — ждём дольше
+    const stopPoll = window.setTimeout(() => window.clearInterval(pollId), 3500)
     window.addEventListener('resize', measure)
     window.addEventListener('scroll', measure, true)
     return () => {

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   IconShoppingCart,
   IconBox,
@@ -13,11 +13,16 @@ import {
   IconBuildingStore,
   IconChevronLeft,
   IconChevronRight,
+  IconPlus,
+  IconDots,
+  IconUser,
+  IconLogout,
   type Icon as TablerIcon,
 } from '@tabler/icons-react'
 import { useAuth } from './AuthContext'
 import { useShop } from './ShopContext'
 import { useTheme } from './ThemeContext'
+import { useOnboarding } from './OnboardingContext'
 import { NotificationBell } from './NotificationBell'
 import { GlobalSearch } from './GlobalSearch'
 import { Button } from '../shared/ui/Button'
@@ -60,6 +65,25 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/employees', label: 'Сотрудники', icon: IconUserCog, roles: ['owner', 'manager'] },
 ]
 
+/** Порядок вкладок в мобильной нижней панели.
+ * С FAB «Продать»: 3 вкладки + кнопка + «Ещё» (как в макете).
+ * Без FAB: 4 вкладки + «Ещё». Остальное — в шторке. */
+const MOBILE_NAV_PRIORITY = [
+  '/',
+  '/products',
+  '/debts',
+  '/orders',
+  '/stock',
+  '/clients',
+  '/storefront',
+  '/tasks',
+  '/analytics',
+  '/employees',
+] as const
+
+const SELL_ROLES: Role[] = ['owner', 'manager', 'seller']
+const SIDEBAR_COLLAPSED_KEY = 'waysklad:sidebar-collapsed'
+
 const ROLE_LABELS: Record<Role, string> = {
   owner: 'Владелец',
   manager: 'Управляющий',
@@ -68,23 +92,49 @@ const ROLE_LABELS: Record<Role, string> = {
   analyst: 'Аналитик',
 }
 
-const SIDEBAR_COLLAPSED_KEY = 'waysklad:sidebar-collapsed'
-
-function NavItems({
-  variant,
-  collapsed,
-  role,
-}: {
-  variant: 'sidebar' | 'bottom'
-  collapsed?: boolean
-  role?: Role
-}) {
-  const storefrontEnabled = useFeature('storefront')
-  const items = NAV_ITEMS.filter(
+function filterNavItems(role: Role | undefined, storefrontEnabled: boolean): NavItem[] {
+  return NAV_ITEMS.filter(
     (item) =>
       (!item.roles || (role && item.roles.includes(role))) &&
       (item.feature !== 'storefront' || storefrontEnabled),
   )
+}
+
+/** С FAB «Продать» в баре 3 вкладки + кнопка + «Ещё» (5 слотов); без FAB — 4 вкладки + «Ещё». */
+function splitMobileNav(
+  items: NavItem[],
+  canSell: boolean,
+): { primary: NavItem[]; more: NavItem[] } {
+  const byPath = new Map(items.map((item) => [item.to, item]))
+  const ordered = MOBILE_NAV_PRIORITY.map((to) => byPath.get(to)).filter(
+    (item): item is NavItem => item != null,
+  )
+  const primaryCount = canSell ? 3 : 4
+  return {
+    primary: ordered.slice(0, primaryCount),
+    more: ordered.slice(primaryCount),
+  }
+}
+
+function isNavActive(pathname: string, to: string): boolean {
+  if (to === '/') return pathname === '/'
+  return pathname === to || pathname.startsWith(`${to}/`)
+}
+
+function isMoreActive(pathname: string, moreItems: NavItem[]): boolean {
+  if (pathname === '/profile' || pathname.startsWith('/profile/')) return true
+  return moreItems.some((item) => isNavActive(pathname, item.to))
+}
+
+function SidebarNavItems({
+  collapsed,
+  role,
+}: {
+  collapsed?: boolean
+  role?: Role
+}) {
+  const storefrontEnabled = useFeature('storefront')
+  const items = filterNavItems(role, storefrontEnabled)
   return (
     <>
       {items.map((item) => (
@@ -93,22 +143,16 @@ function NavItems({
           to={item.to}
           end={item.to === '/'}
           className={({ isActive }) =>
-            [
-              variant === 'sidebar' ? styles['app-sidebar-item'] : styles['app-nav-item'],
-              isActive && styles.active,
-            ]
-              .filter(Boolean)
-              .join(' ')
+            [styles['app-sidebar-item'], isActive && styles.active].filter(Boolean).join(' ')
           }
           data-tooltip={collapsed ? item.label : undefined}
           data-nav={item.to === '/tasks' ? 'tasks' : undefined}
           data-onboarding={item.to}
-          aria-label={variant === 'bottom' ? item.label : undefined}
         >
-          <span className={variant === 'sidebar' ? styles['app-sidebar-icon'] : styles['app-nav-icon']}>
-            <item.icon size={variant === 'sidebar' ? 19 : 21} stroke={1.8} />
+          <span className={styles['app-sidebar-icon']}>
+            <item.icon size={19} stroke={1.8} />
           </span>
-          {!(variant === 'sidebar' && collapsed) && <span>{item.label}</span>}
+          {!collapsed && <span>{item.label}</span>}
         </NavLink>
       ))}
     </>
@@ -157,12 +201,171 @@ function UserBadge({
   )
 }
 
+function MoreSheet({
+  items,
+  open,
+  onClose,
+  onLogout,
+}: {
+  items: NavItem[]
+  open: boolean
+  onClose: () => void
+  onLogout: () => void
+}) {
+  const touchStartY = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [open, onClose])
+
+  if (!open) return null
+
+  return (
+    <div
+      className={styles['app-more-overlay']}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+      role="presentation"
+    >
+      <div
+        className={styles['app-more-sheet']}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Ещё"
+        onTouchStart={(e) => {
+          touchStartY.current = e.touches[0]?.clientY ?? null
+        }}
+        onTouchEnd={(e) => {
+          const start = touchStartY.current
+          touchStartY.current = null
+          if (start == null) return
+          const end = e.changedTouches[0]?.clientY
+          if (end != null && end - start > 64) onClose()
+        }}
+      >
+        <div className={styles['app-more-handle']} aria-hidden="true" />
+        <nav className={styles['app-more-nav']}>
+          {items.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
+              className={({ isActive }) =>
+                [styles['app-more-item'], isActive && styles.active].filter(Boolean).join(' ')
+              }
+              data-onboarding={item.to}
+              data-nav={item.to === '/tasks' ? 'tasks' : undefined}
+              onClick={onClose}
+            >
+              <span className={styles['app-more-icon']}>
+                <item.icon size={22} stroke={1.8} />
+              </span>
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+        <div className={styles['app-more-footer']}>
+          <Link to="/profile" className={styles['app-more-item']} onClick={onClose}>
+            <span className={styles['app-more-icon']}>
+              <IconUser size={22} stroke={1.8} />
+            </span>
+            <span>Профиль</span>
+          </Link>
+          <button
+            type="button"
+            className={styles['app-more-item']}
+            onClick={() => {
+              onClose()
+              onLogout()
+            }}
+          >
+            <span className={styles['app-more-icon']}>
+              <IconLogout size={22} stroke={1.8} />
+            </span>
+            <span>Выйти</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function AppLayout() {
   const { user, logout } = useAuth()
   const { shopName } = useShop()
+  const storefrontEnabled = useFeature('storefront')
+  const { active: onboardingActive, step: onboardingStep } = useOnboarding()
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1')
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [offlineTip, setOfflineTip] = useState(false)
   const headerRef = useRef<HTMLElement>(null)
+  /** История для «назад» закрывает шторку только если её открыл пользователь (не онбординг). */
+  const moreHistoryPushed = useRef(false)
   const { pendingCount, notice, dismissNotice } = useOfflineSync()
+
+  const canSell = user?.role != null && SELL_ROLES.includes(user.role)
+  const navItems = useMemo(
+    () => filterNavItems(user?.role, storefrontEnabled),
+    [user?.role, storefrontEnabled],
+  )
+  const { primary, more } = useMemo(() => splitMobileNav(navItems, canSell), [navItems, canSell])
+  const moreActive = !moreOpen && isMoreActive(pathname, more)
+
+  const closeMore = useCallback(() => {
+    setMoreOpen(false)
+    if (moreHistoryPushed.current) {
+      moreHistoryPushed.current = false
+      if (window.history.state && (window.history.state as { moreNav?: boolean }).moreNav) {
+        window.history.back()
+      }
+    }
+  }, [])
+
+  const openMore = useCallback((withHistory: boolean) => {
+    setMoreOpen(true)
+    if (withHistory && !moreHistoryPushed.current) {
+      window.history.pushState({ moreNav: true }, '')
+      moreHistoryPushed.current = true
+    }
+  }, [])
+
+  const toggleMore = useCallback(() => {
+    if (moreOpen) closeMore()
+    else openMore(true)
+  }, [moreOpen, closeMore, openMore])
+
+  // Онбординг: цель в «Ещё» → открыть шторку без pushState (не ломаем navigate тура).
+  useEffect(() => {
+    if (!onboardingActive) {
+      if (moreOpen && !moreHistoryPushed.current) setMoreOpen(false)
+      return
+    }
+    const target = onboardingStep?.target
+    if (!target) return
+    if (more.some((item) => item.to === target)) {
+      setMoreOpen(true)
+    } else if (!moreHistoryPushed.current) {
+      setMoreOpen(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboardingActive, onboardingStep?.target, more])
+
+  useEffect(() => {
+    function onPopState() {
+      moreHistoryPushed.current = false
+      setMoreOpen(false)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
 
   useEffect(() => {
     if (!notice) return
@@ -173,6 +376,10 @@ export function AppLayout() {
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0')
   }, [collapsed])
+
+  useEffect(() => {
+    if (pendingCount === 0) setOfflineTip(false)
+  }, [pendingCount])
 
   useEffect(() => {
     const el = headerRef.current
@@ -249,7 +456,7 @@ export function AppLayout() {
         )}
 
         <nav className={styles['app-sidebar-nav']}>
-          <NavItems variant="sidebar" collapsed={collapsed} role={user?.role} />
+          <SidebarNavItems collapsed={collapsed} role={user?.role} />
         </nav>
 
         <div className={styles['app-sidebar-footer']}>
@@ -272,21 +479,104 @@ export function AppLayout() {
           </div>
           <GlobalSearch />
           <div className={styles['app-header-user']}>
+            {pendingCount > 0 && (
+              <div className={styles['app-offline-badge-wrap']}>
+                <button
+                  type="button"
+                  className={styles['app-offline-badge']}
+                  onClick={() => setOfflineTip((v) => !v)}
+                  aria-expanded={offlineTip}
+                  aria-label={`Не отправлено: ${pendingCount}`}
+                >
+                  ⏳ {pendingCount}
+                </button>
+                {offlineTip && (
+                  <div className={styles['app-offline-tip']} role="status">
+                    Продажи ждут отправки. Как появится сеть — уйдут сами.
+                  </div>
+                )}
+              </div>
+            )}
             <NotificationBell />
             <UserBadge name={user?.name} role={user?.role} />
-            <Button variant="secondary" onClick={logout}>
-              Выйти
-            </Button>
           </div>
         </header>
 
-        <main className={styles['app-content']}>
+        <main
+          className={[styles['app-content'], canSell && styles['app-content-with-sell']]
+            .filter(Boolean)
+            .join(' ')}
+        >
           <Outlet />
         </main>
 
         <nav className={styles['app-nav']}>
-          <NavItems variant="bottom" role={user?.role} />
+          {primary.map((item, index) => (
+            <Fragment key={item.to}>
+              {canSell && index === 2 && (
+                <div className={styles['app-nav-sell']}>
+                  <button
+                    type="button"
+                    className={styles['app-nav-sell-btn']}
+                    onClick={() => navigate('/sales/new')}
+                    aria-label="Продать"
+                  >
+                    <IconPlus size={26} stroke={2.2} />
+                  </button>
+                  <span className={styles['app-nav-sell-label']}>Продать</span>
+                </div>
+              )}
+              <NavLink
+                to={item.to}
+                end={item.to === '/'}
+                className={({ isActive }) =>
+                  [styles['app-nav-item'], isActive && styles.active].filter(Boolean).join(' ')
+                }
+                data-nav={item.to === '/tasks' ? 'tasks' : undefined}
+                data-onboarding={item.to}
+                aria-label={item.label}
+              >
+                <span className={styles['app-nav-icon']}>
+                  <item.icon size={21} stroke={1.8} />
+                </span>
+                <span>{item.label}</span>
+              </NavLink>
+            </Fragment>
+          ))}
+          {canSell && primary.length < 3 && (
+            <div className={styles['app-nav-sell']}>
+              <button
+                type="button"
+                className={styles['app-nav-sell-btn']}
+                onClick={() => navigate('/sales/new')}
+                aria-label="Продать"
+              >
+                <IconPlus size={26} stroke={2.2} />
+              </button>
+              <span className={styles['app-nav-sell-label']}>Продать</span>
+            </div>
+          )}
+          <button
+            type="button"
+            className={[
+              styles['app-nav-item'],
+              (moreOpen || moreActive) && styles.active,
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            onClick={toggleMore}
+            aria-label="Ещё"
+            aria-expanded={moreOpen}
+            data-onboarding-more
+          >
+            <span className={styles['app-nav-icon']}>
+              <IconDots size={21} stroke={1.8} />
+            </span>
+            <span>Ещё</span>
+          </button>
         </nav>
+
+        <MoreSheet items={more} open={moreOpen} onClose={closeMore} onLogout={logout} />
       </div>
     </div>
   )

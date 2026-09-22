@@ -87,7 +87,7 @@
 .app-content {
   flex: 1;
   padding: 16px;
-  padding-bottom: 88px;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
   width: 100%;
   max-width: min(1100px, 100%);
   margin: 0 auto;
@@ -147,35 +147,82 @@
   margin: 0 8px 8px;
 }
 
+.app-offline-badge-wrap {
+  position: relative;
+}
+
+.app-offline-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.app-offline-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: min(240px, 70vw);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
 .app-nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   display: flex;
+  align-items: stretch;
   border-top: 1px solid var(--border);
   background: var(--bg);
-  padding: 4px 0 max(4px, env(safe-area-inset-bottom));
+  padding: 0 0 max(0px, env(safe-area-inset-bottom));
   z-index: 10;
-  overflow-x: auto;
-  scrollbar-width: none;
+  overflow: visible;
 }
 
-.app-nav::-webkit-scrollbar {
-  display: none;
+.app-content-with-sell {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom));
 }
 
 .app-nav-item {
   flex: 1;
-  min-width: 40px;
+  min-width: 0;
+  min-height: 52px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2px;
-  padding: 8px 2px;
+  padding: 6px 2px;
   text-decoration: none;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .app-nav-item span:not(.app-nav-icon) {
@@ -185,14 +232,6 @@
   white-space: nowrap;
 }
 
-/* Совсем узкие экраны (7+ пунктов не помещаются даже с обрезкой) — прячем
-   подписи, оставляем только иконки; название доступно через aria-label. */
-@media (max-width: 400px) {
-  .app-nav-item span:not(.app-nav-icon) {
-    display: none;
-  }
-}
-
 .app-nav-item.active {
   color: var(--accent);
 }
@@ -200,6 +239,153 @@
 .app-nav-icon {
   font-size: 20px;
   display: flex;
+  flex-shrink: 0;
+}
+
+.app-nav-sell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  padding: 0 2px 6px;
+  margin-top: -18px;
+}
+
+.app-nav-sell-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-nav-sell-btn:active {
+  background: var(--accent-hover);
+  transform: scale(0.96);
+}
+
+.app-nav-sell-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1.1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-more-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(20, 24, 19, 0.42);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: app-more-fade 0.15s ease;
+}
+
+@keyframes app-more-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.app-more-sheet {
+  width: 100%;
+  max-width: 480px;
+  max-height: min(80svh, 560px);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--bg);
+  box-shadow: 0 -8px 32px rgba(20, 24, 19, 0.18);
+  padding: 0 0 max(12px, env(safe-area-inset-bottom));
+  animation: app-more-slide 0.18s ease;
+  overflow: hidden;
+}
+
+@keyframes app-more-slide {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.app-more-handle {
+  width: 36px;
+  height: 4px;
+  margin: 10px auto 6px;
+  border-radius: 999px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.app-more-nav {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 8px 8px;
+}
+
+.app-more-footer {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.app-more-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 500;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-more-item:active {
+  background: var(--bg-muted);
+}
+
+.app-more-item.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.app-more-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: inherit;
 }
 
 .app-user-badge {
