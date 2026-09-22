@@ -456,6 +456,43 @@ class OverviewSeriesResponse(BaseModel):
     active_shops: list[int]
 
 
+class OverviewDeltasResponse(BaseModel):
+    """null — в прошлом периоде был ноль: дельту показывать не от чего."""
+
+    sales_count_30d: float | None
+    sales_sum_30d: float | None
+    new_shops_7d: float | None
+    storefront_requests_7d: float | None
+
+
+class AttentionShopResponse(BaseModel):
+    id: int
+    name: str
+    last_sale_at: str | None
+    created_at: str
+
+
+class AttentionErrorResponse(BaseModel):
+    signature: str
+    type: str
+    path: str
+    count_24h: int
+
+
+class OverviewAttentionResponse(BaseModel):
+    went_quiet: list[AttentionShopResponse]
+    never_sold: list[AttentionShopResponse]
+    top_errors: list[AttentionErrorResponse]
+
+
+class RecentShopResponse(BaseModel):
+    id: int
+    name: str
+    city: str | None
+    created_at: str
+    storefront_enabled: bool
+
+
 class PlatformOverviewResponse(BaseModel):
     shops: OverviewShopsResponse
     users: OverviewUsersResponse
@@ -464,6 +501,9 @@ class PlatformOverviewResponse(BaseModel):
     debts: OverviewDebtsResponse
     storefront: OverviewStorefrontResponse
     series_30d: OverviewSeriesResponse
+    deltas: OverviewDeltasResponse
+    attention: OverviewAttentionResponse
+    recent_shops: list[RecentShopResponse]
 
     @classmethod
     def from_result(cls, result: PlatformOverview) -> "PlatformOverviewResponse":
@@ -475,6 +515,13 @@ class PlatformOverviewResponse(BaseModel):
             debts=OverviewDebtsResponse(**asdict(result.debts)),
             storefront=OverviewStorefrontResponse(**asdict(result.storefront)),
             series_30d=OverviewSeriesResponse(**asdict(result.series_30d)),
+            deltas=OverviewDeltasResponse(**asdict(result.deltas)),
+            attention=OverviewAttentionResponse(
+                went_quiet=[AttentionShopResponse(**asdict(s)) for s in result.attention.went_quiet],
+                never_sold=[AttentionShopResponse(**asdict(s)) for s in result.attention.never_sold],
+                top_errors=[AttentionErrorResponse(**asdict(e)) for e in result.attention.top_errors],
+            ),
+            recent_shops=[RecentShopResponse(**asdict(s)) for s in result.recent_shops],
         )
 
 

@@ -16,6 +16,7 @@ from decimal import Decimal
 
 from sqlalchemy import func, select, text
 
+from app.domain.platform.health import ACTIVE_WITHIN, CHURNED_AFTER, NEW_GRACE_PERIOD
 from app.infrastructure.db.models.customers import CustomerModel
 from app.infrastructure.db.models.debts import DebtModel, DebtRepaymentModel
 from app.infrastructure.db.models.identity import TenantModel, UserModel
@@ -87,6 +88,56 @@ class OverviewSeries:
 
 
 @dataclass(frozen=True)
+class OverviewDeltas:
+    """Изменение к предыдущему такому же периоду, в процентах.
+
+    None — сравнивать не с чем: в прошлом периоде было ноль, и «рост на
+    бесконечность» ничего не говорит. Фронт в этом случае дельту не рисует.
+    """
+
+    sales_count_30d: float | None
+    sales_sum_30d: float | None
+    new_shops_7d: float | None
+    storefront_requests_7d: float | None
+
+
+@dataclass(frozen=True)
+class AttentionShop:
+    """Магазин, на который стоит посмотреть: затих или так и не начал."""
+
+    id: int
+    name: str
+    last_sale_at: str | None
+    created_at: str
+
+
+@dataclass(frozen=True)
+class AttentionError:
+    signature: str
+    type: str
+    path: str
+    count_24h: int
+
+
+@dataclass(frozen=True)
+class OverviewAttention:
+    """Три списка для блока «Требует внимания» на обзоре."""
+
+    went_quiet: list[AttentionShop]
+    never_sold: list[AttentionShop]
+    top_errors: list[AttentionError]
+
+
+@dataclass(frozen=True)
+class RecentShop:
+    id: int
+    name: str
+    city: str | None
+    created_at: str
+    storefront_enabled: bool
+
+
+@dataclass(frozen=True)
 class PlatformOverview:
     shops: ShopsOverview
     users: UsersOverview
@@ -95,6 +146,9 @@ class PlatformOverview:
     debts: DebtsOverview
     storefront: StorefrontOverview
     series_30d: OverviewSeries
+    deltas: OverviewDeltas
+    attention: OverviewAttention
+    recent_shops: list[RecentShop]
 
     def to_json(self) -> dict:
         return {
@@ -115,6 +169,13 @@ class PlatformOverview:
             },
             "storefront": self.storefront.__dict__,
             "series_30d": self.series_30d.__dict__,
+            "deltas": self.deltas.__dict__,
+            "attention": {
+                "went_quiet": [s.__dict__ for s in self.attention.went_quiet],
+                "never_sold": [s.__dict__ for s in self.attention.never_sold],
+                "top_errors": [e.__dict__ for e in self.attention.top_errors],
+            },
+            "recent_shops": [s.__dict__ for s in self.recent_shops],
         }
 
     @classmethod
@@ -137,7 +198,23 @@ class PlatformOverview:
             ),
             storefront=StorefrontOverview(**d["storefront"]),
             series_30d=OverviewSeries(**d["series_30d"]),
+            deltas=OverviewDeltas(**d["deltas"]),
+            attention=OverviewAttention(
+                went_quiet=[AttentionShop(**s) for s in d["attention"]["went_quiet"]],
+                never_sold=[AttentionShop(**s) for s in d["attention"]["never_sold"]],
+                top_errors=[AttentionError(**e) for e in d["attention"]["top_errors"]],
+            ),
+            recent_shops=[RecentShop(**s) for s in d["recent_shops"]],
         )
+
+
+def _percent_change(previous, current) -> float | None:
+    """Изменение в процентах. None — в прошлом периоде был ноль: делить не на
+    что, а «+∞%» читателю ничего не говорит."""
+    prev = float(previous or 0)
+    if prev == 0:
+        return None
+    return round((float(current or 0) - prev) / prev * 100, 1)
 
 
 def msk_day_start_utc(now_utc: datetime) -> datetime:
@@ -172,6 +249,10 @@ class _Overview:
             storefront = await self._storefront(session, d7)
             series = await self._series(session, d30)
 
+            deltas = await self._deltas(session, now, d7, d30)
+            attention = await self._attention(session, now)
+            recent_shops = await self._recent_shops(session)
+
         return PlatformOverview(
             shops=shops,
             users=users,
@@ -180,7 +261,183 @@ class _Overview:
             debts=debts,
             storefront=storefront,
             series_30d=series,
+            deltas=deltas,
+            attention=attention,
+            recent_shops=recent_shops,
         )
+
+    async def _deltas(self, session, now, d7, d30) -> OverviewDeltas:
+        """Сравнение с предыдущим таким же периодом: последние 30 дней против
+        30 дней до них, последние 7 против предыдущих 7."""
+        prev_30_start = now - timedelta(days=60)
+        prev_7_start = now - timedelta(days=14)
+
+        sales_prev = (
+            await session.execute(
+                select(
+                    func.count(SaleModel.id),
+                    func.coalesce(func.sum(SaleModel.total), 0),
+                ).where(SaleModel.created_at >= prev_30_start, SaleModel.created_at < d30)
+            )
+        ).one()
+        sales_now = (
+            await session.execute(
+                select(
+                    func.count(SaleModel.id),
+                    func.coalesce(func.sum(SaleModel.total), 0),
+                ).where(SaleModel.created_at >= d30)
+            )
+        ).one()
+
+        shops_prev = (
+            await session.execute(
+                select(func.count(TenantModel.id)).where(
+                    TenantModel.created_at >= prev_7_start, TenantModel.created_at < d7
+                )
+            )
+        ).scalar_one()
+        shops_now = (
+            await session.execute(
+                select(func.count(TenantModel.id)).where(TenantModel.created_at >= d7)
+            )
+        ).scalar_one()
+
+        requests_prev = (
+            await session.execute(
+                select(func.count(StorefrontRequestModel.id)).where(
+                    StorefrontRequestModel.created_at >= prev_7_start,
+                    StorefrontRequestModel.created_at < d7,
+                )
+            )
+        ).scalar_one()
+        requests_now = (
+            await session.execute(
+                select(func.count(StorefrontRequestModel.id)).where(
+                    StorefrontRequestModel.created_at >= d7
+                )
+            )
+        ).scalar_one()
+
+        return OverviewDeltas(
+            sales_count_30d=_percent_change(sales_prev[0], sales_now[0]),
+            sales_sum_30d=_percent_change(Decimal(sales_prev[1]), Decimal(sales_now[1])),
+            new_shops_7d=_percent_change(shops_prev, shops_now),
+            storefront_requests_7d=_percent_change(requests_prev, requests_now),
+        )
+
+    async def _attention(self, session, now) -> OverviewAttention:
+        """Кого стоит посмотреть: затихшие, так и не начавшие, частые ошибки."""
+        quiet_since = now - ACTIVE_WITHIN
+        churn_since = now - CHURNED_AFTER
+        grace_since = now - NEW_GRACE_PERIOD
+
+        last_sale = (
+            select(
+                SaleModel.tenant_id.label("tenant_id"),
+                func.max(SaleModel.created_at).label("last_at"),
+            )
+            .group_by(SaleModel.tenant_id)
+            .subquery()
+        )
+
+        # продажи были, но давно: между «активен» и «бросил»
+        quiet_rows = (
+            await session.execute(
+                select(
+                    TenantModel.id,
+                    TenantModel.name,
+                    last_sale.c.last_at,
+                    TenantModel.created_at,
+                )
+                .join(last_sale, last_sale.c.tenant_id == TenantModel.id)
+                .where(
+                    last_sale.c.last_at < quiet_since,
+                    last_sale.c.last_at >= churn_since,
+                    TenantModel.is_suspended.is_(False),
+                )
+                .order_by(last_sale.c.last_at.desc())
+                .limit(5)
+            )
+        ).all()
+
+        # зарегистрировались больше недели назад и не пробили ни одного чека
+        never_rows = (
+            await session.execute(
+                select(TenantModel.id, TenantModel.name, TenantModel.created_at)
+                .outerjoin(last_sale, last_sale.c.tenant_id == TenantModel.id)
+                .where(
+                    last_sale.c.last_at.is_(None),
+                    TenantModel.created_at < grace_since,
+                    TenantModel.is_suspended.is_(False),
+                )
+                .order_by(TenantModel.created_at.desc())
+                .limit(5)
+            )
+        ).all()
+
+        error_rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT signature, MAX(error_type) AS error_type, MAX(path) AS path,
+                           COUNT(*) AS count_24h
+                    FROM error_log
+                    WHERE created_at >= :since AND resolved_at IS NULL
+                    GROUP BY signature
+                    ORDER BY count_24h DESC
+                    LIMIT 3
+                    """
+                ),
+                {"since": now - timedelta(days=1)},
+            )
+        ).all()
+
+        return OverviewAttention(
+            went_quiet=[
+                AttentionShop(
+                    id=r[0],
+                    name=r[1],
+                    last_sale_at=r[2].isoformat() if r[2] else None,
+                    created_at=r[3].isoformat(),
+                )
+                for r in quiet_rows
+            ],
+            never_sold=[
+                AttentionShop(
+                    id=r[0], name=r[1], last_sale_at=None, created_at=r[2].isoformat()
+                )
+                for r in never_rows
+            ],
+            top_errors=[
+                AttentionError(signature=r[0], type=r[1], path=r[2], count_24h=r[3])
+                for r in error_rows
+            ],
+        )
+
+    async def _recent_shops(self, session) -> list[RecentShop]:
+        rows = (
+            await session.execute(
+                select(
+                    TenantModel.id,
+                    TenantModel.name,
+                    TenantModel.city,
+                    TenantModel.created_at,
+                    TenantModel.storefront_enabled,
+                )
+                .order_by(TenantModel.created_at.desc())
+                .limit(5)
+            )
+        ).all()
+        return [
+            RecentShop(
+                id=r[0],
+                name=r[1],
+                city=r[2],
+                created_at=r[3].isoformat(),
+                storefront_enabled=r[4],
+            )
+            for r in rows
+        ]
 
     async def _shops(self, session, now, d7, d30) -> ShopsOverview:
         row = (
