@@ -194,8 +194,39 @@
 }
 
 .empty {
-  padding: 40px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 160px;
+  padding: 28px 16px;
+  margin: 4px 0 8px;
+  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, var(--text) 12%, var(--border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg) 65%, var(--bg-muted)) 0%,
+      var(--bg-muted) 100%
+    );
   text-align: center;
   color: var(--text-muted);
   font-size: 14px;
+}
+
+.empty p {
+  margin: 0;
+}
+
+.emptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text-muted);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 6%, transparent);
 }

@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { IconChartBarOff } from '@tabler/icons-react'
 import styles from './BarChart.module.css'
 
 export interface BarChartPoint {
@@ -32,7 +33,12 @@ export function BarChart({ points, height = 200, formatValue, emptyMessage = 'Н
   if (!hasData) {
     return (
       <div className={styles.wrap}>
-        <p className={styles.empty}>{emptyMessage}</p>
+        <div className={styles.empty}>
+          <span className={styles.emptyIcon} aria-hidden="true">
+            <IconChartBarOff size={22} stroke={1.7} />
+          </span>
+          <p>{emptyMessage}</p>
+        </div>
       </div>
     )
   }

@@ -173,6 +173,89 @@
   flex-shrink: 0;
 }
 
+.emptyPanel {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 18px;
+  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, var(--text) 12%, var(--border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg) 65%, var(--bg-muted)) 0%,
+      var(--bg-muted) 100%
+    );
+  animation: emptyIn 0.28s ease-out;
+}
+
+.emptyPanelGood {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent-soft) 45%, var(--bg)) 0%,
+      var(--bg) 100%
+    );
+}
+
+.emptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  background: var(--bg);
+  color: var(--text-muted);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.emptyPanelGood .emptyIcon {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.emptyText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.emptyText strong {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.emptyText p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+@keyframes emptyIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .emptyPanel {
+    animation: none;
+  }
+}
+
 .detailItem {
   display: flex;
   flex-direction: column;

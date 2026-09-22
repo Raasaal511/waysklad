@@ -34,6 +34,8 @@ import {
   IconReceipt,
   IconCoinOff,
   IconShoppingBagX,
+  IconCircleCheck,
+  type Icon as TablerIcon,
 } from '@tabler/icons-react'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './AnalyticsPage.module.css'
@@ -42,6 +44,31 @@ const TOP_PRODUCTS_COLUMNS = '2fr 1fr 1fr 1fr 1fr'
 const CATEGORY_PROFIT_COLUMNS = '1.6fr 1fr 1fr 1fr 1fr'
 const DEAD_STOCK_COLUMNS = '2fr 1fr 1fr 1fr'
 const MISSED_SALES_COLUMNS = '2fr 1fr 1fr'
+
+/** Компактный пустой блок внутри секции аналитики — не голый серый текст. */
+function SectionEmpty({
+  icon: Icon,
+  title,
+  description,
+  tone = 'neutral',
+}: {
+  icon: TablerIcon
+  title: string
+  description?: string
+  tone?: 'neutral' | 'good'
+}) {
+  return (
+    <div className={`${styles.emptyPanel} ${tone === 'good' ? styles.emptyPanelGood : ''}`}>
+      <span className={styles.emptyIcon} aria-hidden="true">
+        <Icon size={22} stroke={1.7} />
+      </span>
+      <div className={styles.emptyText}>
+        <strong>{title}</strong>
+        {description && <p>{description}</p>}
+      </div>
+    </div>
+  )
+}
 
 type PeriodKey = 'month' | 'quarter' | 'year'
 
@@ -507,7 +534,11 @@ export function AnalyticsPage() {
           <h3>Топ товаров за период</h3>
         </div>
         {topProducts.length === 0 ? (
-          <p className={layoutStyles.textMuted}>Продаж за период пока нет</p>
+          <SectionEmpty
+            icon={IconTrophy}
+            title="Пока нет продаж за период"
+            description="Когда появятся продажи, здесь будет топ товаров по выручке."
+          />
         ) : (
           <div className={layoutStyles.dataTable}>
             <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: TOP_PRODUCTS_COLUMNS }}>
@@ -551,7 +582,11 @@ export function AnalyticsPage() {
           <h3>Прибыльность по категориям</h3>
         </div>
         {categoryProfit.length === 0 ? (
-          <p className={layoutStyles.textMuted}>Продаж за период пока нет</p>
+          <SectionEmpty
+            icon={IconChartPie}
+            title="Категорий пока не видно"
+            description="Маржа и доля появятся после первых продаж с категориями."
+          />
         ) : (
           <div className={layoutStyles.dataTable}>
             <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: CATEGORY_PROFIT_COLUMNS }}>
@@ -601,7 +636,12 @@ export function AnalyticsPage() {
           <h3>Мёртвый остаток (60+ дней)</h3>
         </div>
         {deadStock.length === 0 ? (
-          <p className={layoutStyles.textMuted}>Залежавшихся товаров нет</p>
+          <SectionEmpty
+            icon={IconCircleCheck}
+            tone="good"
+            title="Залежавшихся товаров нет"
+            description="Ничего не лежит без продаж дольше 60 дней — хороший знак."
+          />
         ) : (
           <div className={layoutStyles.dataTable}>
             <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: DEAD_STOCK_COLUMNS }}>
@@ -650,7 +690,12 @@ export function AnalyticsPage() {
           Заявки, где покупатель просил товар, а остатка не хватило
         </p>
         {missedSales.length === 0 ? (
-          <p className={layoutStyles.textMuted}>За период таких заявок нет</p>
+          <SectionEmpty
+            icon={IconCircleCheck}
+            tone="good"
+            title="Упущенных заявок нет"
+            description="За период покупатели не просили то, чего не было на остатке."
+          />
         ) : (
           <div className={layoutStyles.dataTable}>
             <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: MISSED_SALES_COLUMNS }}>
