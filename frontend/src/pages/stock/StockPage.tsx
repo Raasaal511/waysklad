@@ -47,15 +47,32 @@ export function StockPage() {
     <div className={layoutStyles.stack}>
       <div className={layoutStyles.sectionTitle}>
         <h2>Склады</h2>
-        <div className={layoutStyles.row} style={{ gap: 8 }}>
-          <Link to="/stock/history">
-            <IconButton variant="accent" tooltip="История движения" style={{ width: 40, height: 40 }}>
-              <IconHistory size={19} stroke={1.8} />
+        <div className={layoutStyles.pageTitleActions}>
+          <div className={layoutStyles.pageTitleActionsDesktop}>
+            <Link to="/stock/history">
+              <IconButton variant="accent" tooltip="История движения" style={{ width: 40, height: 40 }}>
+                <IconHistory size={19} stroke={1.8} />
+              </IconButton>
+            </Link>
+            <Button onClick={() => setShowWarehouseForm(true)}>
+              <IconPlus size={16} stroke={1.8} /> Склад
+            </Button>
+          </div>
+          <div className={layoutStyles.pageTitleActionsMobile}>
+            <Link to="/stock/history" aria-label="История движения">
+              <IconButton variant="muted" size="lg">
+                <IconHistory size={20} stroke={1.8} />
+              </IconButton>
+            </Link>
+            <IconButton
+              variant="accent"
+              size="lg"
+              aria-label="Добавить склад"
+              onClick={() => setShowWarehouseForm(true)}
+            >
+              <IconPlus size={20} stroke={2} />
             </IconButton>
-          </Link>
-          <Button onClick={() => setShowWarehouseForm(true)}>
-            <IconPlus size={16} stroke={1.8} /> Склад
-          </Button>
+          </div>
         </div>
       </div>
 

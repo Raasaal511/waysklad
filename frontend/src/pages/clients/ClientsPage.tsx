@@ -12,6 +12,7 @@ import { ApiError } from '../../shared/api/client'
 import { Modal } from '../../shared/ui/Modal'
 import { IconPlus, IconChevronRight, IconUser, IconTruck, IconPhone, IconMapPin } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
+import { IconButton } from '../../shared/ui/IconButton'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
@@ -68,9 +69,23 @@ export function ClientsPage() {
     <div className={layoutStyles.stack}>
       <div className={layoutStyles.sectionTitle}>
         <h2>Контрагенты</h2>
-        <Button onClick={() => setShowForm(true)}>
-          <IconPlus size={16} stroke={1.8} /> {tab === 'clients' ? 'Клиент' : 'Поставщик'}
-        </Button>
+        <div className={layoutStyles.pageTitleActions}>
+          <div className={layoutStyles.pageTitleActionsDesktop}>
+            <Button onClick={() => setShowForm(true)}>
+              <IconPlus size={16} stroke={1.8} /> {tab === 'clients' ? 'Клиент' : 'Поставщик'}
+            </Button>
+          </div>
+          <div className={layoutStyles.pageTitleActionsMobile}>
+            <IconButton
+              variant="accent"
+              size="lg"
+              aria-label={tab === 'clients' ? 'Добавить клиента' : 'Добавить поставщика'}
+              onClick={() => setShowForm(true)}
+            >
+              <IconPlus size={20} stroke={2} />
+            </IconButton>
+          </div>
+        </div>
       </div>
 
       <div className="sale-period-tabs">

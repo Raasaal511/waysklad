@@ -16,14 +16,17 @@ import {
   IconDownload,
   IconChevronDown,
   IconSearch,
+  IconDots,
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
+import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
 import { DropdownMenu } from '../../shared/ui/DropdownMenu'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
 import { InfoHint } from '../../shared/ui/InfoHint'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import {
   formatMoney,
   formatQuantity,
@@ -216,40 +219,76 @@ export function ProductsPage() {
     <div className={layoutStyles.stack}>
       <div className={layoutStyles.sectionTitle}>
         <h2>Товары</h2>
-        <div className={layoutStyles.row} style={{ gap: 8 }}>
-          <DropdownMenu
-            align="right"
-            trigger={
-              <Button variant="secondary">
-                <IconDownload size={16} stroke={1.8} /> Экспорт <IconChevronDown size={14} stroke={1.8} />
-              </Button>
-            }
-            items={(Object.keys(EXPORT_FORMAT_LABELS) as ExportFormat[]).map((format) => ({
-              key: format,
-              label: EXPORT_FORMAT_LABELS[format],
-              onSelect: () => handleExport(format),
-            }))}
-          />
-          {canManage && (
-            <>
-              <DropdownMenu
-                align="right"
-                trigger={
-                  <Button variant="secondary">
-                    <IconUpload size={16} stroke={1.8} /> Импорт <IconChevronDown size={14} stroke={1.8} />
-                  </Button>
-                }
-                items={(Object.keys(IMPORT_FORMAT_LABELS) as ('xlsx' | 'csv')[]).map((format) => ({
-                  key: format,
-                  label: IMPORT_FORMAT_LABELS[format],
-                  onSelect: () => setImportFormat(format),
-                }))}
-              />
-              <Button onClick={() => navigate('/products/new')}>
-                <IconPlus size={16} stroke={1.8} /> Товар
-              </Button>
-            </>
-          )}
+        <div className={layoutStyles.pageTitleActions}>
+          <div className={layoutStyles.pageTitleActionsDesktop}>
+            <DropdownMenu
+              align="right"
+              trigger={
+                <Button variant="secondary">
+                  <IconDownload size={16} stroke={1.8} /> Экспорт <IconChevronDown size={14} stroke={1.8} />
+                </Button>
+              }
+              items={(Object.keys(EXPORT_FORMAT_LABELS) as ExportFormat[]).map((format) => ({
+                key: format,
+                label: EXPORT_FORMAT_LABELS[format],
+                onSelect: () => handleExport(format),
+              }))}
+            />
+            {canManage && (
+              <>
+                <DropdownMenu
+                  align="right"
+                  trigger={
+                    <Button variant="secondary">
+                      <IconUpload size={16} stroke={1.8} /> Импорт <IconChevronDown size={14} stroke={1.8} />
+                    </Button>
+                  }
+                  items={(Object.keys(IMPORT_FORMAT_LABELS) as ('xlsx' | 'csv')[]).map((format) => ({
+                    key: format,
+                    label: IMPORT_FORMAT_LABELS[format],
+                    onSelect: () => setImportFormat(format),
+                  }))}
+                />
+                <Button onClick={() => navigate('/products/new')}>
+                  <IconPlus size={16} stroke={1.8} /> Товар
+                </Button>
+              </>
+            )}
+          </div>
+          <div className={layoutStyles.pageTitleActionsMobile}>
+            <DropdownMenu
+              align="right"
+              trigger={
+                <IconButton variant="muted" size="lg" aria-label="Ещё действия">
+                  <IconDots size={20} stroke={1.8} />
+                </IconButton>
+              }
+              items={[
+                ...(Object.keys(EXPORT_FORMAT_LABELS) as ExportFormat[]).map((format) => ({
+                  key: `export-${format}`,
+                  label: `Экспорт: ${EXPORT_FORMAT_LABELS[format]}`,
+                  onSelect: () => handleExport(format),
+                })),
+                ...(canManage
+                  ? (Object.keys(IMPORT_FORMAT_LABELS) as ('xlsx' | 'csv')[]).map((format) => ({
+                      key: `import-${format}`,
+                      label: `Импорт: ${IMPORT_FORMAT_LABELS[format]}`,
+                      onSelect: () => setImportFormat(format),
+                    }))
+                  : []),
+              ]}
+            />
+            {canManage && (
+              <IconButton
+                variant="accent"
+                size="lg"
+                aria-label="Добавить товар"
+                onClick={() => navigate('/products/new')}
+              >
+                <IconPlus size={20} stroke={2} />
+              </IconButton>
+            )}
+          </div>
         </div>
       </div>
       {exportError && <p className={layoutStyles.error}>{exportError}</p>}
@@ -318,7 +357,21 @@ export function ProductsPage() {
       {loading ? (
         <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : products.length === 0 ? (
-        <p className={layoutStyles.textMuted}>Товаров не найдено</p>
+        <EmptyState
+          illustration="empty-shelf"
+          title={
+            debouncedQuery || activeFilterCount > 0
+              ? 'Товаров не найдено'
+              : 'Добавьте первый товар'
+          }
+          description={
+            debouncedQuery || activeFilterCount > 0
+              ? 'Измените поиск или сбросьте фильтры — или добавьте новый товар.'
+              : 'Без товара нельзя оформить продажу и пройти тур.'
+          }
+          actionLabel={canManage ? 'Добавить товар' : undefined}
+          onAction={canManage ? () => navigate('/products/new') : undefined}
+        />
       ) : (
         <>
           <p className={layoutStyles.textMuted}>

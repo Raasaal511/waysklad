@@ -326,9 +326,23 @@ export function TasksPage() {
     <div className={layoutStyles.stack}>
       <div className={layoutStyles.sectionTitle}>
         <h2>Задачи</h2>
-        <Button onClick={() => setShowForm(true)}>
-          <IconPlus size={16} stroke={1.8} /> Задача
-        </Button>
+        <div className={layoutStyles.pageTitleActions}>
+          <div className={layoutStyles.pageTitleActionsDesktop}>
+            <Button onClick={() => setShowForm(true)}>
+              <IconPlus size={16} stroke={1.8} /> Задача
+            </Button>
+          </div>
+          <div className={layoutStyles.pageTitleActionsMobile}>
+            <IconButton
+              variant="accent"
+              size="lg"
+              aria-label="Добавить задачу"
+              onClick={() => setShowForm(true)}
+            >
+              <IconPlus size={20} stroke={2} />
+            </IconButton>
+          </div>
+        </div>
       </div>
 
       {showForm && (

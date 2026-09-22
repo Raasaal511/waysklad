@@ -23,6 +23,7 @@ import {
 } from '@tabler/icons-react'
 import { ApiError } from '../../shared/api/client'
 import { Button } from '../../shared/ui/Button'
+import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
 import { DateInput } from '../../shared/ui/DateInput'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
@@ -341,10 +342,24 @@ async function loadSalesPage(params: {
     <div className={layoutStyles.stack}>
       <div className={layoutStyles.sectionTitle}>
         <h2>Продажи</h2>
-        <Button onClick={() => navigate('/sales/new')}>
-          <IconPlus size={16} stroke={1.8} />
-          {hasDraft ? 'Продолжить продажу' : 'Новая продажа'}
-        </Button>
+        <div className={layoutStyles.pageTitleActions}>
+          <div className={layoutStyles.pageTitleActionsDesktop}>
+            <Button onClick={() => navigate('/sales/new')}>
+              <IconPlus size={16} stroke={1.8} />
+              {hasDraft ? 'Продолжить продажу' : 'Новая продажа'}
+            </Button>
+          </div>
+          <div className={layoutStyles.pageTitleActionsMobile}>
+            <IconButton
+              variant="accent"
+              size="lg"
+              aria-label={hasDraft ? 'Продолжить продажу' : 'Новая продажа'}
+              onClick={() => navigate('/sales/new')}
+            >
+              <IconPlus size={20} stroke={2} />
+            </IconButton>
+          </div>
+        </div>
       </div>
 
       <div ref={sentinelRef} style={{ height: 1, marginBottom: -1 }} />

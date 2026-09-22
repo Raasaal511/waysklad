@@ -10,7 +10,8 @@ import { DropdownMenu } from '../../shared/ui/DropdownMenu'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
 import { PillTabs } from '../../shared/ui/PillTabs'
 import { formatQuantity, formatMoney } from '../../shared/lib/format'
-import { IconChevronLeft, IconDownload, IconChevronDown } from '@tabler/icons-react'
+import { IconChevronLeft, IconDownload, IconChevronDown, IconDots } from '@tabler/icons-react'
+import { IconButton } from '../../shared/ui/IconButton'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './MovementHistoryPage.module.css'
 
@@ -187,19 +188,38 @@ export function MovementHistoryPage() {
 
       <div className={layoutStyles.sectionTitle}>
         <h2>История движения товара</h2>
-        <DropdownMenu
-          align="right"
-          trigger={
-            <Button variant="secondary">
-              <IconDownload size={16} stroke={1.8} /> Экспорт <IconChevronDown size={14} stroke={1.8} />
-            </Button>
-          }
-          items={(Object.keys(EXPORT_FORMAT_LABELS) as ExportFormat[]).map((format) => ({
-            key: format,
-            label: EXPORT_FORMAT_LABELS[format],
-            onSelect: () => handleExport(format),
-          }))}
-        />
+        <div className={layoutStyles.pageTitleActions}>
+          <div className={layoutStyles.pageTitleActionsDesktop}>
+            <DropdownMenu
+              align="right"
+              trigger={
+                <Button variant="secondary">
+                  <IconDownload size={16} stroke={1.8} /> Экспорт <IconChevronDown size={14} stroke={1.8} />
+                </Button>
+              }
+              items={(Object.keys(EXPORT_FORMAT_LABELS) as ExportFormat[]).map((format) => ({
+                key: format,
+                label: EXPORT_FORMAT_LABELS[format],
+                onSelect: () => handleExport(format),
+              }))}
+            />
+          </div>
+          <div className={layoutStyles.pageTitleActionsMobile}>
+            <DropdownMenu
+              align="right"
+              trigger={
+                <IconButton variant="muted" size="lg" aria-label="Экспорт">
+                  <IconDots size={20} stroke={1.8} />
+                </IconButton>
+              }
+              items={(Object.keys(EXPORT_FORMAT_LABELS) as ExportFormat[]).map((format) => ({
+                key: format,
+                label: `Экспорт: ${EXPORT_FORMAT_LABELS[format]}`,
+                onSelect: () => handleExport(format),
+              }))}
+            />
+          </div>
+        </div>
       </div>
       {exportError && <p className={layoutStyles.error}>{exportError}</p>}
 
