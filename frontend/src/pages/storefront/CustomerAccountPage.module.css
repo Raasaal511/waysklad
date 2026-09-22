@@ -1,0 +1,308 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 720px;
+}
+
+.title {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+@media (max-width: 767px) {
+  .title {
+    font-size: 24px;
+  }
+}
+
+.card,
+.section {
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--bg);
+}
+
+@media (max-width: 767px) {
+  .card,
+  .section {
+    padding: 16px;
+  }
+}
+
+:global([data-theme='dark']) .card,
+:global([data-theme='dark']) .section {
+  border: 1px solid var(--border);
+}
+
+.avatarRow {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 22px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.phone {
+  margin: 4px 0 0;
+  font-size: 15px;
+}
+
+.muted {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.verified {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.unverified {
+  margin: 0;
+  font-size: 14px;
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.verifyRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.stats {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.editForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.editForm input {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-muted);
+  color: var(--text);
+  font: inherit;
+}
+
+.editActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.warning {
+  margin: 0;
+  font-size: 13px;
+  color: var(--warning);
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sectionHead h2,
+.section > h2 {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.sectionHead h2 {
+  margin-bottom: 0;
+}
+
+.textLink {
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.orderList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.orderCard {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--bg-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.orderMain {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.orderShop {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.orderLogo,
+.orderLogoFallback {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.orderLogoFallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.orderStatus {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.orderStatus[data-status='new'] {
+  color: var(--board-new, var(--accent));
+}
+
+.orderStatus[data-status='accepted'] {
+  color: var(--accent);
+}
+
+.orderMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.orderLines {
+  margin: 0;
+  padding: 0 0 0 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.orderActions {
+  display: flex;
+  gap: 12px;
+}
+
+.others {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.othersToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.securityActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.dangerLink {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--danger);
+  cursor: pointer;
+  text-decoration: underline;
+}

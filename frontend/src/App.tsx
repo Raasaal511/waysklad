@@ -11,7 +11,7 @@ import { RequireFeature } from './app/RequireFeature'
 import { AppLayout } from './app/AppLayout'
 import { LoginPage } from './pages/auth/LoginPage'
 import { StorefrontRequestPage } from './pages/storefront/StorefrontRequestPage'
-import { StorefrontMyOrdersPage } from './pages/storefront/StorefrontMyOrdersPage'
+import { CustomerAccountPage } from './pages/storefront/CustomerAccountPage'
 import { StorefrontCatalogPage } from './pages/storefront/StorefrontCatalogPage'
 import { StorefrontProductPage } from './pages/storefront/StorefrontProductPage'
 import { StorefrontCartPage } from './pages/storefront/StorefrontCartPage'
@@ -145,7 +145,7 @@ export function App() {
                 path="/store/:slug/account"
                 element={
                   <PublicLayout>
-                    <StorefrontMyOrdersPage />
+                    <CustomerAccountPage />
                   </PublicLayout>
                 }
               />
@@ -153,7 +153,7 @@ export function App() {
                 path="/store/:slug/account/orders"
                 element={
                   <PublicLayout>
-                    <StorefrontMyOrdersPage />
+                    <CustomerAccountPage />
                   </PublicLayout>
                 }
               />
