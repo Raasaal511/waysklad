@@ -500,7 +500,10 @@ get_storefront_request = _with_uow(GetStorefrontRequestUseCase)
 get_accept_storefront_request = _with_uow_and_cache(AcceptStorefrontRequestUseCase)
 get_reject_storefront_request = _with_uow(RejectStorefrontRequestUseCase)
 get_list_staff_storefront_messages = _with_uow(ListStaffStorefrontMessagesUseCase)
-get_send_staff_storefront_message = _with_uow(SendStaffStorefrontMessageUseCase)
+def get_send_staff_storefront_message(
+    uow: UowDep, notifier: NotifierDep
+) -> SendStaffStorefrontMessageUseCase:
+    return SendStaffStorefrontMessageUseCase(uow, notifier)
 
 
 def get_list_storefront_messages(factory: SessionFactoryDep) -> ListStorefrontMessagesUseCase:

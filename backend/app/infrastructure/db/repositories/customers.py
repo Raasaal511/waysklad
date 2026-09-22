@@ -59,6 +59,17 @@ class SqlAlchemyCustomerRepository(SqlAlchemyRepository, ICustomerRepository):
         ).scalar_one_or_none()
         return CustomerMapper.to_entity(model) if model else None
 
+    async def get_by_telegram_chat_id(self, chat_id: str) -> Customer | None:
+        chat_id = chat_id.strip()
+        if not chat_id:
+            return None
+        model = (
+            await self._session.execute(
+                select(CustomerModel).where(CustomerModel.telegram_chat_id == chat_id)
+            )
+        ).scalar_one_or_none()
+        return CustomerMapper.to_entity(model) if model else None
+
     async def get_token_version(self, customer_id: int) -> int | None:
         return (
             await self._session.execute(

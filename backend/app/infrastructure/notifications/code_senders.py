@@ -28,8 +28,10 @@ class TelegramCodeSender:
     async def send(self, chat_id: str, phone: str, code: str) -> None:
         text = (
             f"Код подтверждения номера {phone}: <b>{code}</b>\n\n"
+            "Можно ввести код на сайте или отправить боту:\n"
+            f"<code>/confirm {code}</code>\n\n"
             "Код действует 5 минут. Если вы его не запрашивали — просто "
-            "не вводите его и никому не пересылайте."
+            "проигнорируйте сообщение."
         )
         # TelegramNotifier синхронный (requests) — уводим в поток, чтобы не
         # блокировать событийный цикл на время HTTP-запроса к Telegram

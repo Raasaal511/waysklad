@@ -26,10 +26,15 @@ async def _confirm_login(token: str, chat_id: int, message: Message, session_fac
             ConfirmCustomerLoginLinkCommand(token=token, telegram_chat_id=str(chat_id))
         )
     except DomainError as exc:
-        await message.answer(f"Не удалось войти: {exc}. Вернитесь на сайт и запросите вход заново.")
+        await message.answer(
+            f"Не удалось подтвердить номер: {exc}. Вернитесь на сайт и запросите ссылку заново."
+        )
         return
-    await message.answer("Готово — возвращайтесь на сайт, вход подтверждён.")
-
+    await message.answer(
+        "Номер подтверждён. Вернитесь на сайт — можно продолжить.\n\n"
+        "Если запрашивали код в профиле: дождитесь сообщения с кодом или "
+        "отправьте его командой /confirm 123456."
+    )
 
 @router.message(CommandStart())
 async def start(message: Message, command: CommandObject, state: FSMContext, session_factory) -> None:

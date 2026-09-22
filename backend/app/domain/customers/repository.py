@@ -11,6 +11,9 @@ class ICustomerRepository(Protocol):
     async def get_by_username(self, username: str) -> Customer | None:
         """Сравнение без учёта регистра — «Vasya» и «vasya» это один логин."""
         ...
+    async def get_by_telegram_chat_id(self, chat_id: str) -> Customer | None:
+        """Покупатель, уже открывший бота витрины (для /confirm кода)."""
+        ...
     async def get_token_version(self, customer_id: int) -> int | None:
         """Только token_version, без полной загрузки — для проверки JWT на
         каждый запрос. None — покупатель не найден."""
