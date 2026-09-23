@@ -5,6 +5,40 @@
 
 ---
 
+## 2026-09-23 — Обратная связь из кабинета + вкладка в админке (не breaking)
+
+Задача `docs/TASK_FEEDBACK.md`. Только новые эндпоинты, существующие не менялись.
+
+**`POST /api/feedback`** — любой вошедший сотрудник (любая роль), `multipart/form-data`:
+
+| Поле | Тип | |
+|---|---|---|
+| `topic` | `question` \| `bug` \| `suggestion` | обязательно |
+| `text` | string, до 2000 символов | текст **или** фото — хоть что-то |
+| `photos` | до 3 файлов jpg/png/webp, до 5 МБ каждый | поле повторяется |
+| `page` | string | путь экрана, откуда пишут (`location.pathname`) |
+| `app_version` | string | версия сборки, если есть |
+
+`User-Agent` сервер берёт из заголовка сам. Ответ `201`:
+`{ id, topic, text, photos: string[], created_at }`. Ошибки — `400` с `detail`
+по-русски: пустое обращение, > 3 фото, не картинка, неизвестная тема, больше
+10 обращений за час от одного человека. Лимит по IP — 20/час (`429`).
+
+**`GET /api/admin/feedback`** (токен админа) — `?topic=question|bug|suggestion`,
+`?status=new|resolved|all` (по умолчанию `new`), `limit` (≤ 200), `offset`.
+Ответ: `{ items: FeedbackItem[], total, new_count }`, где `new_count` —
+неразобранные всего, без учёта фильтра. `FeedbackItem`: `id, topic, text,
+photos, page, user_agent, app_version, created_at, resolved_at | null,
+tenant_id, shop_name, author_name, author_phone, author_role`.
+
+**`POST /api/admin/feedback/{id}/resolve?resolved=true|false`** — «Разобрано» /
+вернуть в новые. `404`, если обращения нет.
+
+Каждое новое обращение дублируется в Telegram-чат `ADMIN_ALERT_CHAT_ID` (как
+алерты об ошибках сервера), если чат задан.
+
+---
+
 ## 2026-09-22 — Админ-панель платформы v2: обзор, магазины, сервер, ошибки
 
 Часть A задачи `docs/TASK_ADMIN_PANEL_V2.md`. Полное описание с TS-типами —

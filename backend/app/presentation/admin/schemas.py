@@ -1,5 +1,5 @@
 from dataclasses import asdict
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
@@ -555,3 +555,28 @@ class ErrorEntryResponse(BaseModel):
     tenant_id: int | None
     stack: str
     resolved_at: str | None
+
+
+class FeedbackItemResponse(BaseModel):
+    """Обращение из кабинета: кто, откуда и что — чтобы не переспрашивать."""
+
+    id: int
+    topic: str
+    text: str
+    photos: list[str]
+    page: str
+    user_agent: str
+    app_version: str
+    created_at: datetime
+    resolved_at: datetime | None
+    tenant_id: int
+    shop_name: str
+    author_name: str
+    author_phone: str
+    author_role: str
+
+
+class FeedbackListResponse(BaseModel):
+    items: list[FeedbackItemResponse]
+    total: int
+    new_count: int

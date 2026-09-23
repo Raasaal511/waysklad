@@ -170,6 +170,7 @@ from app.application.tasks.get_task_history import GetTaskHistoryUseCase
 from app.application.tasks.list_tasks import ListActiveTasksUseCase, ListCompletedTasksUseCase
 from app.application.tasks.update_task import UpdateTaskUseCase
 from app.application.tasks.create_task import CreateTaskUseCase
+from app.application.feedback.submit_feedback import SubmitFeedbackUseCase
 from app.presentation.deps.cache import CacheDep
 from app.presentation.deps.notifier import NotifierDep
 from app.presentation.deps.security import FileStorageDep, HasherDep
@@ -339,6 +340,10 @@ get_update_warehouse_details = _with_uow_and_cache(UpdateWarehouseDetailsUseCase
 
 def get_set_warehouse_photo(uow: UowDep, storage: FileStorageDep) -> SetWarehousePhotoUseCase:
     return SetWarehousePhotoUseCase(uow, storage)
+
+
+def get_submit_feedback(uow: UowDep, storage: FileStorageDep) -> SubmitFeedbackUseCase:
+    return SubmitFeedbackUseCase(uow, storage)
 
 get_list_warehouses = _with_uow(ListWarehousesUseCase)
 get_list_stock = _with_uow(ListStockUseCase)
@@ -631,6 +636,7 @@ UpdateWarehouseDetailsDep = Annotated[
     UpdateWarehouseDetailsUseCase, Depends(get_update_warehouse_details)
 ]
 SetWarehousePhotoDep = Annotated[SetWarehousePhotoUseCase, Depends(get_set_warehouse_photo)]
+SubmitFeedbackDep = Annotated[SubmitFeedbackUseCase, Depends(get_submit_feedback)]
 ListWarehousesDep = Annotated[ListWarehousesUseCase, Depends(get_list_warehouses)]
 ListStockDep = Annotated[ListStockUseCase, Depends(get_list_stock)]
 ListDocumentsDep = Annotated[ListDocumentsUseCase, Depends(get_list_documents)]

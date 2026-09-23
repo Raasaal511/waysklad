@@ -1,4 +1,5 @@
 import dataclasses
+from typing import Literal
 from dataclasses import asdict
 from decimal import Decimal
 
@@ -14,6 +15,7 @@ from app.application.admin.get_overview import (
     CACHE_TTL_SECONDS as OVERVIEW_CACHE_TTL_SECONDS,
 )
 from app.application.admin.get_overview import PlatformOverview, get_platform_overview
+from app.application.admin.feedback import list_feedback, set_feedback_resolved
 from app.application.admin.get_server_status import (
     ApiInfo,
     AppInfo,
@@ -82,6 +84,8 @@ from app.presentation.admin.schemas import (
     BannerRequest,
     BannerResponse,
     ErrorLogResponse,
+    FeedbackItemResponse,
+    FeedbackListResponse,
     PlatformCategoryCreateRequest,
     PlatformCategoryResponse,
     PlatformCategoryUpdateRequest,
@@ -226,6 +230,40 @@ async def admin_resolve_error_group(
     if affected == 0:
         raise HTTPException(status_code=404, detail="Группа ошибок не найдена")
     return {"signature": signature, "resolved": resolved, "affected": affected}
+
+
+@router.get("/feedback")
+async def admin_list_feedback(
+    factory: SessionFactoryDep,
+    topic: Literal["question", "bug", "suggestion"] | None = None,
+    status: Literal["new", "resolved", "all"] = "new",
+    limit: int = 50,
+    offset: int = 0,
+) -> FeedbackListResponse:
+    """Обращения из кабинетов магазинов, новые сверху."""
+    result = await list_feedback(
+        factory,
+        topic=topic,
+        status=status,
+        limit=min(max(limit, 1), 200),
+        offset=max(offset, 0),
+    )
+    return FeedbackListResponse(
+        items=[FeedbackItemResponse(**asdict(item)) for item in result.items],
+        total=result.total,
+        new_count=result.new_count,
+    )
+
+
+@router.post("/feedback/{feedback_id}/resolve")
+async def admin_resolve_feedback(
+    feedback_id: int, factory: SessionFactoryDep, resolved: bool = True
+) -> dict:
+    """«Разобрано» уводит обращение из новых; resolved=false возвращает обратно.
+    Обращения не удаляются."""
+    if not await set_feedback_resolved(factory, feedback_id, resolved):
+        raise HTTPException(status_code=404, detail="Обращение не найдено")
+    return {"id": feedback_id, "resolved": resolved}
 
 
 @router.get("/error-logs/{entry_id}")
