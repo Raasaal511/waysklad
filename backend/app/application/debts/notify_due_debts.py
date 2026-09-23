@@ -18,7 +18,7 @@ from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 def _debt_text(debt: Debt, who: str) -> str:
     action = "просрочен" if debt.status() is DebtStatus.OVERDUE else "истекает"
     due = debt.due_date.strftime("%d.%m") if debt.due_date else "—"
-    return f"Долг {who} на {debt.balance} ₽ — срок {due} ({action})"
+    return f"Долг {who} на {debt.balance} — срок {due} ({action})"
 
 
 async def _notify_tenant(uow: SqlAlchemyUnitOfWork, notifier: INotifier) -> None:

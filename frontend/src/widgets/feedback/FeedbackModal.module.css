@@ -1,0 +1,242 @@
+/* Обратная связь из кабинета — FeedbackModal.tsx */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.topics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.topic {
+  flex-direction: column;
+  gap: 6px;
+  min-height: 72px;
+  padding: 10px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.topic span {
+  max-width: 100%;
+  text-align: center;
+  /* «Рекомендация» на узком экране: перенос по слогам с дефисом, а не обрыв посреди слова */
+  hyphens: auto;
+  overflow-wrap: normal;
+}
+
+@media (max-width: 420px) {
+  .topic {
+    padding-inline: 2px;
+    font-size: 13px;
+  }
+}
+
+.topic:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.topic:active {
+  transform: scale(0.97);
+}
+
+.topicActive,
+.topicActive:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 104px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  /* 16px — иначе iOS зумит страницу при фокусе */
+  font-size: 16px;
+  line-height: 1.45;
+  transition: border-color 0.15s ease;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.counter {
+  align-self: flex-end;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.photo,
+.photoAdd {
+  width: 76px;
+  height: 76px;
+  border-radius: var(--radius-sm);
+}
+
+.photo {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-muted);
+  animation: feedback-pop 0.18s ease;
+}
+
+.photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photoRemove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  transition: background-color 0.15s ease;
+}
+
+/* видимый кружок маленький, а попасть пальцем — по 44px */
+.photoRemove::before {
+  content: '';
+  position: absolute;
+  inset: -9px;
+}
+
+.photoRemove:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.photoAdd {
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: 1px dashed var(--border);
+  background: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.photoAdd:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 14px;
+  animation: feedback-pop 0.18s ease;
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+}
+
+.submit {
+  width: 100%;
+  min-height: 48px;
+  font-size: 16px;
+}
+
+.hint {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.thanks {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 4px;
+  text-align: center;
+  font-size: 16px;
+  animation: feedback-pop 0.22s ease;
+}
+
+.thanksIcon {
+  color: var(--accent);
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+@keyframes feedback-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo,
+  .error,
+  .thanks {
+    animation: none;
+  }
+
+  .topic:active {
+    transform: none;
+  }
+}

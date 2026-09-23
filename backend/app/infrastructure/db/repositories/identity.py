@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import delete, select
+from datetime import datetime
+
+from sqlalchemy import delete, select, update
 
 from app.domain.common.exceptions import NotFoundError
 from app.domain.common.quantity import UNITS
@@ -9,6 +11,7 @@ from app.domain.identity.repository import (
     ITenantRepository,
     IUserRepository,
     IWarehouseRepository,
+    UserSession,
 )
 from app.infrastructure.db.mappers.identity import TenantMapper, UserMapper, WarehouseMapper
 from app.infrastructure.db.models.catalog import UnitModel
@@ -61,6 +64,20 @@ class SqlAlchemyTenantRepository(SqlAlchemyRepository, ITenantRepository):
         model.summary_weekly_enabled = tenant.summary_weekly_enabled
         model.summary_monthly_enabled = tenant.summary_monthly_enabled
         model.summary_daily_hour_msk = tenant.summary_daily_hour_msk
+        model.city = tenant.city
+        model.logo = tenant.logo
+        model.storefront_show_stock_qty = tenant.storefront_show_stock_qty
+        model.storefront_description = tenant.storefront_description
+        model.contact_phone = tenant.contact_phone
+        model.contact_whatsapp = tenant.contact_whatsapp
+        model.contact_telegram = tenant.contact_telegram
+        model.storefront_min_order_total = tenant.storefront_min_order_total
+        model.policy_refund_money = tenant.policy_refund_money
+        model.policy_payment = tenant.policy_payment
+        model.policy_delivery = tenant.policy_delivery
+        model.policy_returns = tenant.policy_returns
+        # is_verified намеренно не трогаем здесь — меняется только через
+        # set_tenant_verified (админ), владелец через save() повлиять не может
         await self._session.flush()
         return tenant
 
@@ -84,6 +101,19 @@ class SqlAlchemyTenantRepository(SqlAlchemyRepository, ITenantRepository):
 
 
 class SqlAlchemyUserRepository(SqlAlchemyRepository, IUserRepository):
+    async def touch_last_login(self, user_id: int, at: datetime) -> None:
+        # точечный UPDATE: вход не должен перезаписывать остальные поля
+        await self._session.execute(
+            update(UserModel)
+            .where(UserModel.id == user_id)
+            .values(last_login_at=at, last_seen_at=at)
+        )
+
+    async def touch_last_seen(self, user_id: int, at: datetime) -> None:
+        await self._session.execute(
+            update(UserModel).where(UserModel.id == user_id).values(last_seen_at=at)
+        )
+
     async def add(self, user: User) -> User:
         model = UserMapper.to_orm(user, self._tenant)
         self._session.add(model)
@@ -111,17 +141,17 @@ class SqlAlchemyUserRepository(SqlAlchemyRepository, IUserRepository):
         ).scalar_one_or_none()
         return UserMapper.to_entity(model) if model else None
 
-    async def get_token_version(self, user_id: int) -> int | None:
+    async def get_session(self, user_id: int) -> UserSession | None:
         row = (
             await self._session.execute(
-                select(UserModel.token_version).where(
+                select(UserModel.token_version, UserModel.last_seen_at).where(
                     UserModel.id == user_id,
                     UserModel.tenant_id == self._tenant,
                     UserModel.is_active.is_(True),
                 )
             )
-        ).scalar_one_or_none()
-        return row
+        ).one_or_none()
+        return UserSession(token_version=row[0], last_seen_at=row[1]) if row else None
 
     async def list_by_tenant(self) -> list[User]:
         models = (

@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.domain.common.exceptions import NotFoundError
 from app.domain.storefront.entities import (
@@ -9,6 +10,7 @@ from app.domain.storefront.entities import (
     StorefrontRequestStatus,
 )
 from app.domain.storefront.repository import (
+    IProductViewRepository,
     IStorefrontMessageRepository,
     IStorefrontRequestRepository,
 )
@@ -16,7 +18,11 @@ from app.infrastructure.db.mappers.storefront import (
     StorefrontMessageMapper,
     StorefrontRequestMapper,
 )
-from app.infrastructure.db.models.storefront import StorefrontMessageModel, StorefrontRequestModel
+from app.infrastructure.db.models.storefront import (
+    ProductViewDailyModel,
+    StorefrontMessageModel,
+    StorefrontRequestModel,
+)
 from app.infrastructure.db.repositories.base import SqlAlchemyRepository
 
 
@@ -44,6 +50,21 @@ class SqlAlchemyStorefrontRequestRepository(SqlAlchemyRepository, IStorefrontReq
         if model is None:
             raise NotFoundError(f"Заявка {request_id} не найдена")
         return StorefrontRequestMapper.to_entity(model)
+
+    async def get_by_id_any_tenant(self, request_id: int) -> StorefrontRequest | None:
+        # без tenant-фильтра, как и get_by_token: покупатель — сущность
+        # платформы и не знает tenant своей заявки. Право доступа проверяется
+        # по customer_id выше (см. customers/my_chats.py), не здесь.
+        model = (
+            await self._session.execute(
+                select(StorefrontRequestModel).where(StorefrontRequestModel.id == request_id)
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            return None
+        entity = StorefrontRequestMapper.to_entity(model)
+        entity.tenant_id = model.tenant_id
+        return entity
 
     async def get_by_token(self, access_token: str) -> StorefrontRequest | None:
         # без tenant-фильтра: вызывается анонимным покупателем ДО того, как
@@ -119,6 +140,18 @@ class SqlAlchemyStorefrontRequestRepository(SqlAlchemyRepository, IStorefrontReq
             )
         ).scalar_one()
 
+    async def count_accepted(self) -> int:
+        return (
+            await self._session.execute(
+                select(func.count())
+                .select_from(StorefrontRequestModel)
+                .where(
+                    StorefrontRequestModel.tenant_id == self._tenant,
+                    StorefrontRequestModel.status == StorefrontRequestStatus.ACCEPTED,
+                )
+            )
+        ).scalar_one()
+
     async def _get_model(self, request_id: int) -> StorefrontRequestModel | None:
         return (
             await self._session.execute(
@@ -151,3 +184,27 @@ class SqlAlchemyStorefrontMessageRepository(SqlAlchemyRepository, IStorefrontMes
             )
         ).scalars().all()
         return [StorefrontMessageMapper.to_entity(m) for m in models]
+
+
+class SqlAlchemyProductViewRepository(SqlAlchemyRepository, IProductViewRepository):
+    async def record_view(self, product_id: int, day: date) -> None:
+        stmt = pg_insert(ProductViewDailyModel).values(
+            tenant_id=self._tenant, product_id=product_id, day=day, count=1
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["tenant_id", "product_id", "day"],
+            set_={"count": ProductViewDailyModel.count + 1},
+        )
+        await self._session.execute(stmt)
+
+    async def views_since(self, product_id: int, since: date) -> int:
+        total = (
+            await self._session.execute(
+                select(func.coalesce(func.sum(ProductViewDailyModel.count), 0)).where(
+                    ProductViewDailyModel.tenant_id == self._tenant,
+                    ProductViewDailyModel.product_id == product_id,
+                    ProductViewDailyModel.day >= since,
+                )
+            )
+        ).scalar_one()
+        return int(total)

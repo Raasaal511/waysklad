@@ -6,6 +6,7 @@ from app.domain.common.exceptions import (
     AccessDeniedError,
     DomainError,
     NotFoundError,
+    TooManyAttemptsError,
 )
 from app.infrastructure.observability.admin_alerts import report_unhandled_error
 
@@ -18,6 +19,17 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AccessDeniedError)
     async def access_denied(request: Request, exc: AccessDeniedError) -> JSONResponse:
         return JSONResponse(status_code=403, content={"detail": str(exc)})
+
+    @app.exception_handler(TooManyAttemptsError)
+    async def too_many_attempts(request: Request, exc: TooManyAttemptsError) -> JSONResponse:
+        # Retry-After — стандартный заголовок; retry_after в теле, чтобы фронту
+        # не разбирать заголовки ради таймера «отправить повторно через N с»
+        headers = {"Retry-After": str(exc.retry_after)} if exc.retry_after else {}
+        return JSONResponse(
+            status_code=429,
+            content={"detail": str(exc), "retry_after": exc.retry_after},
+            headers=headers,
+        )
 
     @app.exception_handler(DomainError)
     async def domain_error(request: Request, exc: DomainError) -> JSONResponse:

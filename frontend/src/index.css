@@ -1,6 +1,8 @@
 :root {
   --text: #1a1d21;
-  --text-muted: #6b7280;
+  /* #6b7280 давал 4.35:1 на --bg-muted — ниже порога 4.5:1 WCAG AA
+     (Lighthouse color-contrast), затемнено до прохождения на всех фонах */
+  --text-muted: #5f6673;
   --bg: #ffffff;
   --bg-muted: #f1f3f5;
   --border: #e2e5e9;
@@ -11,7 +13,8 @@
   --ink-hover: #0c1913;
   --danger: #c0392b;
   --danger-bg: #fdecea;
-  --warning: #a3690a;
+  /* #a3690a давал 4.06:1 на --warning-bg — ниже порога 4.5:1, затемнено */
+  --warning: #966008;
   --warning-bg: #fbf0dc;
   /* Цвета статусов канбан-досок (Заказы/Задачи) — не зависят от выбранного --accent,
      чтобы колонки читались одинаково при любой персонализации */
@@ -98,20 +101,33 @@
   /* Слабее --accent-soft (фон вторичных кнопок) и полупрозрачная акцентная граница */
   --accent-soft-weak: color-mix(in srgb, var(--accent-soft) 55%, var(--bg));
   --accent-border: color-mix(in srgb, var(--accent) 35%, transparent);
+  /* высота нижней навигации публичных страниц (только <768px) —
+     под неё резервируют место сам каркас и всплывающие элементы (тосты) */
+  --public-bottom-nav-height: 56px;
 }
 
 * {
   box-sizing: border-box;
 }
 
-html {
+/* clip, а не hidden: hidden у body делает его отдельным scroll-контейнером, и все
+   position: sticky (шапки, панель продажи, фильтры) перестают прилипать.
+   hidden оставлен запасным вариантом для браузеров без clip (Safari < 16). */
+html,
+body {
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
   margin: 0;
   background: var(--bg-muted);
-  overflow-x: hidden;
+}
+
+/* Выделение текста — фирменный акцент вместо дефолтного синего браузера (P6, «мелочи»). */
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
 }
 
 #root {
@@ -181,8 +197,33 @@ select {
 
 input:not([type='checkbox']):not([type='radio']):focus,
 select:focus {
+  outline: none;
+}
+
+input:not([type='checkbox']):not([type='radio']):focus-visible,
+select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* iOS зумит страницу, если font-size инпута < 16px */
+@media (max-width: 899px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+a:focus,
+button:focus {
+  outline: none;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 input[type='checkbox'],
@@ -216,6 +257,35 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* Телефон: зона касания ≥ 44px и шрифт инпутов ≥ 16px (иначе iOS зумит).
+   min-height и у disabled: основной CTA формы часто disabled, пока поля пустые. */
+@media (max-width: 899px) {
+  button,
+  a.btn,
+  [role='button'] {
+    min-height: 44px;
+  }
+
+  /* Исключения: компактные степперы/крестики внутри карточек.
+     IconButton намеренно ≥44px — не исключаем. */
+  button.product-tile-remove,
+  button.cart-qty-step,
+  [class*='nav-sell-btn'],
+  [class*='password-toggle'],
+  [class*='clear'],
+  [class*='iconOnly'] {
+    min-height: 0;
+  }
+
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px;
+    min-height: 44px;
+    box-sizing: border-box;
+  }
+}
+
 /* Button variants — перенесены в src/shared/ui/Button.module.css */
 
 /* Text helpers */
@@ -223,6 +293,20 @@ button:disabled {
 .text-muted {
   color: var(--text-muted);
   font-size: 14px;
+}
+
+/* Скрыто визуально, доступно скринридеру — для заголовков секций, которые
+   нужны только для правильного порядка <h1>…<h6> (Lighthouse heading-order). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .field-label {
@@ -382,7 +466,8 @@ tbody tr:not(:last-child) {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .data-table-head,
@@ -1238,6 +1323,12 @@ input.sale-search-input:not([type='checkbox']):not([type='radio']) {
   border: 1px solid color-mix(in srgb, var(--text) 16%, var(--border));
   border-radius: var(--radius);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+@media (max-width: 899px) {
+  input.sale-search-input:not([type='checkbox']):not([type='radio']) {
+    font-size: 16px;
+  }
 }
 
 .sale-search-input:hover {

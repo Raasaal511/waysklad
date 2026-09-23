@@ -28,8 +28,8 @@ def test_receipt_text_includes_shop_items_and_total():
     text = render_receipt_text("Магазин Беркат", _sale(), {100: "Духи масляные 6мл"})
     assert "Магазин Беркат" in text
     assert "Чек №1" in text
-    assert "Духи масляные 6мл — 2 x 250.00 = 500.00" in text
-    assert "Итого: 500.00 ₽" in text
+    assert "Духи масляные 6мл — 2 x 250 ₽ = 500 ₽" in text
+    assert "Итого: 500 ₽" in text
     assert "наличные" in text
 
 
@@ -37,14 +37,25 @@ def test_receipt_text_includes_client_name_and_discount():
     sale = _sale(discount=Money.of("50"))
     text = render_receipt_text("Магазин Беркат", sale, {100: "Товар"}, client_name="Ахмед")
     assert "Клиент: Ахмед" in text
-    assert "Скидка: 50.00" in text
-    assert "Итого: 450.00 ₽" in text
+    assert "Скидка: 50 ₽" in text
+    assert "Итого: 450 ₽" in text
 
 
 def test_receipt_text_labels_credit_payment():
     sale = _sale(payment_method=PaymentMethod.CREDIT, client_id=5)
     text = render_receipt_text("Магазин Беркат", sale, {100: "Товар"})
     assert "в долг" in text
+
+
+def test_receipt_text_shows_paid_now_breakdown():
+    sale = _sale(
+        payment_method=PaymentMethod.CREDIT,
+        client_id=5,
+        paid_now=Money.of("300"),
+    )
+    text = render_receipt_text("Магазин Беркат", sale, {100: "Товар"})
+    assert "Оплачено сразу: 300 ₽" in text
+    assert "В долг: 200 ₽" in text
 
 
 def test_whatsapp_link_strips_plus_and_encodes_text():

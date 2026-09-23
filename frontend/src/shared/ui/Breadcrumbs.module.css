@@ -1,0 +1,64 @@
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+  min-width: 0;
+}
+
+.breadcrumbs::-webkit-scrollbar {
+  display: none;
+}
+
+.breadcrumbItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* flex-shrink: 0 — крошка не должна сжиматься уже своего содержимого: контейнер
+     .breadcrumbs скроллится по горизонтали (overflow-x: auto), а не сминает ссылки.
+     min-width: 0 здесь (без flex-shrink: 0) давал ссылке схлопнуться уже своего
+     min-content и наезжать на соседнюю крошку — баг, видно на мобильном (P6). */
+  flex-shrink: 0;
+}
+
+/* Последняя крошка — не ссылка, единственная, которой разрешено сжиматься и обрезаться. */
+.breadcrumbItem:last-child {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 320px;
+}
+
+.breadcrumbLink {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.breadcrumbLink:hover,
+.breadcrumbLink:focus-visible {
+  color: var(--accent);
+}
+
+.breadcrumbLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.breadcrumbCurrent {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.breadcrumbSep {
+  opacity: 0.6;
+}

@@ -6,6 +6,7 @@ from app.application.storefront.reservation import reserve_request_stock
 from app.application.tasks.notify import notify_user
 from app.domain.catalog.entities import Product
 from app.domain.common.exceptions import DomainError
+from app.domain.common.money import format_rub
 from app.domain.identity.entities import Role
 from app.domain.notifications.entities import NotificationKind
 from app.domain.storefront.entities import StorefrontRequest, StorefrontRequestLine
@@ -14,6 +15,19 @@ from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 # защита от заспамливания списка заявок владельца — не более этого числа
 # ещё не обработанных заявок одновременно с одного телефона на один магазин
 _MAX_PENDING_REQUESTS_PER_PHONE = 5
+
+
+def _line_unit_price(product: Product, variant_id: int | None) -> Decimal:
+    """Цена строки заявки — цена варианта, если задана, иначе retail_price
+    товара (тот же приоритет, что у StorefrontProductVariantResponse.price
+    на витрине). До промпта B2 сумма заявки везде считалась по retail_price
+    товара, игнорируя цену варианта — расхождение с тем, что видит покупатель
+    на карточке товара, исправлено попутно вместе с проверкой минимальной суммы."""
+    if variant_id is not None:
+        variant = next((v for v in product.variants if v.id == variant_id), None)
+        if variant is not None and variant.price is not None:
+            return variant.price.amount
+    return product.retail_price.amount
 
 
 def _validate_storefront_quantity(product: Product, quantity: Decimal) -> None:
@@ -93,6 +107,28 @@ class CreateStorefrontRequestUseCase:
             for product_id, total_quantity in quantity_by_product.items():
                 _validate_storefront_quantity(products_by_id[product_id], total_quantity)
 
+            # сумма по серверным ценам, с учётом цены варианта (промпт B2 п.4) —
+            # считаем до создания заявки, чтобы не резервировать остаток впустую,
+            # если сумма всё равно не пройдёт проверку минимального заказа
+            total_amount = sum(
+                (
+                    _line_unit_price(products_by_id[item.product_id], item.variant_id) * item.quantity
+                    for item in cmd.items
+                ),
+                Decimal("0"),
+            )
+            if (
+                tenant.storefront_min_order_total is not None
+                and total_amount < tenant.storefront_min_order_total
+            ):
+                # normalize() без формата "f" даёт экспоненциальную запись для
+                # круглых чисел (Decimal("1000").normalize() -> "1E+3") — используем
+                # ":f", как и остальные денежные DomainError в проекте (без
+                # разделителя тысяч, общего хелпера форматирования денег в
+                # кодовой базе нет, не изобретаем его здесь)
+                min_total = tenant.storefront_min_order_total.normalize()
+                raise DomainError(f"Минимальная сумма заказа в этом магазине — {format_rub(min_total)}")
+
             request = StorefrontRequest(
                 id=None,
                 customer_name=cmd.customer_name.strip(),
@@ -124,10 +160,6 @@ class CreateStorefrontRequestUseCase:
             recipients = [
                 u for u in await uow.users.list_by_tenant() if u.role in (Role.OWNER, Role.MANAGER)
             ]
-            total_amount = sum(
-                (products_by_id[line.product_id].retail_price.amount * line.quantity for line in request.lines),
-                Decimal("0"),
-            )
             for user in recipients:
                 await notify_user(
                     uow, self._notifier,
@@ -135,7 +167,7 @@ class CreateStorefrontRequestUseCase:
                     kind=NotificationKind.STOREFRONT_REQUEST_NEW,
                     text=(
                         f"Новая заявка с витрины: {request.customer_name}, "
-                        f"{len(request.lines)} товаров на сумму {total_amount} ₽"
+                        f"{len(request.lines)} товаров на сумму {format_rub(total_amount)}"
                     ),
                     link="/orders/storefront-requests",
                     entity_id=request.id,

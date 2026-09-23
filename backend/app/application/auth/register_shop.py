@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from app.domain.audit.entities import AuditEntry
 from app.domain.common.exceptions import DomainError
@@ -16,6 +17,7 @@ class RegisterShopCommand:
     owner_name: str
     phone: str
     password: str
+    personal_data_consent: bool
 
 
 @dataclass(frozen=True)
@@ -30,6 +32,8 @@ class RegisterShopUseCase:
         self._hasher = hasher
 
     async def execute(self, cmd: RegisterShopCommand) -> RegisterShopResult:
+        if not cmd.personal_data_consent:
+            raise DomainError("Нужно согласие на обработку персональных данных")
         if len(cmd.password) < 6:
             raise DomainError("Пароль должен быть не короче 6 символов")
         phone = Phone(cmd.phone)
@@ -49,6 +53,7 @@ class RegisterShopUseCase:
                     phone=phone,
                     role=Role.OWNER,
                     password_hash=self._hasher.hash(cmd.password),
+                    personal_data_consent_at=datetime.now(timezone.utc),
                 )
             )
             await uow.audit.add(

@@ -14,8 +14,14 @@ async def _setup_accepted_request(client, owner_headers, buyer_headers, slug="ma
                 "name": "Товар с отзывом",
                 "purchase_price": "50",
                 "retail_price": "120",
-                "show_on_storefront": True,
             },
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     await client.post(
@@ -113,7 +119,14 @@ async def test_review_requires_accepted_request(client, owner_headers, customer_
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Товар", "purchase_price": "50", "retail_price": "120", "show_on_storefront": True},
+            json={"name": "Товар", "purchase_price": "50", "retail_price": "120"},
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     response = await client.post(
@@ -144,8 +157,14 @@ async def test_review_rejects_product_not_in_request(client, owner_headers, cust
                 "name": "Другой товар",
                 "purchase_price": "10",
                 "retail_price": "20",
-                "show_on_storefront": True,
             },
+        )
+    ).json()
+    other_product = (
+        await client.put(
+            f"/api/products/{other_product['id']}",
+            headers=owner_headers,
+            json={**other_product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
 
@@ -192,7 +211,7 @@ async def test_review_moderation_via_api(client, owner_headers, customer_headers
     # владелец видит отзыв в панели (включая скрытость)
     response = await client.get(f"/api/reviews/product/{product['id']}", headers=owner_headers)
     assert response.status_code == 200, response.text
-    assert response.json()[0]["is_hidden"] is False
+    assert response.json()["reviews"][0]["is_hidden"] is False
 
     # скрываем
     response = await client.post(f"/api/reviews/{review_id}/hide", headers=owner_headers)

@@ -18,8 +18,8 @@ import styles from './Storefront.module.css'
 
 const STATUS_LABELS: Record<string, string> = {
   new: 'Ожидает ответа магазина',
-  accepted: 'Принята — оформлен заказ',
-  rejected: 'Отклонена',
+  accepted: 'Подтверждён — заказ оформлен',
+  rejected: 'Отклонён',
 }
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
@@ -63,7 +63,7 @@ export function StorefrontRequestPage() {
         setMessages(chat)
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : 'Не удалось загрузить заявку')
+          setError(err instanceof ApiError ? err.message : 'Не удалось загрузить заказ')
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -128,8 +128,8 @@ export function StorefrontRequestPage() {
     return (
       <div className={styles.shell}>
         <div className={styles.emptyState}>
-          <h1>Заявка не найдена</h1>
-          <p>Оформите заявку из корзины — ссылка сохранится на этом устройстве.</p>
+          <h1>Заказ не найден</h1>
+          <p>Оформите заказ из корзины — ссылка сохранится на этом устройстве.</p>
           <Link to={`/store/${slug}`}>
             <Button>К витрине</Button>
           </Link>
@@ -147,7 +147,7 @@ export function StorefrontRequestPage() {
       </header>
 
       <main className={styles.requestPage}>
-        <h1>Ваша заявка</h1>
+        <h1>Ваш заказ</h1>
         {loading ? (
           <p className={styles.muted}>Загрузка…</p>
         ) : (

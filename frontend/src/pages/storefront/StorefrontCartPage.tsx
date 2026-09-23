@@ -1,21 +1,27 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { IconChevronLeft, IconTrash } from '@tabler/icons-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { IconTrash } from '@tabler/icons-react'
 import {
   clearCustomerToken,
   loadCustomerToken,
+  savePendingCheckout,
+  takePendingCheckout,
 } from '../../entities/auth/customerApi'
 import {
   createStorefrontRequest,
+  getStorefrontShopProfileCached,
+  peekCachedStorefrontShopProfile,
   saveRequestToken,
 } from '../../entities/storefront/api'
 import { ApiError } from '../../shared/api/client'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
+import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { Button } from '../../shared/ui/Button'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { IconButton } from '../../shared/ui/IconButton'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { loadCart, saveCart, type StorefrontCartItem } from './cart'
-import { CustomerLoginModal, notifyCustomerAuthChanged } from './CustomerLoginModal'
+import { notifyCustomerAuthChanged } from './customerAuthEvents'
 import styles from './Storefront.module.css'
 
 export function StorefrontCartPage() {
@@ -27,12 +33,87 @@ export function StorefrontCartPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [customerToken, setCustomerToken] = useState(() => loadCustomerToken())
-  const [showLogin, setShowLogin] = useState(false)
-  const [pendingSubmit, setPendingSubmit] = useState(false)
+  const [shopName, setShopName] = useState(() => peekCachedStorefrontShopProfile(slug)?.name ?? null)
 
   useEffect(() => {
     setCart(loadCart(slug))
   }, [slug])
+
+  useEffect(() => {
+    function syncAuth() {
+      setCustomerToken(loadCustomerToken())
+    }
+    window.addEventListener('waysklad:customer-auth', syncAuth)
+    window.addEventListener('storage', syncAuth)
+    return () => {
+      window.removeEventListener('waysklad:customer-auth', syncAuth)
+      window.removeEventListener('storage', syncAuth)
+    }
+  }, [])
+
+  useEffect(() => {
+    const pending = takePendingCheckout(slug)
+    if (!pending) return
+    setName(pending.name)
+    setNote(pending.note)
+    const token = loadCustomerToken()
+    if (token && pending.name.trim() && loadCart(slug).length > 0) {
+      // вернулись с логина — оформляем заказ с сохранёнными полями
+      void (async () => {
+        setCustomerToken(token)
+        setSaving(true)
+        setError(null)
+        try {
+          const created = await createStorefrontRequest(
+            slug,
+            {
+              customer_name: pending.name.trim(),
+              note: pending.note || undefined,
+              items: loadCart(slug).map((i) => ({
+                product_id: i.product_id,
+                quantity: i.quantity,
+                variant_id: i.variant_id,
+              })),
+            },
+            token,
+          )
+          saveRequestToken(slug, created.access_token)
+          saveCart(slug, [])
+          navigate(`/store/${slug}/request`, {
+            state: { insufficientStock: created.insufficient_stock_at_request },
+          })
+        } catch (err) {
+          setError(err instanceof ApiError ? err.message : 'Не удалось отправить заказ')
+        } finally {
+          setSaving(false)
+        }
+      })()
+    }
+  }, [slug, navigate])
+
+  useEffect(() => {
+    const cached = peekCachedStorefrontShopProfile(slug)
+    if (cached) {
+      setShopName(cached.name)
+      return
+    }
+    let cancelled = false
+    getStorefrontShopProfileCached(slug)
+      .then((p) => {
+        if (!cancelled) setShopName(p.name)
+      })
+      .catch(() => {
+        if (!cancelled) setShopName(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [slug])
+
+  useEffect(() => {
+    setPageMeta({ title: shopName ? `${shopName} — Корзина` : 'Корзина' })
+    return () => resetPageMeta()
+  }, [shopName])
 
   const total = useMemo(
     () => cart.reduce((sum, i) => sum + Number(i.retail_price) * Number(i.quantity), 0),
@@ -52,6 +133,12 @@ export function StorefrontCartPage() {
 
   function removeItem(index: number) {
     updateCart(cart.filter((_, i) => i !== index))
+  }
+
+  function goLogin() {
+    savePendingCheckout(slug, { name: name.trim(), note })
+    const next = encodeURIComponent(`/store/${slug}/cart`)
+    navigate(`/store/${slug}/login?next=${next}`)
   }
 
   async function submitWithToken(token: string) {
@@ -81,12 +168,11 @@ export function StorefrontCartPage() {
         clearCustomerToken()
         notifyCustomerAuthChanged()
         setCustomerToken(null)
-        setPendingSubmit(true)
-        setShowLogin(true)
         setError('Сессия истекла — войдите снова')
+        goLogin()
         return
       }
-      setError(err instanceof ApiError ? err.message : 'Не удалось отправить заявку')
+      setError(err instanceof ApiError ? err.message : 'Не удалось отправить заказ')
     } finally {
       setSaving(false)
     }
@@ -97,8 +183,7 @@ export function StorefrontCartPage() {
     if (cart.length === 0 || !name.trim()) return
     const token = loadCustomerToken()
     if (!token) {
-      setPendingSubmit(true)
-      setShowLogin(true)
+      goLogin()
       return
     }
     await submitWithToken(token)
@@ -106,22 +191,16 @@ export function StorefrontCartPage() {
 
   return (
     <div className={styles.shell}>
-      <header className={styles.headerCompact}>
-        <Link to={`/store/${slug}`} className={styles.back}>
-          <IconChevronLeft size={16} /> К каталогу
-        </Link>
-      </header>
-
-      <main className={styles.cartPage}>
-        <h1>Корзина</h1>
+      <main className={styles.cartPageContent}>
+        <h1 className={styles.pageTitle}>Корзина</h1>
 
         {cart.length === 0 ? (
-          <div className={styles.emptyState}>
-            <p>Корзина пуста</p>
-            <Link to={`/store/${slug}`}>
-              <Button>В каталог</Button>
-            </Link>
-          </div>
+          <EmptyState
+            illustration="empty-cart"
+            title="Корзина пуста"
+            actionLabel="В каталог"
+            onAction={() => navigate(`/store/${slug}`)}
+          />
         ) : (
           <>
             <div className={styles.cartList}>
@@ -157,10 +236,10 @@ export function StorefrontCartPage() {
             </p>
 
             <form className={styles.checkoutForm} onSubmit={handleSubmit}>
-              <h2>Оформить заявку</h2>
+              <h2>Оформить заказ</h2>
               <p className={styles.muted}>
                 Это не мгновенный заказ — магазин подтвердит наличие и свяжется с вами.
-                {!customerToken && ' Перед отправкой нужно войти через Telegram.'}
+                {!customerToken && ' Перед отправкой нужно войти в аккаунт.'}
               </p>
               <label className={styles.field}>
                 Ваше имя *
@@ -180,31 +259,13 @@ export function StorefrontCartPage() {
                 {saving
                   ? 'Отправка…'
                   : customerToken
-                    ? 'Отправить заявку'
-                    : 'Войти и отправить'}
+                    ? 'Оформить заказ'
+                    : 'Войти и оформить'}
               </Button>
             </form>
           </>
         )}
       </main>
-
-      {showLogin && (
-        <CustomerLoginModal
-          onClose={() => {
-            setShowLogin(false)
-            setPendingSubmit(false)
-          }}
-          onSuccess={async (accessToken) => {
-            setCustomerToken(accessToken)
-            notifyCustomerAuthChanged()
-            setShowLogin(false)
-            if (pendingSubmit && name.trim() && cart.length > 0) {
-              setPendingSubmit(false)
-              await submitWithToken(accessToken)
-            }
-          }}
-        />
-      )}
     </div>
   )
 }

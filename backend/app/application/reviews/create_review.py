@@ -1,8 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import AccessDeniedError, DomainError, NotFoundError
 from app.domain.reviews.entities import Review
 from app.domain.storefront.entities import StorefrontRequestStatus
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 
 
@@ -14,17 +16,21 @@ class CreateReviewCommand:
     rating: int
     text: str = ""
     photo: str = ""
+    photos: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
 
 class CreateReviewUseCase:
     """Авторизованный покупатель оставляет отзыв на товар из своей принятой
-    (ACCEPTED) заявки с витрины — один отзыв на заявку. Автор доказан тем,
-    что заявка с этим customer_id действительно принадлежит вызывающему
-    (см. IStorefrontRequestRepository.list_by_customer), а не отдельным
-    правом доступа."""
+    (ACCEPTED) заявки с витрины — один отзыв на пару (заявка, товар), заявка
+    с несколькими товарами допускает по отзыву на каждый (промпт B3 п.1).
+    Автор доказан тем, что заявка с этим customer_id действительно
+    принадлежит вызывающему (см. IStorefrontRequestRepository.list_by_customer),
+    а не отдельным правом доступа."""
 
-    def __init__(self, session_factory):
+    def __init__(self, session_factory, cache: ICache | None = None):
         self._session_factory = session_factory
+        self._cache = cache
 
     async def execute(self, cmd: CreateReviewCommand) -> Review:
         async with SqlAlchemyUnitOfWork(None, session_factory=self._session_factory) as public_uow:
@@ -41,8 +47,15 @@ class CreateReviewUseCase:
         async with SqlAlchemyUnitOfWork(
             request.tenant_id, session_factory=self._session_factory
         ) as uow:
-            if await uow.reviews.exists_for_request(request.id):
-                raise DomainError("Отзыв по этой заявке уже оставлен")
+            if await uow.reviews.exists_for_request(request.id, cmd.product_id):
+                raise DomainError("Отзыв на этот товар по этой заявке уже оставлен")
+
+            # каждое фото должно быть загружено ЭТИМ покупателем через
+            # POST /api/reviews/photos — иначе кто угодно мог бы подставить
+            # чужой/произвольный URL в отзыв (промпт B3 п.2)
+            for url in cmd.photos:
+                if not await uow.review_uploads.is_owned_by(cmd.customer_id, url):
+                    raise DomainError(f"Фото не загружено этим покупателем: {url}")
 
             review = Review(
                 id=None,
@@ -54,8 +67,14 @@ class CreateReviewUseCase:
                 text=cmd.text,
                 author_name=request.customer_name,
                 photo=cmd.photo,
+                photos=list(cmd.photos),
+                tags=list(cmd.tags),
             )
+            review.normalize_photos()
             review.validate()
             await uow.reviews.add(review)
             await uow.commit()
+            # новый отзыв меняет средний рейтинг товара и магазина целиком
+            # (публичный профиль, промпт B2 п.2) — оба закешированы
+            await invalidate_shop_cache(self._cache, uow)
             return review

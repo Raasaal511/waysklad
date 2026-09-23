@@ -1,0 +1,165 @@
+import { useEffect, useState } from 'react'
+import { Link, matchPath, useLocation } from 'react-router-dom'
+import {
+  IconHeart,
+  IconLayoutGrid,
+  IconShoppingCart,
+  IconUserCircle,
+} from '@tabler/icons-react'
+import {
+  countUnreadCustomerChats,
+  listCustomerChats,
+  loadCustomerToken,
+} from '../../entities/auth/customerApi'
+import { FAVORITES_EVENT } from '../../shared/lib/favorites'
+import { loadLastStoreSlug } from '../../shared/lib/lastStore'
+import { cartCountForSlug, favoritesCountForSlug } from '../../shared/lib/storefrontCounters'
+import styles from './PublicBottomNav.module.css'
+
+const STORE_ROUTE = '/store/:slug/*'
+
+interface NavItemProps {
+  to: string
+  label: string
+  active: boolean
+  count?: number
+  children: React.ReactNode
+}
+
+function NavItem({ to, label, active, count, children }: NavItemProps) {
+  return (
+    <Link
+      to={to}
+      className={`${styles.item} ${active ? styles.itemActive : ''}`}
+      aria-current={active ? 'page' : undefined}
+    >
+      <span className={styles.iconWrap}>
+        {children}
+        {count != null && count > 0 && (
+          <span className={styles.badge}>{count > 99 ? '99+' : count}</span>
+        )}
+      </span>
+      <span className={styles.label}>{label}</span>
+    </Link>
+  )
+}
+
+/**
+ * Нижняя панель публичных страниц — мобильная (<768px).
+ * В магазине: Каталог / Избранное / Корзина / Профиль.
+ * В общем кабинете /account: те же пункты через последний магазин.
+ */
+export function PublicBottomNav() {
+  const location = useLocation()
+  const storeMatch = matchPath(STORE_ROUTE, location.pathname)
+  const slug = storeMatch?.params.slug ?? loadLastStoreSlug()
+  const onAccount = location.pathname === '/account' || location.pathname.startsWith('/account/')
+
+  const [favoritesCount, setFavoritesCount] = useState(0)
+  const [cartCountValue, setCartCountValue] = useState(0)
+  const [authed, setAuthed] = useState(() => !!loadCustomerToken())
+  const [unreadChats, setUnreadChats] = useState(0)
+
+  useEffect(() => {
+    if (!slug) {
+      setFavoritesCount(0)
+      setCartCountValue(0)
+      return
+    }
+    function syncCounters() {
+      setFavoritesCount(favoritesCountForSlug(slug!))
+      setCartCountValue(cartCountForSlug(slug!))
+    }
+    syncCounters()
+    window.addEventListener('storage', syncCounters)
+    window.addEventListener('waysklad:storefront-cart', syncCounters)
+    window.addEventListener(FAVORITES_EVENT, syncCounters)
+    return () => {
+      window.removeEventListener('storage', syncCounters)
+      window.removeEventListener('waysklad:storefront-cart', syncCounters)
+      window.removeEventListener(FAVORITES_EVENT, syncCounters)
+    }
+  }, [slug])
+
+  useEffect(() => {
+    function syncAuth() {
+      setAuthed(!!loadCustomerToken())
+    }
+    window.addEventListener('storage', syncAuth)
+    window.addEventListener('waysklad:customer-auth', syncAuth)
+    return () => {
+      window.removeEventListener('storage', syncAuth)
+      window.removeEventListener('waysklad:customer-auth', syncAuth)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!authed) {
+      setUnreadChats(0)
+      return
+    }
+    let cancelled = false
+    listCustomerChats()
+      .then((chats) => {
+        if (!cancelled) setUnreadChats(countUnreadCustomerChats(chats))
+      })
+      .catch(() => {
+        if (!cancelled) setUnreadChats(0)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [authed, location.pathname])
+
+  if (!slug && !onAccount) return null
+
+  const path = location.pathname
+  const accountActive = onAccount || path.includes('/login')
+
+  return (
+    <nav className={styles.bar} aria-label="Основная навигация">
+      {slug ? (
+        <>
+          <NavItem to={`/store/${slug}`} label="Каталог" active={path === `/store/${slug}`}>
+            <IconLayoutGrid size={22} stroke={1.8} />
+          </NavItem>
+          <NavItem
+            to={`/store/${slug}/favorites`}
+            label="Избранное"
+            active={path === `/store/${slug}/favorites`}
+            count={favoritesCount}
+          >
+            <IconHeart size={22} stroke={1.8} />
+          </NavItem>
+          <NavItem
+            to={`/store/${slug}/cart`}
+            label="Корзина"
+            active={path === `/store/${slug}/cart`}
+            count={cartCountValue}
+          >
+            <IconShoppingCart size={22} stroke={1.8} />
+          </NavItem>
+        </>
+      ) : (
+        <NavItem to="/account/shops" label="Витрины" active={path.startsWith('/account/shops')}>
+          <IconLayoutGrid size={22} stroke={1.8} />
+        </NavItem>
+      )}
+
+      <NavItem
+        to={
+          authed
+            ? '/account'
+            : slug
+              ? `/store/${slug}/login?next=${encodeURIComponent('/account')}`
+              : '/account'
+        }
+        label={authed ? 'Профиль' : 'Войти'}
+        active={accountActive}
+        count={authed ? unreadChats : undefined}
+      >
+        <IconUserCircle size={22} stroke={1.8} />
+      </NavItem>
+    </nav>
+  )
+}

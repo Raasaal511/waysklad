@@ -8,6 +8,7 @@ import { useCatalog } from '../../app/CatalogContext'
 import { Modal } from '../../shared/ui/Modal'
 import { IconPlus, IconChevronRight, IconUsersGroup, IconBuildingWarehouse } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
+import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
 import { Avatar } from '../../shared/ui/Avatar'
@@ -84,9 +85,23 @@ export function EmployeesPage() {
     <div className={layoutStyles.stack}>
       <div className={layoutStyles.sectionTitle}>
         <h2>Сотрудники</h2>
-        <Button onClick={() => setShowEmployeeForm(true)}>
-          <IconPlus size={16} stroke={1.8} /> Сотрудник
-        </Button>
+        <div className={layoutStyles.pageTitleActions}>
+          <div className={layoutStyles.pageTitleActionsDesktop}>
+            <Button onClick={() => setShowEmployeeForm(true)}>
+              <IconPlus size={16} stroke={1.8} /> Сотрудник
+            </Button>
+          </div>
+          <div className={layoutStyles.pageTitleActionsMobile}>
+            <IconButton
+              variant="accent"
+              size="lg"
+              aria-label="Добавить сотрудника"
+              onClick={() => setShowEmployeeForm(true)}
+            >
+              <IconPlus size={20} stroke={2} />
+            </IconButton>
+          </div>
+        </div>
       </div>
 
       {!loading && employees.length > 0 && (

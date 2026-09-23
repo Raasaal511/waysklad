@@ -5,6 +5,303 @@
 
 ---
 
+## 2026-09-23 — «Был в сети» в админке платформы (не breaking)
+
+Новые поля, старые не менялись. Время — ISO с таймзоной, `null` — ни разу.
+
+- `GET /api/admin/tenants` → у каждого магазина `owner_last_seen_at`.
+- `GET /api/admin/tenants/{id}` → `owner.last_seen_at` и `users[].last_seen_at`.
+
+В отличие от `last_login_at` (только ввод пароля, а токен живёт до 30 дней),
+`last_seen_at` сдвигает любой запрос с действующим токеном, с шагом 5 минут.
+Уже выведено: строка в карточке магазина в списке и поле в карточке магазина.
+
+---
+
+## 2026-09-23 — Обратная связь из кабинета + вкладка в админке (не breaking)
+
+Задача `docs/TASK_FEEDBACK.md`. Только новые эндпоинты, существующие не менялись.
+
+**`POST /api/feedback`** — любой вошедший сотрудник (любая роль), `multipart/form-data`:
+
+| Поле | Тип | |
+|---|---|---|
+| `topic` | `question` \| `bug` \| `suggestion` | обязательно |
+| `text` | string, до 2000 символов | текст **или** фото — хоть что-то |
+| `photos` | до 3 файлов jpg/png/webp, до 5 МБ каждый | поле повторяется |
+| `page` | string | путь экрана, откуда пишут (`location.pathname`) |
+| `app_version` | string | версия сборки, если есть |
+
+`User-Agent` сервер берёт из заголовка сам. Ответ `201`:
+`{ id, topic, text, photos: string[], created_at }`. Ошибки — `400` с `detail`
+по-русски: пустое обращение, > 3 фото, не картинка, неизвестная тема, больше
+10 обращений за час от одного человека. Лимит по IP — 20/час (`429`).
+
+**`GET /api/admin/feedback`** (токен админа) — `?topic=question|bug|suggestion`,
+`?status=new|resolved|all` (по умолчанию `new`), `limit` (≤ 200), `offset`.
+Ответ: `{ items: FeedbackItem[], total, new_count }`, где `new_count` —
+неразобранные всего, без учёта фильтра. `FeedbackItem`: `id, topic, text,
+photos, page, user_agent, app_version, created_at, resolved_at | null,
+tenant_id, shop_name, author_name, author_phone, author_role`.
+
+**`POST /api/admin/feedback/{id}/resolve?resolved=true|false`** — «Разобрано» /
+вернуть в новые. `404`, если обращения нет.
+
+Каждое новое обращение дублируется в Telegram-чат `ADMIN_ALERT_CHAT_ID` (как
+алерты об ошибках сервера), если чат задан.
+
+---
+
+## 2026-09-22 — Админ-панель платформы v2: обзор, магазины, сервер, ошибки
+
+Часть A задачи `docs/TASK_ADMIN_PANEL_V2.md`. Полное описание с TS-типами —
+раздел «v2» в **`admin_status.md`**.
+
+**Ломающее изменение.** `GET /api/admin/tenants` отдавал `{ tenants: [...] }`
+с четырьмя полями на магазин. Теперь в ответе ещё `total` и
+`counts_by_health`, а на каждый магазин — агрегаты (продажи за 7/30 дней,
+счётчики сущностей, последняя активность) и `health`
+(`new|active|quiet|churned`). Появились параметры `query`, `status`,
+`storefront`, `sort`, `limit`, `offset`.
+
+**Новое:**
+
+- `GET /api/admin/overview` — сводка по платформе и ряды за 30 дней для
+  графиков.
+- `GET /api/admin/error-groups`, `/{signature}/entries`, `POST
+  /{signature}/resolve`, `GET /api/admin/error-logs/{id}` — ошибки
+  сгруппированы по сигнатуре и переехали в БД: счётчики за 7 дней и вкладка
+  «Решённые» теперь переживают перезапуск Redis.
+
+**Изменилось:**
+
+- `GET /api/admin/tenants/{id}` дополнен рядом продаж, пользователями,
+  складами, топом товаров, блоком витрины, лентой действий и итогами.
+- `GET /api/admin/status` дополнен блоками `app`, `db`, `redis`, `uploads`,
+  `api` (RPS, p50, p95, ошибки за сутки), `backup`, `tls`, `load_avg`.
+  **Важно для UI:** где значения нет — `null`, показывайте «нет данных», а не
+  ноль. `backup.offsite_ok: false` — повод показать предупреждение.
+
+**Приватность.** Во всех ответах только счётчики, даты и статусы: сумм долгов
+по клиентам, закупочных цен, телефонов покупателей и текстов чатов нет.
+
+---
+
+## 2026-09-21 — Личный кабинет покупателя: профиль, подтверждение телефона, заказы, чаты
+
+Часть A задачи `docs/TASK_CUSTOMER_PROFILE.md`. Полное описание с TS-типами —
+**`customer_profile.md`**, здесь только сводка.
+
+**Ломающее изменение.** `GET /api/storefront/requests/my` раньше отдавал голый
+массив, теперь — `{ items, total }` с пагинацией (`limit`/`offset`, по
+умолчанию 20) и фильтром `status`. В каждой заявке добавились состав
+(`order_lines` с названием, фото, количеством и ценой), сумма, данные
+магазина (`shop_slug`, `shop_logo`) и для принятых — `due_date`,
+`accepted_total`, `prepayment`, `to_pay`, `order_status`.
+
+**Новое:**
+
+- `POST /api/auth/customer/phone/request-code` и `/phone/verify` —
+  подтверждение телефона кодом из Telegram-бота. Код 6 цифр, 5 минут, не чаще
+  раза в минуту, 5 попыток. Новый ответ `429` несёт `retry_after` в теле и в
+  заголовке `Retry-After` — по нему рисуется таймер «отправить повторно».
+- `GET/POST /api/auth/customer/chats[/{request_id}]` — чаты по JWT вместо
+  доступа по токену заявки. Старый путь с `?token=` остаётся для покупателей
+  без аккаунта.
+- `PATCH /api/auth/customer/me/password` и `POST /me/logout-all`. Смена пароля
+  возвращает свежий `access_token` — его нужно сохранить сразу, прежние
+  токены отозваны.
+
+**Изменилось:**
+
+- `GET /api/auth/customer/me` дополнен `username`, `phone_verified`,
+  `phone_verified_at`, `created_at`, `has_password`; в `stats` добавились
+  `requests_active` и `shops_count`.
+- `PUT /api/auth/customer/me` теперь принимает `phone`. Смена номера
+  сбрасывает `phone_verified` — предупредите покупателя в форме.
+
+## 2026-09-20 — Публичные страницы P0–P7: витрина, карточка товара, маркетплейс доведены до конца
+
+Финальный шаг серии `docs/PUBLIC_PAGES_FINISH_PROMPTS.md` (P0–P7). Backend не
+менялся на этом шаге — эта запись фиксирует, что все контракты серий M-B1/M-B2
+(главная маркетплейса) и B1/B2/B4 (карточка товара витрины), которые раньше
+были добавлены как «фронтенд не менялся», теперь реально используются фронтом
+целиком, плюс что именно оттуда взято на каждой из трёх публичных страниц:
+
+- **`GET /api/marketplace/home?city=`** (M-B2) — единственный запрос главной
+  `/marketplace`: `entities/marketplace/api.ts:getMarketplaceHome`, разбирается
+  в `pages/marketplace/home/useMarketplaceHome.ts` на баннеры (`HeroCarousel`),
+  категории (`CategoryTiles`), ряд магазинов (`ShopsRow`), 4 товарные секции
+  (`ProductSection`, ленивая подгрузка карточек через `IntersectionObserver`
+  при скролле) и статистику подвала.
+- **`GET /api/marketplace/categories`, `/cities`, `/shops`, `/suggest`** (M-B1/
+  M-B2) — режим каталога маркетплейса (`pages/marketplace/MarketplaceCatalog.tsx`)
+  и страница «Все магазины» (`MarketplaceShopsPage.tsx`); `platform_category`/
+  `city`/`with_discount` и `sort=popular|rating|discount` — параметры общего
+  `FilterBar`.
+- **`GET /api/storefront/{slug}/profile`** (B2) — `ShopHeader` на каталоге
+  магазина и карточке товара (компактный вариант), а также `PublicHeader` для
+  плейсхолдера поиска «Искать в магазине «...»»; все три места используют один
+  запрос через общий кэш модуля (`entities/storefront/api.ts:
+  getStorefrontShopProfileCached`) — без этого кэша шапка и страница спорили
+  бы за один и тот же профиль (исправлено в рамках P7 п.2, «не больше 4
+  запросов на карточке товара»).
+- **`GET /api/storefront/{slug}/products/{id}`** поля из B1 (`unit_code`/
+  `unit_label`, `warranty_text`, `views_90d`, `stock_level`/`stock_qty`,
+  `variants[].name`/`in_stock`/`stock_level`) — `product/VariantList.tsx`
+  (степпер количества и список вариантов), `product/ConditionsCard.tsx`
+  (гарантия), `product/ShopCard.tsx`.
+- **`POST /api/storefront/{slug}/products/{id}/view`** (B1) — `useTrackProductView`
+  в `product/useProductPageData.ts`, один вызов на открытие карточки.
+- **`GET /api/storefront/{slug}/products/{id}/similar?scope=shop|marketplace`**
+  (B4) — `product/SimilarSection.tsx` («Ещё в магазине» и «Похожие в других
+  магазинах»), обе секции лениво грузятся через `React.lazy` + `IntersectionObserver`,
+  не входят в исходные 4 запроса карточки товара.
+- **`compare_at_price`/`old_price`/`discount_percent`, `is_new`, `is_hit`,
+  `shop_logo`, `shop_is_verified`, `shop_city`** (M-B1) — единая `ProductCard`
+  (`pages/storefront/ProductCard.tsx`), бейджи и строка магазина по правилам
+  дизайн-системы (см. `docs/PUBLIC_UI_GUIDE.md`).
+
+Известный пробел (не backend-баг, а недостающее поле — см.
+`docs/PUBLIC_PAGES_FINISH_PROMPTS.md`, раздел «Известные легитимные
+отклонения»): `GET /storefront/{slug}/profile` не отдаёт город и щит
+проверенного магазина отдельно для `ShopHeader`/`ShopCard` витрины в некоторых
+местах — не устранялось на этом шаге, фронтенд-задача вне scope P7.
+
+---
+
+## 2026-09-19 — Похожие товары B4: GET /storefront/{slug}/products/{id}/similar
+
+Последний бэкенд-шаг серии «карточка товара витрины как на wikkeo»
+(`docs/PRODUCT_PAGE_PROMPTS.md`, промпт B4) — данные для блоков «Ещё в
+магазине» и «Похожие товары в других магазинах» внизу карточки. Опирается на
+B1/B2 (записи ниже). Фронтенд не менялся.
+
+Новое: `GET /api/storefront/{slug}/products/{id}/similar?scope=shop|marketplace&limit=10`
+(без авторизации, кэш 5 минут, rate limit как у каталога). `scope=shop` —
+товары этого же магазина (приоритет: та же категория → та же родительская →
+остальные; внутри группы — сначала в наличии, затем по `sold_count`
+убывания), формат элемента как в каталоге витрины. `scope=marketplace` —
+товары других видимых и не заблокированных магазинов (текущий магазин
+исключён целиком), сначала по совпадению категории, при нехватке — добор по
+похожести названия (`pg_trgm similarity()`, если расширение доступно,
+иначе `ILIKE`), формат элемента как в `GET /api/marketplace/products`.
+
+Полное описание, TS-контракт и что сделать на фронте — раздел «Часть B4» в
+уже существующем **`product_page_v2.md`**.
+
+---
+
+## 2026-09-18 — Публичный профиль магазина B2: лого, рейтинг, контакты, FAQ, минимальная сумма заказа
+
+Второй бэкенд-шаг под новую карточку товара витрины «как на wikkeo»
+(`docs/PRODUCT_PAGE_PROMPTS.md`, промпт B2) — правая колонка карточки товара:
+карточка продавца, FAQ, кнопка «Написать», прогресс до минимальной суммы
+заказа. Опирается на B1 (запись ниже). Фронтенд не менялся.
+
+Новое: `GET /api/storefront/{slug}/profile` — публичный профиль магазина без
+авторизации (имя, лого, описание, дата регистрации, рейтинг по всем товарам,
+число товаров, `orders_count`/`orders_count_label` с округлением, `null` для
+новых магазинов с < 5 заказов, минимальная сумма заказа, контакты, видимые
+адреса складов, тексты FAQ — пустой текст отдаётся как `null`). `DELETE
+/api/auth/shop/logo` — удаление логотипа (симметрично уже существовавшему
+`POST .../logo`).
+
+Изменено (только добавлены поля, контракты не сломаны): `GET/PATCH
+/api/auth/shop` получили `storefront_description`, `contact_phone`,
+`contact_whatsapp`, `contact_telegram`, `storefront_min_order_total`,
+`policy_refund_money`/`payment`/`delivery`/`returns`. `GET
+/api/storefront/{slug}/products/{product_id}` получил `product.shop` —
+короткую версию профиля (slug/name/logo/рейтинг магазина) для шапки карточки
+без второго запроса. `GET /api/storefront/{slug}` (каталог) получил
+`min_order_total`.
+
+Изменение поведения: `POST /api/storefront/{slug}/requests` теперь отклоняет
+заявку с `400` и текстом `"Минимальная сумма заказа в этом магазине — N ₽"`,
+если сумма заявки по серверным ценам (с учётом цены варианта, если задана)
+меньше `storefront_min_order_total` магазина. Заодно исправлен баг: сумма
+заявки (и в проверке минимума, и в тексте уведомления владельцу) раньше
+считалась по `retail_price` товара, а не по цене выбранного варианта.
+
+Полное описание, включая TS-контракт и что сделать на фронте — раздел «B2» в
+уже существующем **`product_page_v2.md`**.
+
+---
+
+## 2026-09-18 — Карточка товара витрины B1: варианты, наличие, гарантия, просмотры
+
+Первый бэкенд-шаг под новую карточку товара витрины «как на wikkeo»
+(`docs/PRODUCT_PAGE_PROMPTS.md`, промпт B1). Фронтенд не менялся.
+
+Изменено (только добавлены поля, контракт не сломан): `GET
+/api/storefront/{slug}/products/{product_id}` получил `product.category`
+(вложенный объект с родителем), `unit_code`/`unit_label`, `warranty_text`,
+`views_90d`, `stock_level`/`stock_qty` у товара и у каждого варианта,
+`variants[].name`/`display_name`/`in_stock`/`stock_level`/`stock_qty`.
+`GET/PATCH /api/auth/shop` получил `storefront_show_stock_qty` (bool,
+управляет видимостью `stock_qty`). `POST/PUT /api/products` и варианты
+принимают/отдают `warranty_text` и `variants[].name`.
+
+Новое: `POST /api/storefront/{slug}/products/{product_id}/view` → `204` —
+засчитать просмотр карточки (без авторизации, дедупликация по IP на 30
+минут, rate limit 120/минуту).
+
+Известное ограничение: фильтры каталога `in_stock_only` и
+`variant_size`/`variant_color` пока не связаны между собой (наличие
+считается по товару целиком, не по подошедшему варианту) — подробности в
+`product_page_v2.md`, раздел 2.
+
+Полное описание, включая TS-контракт и что сделать на фронте — новый
+**`product_page_v2.md`**.
+
+---
+
+## 2026-09-18 — Главная маркетплейса M-B2: баннеры, GET /marketplace/home, /shops, /suggest
+
+Второй бэкенд-шаг под главную страницу маркетплейса «как на wikkeo»
+(`docs/MARKETPLACE_HOME_PROMPTS.md`, промпт M-B2). Опирается на M-B1 (запись
+ниже). Фронтенд не менялся.
+
+Новое: `GET /api/marketplace/home?city=` — вся главная одним запросом
+(баннеры, категории с товарами, ряд магазинов, 4 товарные секции, статистика
+платформы; собирается пакетными запросами, без N+1); `GET
+/api/marketplace/shops` — страница «Все магазины» с поиском/сортировкой/
+пагинацией; `GET /api/marketplace/suggest?q=&city=` — подсказки поиска
+(товары/магазины/категории); `GET/POST/PUT/DELETE /api/admin/banners` +
+`POST .../image` и `.../image-mobile` (админка баннеров платформы —
+карусель на главной и промо-плитки).
+
+Полное описание, включая формат ответов, правила отбора товаров в секции и
+что можно сделать на фронте — раздел «M-B2» в **`marketplace_home.md`**.
+
+---
+
+## 2026-09-18 — Главная маркетплейса M-B1: категории платформы, город, проверенный магазин, старая цена
+
+Первый бэкенд-шаг под главную страницу маркетплейса «как на wikkeo»
+(`docs/MARKETPLACE_HOME_PROMPTS.md`, промпт M-B1). Фронтенд не менялся.
+
+Новое: `GET /api/marketplace/categories` (справочник категорий платформы со
+счётчиком товаров), `GET /api/marketplace/cities` (города с числом
+магазинов), `PUT /api/products/categories/{id}` (раньше категорию нельзя
+было редактировать), `POST /api/auth/shop/logo` (логотип магазина),
+`POST/GET/PUT/DELETE /api/admin/platform-categories` +
+`POST .../image` (админка справочника), `POST /api/admin/tenants/{id}/verify`
+и `.../unverify` (проверенный магазин).
+
+Изменено: `Tenant` получил `city`/`is_verified`/`logo`; `Category` (магазина)
+получила `platform_category_id`; `Product` получил `compare_at_price` (+
+`old_price`/`discount_percent` в ответах витрины и маркетплейса); `GET
+/api/marketplace/products` и `GET /api/storefront/{slug}` получили параметры
+`platform_category`, `city`, `with_discount` и новые значения `sort`
+(`popular`, `rating`, `discount`); карточки маркетплейса получили
+`shop_logo`, `shop_is_verified`, `shop_city`, `is_new`, `is_hit`.
+
+Полное описание, включая формат ответов и что можно сделать на фронте —
+новый **`marketplace_home.md`**.
+
+---
+
 ## 2026-09-16 — Карточка товара маркетплейса: GET /marketplace/products/{id}
 
 Новый эндпоинт — детальная карточка товара по глобально уникальному `id`,

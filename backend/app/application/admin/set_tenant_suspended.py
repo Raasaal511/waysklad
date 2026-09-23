@@ -1,7 +1,11 @@
 from sqlalchemy import select, update
 
 from app.domain.common.cache import ICache
-from app.infrastructure.cache.cache_aside import shop_prefix
+from app.infrastructure.cache.cache_aside import (
+    invalidate_admin_cache,
+    invalidate_marketplace_cache,
+    shop_prefix,
+)
 from app.infrastructure.db.models.identity import TenantModel
 
 
@@ -10,7 +14,9 @@ async def set_tenant_suspended(
 ) -> bool:
     """True — применено, False — tenant_id не существует. Инвалидирует
     storefront-кеш сразу (см. invalidate_shop_cache в cache_aside.py) —
-    блокировка/разблокировка не должна ждать TTL, чтобы подействовать на витрину."""
+    блокировка/разблокировка не должна ждать TTL, чтобы подействовать на витрину.
+    Заодно чистит кросс-tenant кеш маркетплейса (список/карточка товара всех
+    магазинов) — блокировка должна сразу убрать магазин из общей ленты."""
     async with session_factory() as session:
         row = (
             await session.execute(
@@ -26,4 +32,7 @@ async def set_tenant_suspended(
 
     if cache is not None and row.slug is not None:
         await cache.delete_prefix(shop_prefix(row.slug))
+    await invalidate_marketplace_cache(cache)
+    # список и обзор админки кешируются — без сброса админ увидит старое
+    await invalidate_admin_cache(cache)
     return True

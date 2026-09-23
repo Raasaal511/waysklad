@@ -28,16 +28,19 @@ export default defineConfig({
         name: 'WaySklad',
         short_name: 'WaySklad',
         description: 'Товарный учёт, продажи и долги для малого бизнеса',
-        theme_color: '#1b6b4d',
+        theme_color: '#1f5c3f',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
         icons: [
           { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'pwa-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
-      },
-    }),
+        // Ссылка на самих себя: так navigator.getInstalledRelatedApps() в обычной вкладке
+        // Chrome отвечает, стоит ли приложение (карточка в профиле).
+        related_applications: [{ platform: 'webapp', url: '/manifest.webmanifest' }],
+      },    }),
   ],
   server: {
     host: true,
@@ -46,6 +49,21 @@ export default defineConfig({
         target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:8000',
         changeOrigin: true,
         ws: true, // WebSocket-канал уведомлений (GET /api/notifications/ws)
+      },
+      '/uploads': {
+        target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
+  },
+  // vite preview — тот же прокси, что и dev-сервер, чтобы можно было гонять
+  // Lighthouse/QA-скрипты по production-сборке с реальным backend (P7 п.2).
+  preview: {
+    proxy: {
+      '/api': {
+        target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:8000',
+        changeOrigin: true,
+        ws: true,
       },
       '/uploads': {
         target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:8000',

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.domain.reviews.entities import Review
+from app.domain.reviews.repository import PublicReviewListFilter, PublicReviewListResult
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 
 
@@ -8,19 +8,20 @@ from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 class ListProductReviewsCommand:
     slug: str
     product_id: int
+    filters: PublicReviewListFilter
+    customer_id: int | None = None  # из необязательного customer JWT — для my_vote
 
 
 @dataclass(frozen=True)
 class ProductReviewsResult:
-    reviews: list[Review]
-    average_rating: float
-    reviews_count: int
+    list_result: PublicReviewListResult
+    my_votes: dict[int, int]  # review_id -> голос текущего покупателя (пусто без токена)
 
 
 class ListProductReviewsUseCase:
     """Публичный (без авторизации) список видимых отзывов на товар — для
     карточки товара на витрине. Скрытые владельцем (is_hidden) не отдаются
-    и не входят в агрегат рейтинга."""
+    и не входят в агрегаты. Фильтры/сортировка/пагинация — промпт B3 п.5."""
 
     def __init__(self, session_factory):
         self._session_factory = session_factory
@@ -32,8 +33,10 @@ class ListProductReviewsUseCase:
             return None
 
         async with SqlAlchemyUnitOfWork(tenant.id, session_factory=self._session_factory) as uow:
-            reviews = await uow.reviews.list_by_product(cmd.product_id)
+            result = await uow.reviews.list_public(cmd.product_id, cmd.filters)
+            my_votes: dict[int, int] = {}
+            if cmd.customer_id is not None:
+                review_ids = [r.id for r in result.reviews if r.id is not None]
+                my_votes = await uow.review_votes.my_votes(review_ids, cmd.customer_id)
 
-        count = len(reviews)
-        average = sum(r.rating for r in reviews) / count if count else 0.0
-        return ProductReviewsResult(reviews=reviews, average_rating=average, reviews_count=count)
+        return ProductReviewsResult(list_result=result, my_votes=my_votes)

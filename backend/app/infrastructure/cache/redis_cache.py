@@ -26,6 +26,13 @@ class RedisCache(ICache):
             retry_on_error=[RedisConnectionError, RedisTimeoutError],
         )
 
+    @property
+    def raw(self):
+        """Соединение Redis напрямую — для того, что не выражается через ICache
+        (счётчики api_metrics, INFO для админки). Обычный код должен ходить
+        через методы интерфейса."""
+        return self._redis
+
     async def get(self, key: str) -> bytes | None:
         try:
             return await self._redis.get(key)
@@ -48,3 +55,8 @@ class RedisCache(ICache):
         except Exception:
             # неудалённые ключи просто доживут до TTL — устаревание, не поломка
             _logger.exception("Redis SCAN/DEL по префиксу не удался prefix=%s", prefix)
+
+    async def ping(self) -> bool:
+        # единственное место, где ошибка Redis не проглатывается — health-check
+        # должен реально узнать, что Redis недоступен, а не тихо продолжить
+        return bool(await self._redis.ping())

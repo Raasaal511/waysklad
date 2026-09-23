@@ -5,9 +5,18 @@ from typing import AsyncIterator, Callable
 # до импорта app.main — тесты логинятся многократно в одном сценарии,
 # и лимит /auth/login иначе рвёт их посреди прогона
 os.environ["RATE_LIMIT_ENABLED"] = "false"
-# тестовое окружение намеренно не хранит секретов — стартовая проверка
-# SECRET_KEY (см. app/main.py) иначе не даст приложению импортироваться
+# тестовое окружение намеренно не хранит секретов
 os.environ["DEBUG"] = "true"
+os.environ.setdefault("SECRET_KEY", "test-secret-not-for-prod")
+# реальные тесты подключаются к своей БД через _ADMIN_DB_URL/db_session_factory
+# ниже (CREATE DATABASE per xdist worker) — этот DATABASE_URL используется
+# только на уровне модуля, при импорте app.main -> db/session.py, где
+# create_async_engine() лениво валидирует URL, но не подключается сразу.
+# Settings() теперь требует DATABASE_URL/SECRET_KEY без дефолта (см.
+# app/infrastructure/config.py) — без этой строки импорт app.main упал бы.
+os.environ.setdefault(
+    "DATABASE_URL", "postgresql+psycopg://postgres:postgres@localhost:5432/waysklad_test"
+)
 # CACHE_REDIS_URL обязателен (deps/cache.py падает при старте без него) —
 # локальный Redis, отдельная логическая БД, чтобы не пересекаться с dev/prod.
 # PYTEST_XDIST_WORKER на этом этапе (импорт conftest.py, до pytest_configure)
@@ -15,11 +24,28 @@ os.environ["DEBUG"] = "true"
 # DB здесь бессмысленно, все воркеры получили бы один и тот же дефолт. Под
 # xdist DB выбирается позже, лениво, в фикстуре client (см. ниже).
 os.environ.setdefault("CACHE_REDIS_URL", "redis://localhost:6379/15")
-# фиксированные логин/пароль — тесты admin-роутера логинятся через POST /api/admin/login
-os.environ.setdefault("ADMIN_LOGIN", "test-admin")
-os.environ.setdefault(
-    "ADMIN_PASSWORD_HASH",
-    "$2b$12$hVd0LRFO6SZp0qzOTV3pAOxTeF0fB18uj/us6lvrgGHJxvaQL4d/W",  # "test-admin-password"
+# вход и регистрация покупателя завязаны на Telegram-бота — без username бота
+# use-case отказывает ещё до обращения к БД (см. request_login_link.py)
+os.environ.setdefault("TELEGRAM_BOT_USERNAME", "waysklad_test_bot")
+# фиксированные логин/пароль — тесты admin-роутера логинятся через POST /api/admin/login.
+# Присваиваем, а не setdefault: docker compose exec подтягивает .env с прод-хешом,
+# и setdefault его не перебивает → все admin-тесты падают «Неверный логин или пароль».
+os.environ["ADMIN_LOGIN"] = "test-admin"
+# bcrypt с прод-фактором 12 стоит ~0.17s на хеш и ~0.19s на проверку. Фикстуры
+# owner_headers/registered_shop регистрируют магазин в сотнях тестов, и эта
+# цена, умноженная на число тестов, была основной статьёй времени прогона.
+# Криптостойкость здесь ничего не защищает — БД живёт один тест.
+os.environ.setdefault("BCRYPT_ROUNDS", "4")
+# Маркетплейс выключен в проде (MARKETPLACE_ENABLED=false по умолчанию, см.
+# app/infrastructure/config.py), но его код жив и покрыт тестами — включаем
+# флаг здесь, до импорта app.main, иначе роутер просто не подключится.
+# Поведение при выключенном флаге проверяет test_marketplace_disabled.py,
+# который поднимает отдельное приложение.
+os.environ["MARKETPLACE_ENABLED"] = "true"
+os.environ["ADMIN_PASSWORD_HASH"] = (
+    # фактор 4 в тон BCRYPT_ROUNDS выше — проверка пароля с фактором 12 стоила
+    # бы 0.19s в каждом тесте admin-роутера
+    "$2b$04$Jrj4Ec92zrIx8po/D/s6kelfq8aBBpOfXMwyaG2Fti0TCbJ5Nqra6"  # "test-admin-password"
 )
 
 import pytest
@@ -38,7 +64,9 @@ from app.domain.common.phone import Phone
 from app.domain.customers.entities import Customer
 from app.domain.identity.entities import Role, Tenant, User, Warehouse
 from app.domain.identity.permissions import Actor
+from app.domain.platform.category_synonyms import SEED_PLATFORM_CATEGORIES
 from app.infrastructure.db.models.base import Base
+from app.infrastructure.db.models.catalog import PlatformCategoryModel
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.files import LocalFileStorage
 from app.infrastructure.security import BcryptPasswordHasher, create_customer_access_token
@@ -50,6 +78,11 @@ from app.presentation.deps.security import get_file_storage
 from app.presentation.deps.uow import get_session_factory
 
 _ADMIN_DB_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/postgres"
+_TEST_DB_HOST = "localhost"
+# в docker compose Postgres доступен как хост `db`, а не localhost контейнера
+if "@db:" in os.environ.get("DATABASE_URL", ""):
+    _ADMIN_DB_URL = "postgresql+psycopg://postgres:postgres@db:5432/postgres"
+    _TEST_DB_HOST = "db"
 
 
 def _worker_db_name() -> str:
@@ -92,16 +125,65 @@ async def _test_db_ready() -> AsyncIterator[str]:
     yield db_name
 
 
-@pytest.fixture
-async def db_session_factory(_test_db_ready) -> AsyncIterator[async_sessionmaker]:
-    """Чистая схема на каждый тест, в БД, выделенной текущему xdist-воркеру."""
-    db_url = f"postgresql+psycopg://postgres:postgres@localhost:5432/{_test_db_ready}"
+@pytest.fixture(scope="session")
+async def _db_engine(_test_db_ready) -> AsyncIterator:
+    """Один движок на сессию воркера, со схемой, созданной один раз.
+
+    Раньше схема пересоздавалась на КАЖДЫЙ тест (drop_all + create_all, 42
+    таблицы) — это и было основной статьёй времени прогона, дороже самих
+    тестов. Теперь схема создаётся один раз, а изоляцию даёт TRUNCATE в
+    db_session_factory: тот же «пустая БД на тест» результат в разы дешевле.
+
+    Схема создаётся из моделей (Base.metadata.create_all), не через Alembic —
+    поэтому сид platform_categories, который в проде накатывается сид-миграцией
+    (migrations/versions/2026-09-18_platform_categories.py), здесь сеется вручную
+    тем же списком (app.domain.platform.category_synonyms.SEED_PLATFORM_CATEGORIES).
+
+    NullPool сохранён: движок теперь живёт всю сессию, а event loop
+    pytest-asyncio создаёт на каждый тест — соединение из пула пережило бы
+    свой loop и упало бы при повторном использовании. Замер показал, что пул
+    здесь экономит меньше секунды на прогоне, так что менять смысла нет."""
+    db_url = f"postgresql+psycopg://postgres:postgres@{_TEST_DB_HOST}:5432/{_test_db_ready}"
     engine = create_async_engine(db_url, poolclass=NullPool)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    # Отдельной транзакцией: в одной drop+create держат до коммита блокировку на
+    # каждую таблицу, индекс и sequence дважды. Все xdist-воркеры делают это разом
+    # и упирались в общий лимит блокировок Postgres («out of shared memory»,
+    # max_locks_per_transaction) — через раз, начиная с таблицы feedback.
+    async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    yield async_sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    factory = async_sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    async with factory() as session:
+        for slug, name, sort_order in SEED_PLATFORM_CATEGORIES:
+            session.add(PlatformCategoryModel(name=name, slug=slug, sort_order=sort_order))
+        await session.commit()
+    yield engine
     await engine.dispose()
+
+
+# platform_categories — справочник, а не данные теста: в проде он приезжает
+# сид-миграцией и дальше не меняется, тесты его только читают. Поэтому он
+# сеется один раз на сессию (в _db_engine) и переживает очистку между тестами,
+# вместо того чтобы вычищаться и пересеваться 12 строками на каждый тест.
+_MUTABLE_TABLES = [t for t in Base.metadata.tables if t != PlatformCategoryModel.__tablename__]
+
+# TRUNCATE всех таблиц разом: один оператор дешевле, чем DROP/CREATE схемы, а
+# RESTART IDENTITY возвращает последовательности к 1 — тесты, которые ждут
+# id=1 у первой созданной записи, продолжают работать как при чистой схеме.
+# CASCADE нужен из-за внешних ключей между таблицами.
+_TRUNCATE_ALL = text(
+    "TRUNCATE " + ", ".join(f'"{table}"' for table in _MUTABLE_TABLES) + " RESTART IDENTITY CASCADE"
+)
+
+
+@pytest.fixture
+async def db_session_factory(_db_engine) -> AsyncIterator[async_sessionmaker]:
+    """Пустая БД на каждый тест, в БД, выделенной текущему xdist-воркеру."""
+    engine = _db_engine
+    async with engine.begin() as conn:
+        await conn.execute(_TRUNCATE_ALL)
+    yield async_sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
 @pytest.fixture
@@ -150,7 +232,11 @@ async def registered_shop(make_uow, random_phone, hasher) -> tuple[int, str, Act
     phone = random_phone()
     result = await RegisterShopUseCase(make_uow(), hasher).execute(
         RegisterShopCommand(
-            shop_name="Магазин Беркат", owner_name="Ахмед", phone=phone, password="secret123"
+            shop_name="Магазин Беркат",
+            owner_name="Ахмед",
+            phone=phone,
+            password="secret123",
+            personal_data_consent=True,
         )
     )
     owner = result.owner
@@ -200,7 +286,9 @@ def _worker_redis_url() -> str:
     воркер видит запись/закешированный результат другого."""
     worker = os.environ.get("PYTEST_XDIST_WORKER", "").removeprefix("gw")
     db = 15 - (int(worker) % 16) if worker.isdigit() else 15
-    return f"redis://localhost:6379/{db}"
+    # docker compose: Redis как хост `redis`; CI/локально — localhost
+    host = "redis" if "://redis:" in os.environ.get("CACHE_REDIS_URL", "") else "localhost"
+    return f"redis://{host}:6379/{db}"
 
 
 @pytest.fixture
@@ -238,6 +326,71 @@ async def client(db_session_factory, tmp_path) -> AsyncIterator[AsyncClient]:
     fastapi_app.dependency_overrides.clear()
 
 
+class SqlQueryCounter:
+    """Считает SQL-запросы, выполненные через движок db_session_factory, пока
+    активен (см. фикстуру sql_query_counter) — нет готового приёма для этого
+    в проекте (см. промпт M-B2 п.2), поэтому используем event.listen на
+    Engine.before_cursor_execute, самый низкоуровневый и надёжный хук
+    SQLAlchemy (считает буквально то, что ушло на сервер, а не ORM-вызовы)."""
+
+    def __init__(self):
+        self.count = 0
+
+    def _on_execute(self, conn, cursor, statement, parameters, context, executemany):
+        self.count += 1
+
+    def reset(self) -> None:
+        self.count = 0
+
+
+@pytest.fixture
+async def sql_query_counter(db_session_factory) -> AsyncIterator[SqlQueryCounter]:
+    """counter.count — число SQL-запросов с последнего reset()/начала теста,
+    выполненных через тестовую БД (db_session_factory и, следовательно, client —
+    оба используют один engine, см. фикстуру client)."""
+    from sqlalchemy import event
+
+    engine = db_session_factory.kw["bind"]
+    counter = SqlQueryCounter()
+    event.listen(engine.sync_engine, "before_cursor_execute", counter._on_execute)
+    try:
+        yield counter
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", counter._on_execute)
+
+
+@pytest.fixture
+def db_engine_queries(db_session_factory):
+    """Считает SQL-запросы за блок — для проверок на N+1.
+
+    Считаются только запросы к данным: BEGIN/COMMIT и прочая служебка
+    отфильтрованы, иначе счётчик зависел бы от транзакционных границ.
+    """
+    from contextlib import contextmanager
+
+    from sqlalchemy import event
+
+    engine = db_session_factory.kw["bind"].sync_engine
+
+    class Counter:
+        count = 0
+
+    @contextmanager
+    def collect():
+        counter = Counter()
+
+        def on_execute(conn, cursor, statement, parameters, context, executemany):
+            counter.count += 1
+
+        event.listen(engine, "before_cursor_execute", on_execute)
+        try:
+            yield counter
+        finally:
+            event.remove(engine, "before_cursor_execute", on_execute)
+
+    return collect
+
+
 @pytest.fixture
 async def customer_headers(make_uow, random_phone) -> Callable:
     """Authorization-заголовок авторизованного покупателя витрины — заводит
@@ -272,6 +425,7 @@ async def owner_headers(client, random_phone) -> dict:
             "owner_name": "Ахмед",
             "phone": random_phone(),
             "password": "secret123",
+            "personal_data_consent": True,
         },
     )
     assert response.status_code == 201, response.text

@@ -37,10 +37,12 @@ import {
 import { IconButton } from '../../shared/ui/IconButton'
 import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
 import { formatQuantity, isLowStock, isOutOfStock, normalizeDecimalInput } from '../../shared/lib/format'
+import { useFeature } from '../../shared/lib/useFeature'
 import { loadRestockCart, saveRestockCart } from './restockCart'
 import {
   AssignedUsersField,
@@ -71,6 +73,7 @@ export function WarehouseDetailPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { shop } = useShop()
+  const storefrontEnabled = useFeature('storefront')
   const canManageWarehouses = user?.role === 'owner' || user?.role === 'manager'
 
   const {
@@ -295,13 +298,13 @@ export function WarehouseDetailPage() {
                 <div className={detail.heroHeading}>
                   <h2 className={detail.heroTitle}>{warehouse.name}</h2>
                   <div className={detail.heroTags}>
-                    {warehouse.show_on_storefront && (
+                    {storefrontEnabled && warehouse.show_on_storefront && (
                       <span className={detail.storefrontChip}>На витрине</span>
                     )}
                   </div>
                 </div>
                 <div className={styles.heroActions}>
-                  {shop?.storefront_enabled && shop.slug && (
+                  {storefrontEnabled && shop?.slug && (
                     <IconButton
                       variant="muted"
                       size="lg"
@@ -420,7 +423,13 @@ export function WarehouseDetailPage() {
         <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : !allStock.some((item) => item.warehouse_id === warehouseId) && !showAllProducts ? (
         <div className={`${layoutStyles.stack} ${detail.reveal}`} style={{ gap: 8, '--reveal-delay': '110ms' } as CSSProperties}>
-          <p className={layoutStyles.textMuted}>На этом складе остатков пока нет</p>
+          <EmptyState
+            illustration="empty-stock"
+            title="На этом складе остатков пока нет"
+            description="Примите товар на склад — или покажите весь каталог компании и выберите позиции."
+            actionLabel="Принять товар"
+            onAction={() => navigate(`/stock/${warehouseId}/movement/receive`)}
+          />
           {products.length > 0 && (
             <button type="button" className="disclosure-link" onClick={() => setShowAllProducts(true)}>
               Показать все товары компании, чтобы принять сюда
@@ -839,6 +848,7 @@ function WarehouseEditForm({
 }) {
   const [name, setName] = useState(warehouse.name)
   const [address, setAddress] = useState(warehouse.address)
+  const storefrontEnabled = useFeature('storefront')
   const [showOnStorefront, setShowOnStorefront] = useState(warehouse.show_on_storefront ?? false)
   const [selectedIds, setSelectedIds] = useState<number[]>(warehouse.assigned_user_ids)
   const [error, setError] = useState<string | null>(null)
@@ -874,18 +884,22 @@ function WarehouseEditForm({
         Адрес
         <input value={address} onChange={(e) => setAddress(e.target.value)} />
       </label>
-      <label className="sale-checkbox">
-        <input
-          type="checkbox"
-          checked={showOnStorefront}
-          onChange={(e) => setShowOnStorefront(e.target.checked)}
-        />
-        Показывать на витрине
-      </label>
-      <p className="text-muted" style={{ margin: '-6px 0 0', fontSize: 13, lineHeight: 1.4 }}>
-        Учитывается в наличии для покупателей. Если ни один склад не отмечен — на витрине везде
-        «нет в наличии».
-      </p>
+      {storefrontEnabled && (
+        <>
+          <label className="sale-checkbox">
+            <input
+              type="checkbox"
+              checked={showOnStorefront}
+              onChange={(e) => setShowOnStorefront(e.target.checked)}
+            />
+            Показывать на витрине
+          </label>
+          <p className="text-muted" style={{ margin: '-6px 0 0', fontSize: 13, lineHeight: 1.4 }}>
+            Учитывается в наличии для покупателей. Если ни один склад не отмечен — на витрине везде
+            «нет в наличии».
+          </p>
+        </>
+      )}
       <label className="field">
         Ответственные
         <AssignedUsersField candidates={candidates} selectedIds={selectedIds} onChange={setSelectedIds} />

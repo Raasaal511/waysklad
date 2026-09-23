@@ -1,4 +1,4 @@
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, false, func, literal, or_, select
 
 from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Category, Product
@@ -24,9 +24,9 @@ from app.infrastructure.db.models.catalog import (
     ProductVariantModel,
     UnitModel,
 )
-from app.infrastructure.db.models.inventory import StockDocumentLineModel
+from app.infrastructure.db.models.inventory import StockDocumentLineModel, StockItemModel
 from app.infrastructure.db.models.orders import OrderLineModel
-from app.infrastructure.db.models.sales import SaleLineModel
+from app.infrastructure.db.models.sales import SaleLineModel, SaleModel, SaleReturnLineModel, SaleReturnModel
 from app.infrastructure.db.models.storefront import StorefrontRequestLineModel
 from app.infrastructure.db.models.tasks import TaskModel
 from app.infrastructure.db.repositories.base import SqlAlchemyRepository
@@ -52,6 +52,23 @@ class SqlAlchemyCategoryRepository(SqlAlchemyRepository, ICategoryRepository):
         if model is None:
             raise NotFoundError(f"Категория {category_id} не найдена")
         return CategoryMapper.to_entity(model)
+
+    async def save(self, category: Category) -> Category:
+        model = (
+            await self._session.execute(
+                select(CategoryModel).where(
+                    CategoryModel.tenant_id == self._tenant,
+                    CategoryModel.id == category.id,
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            raise NotFoundError(f"Категория {category.id} не найдена")
+        model.name = category.name
+        model.parent_id = category.parent_id
+        model.platform_category_id = category.platform_category_id
+        await self._session.flush()
+        return category
 
     async def list(self) -> list[Category]:
         models = (
@@ -112,9 +129,17 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
         model.unit_code = product.unit.code
         model.purchase_price = product.purchase_price.amount
         model.retail_price = product.retail_price.amount
+        model.compare_at_price = (
+            product.compare_at_price.amount if product.compare_at_price is not None else None
+        )
         model.min_stock = product.min_stock
         model.photo = product.photo
+        model.description = product.description
+        model.warranty_text = product.warranty_text
+        model.storefront_photos = list(product.storefront_photos)
         model.show_on_storefront = product.show_on_storefront
+        model.storefront_min_qty = product.storefront_min_qty
+        model.storefront_step_qty = product.storefront_step_qty
         # варианты: существующие обновляются, новые добавляются, убранные удаляются (delete-orphan)
         existing = {v.id: v for v in model.variants}
         updated = []
@@ -126,6 +151,7 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
                 variant_model.barcode = variant.barcode.value if variant.barcode else None
                 variant_model.photo = variant.photo
                 variant_model.price = variant.price.amount if variant.price else None
+                variant_model.name = variant.name
                 updated.append(variant_model)
             else:
                 updated.append(ProductVariantMapper.to_orm(variant, self._tenant))
@@ -140,6 +166,26 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
         if model is None:
             raise NotFoundError(f"Товар {product_id} не найден")
         return ProductMapper.to_entity(model, await self._units_map())
+
+    async def list_by_ids(self, product_ids: list[int]) -> list[Product]:
+        # один запрос на весь список — иначе карточки заказов покупателя
+        # дали бы по обращению на каждую позицию (N+1)
+        if not product_ids:
+            return []
+        models = (
+            (
+                await self._session.execute(
+                    select(ProductModel).where(
+                        ProductModel.tenant_id == self._tenant,
+                        ProductModel.id.in_(product_ids),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        units = await self._units_map()
+        return [ProductMapper.to_entity(m, units) for m in models]
 
     async def deactivate(self, product_id: int) -> None:
         model = await self._get_model(product_id)
@@ -277,6 +323,77 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
             )
         ).scalars().all()
         return list(sizes), list(colors)
+
+    async def list_similar_in_shop(
+        self,
+        product_id: int,
+        category_id: int | None,
+        parent_category_id: int | None,
+        warehouse_ids: list[int],
+        limit: int,
+    ) -> list[Product]:
+        # приоритет группы: 0 — та же категория, 1 — та же родительская, 2 — остальные.
+        # false() вместо пропуска ветки — category_id/parent_category_id может быть
+        # None (товар без категории), тогда группа 0/1 просто никогда не совпадает.
+        same_category = (
+            ProductModel.category_id == category_id if category_id is not None else false()
+        )
+        same_parent = (
+            CategoryModel.parent_id == parent_category_id
+            if parent_category_id is not None
+            else false()
+        )
+        priority = case((same_category, 0), (same_parent, 1), else_=2)
+        stock_expr = (
+            select(func.coalesce(func.sum(StockItemModel.quantity), 0))
+            .where(
+                StockItemModel.product_id == ProductModel.id,
+                StockItemModel.warehouse_id.in_(warehouse_ids),
+            )
+            .correlate(ProductModel)
+            .scalar_subquery()
+            if warehouse_ids
+            else literal(0)
+        )
+        returned = (
+            select(func.coalesce(func.sum(SaleReturnLineModel.quantity), 0))
+            .join(SaleReturnModel, SaleReturnModel.id == SaleReturnLineModel.return_id)
+            .where(SaleReturnLineModel.sale_line_id == SaleLineModel.id)
+            .correlate(SaleLineModel)
+            .scalar_subquery()
+        )
+        sold_count_expr = (
+            select(func.coalesce(func.sum(SaleLineModel.quantity - returned), 0))
+            .join(SaleModel, SaleModel.id == SaleLineModel.sale_id)
+            .where(
+                SaleLineModel.product_id == ProductModel.id,
+                SaleModel.tenant_id == self._tenant,
+                SaleModel.deleted_at.is_(None),
+            )
+            .correlate(ProductModel)
+            .scalar_subquery()
+        )
+
+        stmt = (
+            select(ProductModel)
+            .outerjoin(CategoryModel, CategoryModel.id == ProductModel.category_id)
+            .where(
+                ProductModel.tenant_id == self._tenant,
+                ProductModel.is_active.is_(True),
+                ProductModel.show_on_storefront.is_(True),
+                ProductModel.id != product_id,
+            )
+            .order_by(
+                priority,
+                (stock_expr > 0).desc(),
+                sold_count_expr.desc(),
+                ProductModel.id.desc(),
+            )
+            .limit(limit)
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        units = await self._units_map()
+        return [ProductMapper.to_entity(m, units) for m in models]
 
     async def search_all(self, query: str = "") -> list[Product]:
         models = (

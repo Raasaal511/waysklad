@@ -46,7 +46,10 @@ _BOUNDS = {
 
 
 def period_range(period: SummaryPeriod, today: date | None = None) -> PeriodRange:
-    today = today or datetime.now(timezone.utc).date()
+    # Сводки привязаны к часу МСК владельца — календарный день тоже берём по МСК,
+    # иначе в 20:00 МСК 1 сентября UTC ещё 31 августа и «день» уезжает назад.
+    if today is None:
+        today = (datetime.now(timezone.utc) + timedelta(hours=3)).date()
     start, end = _BOUNDS[period](today)
     return PeriodRange(
         date_from=datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc),

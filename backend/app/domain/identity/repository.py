@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 
 from app.domain.identity.entities import Tenant, User, Warehouse
@@ -19,15 +21,31 @@ class ITenantRepository(Protocol):
     async def list_all(self) -> list[Tenant]: ...
 
 
+@dataclass(frozen=True)
+class UserSession:
+    token_version: int
+    last_seen_at: datetime | None
+
+
 class IUserRepository(Protocol):
+    async def touch_last_login(self, user_id: int, at: datetime) -> None:
+        """Отметить вход. Отдельным методом, а не через save(): вход не должен
+        перезаписывать остальные поля пользователя. Вход — тоже активность,
+        поэтому last_seen_at сдвигается вместе с last_login_at."""
+        ...
+
+    async def touch_last_seen(self, user_id: int, at: datetime) -> None:
+        """Отметить обращение с действующим токеном — точечно, как и вход."""
+        ...
+
     async def add(self, user: User) -> User: ...
     async def get(self, user_id: int) -> User: ...
     async def get_by_phone(self, phone: str) -> User | None: ...
     async def list_by_tenant(self) -> list[User]: ...
     async def save(self, user: User) -> User: ...
-    async def get_token_version(self, user_id: int) -> int | None:
-        """Только token_version, без полной загрузки — для проверки JWT на каждый запрос.
-        None — пользователь не найден или деактивирован (is_active=False)."""
+    async def get_session(self, user_id: int) -> UserSession | None:
+        """token_version и last_seen_at без полной загрузки — для проверки JWT на
+        каждый запрос. None — пользователь не найден или деактивирован."""
         ...
 
 

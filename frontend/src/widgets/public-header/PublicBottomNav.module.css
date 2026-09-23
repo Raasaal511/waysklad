@@ -1,0 +1,76 @@
+/* Нижняя навигация публичных страниц — только мобильная ширина. */
+
+.bar {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 90;
+    display: flex;
+    align-items: stretch;
+    height: var(--public-bottom-nav-height);
+    padding-bottom: env(safe-area-inset-bottom);
+    border-top: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+    background: var(--bg);
+  }
+
+  .item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .itemActive {
+    color: var(--accent);
+  }
+
+  .item:active .iconWrap {
+    transform: scale(0.92);
+  }
+
+  .iconWrap {
+    position: relative;
+    display: flex;
+    transition: transform 0.15s ease;
+  }
+
+  .badge {
+    position: absolute;
+    top: -5px;
+    right: -8px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+  }
+
+  .label {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item,
+  .iconWrap {
+    transition: none;
+  }
+}

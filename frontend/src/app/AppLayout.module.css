@@ -3,6 +3,13 @@
 .app-layout {
   min-height: 100svh;
   display: flex;
+  /* Нижнее меню (<900px): полоса 52px + бордер 1px, FAB «Продать» выступает над ней на 22px.
+     Всё, что прилипает к низу экрана, ставится выше этой отметки. */
+  --app-nav-height: 53px;
+  --app-nav-fab-rise: 22px;
+  --app-nav-clearance: calc(
+    var(--app-nav-height) + var(--app-nav-fab-rise) + env(safe-area-inset-bottom, 0px)
+  );
 }
 
 .app-sidebar {
@@ -44,13 +51,12 @@
   line-height: 1.25;
   color: var(--text);
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-brand-tag {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-muted);
   letter-spacing: 0.02em;
@@ -76,18 +82,63 @@
 .app-header-user {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
-.app-header-user button {
+/* Не трогаем колокольчик/иконки — им задан свой 44×44. */
+.app-header-user > button:not([class*='bell']):not([aria-label]) {
   padding: 7px 12px;
   font-size: 13px;
+}
+
+/* До 899: компактный бейдж 44×44 (на 600–899 раньше оставался 33px по высоте). */
+@media (max-width: 899px) {
+  .app-header {
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .app-shop-brand {
+    flex: 1 1 auto;
+    max-width: calc(100% - 100px);
+  }
+
+  .app-shop-name {
+    max-width: 100%;
+  }
+
+  .app-brand-tag {
+    display: none;
+  }
+
+  .app-header-user {
+    gap: 0;
+  }
+
+  .app-header-user .app-user-info {
+    display: none;
+  }
+
+  .app-header-user .app-user-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .app-header-user .app-user-badge {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+    gap: 0;
+  }
 }
 
 .app-content {
   flex: 1;
   padding: 16px;
-  padding-bottom: 88px;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
   width: 100%;
   max-width: min(1100px, 100%);
   margin: 0 auto;
@@ -110,6 +161,18 @@
   font-size: 13px;
   max-width: min(90vw, 420px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 899px) {
+  .app-offline-toast {
+    top: auto;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+
+  .app-content-with-sell ~ .app-offline-toast,
+  .app-layout:has(.app-content-with-sell) .app-offline-toast {
+    bottom: calc(88px + env(safe-area-inset-bottom));
+  }
 }
 
 .app-offline-toast-success {
@@ -147,35 +210,88 @@
   margin: 0 8px 8px;
 }
 
+.app-offline-badge-wrap {
+  position: relative;
+}
+
+.app-offline-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.app-offline-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: min(240px, 70vw);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
 .app-nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   display: flex;
+  align-items: stretch;
   border-top: 1px solid var(--border);
   background: var(--bg);
-  padding: 4px 0 max(4px, env(safe-area-inset-bottom));
+  padding: 0 0 max(0px, env(safe-area-inset-bottom));
   z-index: 10;
-  overflow-x: auto;
-  scrollbar-width: none;
+  overflow: visible;
 }
 
-.app-nav::-webkit-scrollbar {
+/* Экранная клавиатура открыта (useKeyboardOpen): меню не должно закрывать поле ввода. */
+:global(html[data-keyboard='open']) .app-nav {
   display: none;
+}
+
+.app-content-with-sell {
+  /* Не меньше отступа sticky-панелей над меню, иначе в конце прокрутки они налезут на контент. */
+  padding-bottom: calc(var(--app-nav-clearance) + 12px);
 }
 
 .app-nav-item {
   flex: 1;
-  min-width: 40px;
+  min-width: 0;
+  min-height: 52px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-end;
   gap: 2px;
-  padding: 8px 2px;
+  padding: 6px 2px;
   text-decoration: none;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .app-nav-item span:not(.app-nav-icon) {
@@ -185,14 +301,6 @@
   white-space: nowrap;
 }
 
-/* Совсем узкие экраны (7+ пунктов не помещаются даже с обрезкой) — прячем
-   подписи, оставляем только иконки; название доступно через aria-label. */
-@media (max-width: 400px) {
-  .app-nav-item span:not(.app-nav-icon) {
-    display: none;
-  }
-}
-
 .app-nav-item.active {
   color: var(--accent);
 }
@@ -200,6 +308,222 @@
 .app-nav-icon {
   font-size: 20px;
   display: flex;
+  flex-shrink: 0;
+}
+
+.app-nav-sell {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 6px 2px;
+  margin-top: 0;
+  position: relative;
+}
+
+.app-nav-sell-btn {
+  position: absolute;
+  left: 50%;
+  bottom: calc(6px + 1.1em + 2px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-nav-sell-btn:active {
+  background: var(--accent-hover);
+  transform: translateX(-50%) scale(0.96);
+}
+
+.app-nav-sell-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1.1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-nav-item:focus,
+.app-nav-sell-btn:focus {
+  outline: none;
+}
+
+.app-nav-item:focus-visible,
+.app-nav-sell-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.app-more-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(20, 24, 19, 0.42);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: app-more-fade 0.15s ease;
+}
+
+@keyframes app-more-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.app-more-sheet {
+  width: min(100%, calc(100vw - 32px));
+  max-width: 480px;
+  max-height: min(calc(100dvh - 32px), 560px);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--bg);
+  box-shadow: 0 -8px 32px rgba(20, 24, 19, 0.18);
+  padding: 0 0 max(12px, env(safe-area-inset-bottom));
+  margin: 0 16px;
+  animation: app-more-slide 0.18s ease;
+  overflow: hidden;
+}
+
+@keyframes app-more-slide {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.app-more-handle {
+  width: 36px;
+  height: 4px;
+  margin: 10px auto 6px;
+  border-radius: 999px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.app-more-nav {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 8px 8px;
+}
+
+.app-more-footer {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.app-more-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 500;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-more-item:active {
+  background: var(--bg-muted);
+}
+
+.app-more-item.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Выключенный раздел (витрина): виден приглушённым и ведёт туда, где его включают.
+   Приглушаем цветом, а не opacity, иначе вместе с пунктом побледнеет и подсказка. */
+.app-sidebar-item.locked,
+.app-more-item.locked {
+  color: color-mix(in srgb, var(--text-muted) 55%, transparent);
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+/* Подсказка неактивного пункта: как [data-tooltip] меню, но fixed — поверх прокрутки списка. */
+.app-sidebar-tooltip {
+  position: fixed;
+  z-index: 200;
+  width: max-content;
+  max-width: 220px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  pointer-events: none;
+  transform: translateY(-50%);
+  animation: appSidebarTooltipIn 0.12s ease;
+}
+
+@keyframes appSidebarTooltipIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-4px);
+  }
+}
+
+/* Пункты шторки центрированы группой (иконка + текст) — строки тоже по центру. */
+.app-more-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  text-align: center;
+}
+
+.app-more-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.app-more-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: inherit;
 }
 
 .app-user-badge {
@@ -319,6 +643,13 @@
     flex-direction: column;
     gap: 2px;
     flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .app-sidebar-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .app-sidebar-item {
@@ -355,6 +686,24 @@
 
   .app-sidebar-footer {
     padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* «Обратная связь» — кнопка, но выглядит как пункт меню над «Выйти» */
+  .app-sidebar-feedback {
+    width: 100%;
+    justify-content: flex-start;
+    background: none;
+    font-weight: 400;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .app-sidebar-feedback:hover {
+    color: var(--text);
   }
 
   .app-logout {
@@ -427,6 +776,12 @@
   .sidebar-collapsed .app-sidebar-footer {
     display: flex;
     justify-content: center;
+    align-items: center;
+  }
+
+  .sidebar-collapsed .app-sidebar-feedback {
+    width: auto;
+    justify-content: center;
   }
 
   .sidebar-collapsed .app-logout {
@@ -434,4 +789,10 @@
     height: 36px;
     padding: 0;
   }
+}
+
+/* Поиск товаров в сайдбаре — на десктопе .app-header скрыта (min-width: 900px),
+   и шапочный GlobalSearch туда не попадает; в свёрнутом сайдбаре не рендерится. */
+.app-sidebar-search {
+  padding: 0 4px 10px;
 }

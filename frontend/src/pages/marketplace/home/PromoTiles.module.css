@@ -1,0 +1,214 @@
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.tile {
+  position: relative;
+  height: 220px;
+  border-radius: 24px;
+  padding: 24px;
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--text);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  transition: transform 150ms ease-out;
+}
+
+.tile:hover {
+  transform: translateY(-2px);
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tileText {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 62%;
+}
+
+.tileTitle {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.highlight {
+  display: inline-block;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 20px;
+  padding: 0 10px;
+  transform: rotate(-1deg);
+}
+
+.tileSubtitle {
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 0;
+  opacity: 0.85;
+}
+
+.tileBtn,
+.tileBtnLight {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.tileBtnArrow {
+  transition: transform 150ms ease-out;
+}
+
+.tile:hover .tileBtnArrow {
+  transform: translateX(3px);
+}
+
+.tileImage {
+  position: relative;
+  z-index: 1;
+  max-width: 40%;
+  max-height: 100%;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* Плитка с картинкой из баннера (banners.promo) */
+.tileBanner {
+  background: var(--bg-muted);
+}
+
+.tileBanner[data-theme='accent'] {
+  background: var(--accent);
+  color: #fff;
+}
+
+.tileBanner[data-theme='accent'] .highlight {
+  background: #fff;
+  color: var(--accent);
+}
+
+.tileBanner[data-theme='dark'] {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+/* --ink — контрастный акцентный тон, меняющийся местами со светлой/тёмной темой (в тёмной
+   теме он светлый, для контраста с тёмными поверхностями чата/кнопок). Но банер с
+   редакторским выбором «тёмная плитка» должен оставаться тёмной плиткой независимо от темы
+   сайта — иначе на тёмной странице такая плитка становится светлым пятном (P6). В тёмной
+   теме используем var(--bg) страницы (он и так тёмный) + рамку, чтобы плитка не сливалась
+   с фоном. */
+:root[data-theme='dark'] .tileBanner[data-theme='dark'] {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+/* «Откройте магазин бесплатно» — фон var(--accent), текст белый (M-F2 п.4а) */
+.tileOnboarding {
+  background: var(--accent);
+  color: #fff;
+}
+
+.tileOnboarding .tileBtnLight {
+  background: #fff;
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 10px 18px;
+}
+
+/* «Отзывы реальных покупателей» — фон var(--accent-soft) (M-F2 п.4б) */
+.tileReviews {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.reviewsArt {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 44%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.reviewsStars {
+  display: flex;
+  gap: 4px;
+  color: var(--warning);
+}
+
+.reviewsCard {
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 12px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reviewsCardLine {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border);
+}
+
+.skeletonTile {
+  background: var(--bg-muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeletonTile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonTile::after {
+    animation: none;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (max-width: 767px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .tile {
+    height: 200px;
+  }
+  .tileTitle {
+    font-size: 24px;
+  }
+}

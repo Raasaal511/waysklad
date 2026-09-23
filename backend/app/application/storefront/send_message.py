@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 
 from app.application.tasks.notify import notify_user
@@ -8,6 +9,7 @@ from app.domain.identity.entities import Role
 from app.domain.identity.permissions import Actor, Permission, require
 from app.domain.notifications.entities import NotificationKind
 from app.domain.storefront.entities import MessageAuthor, StorefrontMessage
+from app.infrastructure.config import settings
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.notifications.ws_broadcast import broadcaster, storefront_request_channel
 
@@ -79,21 +81,53 @@ class SendStaffStorefrontMessageCommand:
 
 
 class SendStaffStorefrontMessageUseCase:
-    """Сотрудник (owner/manager/…) отвечает в чат заявки из панели управления."""
+    """Сотрудник (owner/manager/…) отвечает в чат заявки из панели управления.
 
-    def __init__(self, uow: IUnitOfWork):
+    Покупателю с привязанным Telegram уходит короткое уведомление — чтобы
+    ответ магазина не терялся, пока он не откроет чат на сайте.
+    """
+
+    def __init__(self, uow: IUnitOfWork, notifier: INotifier | None = None):
         self._uow = uow
+        self._notifier = notifier
 
     async def execute(self, actor: Actor, cmd: SendStaffStorefrontMessageCommand) -> StorefrontMessage:
         require(actor, Permission.ORDERS_VIEW)
 
         async with self._uow as uow:
-            await uow.storefront_requests.get(cmd.request_id)  # 404 если чужая/не существует
+            request = await uow.storefront_requests.get(cmd.request_id)
             message = StorefrontMessage(
                 id=None, request_id=cmd.request_id, author=MessageAuthor.STAFF, text=cmd.text
             )
             message.validate()
             await uow.storefront_messages.add(message)
             await _publish_message(message)
+
+            customer_chat_id = ""
+            shop_name = ""
+            shop_slug = ""
+            if request.customer_id is not None:
+                customer = await uow.customers.get(request.customer_id)
+                customer_chat_id = customer.telegram_chat_id or ""
+                tenant = await uow.tenants.get(uow.tenant_id)
+                shop_name = tenant.name
+                shop_slug = tenant.slug or ""
+
             await uow.commit()
-            return message
+
+        if self._notifier and customer_chat_id:
+            preview = cmd.text.strip()
+            if len(preview) > 120:
+                preview = preview[:117] + "…"
+            path = f"/account/chats/{cmd.request_id}"
+            link = f"{settings.public_base_url.rstrip('/')}{path}" if settings.public_base_url and path else path
+            text = (
+                f"Магазин «{shop_name}» ответил по заказу:\n{preview}"
+                + (f"\n\nОткрыть чат: {link}" if link else "")
+            )
+            try:
+                await asyncio.to_thread(self._notifier.send, customer_chat_id, text)
+            except Exception:
+                pass
+
+        return message

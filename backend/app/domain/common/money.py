@@ -4,6 +4,27 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
 _CENT = Decimal("0.01")
+_NARROW_NBSP = "\u202f"  # как formatMoney на фронте
+
+
+def format_rub(value: Money | Decimal | int | str) -> str:
+    """Сумма для людей: «63 200 ₽», «1 250,50 ₽», «0 ₽». Без лишних ,00 у целых."""
+    if isinstance(value, Money):
+        amount = value.amount
+    else:
+        amount = Decimal(str(value)).quantize(_CENT, ROUND_HALF_UP)
+
+    sign = "-" if amount < 0 else ""
+    amount = abs(amount)
+    whole = int(amount)
+    cents = int((amount - whole) * 100)
+
+    whole_str = f"{whole:,}".replace(",", _NARROW_NBSP)
+    if cents == 0:
+        body = whole_str
+    else:
+        body = f"{whole_str},{cents:02d}"
+    return f"{sign}{body} ₽"
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -38,4 +59,5 @@ class Money:
         return self.amount < 0
 
     def __str__(self) -> str:
-        return f"{self.amount} ₽"
+        return format_rub(self)
+

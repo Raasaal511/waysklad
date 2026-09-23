@@ -31,10 +31,12 @@ import {
   IconTable,
   IconList,
   IconCalendar,
+  IconDots,
   type Icon as TablerIcon,
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
+import { DropdownMenu } from '../../shared/ui/DropdownMenu'
 import { formatMoney } from '../../shared/lib/format'
 import { useAuth } from '../../app/AuthContext'
 import { IssueOrderModal } from './IssueOrderModal'
@@ -214,17 +216,46 @@ export function OrdersPage() {
     <div className={layoutStyles.stack}>
       <div className={layoutStyles.sectionTitle}>
         <h2>Заказы</h2>
-        <div className={layoutStyles.row} style={{ gap: 8 }}>
-          <Link to="/storefront?tab=requests">
-            <Button variant="secondary">
-              <IconBuildingStore size={16} stroke={1.8} /> Заявки с витрины
-            </Button>
-          </Link>
-          {canManage && (
-            <Button onClick={() => navigate('/orders/new')}>
-              <IconPlus size={16} stroke={1.8} /> Заказ
-            </Button>
-          )}
+        <div className={layoutStyles.pageTitleActions}>
+          <div className={layoutStyles.pageTitleActionsDesktop}>
+            <Link to="/storefront?tab=requests">
+              <Button variant="secondary">
+                <IconBuildingStore size={16} stroke={1.8} /> Заявки с витрины
+              </Button>
+            </Link>
+            {canManage && (
+              <Button onClick={() => navigate('/orders/new')}>
+                <IconPlus size={16} stroke={1.8} /> Заказ
+              </Button>
+            )}
+          </div>
+          <div className={layoutStyles.pageTitleActionsMobile}>
+            <DropdownMenu
+              align="right"
+              trigger={
+                <IconButton variant="muted" size="lg" aria-label="Ещё действия">
+                  <IconDots size={20} stroke={1.8} />
+                </IconButton>
+              }
+              items={[
+                {
+                  key: 'requests',
+                  label: 'Заявки с витрины',
+                  onSelect: () => navigate('/storefront?tab=requests'),
+                },
+              ]}
+            />
+            {canManage && (
+              <IconButton
+                variant="accent"
+                size="lg"
+                aria-label="Создать заказ"
+                onClick={() => navigate('/orders/new')}
+              >
+                <IconPlus size={20} stroke={2} />
+              </IconButton>
+            )}
+          </div>
         </div>
       </div>
 

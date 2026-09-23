@@ -1,3 +1,4 @@
+from app.domain.common.money import format_rub
 from decimal import Decimal
 
 from app.domain.catalog.entities import Product
@@ -12,7 +13,7 @@ def catalog_page_text(shop_name: str, offset: int, total: int) -> str:
 
 
 def product_card_text(product: Product, in_stock: bool) -> str:
-    lines = [f"<b>{product.name}</b>", f"Цена: {product.retail_price.amount} ₽"]
+    lines = [f"<b>{product.name}</b>", f"Цена: {format_rub(product.retail_price)}"]
     if product.sku:
         lines.append(f"Артикул: {product.sku}")
     lines.append("В наличии" if in_stock else "Сейчас нет в наличии")

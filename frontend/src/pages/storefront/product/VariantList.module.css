@@ -1,0 +1,335 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toolsRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.searchField {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  color: var(--text-muted);
+}
+
+/* outline у самого <input> снят намеренно — фокус показывает контейнер
+   (блок «Д» п.5: у каждого интерактивного элемента есть :focus-visible) */
+.searchField:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.searchField input {
+  border: none;
+  outline: none;
+  background: none;
+  font: inherit;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+}
+
+.filterChip {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.filterChip:hover {
+  border-color: var(--accent-border);
+}
+
+.filterChip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.filterChipActive {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: transparent;
+}
+
+/* --- Количество (товар без вариантов) --- */
+
+.qtyBlock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--bg-muted);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.qtyBlockInfo {
+  min-width: 0;
+}
+
+.qtyBlockPrice {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.qtyBlockUnit {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg);
+  border: 1px solid transparent;
+  border-radius: 16px;
+  padding: 16px;
+  transition:
+    border-color 0.15s ease,
+    opacity 0.15s ease,
+    background 0.15s ease;
+}
+
+.rowSelected {
+  border-color: var(--accent);
+}
+
+.rowMuted {
+  opacity: 0.55;
+}
+
+.rowHighlight {
+  animation: highlightPulse 1.6s ease;
+}
+
+@keyframes highlightPulse {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+  30% {
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rowHighlight {
+    animation: none;
+  }
+}
+
+.rowThumbWrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-muted);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.rowThumbWrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.rowThumbExpand {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rowBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.rowName {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowStock {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+}
+
+.rowStockLow {
+  color: var(--warning);
+}
+
+.rowStockOut {
+  color: var(--danger);
+}
+
+.rowPrice {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 2px 0 0;
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.stepBtn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition:
+    transform 0.1s ease,
+    opacity 0.15s ease;
+}
+
+.stepBtn svg {
+  flex-shrink: 0;
+}
+
+.stepBtn:hover:not(:disabled) {
+  transform: scale(1.06);
+}
+
+.stepBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.stepBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.stepPlus {
+  background: var(--accent);
+  color: #fff;
+}
+
+.stepMinus {
+  background: var(--bg-muted);
+  color: var(--text);
+}
+
+input.stepValue.stepValue {
+  width: 32px;
+  height: 32px;
+  min-width: 28px;
+  text-align: center;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  padding: 0;
+}
+
+input.stepValue.stepValue:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-color: transparent;
+}
+
+.addOnlyBtn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.1s ease;
+}
+
+.addOnlyBtn svg {
+  flex-shrink: 0;
+}
+
+.addOnlyBtn:hover {
+  transform: scale(1.06);
+}
+
+.addOnlyBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 4px 0 0;
+}
+
+.showAllBtn {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.showAllBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

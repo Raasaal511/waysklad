@@ -23,6 +23,8 @@ import {
 } from '@tabler/icons-react'
 import { ApiError } from '../../shared/api/client'
 import { Button } from '../../shared/ui/Button'
+import { IconButton } from '../../shared/ui/IconButton'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { Select } from '../../shared/ui/Select'
 import { DateInput } from '../../shared/ui/DateInput'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
@@ -341,10 +343,24 @@ async function loadSalesPage(params: {
     <div className={layoutStyles.stack}>
       <div className={layoutStyles.sectionTitle}>
         <h2>Продажи</h2>
-        <Button onClick={() => navigate('/sales/new')}>
-          <IconPlus size={16} stroke={1.8} />
-          {hasDraft ? 'Продолжить продажу' : 'Новая продажа'}
-        </Button>
+        <div className={layoutStyles.pageTitleActions}>
+          <div className={layoutStyles.pageTitleActionsDesktop}>
+            <Button onClick={() => navigate('/sales/new')}>
+              <IconPlus size={16} stroke={1.8} />
+              {hasDraft ? 'Продолжить продажу' : 'Новая продажа'}
+            </Button>
+          </div>
+          <div className={layoutStyles.pageTitleActionsMobile}>
+            <IconButton
+              variant="accent"
+              size="lg"
+              aria-label={hasDraft ? 'Продолжить продажу' : 'Новая продажа'}
+              onClick={() => navigate('/sales/new')}
+            >
+              <IconPlus size={20} stroke={2} />
+            </IconButton>
+          </div>
+        </div>
       </div>
 
       <div ref={sentinelRef} style={{ height: 1, marginBottom: -1 }} />
@@ -504,9 +520,17 @@ async function loadSalesPage(params: {
       {loading ? (
         <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : filteredSales.length === 0 ? (
-        <p className={layoutStyles.textMuted}>
-          {total === 0 ? 'Продаж пока нет — начните первую' : 'За этот период продаж нет'}
-        </p>
+        total === 0 ? (
+          <EmptyState
+            illustration="empty-sales"
+            title="Продаж пока нет — начните первую"
+            description="Оформите продажу: товар, количество, оплата — и чек готов."
+            actionLabel="Новая продажа"
+            onAction={() => navigate('/sales/new')}
+          />
+        ) : (
+          <p className={layoutStyles.textMuted}>За этот период продаж нет</p>
+        )
       ) : (
         <div key={`${dateRange.from}-${dateRange.to}`} className={layoutStyles.stack} style={{ gap: 16 }}>
           {groups.map((group) => (

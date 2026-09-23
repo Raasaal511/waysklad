@@ -17,7 +17,7 @@ async def test_storekeeper_limited_to_assigned_warehouse_via_api(
 
     login = await client.post(
         "/api/auth/login",
-        json={"phone": response.json()["phone"], "password": "secret123"},
+        json={"phone": response.json()["phone"], "password": "secret123", "personal_data_consent": True},
     )
     storekeeper_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
 
@@ -203,7 +203,7 @@ async def test_counterparties_scoped_by_warehouse_via_api(client, owner_headers,
     )
     assert response.status_code == 201, response.text
     login = await client.post(
-        "/api/auth/login", json={"phone": seller_phone, "password": "secret123"}
+        "/api/auth/login", json={"phone": seller_phone, "password": "secret123", "personal_data_consent": True}
     )
     seller_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
 
@@ -413,7 +413,7 @@ async def test_task_full_lifecycle_via_api(client, owner_headers, random_phone):
     employee_id = response.json()["id"]
 
     response = await client.post(
-        "/api/auth/login", json={"phone": phone, "password": "secret123"}
+        "/api/auth/login", json={"phone": phone, "password": "secret123", "personal_data_consent": True}
     )
     employee_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
 
@@ -540,10 +540,11 @@ async def test_task_client_link_tenant_isolation_via_api(client, owner_headers, 
         json={
             "shop_name": "Чужой магазин", "owner_name": "Другой", "phone": other_owner_phone,
             "password": "secret123",
+            "personal_data_consent": True,
         },
     )
     login = await client.post(
-        "/api/auth/login", json={"phone": other_owner_phone, "password": "secret123"}
+        "/api/auth/login", json={"phone": other_owner_phone, "password": "secret123", "personal_data_consent": True}
     )
     other_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
     response = await client.post(
@@ -732,7 +733,7 @@ async def test_seller_sees_only_own_tasks_via_api(client, owner_headers, random_
     assert response.status_code == 201, response.text
 
     response = await client.post(
-        "/api/auth/login", json={"phone": phone, "password": "secret123"}
+        "/api/auth/login", json={"phone": phone, "password": "secret123", "personal_data_consent": True}
     )
     seller_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
 
@@ -772,7 +773,7 @@ async def test_storekeeper_cannot_view_orders_via_api(client, owner_headers, ran
     assert response.status_code == 201, response.text
 
     response = await client.post(
-        "/api/auth/login", json={"phone": storekeeper_phone, "password": "secret123"}
+        "/api/auth/login", json={"phone": storekeeper_phone, "password": "secret123", "personal_data_consent": True}
     )
     storekeeper_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
 

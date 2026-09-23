@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { listProducts, getByBarcode, type Product } from '../../entities/product/api'
+import { listProducts, getByBarcode, getProduct, type Product } from '../../entities/product/api'
 import { type Client, createClient } from '../../entities/counterparty/api'
 import { useCatalog } from '../../app/CatalogContext'
 import {
@@ -67,11 +67,14 @@ export function NewSaleForm({
   onClientsChange,
   onClose,
   onDone,
+  initialProductId = null,
 }: {
   clients: Client[]
   onClientsChange: (clients: Client[]) => void
   onClose: () => void
   onDone: (sale: Sale) => void
+  /** Товар сразу в корзину — ссылка с карточки товара `/sales/new?product=…`. */
+  initialProductId?: number | null
 }) {
   const draft = useMemo(() => loadDraft(), [])
   const {
@@ -103,6 +106,7 @@ export function NewSaleForm({
   useEffect(() => () => window.clearTimeout(maxReachedTimerRef.current), [])
   const [payment, setPayment] = useState<PaymentMethod>(draft?.payment ?? 'cash')
   const [debtDueDate, setDebtDueDate] = useState('')
+  const [paidNow, setPaidNow] = useState(draft?.paidNow ?? '')
   const [cashReceived, setCashReceived] = useState('')
   const [keepChange, setKeepChange] = useState(false)
   const [discount, setDiscount] = useState(draft?.discount ?? '0')
@@ -190,6 +194,26 @@ export function NewSaleForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // С карточки товара: `/sales/new?product=id` — сразу кладём в корзину
+  const initialProductAddedRef = useRef(false)
+  useEffect(() => {
+    if (!initialProductId || initialProductAddedRef.current) return
+    let cancelled = false
+    getProduct(initialProductId)
+      .then((product) => {
+        if (cancelled) return
+        initialProductAddedRef.current = true
+        setCart((prev) => {
+          if (prev.some((l) => l.product.id === product.id)) return prev
+          return [...prev, { product, quantity: '1', price: product.retail_price }]
+        })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [initialProductId])
+
   // Черновик переживает закрытие модалки/перезагрузку страницы, пока продажа не проведена
   useEffect(() => {
     if (offlineQueued) return
@@ -197,8 +221,8 @@ export function NewSaleForm({
       clearDraft()
       return
     }
-    saveDraft({ warehouseId, cart, payment, discount, discountMode, clientId })
-  }, [warehouseId, cart, payment, discount, discountMode, clientId, offlineQueued])
+    saveDraft({ warehouseId, cart, payment, discount, discountMode, clientId, paidNow })
+  }, [warehouseId, cart, payment, discount, discountMode, clientId, paidNow, offlineQueued])
 
   async function handleScan(code: string) {
     setShowScanner(false)
@@ -375,6 +399,7 @@ export function NewSaleForm({
     setClientId(null)
     setPayment('cash')
     setDebtDueDate('')
+    setPaidNow('')
     setCashReceived('')
     setError(null)
   }
@@ -396,6 +421,10 @@ export function NewSaleForm({
   const discountAmount = centsToMoney(discountAmountCents)
   const totalCents = Math.max(0, subtotalCents - discountAmountCents)
   const total = centsToMoney(totalCents)
+  const paidNowCents =
+    payment === 'credit' && paidNow ? Math.round(Number(paidNow || 0) * 100) : 0
+  const debtCents = Math.max(0, totalCents - paidNowCents)
+  const debtAmount = centsToMoney(debtCents)
   const cashReceivedCents = Math.round(Number(cashReceived || 0) * 100)
   const rawChangeCents = cashReceivedCents - totalCents
   const changeKeptCents = keepChange && rawChangeCents > 0 ? rawChangeCents : 0
@@ -411,6 +440,10 @@ export function NewSaleForm({
     }
     if (payment === 'credit' && !debtDueDate) {
       setError('Для продажи в долг укажите срок «Долг до»')
+      return
+    }
+    if (payment === 'credit' && paidNowCents > 0 && paidNowCents >= totalCents) {
+      setError('Клиент заплатил всю сумму — выберите „Наличные“ или „Перевод“')
       return
     }
     const overStockLine = cart.find((l) => {
@@ -431,7 +464,11 @@ export function NewSaleForm({
     const cashReceivedValue =
       payment === 'cash' && cashReceived && cashReceivedCents >= totalCents ? cashReceived : null
     const changeKeptValue =
-      cashReceivedValue && changeKeptCents > 0 ? centsToMoney(changeKeptCents).toFixed(2) : null
+      cashReceivedValue && changeKeptCents > 0
+        ? centsToMoney(changeKeptCents).toFixed(2)
+        : '0'
+    const paidNowValue =
+      payment === 'credit' && paidNowCents > 0 ? centsToMoney(paidNowCents).toFixed(2) : '0'
     try {
       const sale = await createSale({
         warehouse_id: warehouseId,
@@ -442,6 +479,7 @@ export function NewSaleForm({
         cash_received: cashReceivedValue,
         change_kept: changeKeptValue,
         debt_due_date: payment === 'credit' ? debtDueDate : null,
+        paid_now: payment === 'credit' ? paidNowValue : '0',
       })
       clearDraft()
       refreshCatalog(['stock']).catch(() => {})
@@ -459,6 +497,7 @@ export function NewSaleForm({
           cash_received: cashReceivedValue,
           change_kept: changeKeptValue,
           debt_due_date: payment === 'credit' ? debtDueDate : null,
+          paid_now: payment === 'credit' ? paidNowValue : '0',
         })
         clearDraft()
         setOfflineQueued({ itemsCount: items.length, total: total.toFixed(2) })
@@ -466,6 +505,7 @@ export function NewSaleForm({
         setDiscount('0')
         setClientId(null)
         setDebtDueDate('')
+        setPaidNow('')
         setCashReceived('')
       } else {
         setError(err instanceof ApiError ? err.message : 'Не удалось провести продажу')
@@ -474,6 +514,13 @@ export function NewSaleForm({
       setSaving(false)
     }
   }
+
+  const submitButtonLabel = (() => {
+    if (saving) return 'Продаём…'
+    if (cart.length === 0) return 'Продать'
+    if (payment === 'credit') return `В долг · ${formatMoney(debtAmount)} ₽`
+    return `Продать · ${formatMoney(total)} ₽`
+  })()
 
   const checkoutActions = (
     <>
@@ -498,7 +545,7 @@ export function NewSaleForm({
           onClick={handleCheckout}
           disabled={saving || !warehouseId || cart.length === 0}
         >
-          {saving ? 'Проведение…' : 'Провести продажу'}
+          {submitButtonLabel}
         </Button>
       </div>
     </>
@@ -950,6 +997,25 @@ export function NewSaleForm({
                   onChange={setDebtDueDate}
                 />
               </div>
+            )}
+
+            {payment === 'credit' && (
+              <label className={[layoutStyles.field, styles.saleReceivedField].join(' ')}>
+                Заплатил сейчас
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={paidNow}
+                  onChange={(e) => {
+                    const normalized = normalizeDecimalInput(e.target.value)
+                    if (normalized !== null) setPaidNow(normalized)
+                  }}
+                />
+                <span className={layoutStyles.textMuted}>
+                  В долг: {formatMoney(debtAmount)} ₽
+                </span>
+              </label>
             )}
           </div>
 

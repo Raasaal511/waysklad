@@ -97,7 +97,7 @@ async def test_deactivate_client_with_debt_requires_force(
         IssueDebtCommand(client_id=client.id, warehouse_id=warehouse_id, amount=Decimal("1500")),
     )
 
-    with pytest.raises(ClientHasDebtError, match="1500"):
+    with pytest.raises(ClientHasDebtError, match="1\u202f500"):
         await UpdateClientUseCase(make_uow(tenant_id)).execute(
             owner,
             UpdateClientCommand(client_id=client.id, name="Должник", is_active=False),

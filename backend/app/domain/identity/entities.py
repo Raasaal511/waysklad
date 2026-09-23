@@ -1,4 +1,6 @@
 from dataclasses import dataclass, field
+from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 
 from app.domain.common.phone import Phone
@@ -32,6 +34,29 @@ class Tenant:
     # неоплату. Заблокированный tenant: обычный логин (get_current_user) и
     # публичная витрина недоступны, существующие данные не удаляются.
     is_suspended: bool = False
+    city: str | None = None  # из справочника app.domain.platform.cities.CITIES
+    # Проставляется только админом платформы (POST /api/admin/tenants/{id}/verify) —
+    # значок доверия на витрине/маркетплейсе, магазин повлиять сам не может.
+    is_verified: bool = False
+    logo: str = ""  # тот же паттерн, что Warehouse.photo — необязательный логотип магазина
+    # точный остаток варианта/товара на витрине (B1 п.2) — по умолчанию выключено:
+    # владелец сам решает, раскрывать ли конкурентам объём своих продаж
+    storefront_show_stock_qty: bool = False
+    # публичный профиль магазина (B2) — карточка продавца, FAQ, контакты
+    storefront_description: str = ""  # до 500 символов, короткое «о магазине»
+    contact_phone: str = ""
+    contact_whatsapp: str = ""
+    contact_telegram: str = ""  # username без "@" — валидируется в UpdateShopUseCase
+    storefront_min_order_total: Decimal | None = None
+    policy_refund_money: str = ""
+    policy_payment: str = ""
+    policy_delivery: str = ""
+    policy_returns: str = ""
+    # когда магазин зарегистрирован — «На ВайСклад с …» в публичном профиле
+    # (B2 п.2). Заполняется мапперами из TenantModel.created_at (TimestampMixin),
+    # у самой Tenant это единственное поле, публикующее created_at наружу —
+    # остальной домен считает его инфраструктурной деталью
+    created_at: datetime | None = None
 
 
 @dataclass
@@ -83,3 +108,9 @@ class User:
     # инкрементируется при смене пароля/разлогине со всех устройств — токены
     # с прежним значением перестают проходить проверку
     token_version: int = 0
+    # последний успешный вход — только для админки платформы («магазин жив?»),
+    # в бизнес-правилах не участвует
+    last_login_at: datetime | None = None
+    # согласие на обработку телефона при регистрации (152-ФЗ); NULL у старых
+    # аккаунтов — их не блокируем
+    personal_data_consent_at: datetime | None = None

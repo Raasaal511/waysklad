@@ -116,3 +116,43 @@
   flex: 0 0 auto;
   width: 190px;
 }
+
+.telegramWarning {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--warning);
+  background: var(--warning-bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* Карточка витрины: сюда ведёт неактивный пункт «Витрина» из меню (#storefront).
+   Отступ сверху — под прилипшую шапку; подсветка показывает, что искать. */
+.storefrontCard {
+  scroll-margin-top: calc(var(--app-header-height, 0px) + 16px);
+  transition: box-shadow 0.3s ease;
+}
+
+.storefrontCardHighlighted {
+  animation: storefrontCardPulse 1.6s ease-out;
+}
+
+@keyframes storefrontCardPulse {
+  0%,
+  40% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .storefrontCardHighlighted {
+    animation: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+}

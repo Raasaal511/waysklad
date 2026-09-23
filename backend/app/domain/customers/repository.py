@@ -1,13 +1,19 @@
 from datetime import datetime
 from typing import Protocol
 
-from app.domain.customers.entities import Customer, CustomerLoginLink
+from app.domain.customers.entities import Customer, CustomerLoginLink, PhoneVerificationCode
 
 
 class ICustomerRepository(Protocol):
     async def add(self, customer: Customer) -> Customer: ...
     async def get(self, customer_id: int) -> Customer: ...
     async def get_by_phone(self, phone: str) -> Customer | None: ...
+    async def get_by_username(self, username: str) -> Customer | None:
+        """Сравнение без учёта регистра — «Vasya» и «vasya» это один логин."""
+        ...
+    async def get_by_telegram_chat_id(self, chat_id: str) -> Customer | None:
+        """Покупатель, уже открывший бота витрины (для /confirm кода)."""
+        ...
     async def get_token_version(self, customer_id: int) -> int | None:
         """Только token_version, без полной загрузки — для проверки JWT на
         каждый запрос. None — покупатель не найден."""
@@ -23,4 +29,22 @@ class ICustomerLoginLinkRepository(Protocol):
         """Удаляет ссылки старше cutoff (созданные до этого момента) — и
         неподтверждённые (протухшие черновики входа), и уже подтверждённые
         (своё дело сделали, дальше не нужны). Возвращает число удалённых."""
+        ...
+
+
+class IPhoneVerificationCodeRepository(Protocol):
+    async def add(self, code: PhoneVerificationCode) -> PhoneVerificationCode: ...
+    async def get_active(self, customer_id: int, now: datetime) -> PhoneVerificationCode | None:
+        """Последний непросроченный код покупателя, если он есть."""
+        ...
+
+    async def get_last(self, customer_id: int) -> PhoneVerificationCode | None:
+        """Последний выпущенный код независимо от срока — для cooldown."""
+        ...
+
+    async def count_since(self, customer_id: int, since: datetime) -> int: ...
+    async def save(self, code: PhoneVerificationCode) -> PhoneVerificationCode: ...
+    async def expire_active(self, customer_id: int, now: datetime) -> None:
+        """Делает действующие коды покупателя недействительными, не удаляя
+        строки: по ним считается лимит «не больше N кодов в час»."""
         ...

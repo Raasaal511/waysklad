@@ -1,6 +1,8 @@
-/README.md
-
+# Документация — только локально, не на GitHub (решение владельца 23.09)
 docs/
+
+# Исходники иллюстраций (сборка → public/illustrations/*.webp)
+frontend/design-src/
 
 /.claude
 # --- Python ---

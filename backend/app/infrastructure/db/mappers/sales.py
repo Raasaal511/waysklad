@@ -21,6 +21,7 @@ class SaleMapper:
             payment_method=sale.payment_method,
             discount=sale.discount.amount,
             prepayment=sale.prepayment.amount,
+            paid_now=sale.paid_now.amount,
             total=sale.total.amount,  # снимок суммы чека для аналитики
             client_op_id=sale.client_op_id,
             note=sale.note,
@@ -49,6 +50,7 @@ class SaleMapper:
             payment_method=model.payment_method,
             discount=Money(model.discount),
             prepayment=Money(model.prepayment),
+            paid_now=Money(model.paid_now),
             client_id=model.client_id,
             created_at=model.created_at,
             client_op_id=model.client_op_id,

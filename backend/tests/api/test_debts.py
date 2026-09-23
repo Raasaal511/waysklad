@@ -122,6 +122,6 @@ async def test_due_debt_whatsapp_reminder_link_via_api(client, owner_headers):
     with_phone_link = by_client[with_phone_id]["whatsapp_reminder_link"]
     assert with_phone_link is not None
     assert with_phone_link.startswith("https://wa.me/79281112233?text=")
-    assert "1000" in with_phone_link
+    assert "1%E2%80%AF000" in with_phone_link or "1\u202f000" in with_phone_link
 
     assert by_client[without_phone_id]["whatsapp_reminder_link"] is None

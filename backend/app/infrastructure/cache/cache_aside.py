@@ -26,6 +26,47 @@ def shop_prefix(slug: str) -> str:
     return f"shop:{slug}:"
 
 
+# Префиксы кросс-tenant кешей маркетплейса (без shop_prefix — их ключ не завязан
+# на один slug, т.к. одна запись отвечает сразу за много магазинов). Admin-действия,
+# которые должны быть видны на маркетплейсе немедленно (verify/unverify, suspend/
+# unsuspend), чистят эти namespace целиком, а не ждут TTL (_CACHE_TTL_SECONDS
+# в list_products.py/get_product.py).
+MARKETPLACE_CATALOG_PREFIX = "marketplace_catalog:"
+MARKETPLACE_PRODUCT_PREFIX = "marketplace_product:"
+# главная (M-B2): баннеры/секции меняются при verify/unverify/suspend магазина,
+# а также при любой мутации баннера в админке (см. platform_banners.py)
+MARKETPLACE_HOME_PREFIX = "marketplace_home:"
+MARKETPLACE_SHOPS_PREFIX = "marketplace_shops:"
+MARKETPLACE_SUGGEST_PREFIX = "marketplace_suggest:"
+
+
+ADMIN_OVERVIEW_PREFIX = "admin:overview"
+ADMIN_TENANTS_PREFIX = "admin:tenants"
+
+
+async def invalidate_marketplace_cache(cache: ICache | None) -> None:
+    if cache is None:
+        return
+    await cache.delete_prefix(MARKETPLACE_CATALOG_PREFIX)
+    await cache.delete_prefix(MARKETPLACE_PRODUCT_PREFIX)
+    await cache.delete_prefix(MARKETPLACE_HOME_PREFIX)
+    await cache.delete_prefix(MARKETPLACE_SHOPS_PREFIX)
+    await cache.delete_prefix(MARKETPLACE_SUGGEST_PREFIX)
+
+
+async def invalidate_admin_cache(cache: ICache | None) -> None:
+    """Сбрасывает кеши админ-панели (обзор, список магазинов).
+
+    Вызывается после действий админа над магазином: список кешируется на
+    десятки секунд, и без сброса админ нажимал бы «Проверенный», а список
+    ещё полминуты показывал бы старое значение.
+    """
+    if cache is None:
+        return
+    await cache.delete_prefix(ADMIN_OVERVIEW_PREFIX)
+    await cache.delete_prefix(ADMIN_TENANTS_PREFIX)
+
+
 async def cached(
     cache: ICache,
     key: str,

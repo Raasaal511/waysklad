@@ -1,8 +1,15 @@
 FROM python:3.12-slim
 
+# Версия сборки для админки («Эксплуатация»). Дефолты заданы, чтобы локальная
+# сборка без --build-arg не падала: docker build --build-arg GIT_SHA=$(git rev-parse --short HEAD)
+ARG GIT_SHA=dev
+ARG BUILD_TIME=""
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    GIT_SHA=$GIT_SHA \
+    BUILD_TIME=$BUILD_TIME
 
 WORKDIR /app
 

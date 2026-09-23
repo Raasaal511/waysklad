@@ -149,7 +149,10 @@ export function Select({
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={ariaLabel}
+        // accessible name должно включать видимый текст кнопки (WCAG 2.5.3 Label in
+        // Name / Lighthouse label-content-name-mismatch) — aria-label не заменяет его
+        // целиком, а поясняет назначение перед выбранным значением
+        aria-label={ariaLabel && selected ? `${ariaLabel}: ${selected.label}` : ariaLabel}
         onClick={() => !disabled && setOpen((v) => !v)}
         onKeyDown={handleTriggerKeyDown}
       >

@@ -29,7 +29,7 @@ class RequestCustomerLoginLinkUseCase:
         self._uow = uow
 
     async def execute(self, cmd: RequestCustomerLoginLinkCommand) -> RequestCustomerLoginLinkResult:
-        if not settings.telegram_bot_username:
+        if not settings.telegram_bot_username_clean:
             raise DomainError("Вход через Telegram недоступен")
 
         phone = Phone(cmd.phone)
@@ -39,5 +39,5 @@ class RequestCustomerLoginLinkUseCase:
             await uow.customer_login_links.add(link)
             await uow.commit()
 
-        deep_link = f"https://t.me/{settings.telegram_bot_username}?start=login_{link.token}"
+        deep_link = f"https://t.me/{settings.telegram_bot_username_clean}?start=login_{link.token}"
         return RequestCustomerLoginLinkResult(token=link.token, telegram_deep_link=deep_link)

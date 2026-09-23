@@ -19,7 +19,9 @@
 }
 
 .dueDatePreset {
-  padding: 4px 10px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  min-height: 44px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: transparent;
@@ -45,6 +47,10 @@
   justify-content: flex-end;
   gap: 8px;
   padding-top: 4px;
+}
+
+.saveBar button {
+  min-height: 44px;
 }
 
 @media (max-width: 720px) {

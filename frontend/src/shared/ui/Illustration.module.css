@@ -1,0 +1,22 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/*
+ * Тёмная тема: мягкая тёмная тень — силуэт чуть «садится» на --bg,
+ * без светлого ореола.
+ */
+:global([data-theme='dark']) .img {
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
+}

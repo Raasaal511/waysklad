@@ -15,8 +15,10 @@ from app.infrastructure.db.repositories.counterparties import (
 from app.infrastructure.db.repositories.customers import (
     SqlAlchemyCustomerLoginLinkRepository,
     SqlAlchemyCustomerRepository,
+    SqlAlchemyPhoneVerificationCodeRepository,
 )
 from app.infrastructure.db.repositories.debts import SqlAlchemyDebtRepository
+from app.infrastructure.db.repositories.feedback import SqlAlchemyFeedbackRepository
 from app.infrastructure.db.repositories.identity import (
     SqlAlchemyTenantRepository,
     SqlAlchemyUserRepository,
@@ -29,12 +31,21 @@ from app.infrastructure.db.repositories.inventory import (
 from app.infrastructure.db.repositories.marketplace import SqlAlchemyMarketplaceProductRepository
 from app.infrastructure.db.repositories.notifications import SqlAlchemyNotificationRepository
 from app.infrastructure.db.repositories.orders import SqlAlchemyOrderRepository
-from app.infrastructure.db.repositories.reviews import SqlAlchemyReviewRepository
+from app.infrastructure.db.repositories.platform import (
+    SqlAlchemyPlatformBannerRepository,
+    SqlAlchemyPlatformCategoryRepository,
+)
+from app.infrastructure.db.repositories.reviews import (
+    SqlAlchemyReviewRepository,
+    SqlAlchemyReviewUploadRepository,
+    SqlAlchemyReviewVoteRepository,
+)
 from app.infrastructure.db.repositories.sales import (
     SqlAlchemySaleRepository,
     SqlAlchemySaleReturnRepository,
 )
 from app.infrastructure.db.repositories.storefront import (
+    SqlAlchemyProductViewRepository,
     SqlAlchemyStorefrontMessageRepository,
     SqlAlchemyStorefrontRequestRepository,
 )
@@ -65,6 +76,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.suppliers = SqlAlchemySupplierRepository(self)
         self.customers = SqlAlchemyCustomerRepository(self)
         self.customer_login_links = SqlAlchemyCustomerLoginLinkRepository(self)
+        self.customer_phone_codes = SqlAlchemyPhoneVerificationCodeRepository(self)
         self.stock = SqlAlchemyStockRepository(self)
         self.stock_documents = SqlAlchemyStockDocumentRepository(self)
         self.sales = SqlAlchemySaleRepository(self)
@@ -73,12 +85,18 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.orders = SqlAlchemyOrderRepository(self)
         self.storefront_requests = SqlAlchemyStorefrontRequestRepository(self)
         self.storefront_messages = SqlAlchemyStorefrontMessageRepository(self)
+        self.product_views = SqlAlchemyProductViewRepository(self)
         self.reviews = SqlAlchemyReviewRepository(self)
+        self.review_uploads = SqlAlchemyReviewUploadRepository(self)
+        self.review_votes = SqlAlchemyReviewVoteRepository(self)
         self.tasks = SqlAlchemyTaskRepository(self)
         self.notifications = SqlAlchemyNotificationRepository(self)
         self.audit = SqlAlchemyAuditRepository(self)
         self.analytics = SqlAlchemyAnalyticsRepository(self)
         self.marketplace_products = SqlAlchemyMarketplaceProductRepository(self.session)
+        self.platform_categories = SqlAlchemyPlatformCategoryRepository(self.session)
+        self.platform_banners = SqlAlchemyPlatformBannerRepository(self.session)
+        self.feedback = SqlAlchemyFeedbackRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:

@@ -30,7 +30,10 @@ class SaleModel(Base, TenantMixin, TimestampMixin):
     # уже полученная ранее предоплата (заказ) — уменьшает total, не revenue;
     # отдельно от discount, см. Sale.prepayment в домене
     prepayment: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    # оплачено сразу при credit — остаток в долг; не уменьшает total/выручку
+    paid_now: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)  # снимок суммы чека
+
     client_op_id: Mapped[str | None] = mapped_column(String(64))
     note: Mapped[str] = mapped_column(Text, default="")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)

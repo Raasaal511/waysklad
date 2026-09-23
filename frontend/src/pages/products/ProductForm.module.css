@@ -202,6 +202,14 @@
   background: var(--bg) !important;
 }
 
+@media (max-width: 899px) {
+  .skuEdit input {
+    font-size: 16px !important;
+    min-height: 44px;
+    width: min(160px, 100%);
+  }
+}
+
 .skuEdit input:hover {
   border-color: var(--accent) !important;
 }
@@ -289,7 +297,7 @@
 
 .metaField input {
   flex: 1;
-  min-width: 0;
+  min-width: 44px;
   font-size: 13.5px !important;
   padding: 4px 0 !important;
   border: none !important;
@@ -298,14 +306,22 @@
   outline: none !important;
 }
 
+@media (max-width: 899px) {
+  .metaField input {
+    font-size: 16px !important;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px 0 !important;
+  }
+}
+
 .metaField input:focus {
   outline: none !important;
   box-shadow: none !important;
 }
 
 .unitSelect {
-  flex: 1;
-  min-width: 120px;
+  width: 110px;
 }
 
 .metaFieldSelect {
@@ -313,33 +329,41 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  flex: 1;
-  max-width: 420px;
+  flex: 0 0 auto;
 }
 
 .metricInput {
   width: 100%;
   border: 1px solid var(--border) !important;
-  background: var(--bg) !important;
-  padding: 6px 8px !important;
+  background: var(--bg-muted) !important;
+  padding: 5px 8px !important;
   border-radius: var(--radius-sm) !important;
   box-shadow: none !important;
   outline: none !important;
   font: inherit;
-  font-size: 16px !important;
+  font-size: 18px !important;
   font-weight: 700;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.metricInput::placeholder {
+  color: var(--text-muted);
+  font-weight: 700;
 }
 
 .metricInput:hover {
   border-color: var(--accent) !important;
+  background: var(--bg) !important;
 }
 
 .metricInput:focus {
   border-color: var(--accent) !important;
-  outline: 2px solid var(--accent) !important;
-  outline-offset: 1px;
+  background: var(--bg) !important;
+  outline: 2px solid var(--accent-soft) !important;
+  outline-offset: 0;
   box-shadow: none !important;
 }
 
@@ -392,7 +416,7 @@
 
 .variantRow {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: 1.2fr 1fr 1fr auto;
   gap: 10px;
   align-items: center;
   min-width: 0;
@@ -440,14 +464,69 @@
     width: 100%;
   }
 
+  /* Штрихкод — на всю строку, единица переносится ниже. Одного width: 100% мало:
+     flex: 1 (basis 0) его перебивает, и поле с двумя кнопками ужималось до 105px. */
   .metaField {
     max-width: none;
     width: 100%;
+    flex-basis: 100%;
   }
 
   .saveBar > * {
     flex: 1;
   }
+}
+
+.showcaseCard {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.showcaseSubtitle {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.showcaseBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.showcaseField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.showcaseFieldLabel {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.showcaseFieldLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.showcaseToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .descriptionInput {
@@ -461,12 +540,47 @@
   font: inherit;
   line-height: 1.45;
   resize: vertical;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.descriptionInput:hover {
+  border-color: var(--accent);
+}
+
+.descriptionInput:focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 0;
+}
+
+.galleryCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .galleryGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1.5px dashed transparent;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.galleryGridActive {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .galleryItem {
@@ -477,6 +591,11 @@
   border: 1px solid var(--border);
   cursor: grab;
   background: var(--bg-muted);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.galleryItem:active {
+  cursor: grabbing;
 }
 
 .galleryItem img {
@@ -486,23 +605,81 @@
   display: block;
 }
 
-.galleryRemove {
+.galleryItemOverlay {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 6px;
+  pointer-events: none;
+}
+
+.galleryItemOverlay > * {
+  pointer-events: auto;
+}
+
+.galleryMainBadge {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.galleryRemove {
   width: 24px;
   height: 24px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: none;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--bg) 85%, transparent);
-  color: var(--text);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.galleryRemove svg {
+  flex-shrink: 0;
 }
 
 .galleryRemove:hover {
   background: var(--danger);
   color: #fff;
+}
+
+.galleryAddTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  border: 1.5px dashed var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.galleryAddTile:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.galleryAddTile:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

@@ -23,8 +23,12 @@ import {
   IconSearch,
   IconClockHour4,
   IconBrandWhatsapp,
+  IconDots,
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
+import { IconButton } from '../../shared/ui/IconButton'
+import { EmptyState } from '../../shared/ui/EmptyState'
+import { DropdownMenu } from '../../shared/ui/DropdownMenu'
 import { formatMoney } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
 import { daysOverdue, pluralDays } from '../../entities/debt/dueDate'
@@ -268,16 +272,45 @@ export function DebtsPage() {
     <div className={layoutStyles.stack}>
       <div className={layoutStyles.sectionTitle}>
         <h2>Долги</h2>
-        <div className={layoutStyles.row} style={{ gap: 8 }}>
-          {overview?.has_scheduled_payments && (
-            <Button variant="secondary" onClick={() => setShowUpcoming(true)}>
-              <IconClockHour4 size={16} stroke={1.8} /> Выплаты
-              {upcoming.length > 0 && <span className={layoutStyles.countBadge}>{upcoming.length}</span>}
+        <div className={layoutStyles.pageTitleActions}>
+          <div className={layoutStyles.pageTitleActionsDesktop}>
+            {overview?.has_scheduled_payments && (
+              <Button variant="secondary" onClick={() => setShowUpcoming(true)}>
+                <IconClockHour4 size={16} stroke={1.8} /> Выплаты
+                {upcoming.length > 0 && <span className={layoutStyles.countBadge}>{upcoming.length}</span>}
+              </Button>
+            )}
+            <Button onClick={() => navigate('/debts/new')}>
+              <IconPlus size={16} stroke={1.8} /> Выдать долг
             </Button>
-          )}
-          <Button onClick={() => navigate('/debts/new')}>
-            <IconPlus size={16} stroke={1.8} /> Выдать долг
-          </Button>
+          </div>
+          <div className={layoutStyles.pageTitleActionsMobile}>
+            {overview?.has_scheduled_payments && (
+              <DropdownMenu
+                align="right"
+                trigger={
+                  <IconButton variant="muted" size="lg" aria-label="Ещё действия">
+                    <IconDots size={20} stroke={1.8} />
+                  </IconButton>
+                }
+                items={[
+                  {
+                    key: 'upcoming',
+                    label: upcoming.length > 0 ? `Выплаты (${upcoming.length})` : 'Выплаты',
+                    onSelect: () => setShowUpcoming(true),
+                  },
+                ]}
+              />
+            )}
+            <IconButton
+              variant="accent"
+              size="lg"
+              aria-label="Выдать долг"
+              onClick={() => navigate('/debts/new')}
+            >
+              <IconPlus size={20} stroke={2} />
+            </IconButton>
+          </div>
         </div>
       </div>
 
@@ -413,13 +446,19 @@ export function DebtsPage() {
         loading ? (
           <p className={layoutStyles.textMuted}>Загрузка…</p>
         ) : debts.length === 0 ? (
-          <p className={layoutStyles.textMuted}>
-            {debouncedQuery.trim()
-              ? 'Ничего не найдено'
-              : statusFilter === 'all'
-                ? 'Долгов нет'
-                : 'Долгов с таким статусом нет'}
-          </p>
+          debouncedQuery.trim() || statusFilter !== 'all' ? (
+            <p className={layoutStyles.textMuted}>
+              {debouncedQuery.trim() ? 'Ничего не найдено' : 'Долгов с таким статусом нет'}
+            </p>
+          ) : (
+            <EmptyState
+              illustration="state-no-debts"
+              title="Никто не должен — все рассчитались"
+              description="Когда появится продажа в долг или выдача — она будет здесь."
+              actionLabel="Выдать долг"
+              onAction={() => navigate('/debts/new')}
+            />
+          )
         ) : (
           <div key={`${direction}-${statusFilter}`} className={layoutStyles.stack}>
             <div className={styles['debt-row-list']}>
@@ -444,7 +483,15 @@ export function DebtsPage() {
       ) : loadingClosed && !closedLoaded ? (
         <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : closedGroups.length === 0 ? (
-        <p className={layoutStyles.textMuted}>{debouncedQuery.trim() ? 'Ничего не найдено' : 'Погашенных долгов нет'}</p>
+        debouncedQuery.trim() ? (
+          <p className={layoutStyles.textMuted}>Ничего не найдено</p>
+        ) : (
+          <EmptyState
+            illustration="empty-archive"
+            title="Погашенных долгов нет"
+            description="Закрытые долги появятся здесь после полного погашения."
+          />
+        )
       ) : (
         <div className={layoutStyles.stack}>
           {closedGroups.map((group) => (

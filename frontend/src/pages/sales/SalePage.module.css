@@ -74,6 +74,22 @@
 
 .salePageActionsSubmit {
   min-width: 180px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Над нижним меню кабинета вместе с выступающей FAB «Продать» (переменная — в AppLayout).
+   Отступ меньше нижнего padding контента, поэтому в конце прокрутки панель стоит на своём
+   месте в потоке и последние строки формы не прячет. */
+@media (max-width: 899px) {
+  .salePageActions {
+    bottom: calc(var(--app-nav-clearance, 0px) + 8px);
+  }
+}
+
+/* Экранная клавиатура открыта: на сжатом окне прилипшая панель закрыла бы поле количества.
+   Возвращаем её в поток — она остаётся в конце формы. */
+:global(html[data-keyboard='open']) .salePageActions {
+  position: static;
 }
 
 @media (max-width: 640px) {
@@ -81,8 +97,12 @@
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
-    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
     padding: 14px;
+  }
+
+  .salePageActionsButtons button,
+  .salePageActionsButtons a {
+    min-height: 44px;
   }
 
   .salePageActionsTotal {
@@ -457,6 +477,14 @@ input.saleClientSearch:not([type='checkbox']):not([type='radio']) {
   white-space: nowrap;
 }
 
+@media (max-width: 899px) {
+  input.saleClientSearch:not([type='checkbox']):not([type='radio']),
+  .saleSortField select,
+  .saleSortField .selectTrigger {
+    font-size: 16px;
+  }
+}
+
 .saleFiltersScroll input.saleFilterActive:not([type='checkbox']):not([type='radio']),
 .saleFiltersScroll select.saleFilterActive {
   border-color: var(--accent);
@@ -680,6 +708,12 @@ input.saleSearchInput:not([type='checkbox']):not([type='radio']) {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+@media (max-width: 899px) {
+  input.saleSearchInput:not([type='checkbox']):not([type='radio']) {
+    font-size: 16px;
+  }
+}
+
 .saleSearchInput:hover {
   border-color: var(--accent);
 }
@@ -789,6 +823,7 @@ input.saleSearchInput:not([type='checkbox']):not([type='radio']):focus {
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
+  min-height: 44px;
   background: var(--bg);
   color: var(--text-muted);
   border: 1px solid var(--border);

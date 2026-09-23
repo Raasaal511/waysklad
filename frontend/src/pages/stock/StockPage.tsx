@@ -5,6 +5,7 @@ import { Modal } from '../../shared/ui/Modal'
 import { IconPlus, IconBuildingWarehouse, IconChevronRight, IconHistory } from '@tabler/icons-react'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Button } from '../../shared/ui/Button'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { isLowStock } from '../../shared/lib/format'
 import { NewWarehouseForm } from './shared'
 import { useCatalog } from '../../app/CatalogContext'
@@ -47,15 +48,32 @@ export function StockPage() {
     <div className={layoutStyles.stack}>
       <div className={layoutStyles.sectionTitle}>
         <h2>Склады</h2>
-        <div className={layoutStyles.row} style={{ gap: 8 }}>
-          <Link to="/stock/history">
-            <IconButton variant="accent" tooltip="История движения" style={{ width: 40, height: 40 }}>
-              <IconHistory size={19} stroke={1.8} />
+        <div className={layoutStyles.pageTitleActions}>
+          <div className={layoutStyles.pageTitleActionsDesktop}>
+            <Link to="/stock/history">
+              <IconButton variant="accent" tooltip="История движения" style={{ width: 40, height: 40 }}>
+                <IconHistory size={19} stroke={1.8} />
+              </IconButton>
+            </Link>
+            <Button onClick={() => setShowWarehouseForm(true)}>
+              <IconPlus size={16} stroke={1.8} /> Склад
+            </Button>
+          </div>
+          <div className={layoutStyles.pageTitleActionsMobile}>
+            <Link to="/stock/history" aria-label="История движения">
+              <IconButton variant="muted" size="lg">
+                <IconHistory size={20} stroke={1.8} />
+              </IconButton>
+            </Link>
+            <IconButton
+              variant="accent"
+              size="lg"
+              aria-label="Добавить склад"
+              onClick={() => setShowWarehouseForm(true)}
+            >
+              <IconPlus size={20} stroke={2} />
             </IconButton>
-          </Link>
-          <Button onClick={() => setShowWarehouseForm(true)}>
-            <IconPlus size={16} stroke={1.8} /> Склад
-          </Button>
+          </div>
         </div>
       </div>
 
@@ -94,7 +112,13 @@ export function StockPage() {
       {loading ? (
         <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : warehouses.length === 0 ? (
-        <p className={layoutStyles.textMuted}>Складов пока нет</p>
+        <EmptyState
+          illustration="empty-stock"
+          title="Складов пока нет"
+          description="Создайте склад — туда будете принимать товар и списывать продажи."
+          actionLabel="Добавить склад"
+          onAction={() => setShowWarehouseForm(true)}
+        />
       ) : (
         <div className={layoutStyles.warehouseTiles}>
           {warehouses.map((w, i) => {

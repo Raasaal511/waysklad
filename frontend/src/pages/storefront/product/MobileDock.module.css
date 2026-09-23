@@ -1,0 +1,93 @@
+.dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: slideUp 0.2s ease;
+}
+
+@media (max-width: 767px) {
+  .dock {
+    /* Над PublicBottomNav (z-index 90), не под ней */
+    bottom: calc(var(--public-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 10px;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock {
+    animation: none;
+  }
+}
+
+.totalBlock {
+  flex-shrink: 0;
+}
+
+.totalLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.totalValue {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.contactBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.contactBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.addBtn {
+  height: 44px;
+  border-radius: 12px;
+  flex: 1;
+  max-width: 200px;
+}
+
+@media (min-width: 768px) {
+  .dock {
+    display: none;
+  }
+}

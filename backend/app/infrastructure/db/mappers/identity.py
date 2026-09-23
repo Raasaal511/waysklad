@@ -16,6 +16,19 @@ class TenantMapper:
             summary_monthly_enabled=tenant.summary_monthly_enabled,
             summary_daily_hour_msk=tenant.summary_daily_hour_msk,
             is_suspended=tenant.is_suspended,
+            city=tenant.city,
+            is_verified=tenant.is_verified,
+            logo=tenant.logo,
+            storefront_show_stock_qty=tenant.storefront_show_stock_qty,
+            storefront_description=tenant.storefront_description,
+            contact_phone=tenant.contact_phone,
+            contact_whatsapp=tenant.contact_whatsapp,
+            contact_telegram=tenant.contact_telegram,
+            storefront_min_order_total=tenant.storefront_min_order_total,
+            policy_refund_money=tenant.policy_refund_money,
+            policy_payment=tenant.policy_payment,
+            policy_delivery=tenant.policy_delivery,
+            policy_returns=tenant.policy_returns,
         )
 
     @staticmethod
@@ -31,6 +44,20 @@ class TenantMapper:
             summary_monthly_enabled=model.summary_monthly_enabled,
             summary_daily_hour_msk=model.summary_daily_hour_msk,
             is_suspended=model.is_suspended,
+            city=model.city,
+            is_verified=model.is_verified,
+            logo=model.logo,
+            storefront_show_stock_qty=model.storefront_show_stock_qty,
+            storefront_description=model.storefront_description,
+            contact_phone=model.contact_phone,
+            contact_whatsapp=model.contact_whatsapp,
+            contact_telegram=model.contact_telegram,
+            storefront_min_order_total=model.storefront_min_order_total,
+            policy_refund_money=model.policy_refund_money,
+            policy_payment=model.policy_payment,
+            policy_delivery=model.policy_delivery,
+            policy_returns=model.policy_returns,
+            created_at=model.created_at,
         )
 
 
@@ -44,6 +71,7 @@ class UserMapper:
             password_hash=user.password_hash,
             role=user.role,
             is_active=user.is_active,
+            personal_data_consent_at=user.personal_data_consent_at,
         )
 
     @staticmethod
@@ -57,6 +85,8 @@ class UserMapper:
             is_active=model.is_active,
             tenant_id=model.tenant_id,
             token_version=model.token_version,
+            last_login_at=model.last_login_at,
+            personal_data_consent_at=model.personal_data_consent_at,
         )
 
 

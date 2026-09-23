@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { IconEye, IconEyeOff } from '@tabler/icons-react'
 import { login, registerShop } from '../../entities/auth/api'
 import { ApiError } from '../../shared/api/client'
@@ -29,6 +29,7 @@ export function LoginPage() {
 
   const [shopName, setShopName] = useState('')
   const [ownerName, setOwnerName] = useState('')
+  const [personalDataConsent, setPersonalDataConsent] = useState(false)
 
   const [error, setError] = useState<string | null>(
     suspended ? 'Магазин заблокирован. Доступ временно ограничен.' : null,
@@ -61,10 +62,20 @@ export function LoginPage() {
 
   async function handleRegister(e: FormEvent) {
     e.preventDefault()
+    if (!personalDataConsent) {
+      setError('Нужно согласие на обработку персональных данных')
+      return
+    }
     setError(null)
     setLoading(true)
     try {
-      const result = await registerShop({ shop_name: shopName, owner_name: ownerName, phone, password })
+      const result = await registerShop({
+        shop_name: shopName,
+        owner_name: ownerName,
+        phone,
+        password,
+        personal_data_consent: true,
+      })
       auth.login(result, true)
       sessionStorage.setItem('waysklad:onboarding-pending', '1')
       navigate('/')
@@ -237,8 +248,27 @@ export function LoginPage() {
                   </button>
                 </div>
               </label>
+              <label className={styles['auth-remember']}>
+                <input
+                  type="checkbox"
+                  checked={personalDataConsent}
+                  onChange={(e) => setPersonalDataConsent(e.target.checked)}
+                  tabIndex={mode === 'register' ? 0 : -1}
+                  required={mode === 'register'}
+                />
+                <span>
+                  Согласен на обработку телефона.{' '}
+                  <Link to="/privacy" tabIndex={mode === 'register' ? 0 : -1}>
+                    Подробнее
+                  </Link>
+                </span>
+              </label>
               {mode === 'register' && error && <p className={layoutStyles.error}>{error}</p>}
-              <Button type="submit" disabled={loading || mode !== 'register'} tabIndex={mode === 'register' ? 0 : -1}>
+              <Button
+                type="submit"
+                disabled={loading || mode !== 'register' || !personalDataConsent}
+                tabIndex={mode === 'register' ? 0 : -1}
+              >
                 {loading && mode === 'register' ? 'Создаём магазин…' : 'Создать магазин'}
               </Button>
             </form>

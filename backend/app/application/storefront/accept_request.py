@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from app.application.storefront.reservation import release_request_reservation
 from app.domain.audit.entities import AuditEntry
+from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError, InsufficientStockError
 from app.domain.common.money import Money
 from app.domain.common.phone import Phone
@@ -13,6 +14,7 @@ from app.domain.counterparties.entities import Client
 from app.domain.identity.permissions import Actor, Permission, require, require_warehouse
 from app.domain.orders.entities import Order, OrderLine, OrderSource
 from app.domain.storefront.entities import StorefrontRequestStatus
+from app.infrastructure.cache.cache_aside import invalidate_shop_cache
 
 
 @dataclass(frozen=True)
@@ -27,8 +29,9 @@ class AcceptStorefrontRequestUseCase:
     """Владелец/менеджер принимает сырую заявку с витрины: указывает склад и дату
     готовности — только тогда она становится настоящим Order с резервом остатка."""
 
-    def __init__(self, uow: IUnitOfWork):
+    def __init__(self, uow: IUnitOfWork, cache: ICache | None = None):
         self._uow = uow
+        self._cache = cache
 
     async def execute(self, actor: Actor, cmd: AcceptStorefrontRequestCommand) -> Order:
         require(actor, Permission.ORDERS_MANAGE)
@@ -101,4 +104,7 @@ class AcceptStorefrontRequestUseCase:
             )
 
             await uow.commit()
+            # accept меняет orders_count публичного профиля магазина (промпт B2 п.2) —
+            # без явной инвалидации счётчик отставал бы до истечения TTL кеша профиля
+            await invalidate_shop_cache(self._cache, uow)
             return order

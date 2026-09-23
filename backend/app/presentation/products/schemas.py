@@ -14,6 +14,7 @@ from app.application.products.create_unit import CreateUnitCommand
 from app.application.products.generate_barcode import GenerateBarcodeResult
 from app.application.products.import_excel import ImportProductsResult, RowError
 from app.application.products.import_preview import PreviewProductsResult, PreviewRow
+from app.application.products.update_category import UpdateCategoryCommand
 from app.application.products.update_product import (
     UpdateProductCommand,
     UpdateVariantInput,
@@ -64,6 +65,7 @@ class VariantCreateRequest(BaseModel):
     color: str = ""
     barcode: str | None = None
     price: Decimal | None = None
+    name: str = Field("", max_length=100)
 
 
 class VariantUpdateRequest(BaseModel):
@@ -73,6 +75,7 @@ class VariantUpdateRequest(BaseModel):
     barcode: str | None = None
     photo: str = ""
     price: Decimal | None = None
+    name: str = Field("", max_length=100)
 
 
 class ProductCreateRequest(BaseModel):
@@ -80,11 +83,13 @@ class ProductCreateRequest(BaseModel):
     unit_code: str = "pcs"
     purchase_price: Decimal = Decimal("0")
     retail_price: Decimal = Decimal("0")
+    compare_at_price: Decimal | None = Field(None, gt=0)
     sku: str = ""
     barcode: str | None = None
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
     description: str = ""
+    warranty_text: str = Field("", max_length=5000)
     show_on_storefront: bool = False
     storefront_min_qty: Decimal | None = None
     storefront_step_qty: Decimal | None = None
@@ -98,16 +103,20 @@ class ProductCreateRequest(BaseModel):
             unit_code=self.unit_code,
             purchase_price=self.purchase_price,
             retail_price=self.retail_price,
+            compare_at_price=self.compare_at_price,
             sku=self.sku,
             barcode=self.barcode,
             category_id=self.category_id,
             min_stock=self.min_stock,
             description=self.description,
+            warranty_text=self.warranty_text,
             show_on_storefront=self.show_on_storefront,
             storefront_min_qty=self.storefront_min_qty,
             storefront_step_qty=self.storefront_step_qty,
             variants=[
-                VariantInput(size=v.size, color=v.color, barcode=v.barcode, price=v.price)
+                VariantInput(
+                    size=v.size, color=v.color, barcode=v.barcode, price=v.price, name=v.name
+                )
                 for v in self.variants
             ],
             initial_stock_warehouse_id=self.initial_stock_warehouse_id,
@@ -120,12 +129,14 @@ class ProductUpdateRequest(BaseModel):
     unit_code: str = "pcs"
     purchase_price: Decimal = Decimal("0")
     retail_price: Decimal = Decimal("0")
+    compare_at_price: Decimal | None = Field(None, gt=0)
     sku: str = ""
     barcode: str | None = None
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
     photo: str = ""
     description: str = ""
+    warranty_text: str = Field("", max_length=5000)
     show_on_storefront: bool = False
     storefront_min_qty: Decimal | None = None
     storefront_step_qty: Decimal | None = None
@@ -138,19 +149,21 @@ class ProductUpdateRequest(BaseModel):
             unit_code=self.unit_code,
             purchase_price=self.purchase_price,
             retail_price=self.retail_price,
+            compare_at_price=self.compare_at_price,
             sku=self.sku,
             barcode=self.barcode,
             category_id=self.category_id,
             min_stock=self.min_stock,
             photo=self.photo,
             description=self.description,
+            warranty_text=self.warranty_text,
             show_on_storefront=self.show_on_storefront,
             storefront_min_qty=self.storefront_min_qty,
             storefront_step_qty=self.storefront_step_qty,
             variants=[
                 UpdateVariantInput(
                     id=v.id, size=v.size, color=v.color, barcode=v.barcode,
-                    photo=v.photo, price=v.price,
+                    photo=v.photo, price=v.price, name=v.name,
                 )
                 for v in self.variants
             ],
@@ -160,19 +173,42 @@ class ProductUpdateRequest(BaseModel):
 class CategoryCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     parent_id: int | None = None
+    platform_category_id: int | None = None
 
     def to_command(self) -> CreateCategoryCommand:
-        return CreateCategoryCommand(name=self.name, parent_id=self.parent_id)
+        return CreateCategoryCommand(
+            name=self.name, parent_id=self.parent_id, platform_category_id=self.platform_category_id
+        )
+
+
+class CategoryUpdateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    parent_id: int | None = None
+    platform_category_id: int | None = None
+
+    def to_command(self, category_id: int) -> UpdateCategoryCommand:
+        return UpdateCategoryCommand(
+            category_id=category_id,
+            name=self.name,
+            parent_id=self.parent_id,
+            platform_category_id=self.platform_category_id,
+        )
 
 
 class CategoryResponse(BaseModel):
     id: int
     name: str
     parent_id: int | None
+    platform_category_id: int | None
 
     @classmethod
     def from_entity(cls, category: Category) -> "CategoryResponse":
-        return cls(id=category.id, name=category.name, parent_id=category.parent_id)
+        return cls(
+            id=category.id,
+            name=category.name,
+            parent_id=category.parent_id,
+            platform_category_id=category.platform_category_id,
+        )
 
 
 class UnitCreateRequest(BaseModel):
@@ -369,6 +405,7 @@ class VariantResponse(BaseModel):
     barcode: str | None
     photo: str
     price: Decimal | None
+    name: str
 
 
 class ProductResponse(BaseModel):
@@ -376,6 +413,7 @@ class ProductResponse(BaseModel):
     name: str
     unit_code: str
     retail_price: Decimal
+    compare_at_price: Decimal | None  # «старая цена» как есть в БД — для формы редактирования владельцем
     purchase_price: Decimal | None  # None — у роли нет права видеть закупочную
     margin: Decimal | None
     sku: str
@@ -384,6 +422,7 @@ class ProductResponse(BaseModel):
     min_stock: Decimal
     photo: str
     description: str
+    warranty_text: str
     storefront_photos: list[str]
     show_on_storefront: bool
     storefront_min_qty: Decimal | None
@@ -397,6 +436,9 @@ class ProductResponse(BaseModel):
             name=product.name,
             unit_code=product.unit.code,
             retail_price=product.retail_price.amount,
+            compare_at_price=product.compare_at_price.amount
+            if product.compare_at_price is not None
+            else None,
             purchase_price=product.purchase_price.amount if show_purchase else None,
             margin=product.margin.amount if show_purchase else None,
             sku=product.sku,
@@ -405,6 +447,7 @@ class ProductResponse(BaseModel):
             min_stock=product.min_stock,
             photo=product.photo,
             description=product.description,
+            warranty_text=product.warranty_text,
             storefront_photos=list(product.storefront_photos),
             show_on_storefront=product.show_on_storefront,
             storefront_min_qty=product.storefront_min_qty,
@@ -417,6 +460,7 @@ class ProductResponse(BaseModel):
                     barcode=v.barcode.value if v.barcode else None,
                     photo=v.photo,
                     price=v.price.amount if v.price else None,
+                    name=v.name,
                 )
                 for v in product.variants
             ],

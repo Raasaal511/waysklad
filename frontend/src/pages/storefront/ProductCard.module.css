@@ -1,0 +1,427 @@
+/* ProductCard — единая карточка товара (каталог магазина, маркетплейс,
+   похожие товары, недавно просмотренные, избранное). Блок «Д» п.1-7. */
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease;
+}
+
+/* Светлая тема: у карточек рамки нет (блок «Д» п.1). Тёмная — рамка 1px var(--border). */
+:root[data-theme='dark'] .card {
+  border: 1px solid var(--border);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .card {
+    border: 1px solid var(--border);
+  }
+}
+
+.photo {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--bg-muted);
+}
+
+.photo :global(img),
+.photo :global(.product-tile-photo) {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none;
+  object-fit: cover;
+  border-radius: 0;
+  border: 0;
+  transition: transform 0.15s ease-out;
+}
+
+.photo :global(.product-tile-photo-empty) {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* Товар «нет в наличии» — фото приглушено (блок «Д» п.6). */
+.photo[data-dim] :global(img) {
+  opacity: 0.6;
+}
+
+/* Hover фото — только на устройствах, где есть реальный hover (не на тач-экранах). */
+@media (hover: hover) {
+  .card:hover .photo :global(img) {
+    transform: scale(1.03);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo :global(img) {
+    transition: none;
+  }
+
+  .card:hover .photo :global(img) {
+    transform: none;
+  }
+}
+
+.badges {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.badge {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  padding: 3px 8px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.badge[data-tone='out'] {
+  color: var(--text-muted);
+  background: var(--bg-muted);
+}
+
+.badge[data-tone='discount'] {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.badge[data-tone='hit'] {
+  color: var(--warning);
+  background: var(--warning-bg);
+}
+
+.badge[data-tone='new'] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.favBtn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+
+:root[data-theme='dark'] .favBtn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .favBtn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+  }
+}
+
+.favBtn:hover {
+  color: var(--danger);
+  transform: scale(1.05);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .favBtn {
+    transition: none;
+  }
+
+  .favBtn:hover {
+    transform: none;
+  }
+}
+
+.favBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.body {
+  padding: 12px 4px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.link {
+  color: var(--text);
+  text-decoration: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  min-height: calc(1.4em * 2);
+}
+
+/* Вся карточка кликабельна через ::after на ссылке названия, растянутый до
+   границ .card (ближайшего position:relative предка) — без вложенных <a>
+   (блок «Д» п.11). .link сам НЕ позиционирован, иначе ::after растянулся бы
+   только до его собственных границ. Остальные интерактивные элементы (♡,
+   имя магазина, «+») стоят выше через z-index. */
+.link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.priceRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.price {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.oldPrice {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.rating {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--warning);
+  white-space: nowrap;
+}
+
+.quickAdd {
+  position: relative;
+  z-index: 2;
+  /* всегда у правого края строки: без этого кнопка липнет вплотную к цене
+     (когда рейтинга нет) или к рейтингу (у него margin-left: auto) */
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.quickAdd svg {
+  flex-shrink: 0;
+}
+
+.quickAdd:hover {
+  transform: scale(1.06);
+}
+
+.quickAdd:active {
+  transform: scale(0.92);
+}
+
+/* подтверждение добавления: кнопка «пульсирует» и на ней проступает галочка
+   (::after), плюс сам значок + на это время прячется */
+.quickAddAdded {
+  animation: quickAddPop 0.42s ease-out;
+}
+
+.quickAddAdded svg {
+  opacity: 0;
+}
+
+.quickAddAdded::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 5px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(-45deg) translate(1px, -1px);
+  animation: quickAddCheck 0.42s ease-out;
+}
+
+@keyframes quickAddPop {
+  0% {
+    transform: scale(0.92);
+  }
+  45% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes quickAddCheck {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quickAdd {
+    transition: none;
+  }
+
+  .quickAdd:hover,
+  .quickAdd:active {
+    transform: none;
+  }
+
+  /* галочку оставляем — это подтверждение действия, а не украшение */
+  .quickAddAdded,
+  .quickAddAdded::after {
+    animation: none;
+  }
+}
+
+.quickAdd:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.shopRow {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.shopName {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--text-muted);
+  text-decoration: none;
+  overflow: hidden;
+}
+
+.shopName:hover {
+  color: var(--text);
+}
+
+.shopName:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.shopVerified {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.shopNameText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sold {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* --- Skeleton: та же геометрия карточки, без текста --- */
+
+.skeletonPhoto {
+  background: var(--bg-muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeletonPhoto::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--bg) 45%, transparent),
+    transparent
+  );
+  animation: shimmer 1.4s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonPhoto::after {
+    animation: none;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeletonLine {
+  height: 14px;
+  border-radius: 8px;
+  background: var(--bg-muted);
+}

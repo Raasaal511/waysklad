@@ -8,6 +8,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.lib.styles import ParagraphStyle
 
+from app.domain.common.money import format_rub
 from app.domain.sales.entities import Sale
 from app.domain.sales.payment import PaymentMethod
 
@@ -115,11 +116,19 @@ def render_receipt_pdf(
     story.append(Spacer(1, 6 * mm))
 
     if sale.discount.amount:
-        story.append(Paragraph(f"Скидка: {sale.discount.amount} ₽", meta_style))
+        story.append(Paragraph(f"Скидка: {format_rub(sale.discount)}", meta_style))
         story.append(Spacer(1, 1.5 * mm))
-    story.append(Paragraph(f"Итого: {sale.total.amount} ₽", total_style))
+    if sale.prepayment.amount:
+        story.append(Paragraph(f"Предоплата: {format_rub(sale.prepayment)}", meta_style))
+        story.append(Spacer(1, 1.5 * mm))
+    story.append(Paragraph(f"Итого: {format_rub(sale.total)}", total_style))
     story.append(Spacer(1, 1.5 * mm))
     story.append(Paragraph(f"Оплата: {_PAYMENT_LABELS[sale.payment_method]}", meta_style))
+    if sale.payment_method is PaymentMethod.CREDIT and sale.paid_now.amount:
+        story.append(Spacer(1, 1.5 * mm))
+        story.append(Paragraph(f"Оплачено сразу: {format_rub(sale.paid_now)}", meta_style))
+        story.append(Spacer(1, 1.5 * mm))
+        story.append(Paragraph(f"В долг: {format_rub(sale.debt_amount)}", meta_style))
     story.append(Spacer(1, 8 * mm))
     story.append(Paragraph("Спасибо за покупку!", meta_style))
 

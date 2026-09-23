@@ -1,11 +1,12 @@
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.domain.common.exceptions import AccessDeniedError
+from app.domain.common.exceptions import AccessDeniedError, NotFoundError
 from app.domain.identity.entities import Role
 from app.domain.identity.permissions import Actor, Permission, has_permission
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
@@ -16,6 +17,10 @@ _bearer = HTTPBearer(auto_error=False)
 
 # роли, чьи данные фильтруются по списку привязанных складов
 _WAREHOUSE_SCOPED_ROLES = (Role.MANAGER, Role.SELLER, Role.STOREKEEPER)
+
+# «был в сети» с точностью до шага: админке хватает минут, а писать в users
+# на каждый запрос — лишняя транзакция и блокировка строки
+LAST_SEEN_STEP = timedelta(minutes=5)
 
 
 @dataclass(frozen=True)
@@ -36,10 +41,26 @@ async def _resolve_current_user(token: str, factory: SessionFactoryDep) -> Curre
     # версией 0, чтобы не разлогинить всех разом при выкатке
     token_version = payload.get("tv", 0)
     uow = SqlAlchemyUnitOfWork(tenant_id, session_factory=factory)
-    async with uow:
-        current_version = await uow.users.get_token_version(user_id)
-        tenant = await uow.tenants.get(tenant_id)
-    if current_version is None or current_version != token_version:
+    try:
+        async with uow:
+            user_session = await uow.users.get_session(user_id)
+            tenant = await uow.tenants.get(tenant_id)
+            is_valid = (
+                user_session is not None
+                and user_session.token_version == token_version
+                and not tenant.is_suspended
+            )
+            if is_valid:
+                now = datetime.now(timezone.utc)
+                seen = user_session.last_seen_at
+                if seen is None or now - seen >= LAST_SEEN_STEP:
+                    await uow.users.touch_last_seen(user_id, now)
+                    await uow.commit()
+    except NotFoundError:
+        # tenant_id из токена больше не существует (например, дев-БД пересоздана) —
+        # это невалидная сессия, а не «ресурс не найден» на уровне API
+        raise HTTPException(status_code=401, detail="Сессия недействительна, войдите снова")
+    if user_session is None or user_session.token_version != token_version:
         raise HTTPException(status_code=401, detail="Сессия завершена, войдите снова")
     if tenant.is_suspended:
         # блокировка платформой действует немедленно на уже выданные токены —

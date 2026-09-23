@@ -1,0 +1,46 @@
+.specs {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px 24px;
+}
+
+@media (min-width: 640px) {
+  .specs {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.specRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 0;
+  font-size: 14px;
+}
+
+.specName {
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.specDots {
+  flex: 1;
+  border-bottom: 1px dotted var(--border);
+  min-width: 12px;
+  margin-bottom: 4px;
+}
+
+.specValue {
+  color: var(--text);
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.views {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 16px 0 0;
+}

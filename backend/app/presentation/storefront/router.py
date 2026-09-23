@@ -2,12 +2,18 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
+from slowapi.util import get_remote_address
 
+from app.application.customers.list_my_requests import DEFAULT_LIMIT
 from app.application.storefront.get_product import GetStorefrontProductCommand
+from app.application.storefront.get_profile import GetStorefrontProfileCommand
 from app.application.storefront.get_request_status import GetStorefrontRequestStatusCommand
+from app.application.storefront.get_similar_products import GetSimilarProductsCommand
 from app.application.storefront.list_messages import ListStorefrontMessagesCommand
+from app.application.storefront.record_product_view import RecordProductViewCommand
 from app.application.storefront.reject_request import RejectStorefrontRequestCommand
 from app.domain.identity.permissions import Permission
+from app.infrastructure.config import settings
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.rate_limit import limiter
 from app.infrastructure.notifications.ws_broadcast import broadcaster, storefront_request_channel
@@ -16,13 +22,16 @@ from app.presentation.deps import (
     ActorDep,
     CreateStorefrontRequestDep,
     GetStorefrontCatalogDep,
+    GetSimilarProductsDep,
     GetStorefrontProductDep,
+    GetStorefrontProfileDep,
     GetStorefrontRequestDep,
     GetStorefrontRequestStatusDep,
     ListMyStorefrontRequestsDep,
     ListStaffStorefrontMessagesDep,
     ListStorefrontMessagesDep,
     ListStorefrontRequestsDep,
+    RecordProductViewDep,
     RejectStorefrontRequestDep,
     SendStaffStorefrontMessageDep,
     SendStorefrontMessageDep,
@@ -36,14 +45,18 @@ from app.presentation.storefront.schemas import (
     AcceptStorefrontRequestRequest,
     CreateStorefrontRequestRequest,
     MyStorefrontRequestResponse,
+    MyStorefrontRequestsResponse,
     SendStorefrontMessageRequest,
     StorefrontCatalogParams,
     StorefrontCatalogResponse,
     StorefrontMessageResponse,
     StorefrontProductPageResponse,
+    StorefrontProfileResponse,
     StorefrontRequestCreatedResponse,
     StorefrontRequestResponse,
     StorefrontRequestStatusResponse,
+    SimilarProductsParams,
+    SimilarProductsResponse,
 )
 
 router = APIRouter(prefix="/storefront", tags=["storefront"])
@@ -77,6 +90,60 @@ async def get_storefront_product(
     return StorefrontProductPageResponse.from_result(result)
 
 
+@router.get("/{slug}/products/{product_id}/similar")
+@limiter.limit("300/minute")
+async def get_storefront_similar_products(
+    request: Request,
+    slug: str,
+    product_id: int,
+    params: Annotated[SimilarProductsParams, Depends()],
+    use_case: GetSimilarProductsDep,
+) -> SimilarProductsResponse:
+    if params.scope not in ("shop", "marketplace"):
+        raise HTTPException(status_code=422, detail="scope должен быть shop или marketplace")
+    # scope=marketplace — межмагазинная выдача (товары других магазинов
+    # платформы): часть маркетплейса, а не витрины магазина, поэтому живёт
+    # под тем же флагом, что и /api/marketplace/* (см. infrastructure/config.py).
+    if params.scope == "marketplace" and not settings.marketplace_enabled:
+        raise HTTPException(status_code=404, detail="Маркетплейс недоступен")
+    result = await use_case.execute(
+        GetSimilarProductsCommand(
+            slug=slug, product_id=product_id, scope=params.scope, limit=params.limit
+        )
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+    return SimilarProductsResponse.from_result(result)
+
+
+@router.get("/{slug}/profile")
+@limiter.limit("300/minute")
+async def get_storefront_profile(
+    request: Request, slug: str, use_case: GetStorefrontProfileDep
+) -> StorefrontProfileResponse:
+    result = await use_case.execute(GetStorefrontProfileCommand(slug=slug))
+    if result is None:
+        raise HTTPException(status_code=404, detail="Витрина не найдена")
+    return StorefrontProfileResponse.from_result(result)
+
+
+@router.post("/{slug}/products/{product_id}/view", status_code=204)
+@limiter.limit("120/minute")
+async def record_storefront_product_view(
+    request: Request, slug: str, product_id: int, use_case: RecordProductViewDep
+) -> None:
+    """Без авторизации — вызывается при открытии карточки товара покупателем
+    (в т.ч. анонимным). 404 — как у самой карточки: и несуществующий, и
+    скрытый товар неотличимы снаружи."""
+    found = await use_case.execute(
+        RecordProductViewCommand(
+            slug=slug, product_id=product_id, client_ip=get_remote_address(request)
+        )
+    )
+    if not found:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+
+
 @router.get("/{slug}/og", response_class=HTMLResponse)
 @limiter.limit("300/minute")
 async def get_storefront_catalog_og(
@@ -93,6 +160,7 @@ async def get_storefront_catalog_og(
         title=tenant.name,
         description=f"Каталог магазина «{tenant.name}» на WaySklad",
         canonical_url=canonical,
+        image_url=absolute_asset_url(origin, tenant.logo) if tenant.logo else None,
         site_name="WaySklad",
     )
 
@@ -152,10 +220,19 @@ async def list_new_storefront_requests(
 
 @router.get("/requests/my")
 async def list_my_storefront_requests(
-    customer: CurrentCustomerDep, use_case: ListMyStorefrontRequestsDep
-) -> list[MyStorefrontRequestResponse]:
-    items = await use_case.execute(customer.id)
-    return [MyStorefrontRequestResponse.from_item(i) for i in items]
+    customer: CurrentCustomerDep,
+    use_case: ListMyStorefrontRequestsDep,
+    status: str | None = None,
+    limit: int = DEFAULT_LIMIT,
+    offset: int = 0,
+) -> MyStorefrontRequestsResponse:
+    result = await use_case.execute(
+        customer.id, status=status, limit=min(max(limit, 1), 100), offset=max(offset, 0)
+    )
+    return MyStorefrontRequestsResponse(
+        items=[MyStorefrontRequestResponse.from_item(i) for i in result.items],
+        total=result.total,
+    )
 
 
 @router.get("/requests/status")

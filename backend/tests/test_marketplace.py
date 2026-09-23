@@ -13,6 +13,7 @@ async def _register_shop(client, random_phone, shop_name: str, storefront_enable
             "owner_name": "Продавец",
             "phone": random_phone(),
             "password": "secret123",
+            "personal_data_consent": True,
         },
     )
     assert response.status_code == 201, response.text
@@ -91,12 +92,18 @@ async def _add_product(client, headers, warehouse_id, name, price, qty="10", **e
             "name": name,
             "purchase_price": "10",
             "retail_price": price,
-            "show_on_storefront": True,
             **extra,
         },
     )
     assert response.status_code == 201, response.text
     product = response.json()
+    update_response = await client.put(
+        f"/api/products/{product['id']}",
+        headers=headers,
+        json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
+    )
+    assert update_response.status_code == 200, update_response.text
+    product = update_response.json()
 
     if qty != "0":  # без приёмки товар остаётся без остатка — эквивалент qty=0
         receive_response = await client.post(
@@ -137,6 +144,8 @@ async def test_marketplace_lists_products_from_multiple_shops(client, random_pho
         "id", "name", "retail_price", "photo", "category_name", "in_stock",
         "min_order_qty", "order_step_qty", "shop_slug", "shop_name",
         "sold_count", "average_rating", "reviews_count",
+        "shop_logo", "shop_is_verified", "shop_city", "old_price", "discount_percent",
+        "is_new", "is_hit",
     }
 
 

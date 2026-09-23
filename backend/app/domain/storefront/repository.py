@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Protocol
 
 from app.domain.storefront.entities import StorefrontMessage, StorefrontRequest
@@ -9,6 +9,11 @@ class IStorefrontRequestRepository(Protocol):
     async def save(self, request: StorefrontRequest) -> StorefrontRequest: ...
     async def get(self, request_id: int) -> StorefrontRequest: ...
     async def get_by_token(self, access_token: str) -> StorefrontRequest | None: ...
+    async def get_by_id_any_tenant(self, request_id: int) -> StorefrontRequest | None:
+        """Заявка по id без фильтра по tenant — для авторизованного покупателя,
+        который ещё не знает магазин своей заявки. Владение проверяет
+        вызывающий (customer_id), сам метод доступа не даёт."""
+        ...
     async def list_new(self) -> list[StorefrontRequest]: ...
     async def count_new_by_phone(self, phone: str) -> int:
         """Сколько ещё не обработанных (status=new) заявок с этим телефоном
@@ -27,7 +32,24 @@ class IStorefrontRequestRepository(Protocol):
         к какому магазину относится заявка)."""
         ...
 
+    async def count_accepted(self) -> int:
+        """Заявки со статусом ACCEPTED — часть orders_count публичного
+        профиля магазина (промпт B2 п.2)."""
+        ...
+
 
 class IStorefrontMessageRepository(Protocol):
     async def add(self, message: StorefrontMessage) -> StorefrontMessage: ...
     async def list_by_request(self, request_id: int) -> list[StorefrontMessage]: ...
+
+
+class IProductViewRepository(Protocol):
+    async def record_view(self, product_id: int, day: date) -> None:
+        """Инкремент дневного счётчика (upsert) — дедупликация по IP уже
+        сделана вызывающим use case через Redis, сюда попадают только
+        засчитанные просмотры."""
+        ...
+
+    async def views_since(self, product_id: int, since: date) -> int:
+        """Сумма count за дни >= since (включительно) — для views_90d."""
+        ...

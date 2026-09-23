@@ -5,23 +5,64 @@ export type StorefrontRequestStatus = 'new' | 'accepted' | 'rejected'
 export type StorefrontMessageAuthor = 'customer' | 'staff'
 export type StorefrontSort = 'name' | 'price_asc' | 'price_desc' | 'created_desc'
 
+export type StockLevel = 'out' | 'low' | 'in'
+
 export interface StorefrontProduct {
   id: number
   name: string
   retail_price: string
+  old_price?: string | null
+  discount_percent?: number | null
   photo: string
   category_id: number | null
   in_stock: boolean
   sold_count?: string
   min_order_qty: string | null
   order_step_qty: string | null
+  average_rating: number
+  reviews_count: number
+}
+
+export interface StorefrontVariant {
+  id: number
+  size: string
+  color: string
+  photo: string
+  price: string | null
+  name: string
+  display_name: string
+  in_stock: boolean
+  stock_level: StockLevel
+  stock_qty: string | null
+}
+
+export interface StorefrontProductCategory {
+  id: number
+  name: string
+  parent: { id: number; name: string } | null
+}
+
+export interface StorefrontProductShop {
+  slug: string
+  name: string
+  logo: string
+  average_rating: number
+  reviews_count: number
 }
 
 export interface StorefrontProductDetail extends StorefrontProduct {
   sku: string
   description: string
   storefront_photos: string[]
-  variants: { id: number; size: string; color: string }[]
+  variants: StorefrontVariant[]
+  warranty_text: string
+  stock_level: StockLevel
+  stock_qty: string | null
+  category: StorefrontProductCategory | null
+  unit_code: string
+  unit_label: string
+  views_90d: number
+  shop: StorefrontProductShop
 }
 
 export interface StorefrontCategory {
@@ -45,11 +86,81 @@ export interface StorefrontCatalog {
   available_sizes: string[]
   available_colors: string[]
   total: number
+  min_order_total: string | null
 }
 
 export interface StorefrontProductPage {
   shop_name: string
   product: StorefrontProductDetail
+}
+
+export interface StorefrontProfileRating {
+  average_rating: number
+  reviews_count: number
+}
+
+export interface StorefrontProfileContacts {
+  phone: string
+  whatsapp: string
+  telegram: string
+}
+
+export interface StorefrontProfileAddress {
+  name: string
+  address: string
+}
+
+export interface StorefrontProfilePolicies {
+  refund_money: string | null
+  payment: string | null
+  delivery: string | null
+  returns: string | null
+}
+
+export interface StorefrontShopProfile {
+  name: string
+  slug: string
+  logo: string
+  description: string
+  on_platform_since: string
+  rating: StorefrontProfileRating
+  products_count: number
+  orders_count: number | null
+  orders_count_label: string | null
+  min_order_total: string | null
+  contacts: StorefrontProfileContacts
+  addresses: StorefrontProfileAddress[]
+  policies: StorefrontProfilePolicies
+}
+
+export type SimilarScope = 'shop' | 'marketplace'
+
+export interface SimilarMarketplaceProduct {
+  id: number
+  name: string
+  retail_price: string
+  photo: string
+  category_name: string | null
+  in_stock: boolean
+  min_order_qty: string | null
+  order_step_qty: string | null
+  shop_slug: string
+  shop_name: string
+  sold_count: string
+  average_rating: number
+  reviews_count: number
+  shop_logo: string
+  shop_is_verified: boolean
+  shop_city: string | null
+  old_price: string | null
+  discount_percent: number | null
+  is_new: boolean
+  is_hit: boolean
+}
+
+export interface SimilarProductsResponse {
+  shop_products: StorefrontProduct[]
+  marketplace_products: SimilarMarketplaceProduct[]
 }
 
 export interface StorefrontRequestLine {
@@ -105,6 +216,8 @@ export interface CatalogParams {
   inStockOnly?: boolean
   variantSize?: string
   variantColor?: string
+  /** «от N звёзд» — backend уже поддерживает (StorefrontCatalogParams.min_rating), 1..5. */
+  minRating?: number | null
 }
 
 function catalogQuery(params: CatalogParams) {
@@ -120,6 +233,7 @@ function catalogQuery(params: CatalogParams) {
   if (params.inStockOnly) search.set('in_stock_only', 'true')
   if (params.variantSize) search.set('variant_size', params.variantSize)
   if (params.variantColor) search.set('variant_color', params.variantColor)
+  if (params.minRating != null) search.set('min_rating', String(params.minRating))
   const qs = search.toString()
   return qs ? `?${qs}` : ''
 }
@@ -131,6 +245,55 @@ export function getStorefrontCatalog(slug: string, params: CatalogParams = {}) {
 export function getStorefrontProduct(slug: string, productId: number) {
   return api.get<StorefrontProductPage>(
     `/storefront/${encodeURIComponent(slug)}/products/${productId}`,
+  )
+}
+
+export function getStorefrontShopProfile(slug: string) {
+  return api.get<StorefrontShopProfile>(`/storefront/${encodeURIComponent(slug)}/profile`)
+}
+
+// Профиль магазина запрашивают одновременно PublicHeader (имя для плейсхолдера
+// поиска) и страница каталога/товара (вся карточка магазина) — общий кэш +
+// дедупликация одновременных запросов, чтобы это не превращалось в два похода
+// на сервер за одним и тем же (P7 п.2, не больше 4 запросов на карточке товара).
+const shopProfileCache = new Map<string, StorefrontShopProfile>()
+const shopProfileInflight = new Map<string, Promise<StorefrontShopProfile>>()
+
+export function getStorefrontShopProfileCached(slug: string): Promise<StorefrontShopProfile> {
+  const cached = shopProfileCache.get(slug)
+  if (cached) return Promise.resolve(cached)
+  const inflight = shopProfileInflight.get(slug)
+  if (inflight) return inflight
+  const request = getStorefrontShopProfile(slug)
+    .then((data) => {
+      shopProfileCache.set(slug, data)
+      shopProfileInflight.delete(slug)
+      return data
+    })
+    .catch((err) => {
+      shopProfileInflight.delete(slug)
+      throw err
+    })
+  shopProfileInflight.set(slug, request)
+  return request
+}
+
+export function peekCachedStorefrontShopProfile(slug: string): StorefrontShopProfile | null {
+  return shopProfileCache.get(slug) ?? null
+}
+
+/** Фиксирует просмотр карточки товара. Не бросает — вызывающий код не должен падать из-за метрики. */
+export async function trackProductView(slug: string, productId: number): Promise<void> {
+  try {
+    await api.post<void>(`/storefront/${encodeURIComponent(slug)}/products/${productId}/view`)
+  } catch {
+    // просмотры — не критичная метрика, тихо игнорируем сбой
+  }
+}
+
+export function getSimilarProducts(slug: string, productId: number, scope: SimilarScope, limit = 10) {
+  return api.get<SimilarProductsResponse>(
+    `/storefront/${encodeURIComponent(slug)}/products/${productId}/similar?scope=${scope}&limit=${limit}`,
   )
 }
 

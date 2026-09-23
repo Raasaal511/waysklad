@@ -181,6 +181,53 @@ async def test_variant_price_and_photo_via_api(client, owner_headers):
     assert response.status_code == 400  # несуществующий вариант
 
 
+async def test_variant_name_and_warranty_text_via_api(client, owner_headers):
+    """Промпт B1 п.1, п.4 — название варианта и гарантия принимаются/отдаются
+    в API владельца точно так же, как остальные поля товара/варианта."""
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={
+            "name": "Наушники",
+            "purchase_price": "1000",
+            "retail_price": "2000",
+            "warranty_text": "Гарантия 12 месяцев от производителя",
+            "variants": [{"size": "", "color": "Чёрный", "name": "Aurum"}],
+        },
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["warranty_text"] == "Гарантия 12 месяцев от производителя"
+    assert body["variants"][0]["name"] == "Aurum"
+    product_id = body["id"]
+    variant_id = body["variants"][0]["id"]
+
+    response = await client.put(
+        f"/api/products/{product_id}",
+        headers=owner_headers,
+        json={
+            "name": "Наушники",
+            "purchase_price": "1000",
+            "retail_price": "2000",
+            "warranty_text": "Гарантия 24 месяца",
+            "variants": [{"id": variant_id, "size": "", "color": "Чёрный", "name": "Aurum Pro"}],
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["warranty_text"] == "Гарантия 24 месяца"
+    assert body["variants"][0]["name"] == "Aurum Pro"
+
+    # дефолт — пустая строка, как у description
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Без гарантии", "purchase_price": "10", "retail_price": "20"},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["warranty_text"] == ""
+
+
 async def test_custom_unit_via_api(client, owner_headers):
     response = await client.post(
         "/api/products/units",
@@ -508,3 +555,44 @@ async def test_products_category_and_sort_via_api(client, owner_headers):
         params={"category_id": category_id, "sort": "created_asc"},
     )
     assert [p["name"] for p in response.json()] == ["Сок яблочный", "Сок вишнёвый"]
+
+
+async def test_search_by_digits_part_of_sku(client, owner_headers):
+    """Артикул генерируется как «СКО-1928463750124» (префикс из названия +
+    13 цифр), и владелец часто помнит/диктует только цифровую часть —
+    поиск по ней одной должен находить товар."""
+    created = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={
+                "name": "Смарт-часы Watch Ultra",
+                "sku": "СМА-1928463750124",
+                "purchase_price": "100",
+                "retail_price": "200",
+            },
+        )
+    ).json()
+    await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={
+            "name": "Кофта оверсайз",
+            "sku": "КОФ-9051432687193",
+            "purchase_price": "100",
+            "retail_price": "200",
+        },
+    )
+
+    # только цифры, без буквенного префикса
+    response = await client.get(
+        "/api/products", headers=owner_headers, params={"query": "1928463750124"}
+    )
+    assert response.status_code == 200, response.text
+    assert [p["id"] for p in response.json()] == [created["id"]]
+
+    # часть цифр в середине артикула — ILIKE ищет подстроку
+    response = await client.get(
+        "/api/products", headers=owner_headers, params={"query": "846375"}
+    )
+    assert [p["id"] for p in response.json()] == [created["id"]]

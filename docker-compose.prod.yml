@@ -56,12 +56,29 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips=*
     volumes:
       - uploads_data:/app/uploads
+      # Метаданные от внешних скриптов (deploy/backup.sh, certbot-хук) для
+      # раздела «Эксплуатация» в админке. Только чтение: backend сам сюда
+      # ничего не пишет и в /etc/letsencrypt не ходит.
+      - ${STATUS_DIR:-/opt/waysklad/status}:/app/status:ro
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Dockerfile уже объявляет HEALTHCHECK — Docker учёл бы его и без этого
+    # блока (frontend ниже уже ждёт backend: condition: service_healthy),
+    # но явный блок здесь делает это видимым в самом compose-файле, тем же
+    # стилем, что у db/redis выше, а не полагается на то, что кто-то откроет
+    # Dockerfile, чтобы узнать, чем backend вообще проверяется. GET /api/health
+    # теперь реально проверяет БД и Redis (раньше был статичный {"status":"ok"}) —
+    # контейнер больше не может быть "up" и healthy, если БД/Redis отвалились.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   frontend:
     build: ./frontend

@@ -55,8 +55,14 @@ async def test_storefront_catalog_via_api(client, owner_headers):
                 "name": "Видимый товар",
                 "purchase_price": "50",
                 "retail_price": "150",
-                "show_on_storefront": True,
             },
+        )
+    ).json()
+    visible = (
+        await client.put(
+            f"/api/products/{visible['id']}",
+            headers=owner_headers,
+            json={**visible, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     assert visible["show_on_storefront"] is True
@@ -93,7 +99,7 @@ async def test_storefront_catalog_via_api(client, owner_headers):
     assert set(product.keys()) == {
         "id", "name", "retail_price", "photo", "category_id", "in_stock",
         "min_order_qty", "order_step_qty", "sold_count",
-        "average_rating", "reviews_count",
+        "average_rating", "reviews_count", "old_price", "discount_percent",
     }
 
     response = await client.get(f"/api/storefront/{slug}", params={"query": "Скрытый"})
@@ -131,8 +137,14 @@ async def test_storefront_catalog_filtered_by_warehouse_via_api(client, owner_he
                 "name": "Товар только на складе 1",
                 "purchase_price": "50",
                 "retail_price": "100",
-                "show_on_storefront": True,
             },
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     response = await client.post(
@@ -181,8 +193,14 @@ async def test_storefront_warehouse_hidden_from_catalog_via_api(client, owner_he
                 "name": "Товар со скрытого склада",
                 "purchase_price": "50",
                 "retail_price": "100",
-                "show_on_storefront": True,
             },
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     response = await client.post(
@@ -230,9 +248,15 @@ async def test_storefront_product_page_via_api(client, owner_headers):
                 "sku": "DR-001",
                 "purchase_price": "300",
                 "retail_price": "600",
-                "show_on_storefront": True,
                 "variants": [{"size": "M", "color": "Красный"}],
             },
+        )
+    ).json()
+    visible = (
+        await client.put(
+            f"/api/products/{visible['id']}",
+            headers=owner_headers,
+            json={**visible, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     hidden = (
@@ -280,9 +304,15 @@ async def test_storefront_og_html_for_bots(client, owner_headers):
                 "name": "Платье OG",
                 "purchase_price": "300",
                 "retail_price": "600",
-                "show_on_storefront": True,
                 "description": "Лёгкое летнее платье",
             },
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
 
@@ -316,9 +346,15 @@ async def test_storefront_catalog_sort_and_category_counts_via_api(client, owner
                 "name": "Дешёвый",
                 "purchase_price": "10",
                 "retail_price": "50",
-                "show_on_storefront": True,
                 "category_id": category["id"],
             },
+        )
+    ).json()
+    cheap = (
+        await client.put(
+            f"/api/products/{cheap['id']}",
+            headers=owner_headers,
+            json={**cheap, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     pricey = (
@@ -329,9 +365,15 @@ async def test_storefront_catalog_sort_and_category_counts_via_api(client, owner
                 "name": "Дорогой",
                 "purchase_price": "100",
                 "retail_price": "500",
-                "show_on_storefront": True,
                 "category_id": category["id"],
             },
+        )
+    ).json()
+    pricey = (
+        await client.put(
+            f"/api/products/{pricey['id']}",
+            headers=owner_headers,
+            json={**pricey, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     # товар без show_on_storefront не должен попадать в счётчик категории
@@ -378,14 +420,32 @@ async def test_storefront_catalog_price_and_in_stock_filters_via_api(client, own
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Дешёвый", "purchase_price": "10", "retail_price": "50", "show_on_storefront": True},
+            json={"name": "Дешёвый", "purchase_price": "10", "retail_price": "50"},
+        )
+    ).json()
+    cheap = (
+        await client.put(
+            f"/api/products/{cheap['id']}",
+            headers=owner_headers,
+            json={**cheap, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     expensive_out_of_stock = (
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Дорогой без остатка", "purchase_price": "100", "retail_price": "500", "show_on_storefront": True},
+            json={"name": "Дорогой без остатка", "purchase_price": "100", "retail_price": "500"},
+        )
+    ).json()
+    expensive_out_of_stock = (
+        await client.put(
+            f"/api/products/{expensive_out_of_stock['id']}",
+            headers=owner_headers,
+            json={
+                **expensive_out_of_stock,
+                "photo": "https://example.com/test.jpg",
+                "show_on_storefront": True,
+            },
         )
     ).json()
     await client.post(
@@ -422,9 +482,15 @@ async def test_storefront_catalog_variant_filter_via_api(client, owner_headers):
                 "name": "Платье",
                 "purchase_price": "500",
                 "retail_price": "1500",
-                "show_on_storefront": True,
                 "variants": [{"size": "M", "color": "Красный"}],
             },
+        )
+    ).json()
+    dress_red_m = (
+        await client.put(
+            f"/api/products/{dress_red_m['id']}",
+            headers=owner_headers,
+            json={**dress_red_m, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     shoes_blue = (
@@ -435,9 +501,15 @@ async def test_storefront_catalog_variant_filter_via_api(client, owner_headers):
                 "name": "Кроссовки",
                 "purchase_price": "800",
                 "retail_price": "2500",
-                "show_on_storefront": True,
                 "variants": [{"size": "42", "color": "Синий"}],
             },
+        )
+    ).json()
+    shoes_blue = (
+        await client.put(
+            f"/api/products/{shoes_blue['id']}",
+            headers=owner_headers,
+            json={**shoes_blue, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
 
@@ -474,21 +546,42 @@ async def test_storefront_catalog_min_rating_filter_via_api(client, owner_header
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Хороший товар", "purchase_price": "10", "retail_price": "50", "show_on_storefront": True},
+            json={"name": "Хороший товар", "purchase_price": "10", "retail_price": "50"},
+        )
+    ).json()
+    high_rated = (
+        await client.put(
+            f"/api/products/{high_rated['id']}",
+            headers=owner_headers,
+            json={**high_rated, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     low_rated = (
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Так себе товар", "purchase_price": "10", "retail_price": "50", "show_on_storefront": True},
+            json={"name": "Так себе товар", "purchase_price": "10", "retail_price": "50"},
+        )
+    ).json()
+    low_rated = (
+        await client.put(
+            f"/api/products/{low_rated['id']}",
+            headers=owner_headers,
+            json={**low_rated, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     no_reviews = (
         await client.post(
             "/api/products",
             headers=owner_headers,
-            json={"name": "Без отзывов", "purchase_price": "10", "retail_price": "50", "show_on_storefront": True},
+            json={"name": "Без отзывов", "purchase_price": "10", "retail_price": "50"},
+        )
+    ).json()
+    no_reviews = (
+        await client.put(
+            f"/api/products/{no_reviews['id']}",
+            headers=owner_headers,
+            json={**no_reviews, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
         )
     ).json()
     for product in (high_rated, low_rated, no_reviews):

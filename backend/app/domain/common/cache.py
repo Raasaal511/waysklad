@@ -18,3 +18,9 @@ class ICache(Protocol):
         """Удаляет все ключи, начинающиеся с prefix — инвалидация по tenant_id
         при мутациях (см. SqlAlchemyUnitOfWork.commit), а не ожидание TTL."""
         ...
+
+    async def ping(self) -> bool:
+        """Реальная проверка соединения — для healthcheck (GET /api/health),
+        не для обычного пути cache-aside (тот и так деградирует тихо при
+        недоступном Redis, см. класс-докстринг)."""
+        ...

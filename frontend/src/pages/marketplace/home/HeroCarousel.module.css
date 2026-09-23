@@ -1,0 +1,291 @@
+.wrap {
+  position: relative;
+}
+
+.viewport {
+  overflow: hidden;
+  border-radius: 24px;
+}
+
+.track {
+  display: flex;
+  transition: transform 450ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track {
+    transition: none;
+  }
+}
+
+.slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  height: 360px;
+  padding: 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+.slide[data-theme='light'] {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.slide[data-theme='accent'] {
+  background: var(--accent);
+  color: #fff;
+}
+
+.slide[data-theme='dark'] {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+/* --ink инвертируется между темами (см. PromoTiles.module.css) — редакторски «тёмный» слайд
+   должен оставаться тёмным на тёмной странице, а не становиться светлым пятном (P6). */
+:root[data-theme='dark'] .slide[data-theme='dark'] {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.slideText {
+  position: relative;
+  z-index: 1;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.slideTitle {
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.highlight {
+  display: inline-block;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 20px;
+  padding: 2px 14px;
+  transform: rotate(-1deg);
+}
+
+.slide[data-theme='accent'] .highlight {
+  background: #fff;
+  color: var(--accent);
+}
+
+.slideSubtitle {
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0;
+  opacity: 0.85;
+}
+
+.slideBtn {
+  white-space: nowrap;
+}
+
+.slideImageWrap {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  align-self: flex-end;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.slideImage {
+  max-height: 100%;
+  max-width: 360px;
+  object-fit: contain;
+  object-position: bottom right;
+}
+
+.arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: none;
+  background: var(--bg-muted);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 150ms ease-out, transform 150ms ease-out;
+  z-index: 2;
+}
+
+.arrow:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.arrow:active {
+  transform: translateY(-50%) scale(0.96);
+}
+
+.arrow:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.arrowPrev {
+  left: -20px;
+}
+
+.arrowNext {
+  right: -20px;
+}
+
+.dots {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  z-index: 2;
+}
+
+/* Кликабельная область кнопки — стабильные 24×24 (WCAG 2.5.8 target-size), не
+   масштабируется, чтобы не наезжать на соседнюю кнопку; масштабируется только
+   .dotMark внутри. */
+.dot {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dotMark {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+  transition: background 150ms ease-out, transform 150ms ease-out;
+}
+
+.dot:hover .dotMark {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.dotMarkActive {
+  background: #fff;
+  transform: scale(1.25);
+}
+
+.dot:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+.skeleton {
+  height: 360px;
+  border-radius: 24px;
+  background: var(--bg-muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (max-width: 1279px) {
+  .slide {
+    height: 300px;
+    padding: 32px;
+  }
+  .skeleton {
+    height: 300px;
+  }
+}
+
+@media (max-width: 767px) {
+  .slide {
+    height: auto;
+    aspect-ratio: 16 / 10;
+    padding: 24px;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-end;
+  }
+  .slideText {
+    max-width: 100%;
+  }
+  .slideTitle {
+    font-size: 28px;
+  }
+  .slideImageWrap {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    align-items: stretch;
+  }
+  .slideImage {
+    max-width: 100%;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .slide[data-theme='light']::before,
+  .slide[data-theme='accent']::before,
+  .slide[data-theme='dark']::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0));
+  }
+  .slide[data-theme='light'] .slideText,
+  .slide[data-theme='accent'] .slideText,
+  .slide[data-theme='dark'] .slideText {
+    color: #fff;
+  }
+  .arrow {
+    display: none;
+  }
+  .skeleton {
+    height: auto;
+    aspect-ratio: 16 / 10;
+  }
+}

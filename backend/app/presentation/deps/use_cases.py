@@ -17,11 +17,13 @@ from app.application.analytics.top_products import (
 from app.application.auth.change_password import ChangePasswordUseCase
 from app.application.auth.connect_telegram import ConnectTelegramUseCase
 from app.application.auth.create_employee import CreateEmployeeUseCase
+from app.application.auth.delete_shop_logo import DeleteShopLogoUseCase
 from app.application.auth.get_shop import GetShopUseCase
 from app.application.auth.list_employees import ListEmployeesUseCase
 from app.application.auth.login import LoginUseCase
 from app.application.auth.logout_all import LogoutAllUseCase
 from app.application.auth.register_shop import RegisterShopUseCase
+from app.application.auth.set_shop_logo import SetShopLogoUseCase
 from app.application.auth.update_employee import UpdateEmployeeUseCase
 from app.application.auth.update_shop import UpdateShopUseCase
 from app.application.counterparties.create_client import CreateClientUseCase
@@ -34,6 +36,21 @@ from app.application.counterparties.update_client import UpdateClientUseCase
 from app.application.customers.get_login_status import GetCustomerLoginStatusUseCase
 from app.application.customers.get_profile import GetCustomerProfileUseCase
 from app.application.customers.list_my_requests import ListMyStorefrontRequestsUseCase
+from app.application.customers.login_with_password import LoginCustomerUseCase
+from app.application.customers.register_with_password import RegisterCustomerUseCase
+from app.application.customers.request_phone_code import RequestPhoneCodeUseCase
+from app.application.customers.change_password import (
+    ChangeCustomerPasswordUseCase,
+    LogoutAllCustomerUseCase,
+)
+from app.application.customers.my_chats import (
+    ListCustomerChatMessagesUseCase,
+    ListCustomerChatsUseCase,
+    SendCustomerChatMessageUseCase,
+)
+from app.application.customers.verify_phone_code import VerifyPhoneCodeUseCase
+from app.infrastructure.config import settings
+from app.infrastructure.notifications.code_senders import build_code_sender
 from app.application.customers.request_login_link import RequestCustomerLoginLinkUseCase
 from app.application.customers.update_profile import UpdateCustomerProfileUseCase
 from app.application.debts.create_installment import CreateInstallmentUseCase
@@ -68,8 +85,13 @@ from app.application.inventory.update_warehouse_details import (
     UpdateWarehouseDetailsUseCase,
 )
 from app.application.inventory.write_off import WriteOffUseCase
+from app.application.marketplace.get_home import GetMarketplaceHomeUseCase
 from app.application.marketplace.get_product import GetMarketplaceProductUseCase
+from app.application.marketplace.list_cities import ListCitiesUseCase
+from app.application.marketplace.list_platform_categories import ListPlatformCategoriesUseCase
 from app.application.marketplace.list_products import ListMarketplaceProductsUseCase
+from app.application.marketplace.list_shops import ListShopsUseCase
+from app.application.marketplace.suggest import SuggestUseCase
 from app.application.notifications.list_notifications import ListNotificationsUseCase
 from app.application.notifications.mark_read import (
     MarkAllNotificationsReadUseCase,
@@ -86,6 +108,7 @@ from app.application.orders.update_order import UpdateOrderUseCase
 from app.application.products.add_storefront_photo import AddStorefrontPhotoUseCase
 from app.application.products.apply_import import ApplyProductImportUseCase
 from app.application.products.create_category import CreateCategoryUseCase
+from app.application.products.update_category import UpdateCategoryUseCase
 from app.application.products.create_product import CreateProductUseCase
 from app.application.products.create_unit import CreateUnitUseCase
 from app.application.products.delete_product import DeleteProductUseCase
@@ -106,10 +129,14 @@ from app.application.products.update_product import UpdateProductUseCase
 from app.application.sales.create_sale import CreateSaleUseCase
 from app.application.sales.delete_sale import DeleteSaleUseCase
 from app.application.sales.edit_sale import EditSaleUseCase
+from app.application.reviews.check_review_eligibility import CheckReviewEligibilityUseCase
 from app.application.reviews.create_review import CreateReviewUseCase
+from app.application.reviews.list_all_reviews_for_owner import ListAllReviewsForOwnerUseCase
 from app.application.reviews.list_product_reviews import ListProductReviewsUseCase
 from app.application.reviews.list_reviews_for_owner import ListReviewsForOwnerUseCase
 from app.application.reviews.set_review_hidden import SetReviewHiddenUseCase
+from app.application.reviews.upload_review_photo import UploadReviewPhotoUseCase
+from app.application.reviews.vote_review import VoteReviewUseCase
 from app.application.sales.get_receipt_data import GetReceiptDataUseCase
 from app.application.sales.get_sale import GetSaleUseCase
 from app.application.sales.get_sale_history import GetSaleHistoryUseCase
@@ -121,6 +148,8 @@ from app.application.storefront.accept_request import AcceptStorefrontRequestUse
 from app.application.storefront.create_request import CreateStorefrontRequestUseCase
 from app.application.storefront.get_catalog import GetStorefrontCatalogUseCase
 from app.application.storefront.get_product import GetStorefrontProductUseCase
+from app.application.storefront.get_profile import GetStorefrontProfileUseCase
+from app.application.storefront.get_similar_products import GetSimilarProductsUseCase
 from app.application.storefront.get_request import GetStorefrontRequestUseCase
 from app.application.storefront.get_request_status import GetStorefrontRequestStatusUseCase
 from app.application.storefront.list_messages import (
@@ -128,6 +157,7 @@ from app.application.storefront.list_messages import (
     ListStorefrontMessagesUseCase,
 )
 from app.application.storefront.list_requests import ListStorefrontRequestsUseCase
+from app.application.storefront.record_product_view import RecordProductViewUseCase
 from app.application.storefront.reject_request import RejectStorefrontRequestUseCase
 from app.application.storefront.send_message import (
     SendStaffStorefrontMessageUseCase,
@@ -140,6 +170,7 @@ from app.application.tasks.get_task_history import GetTaskHistoryUseCase
 from app.application.tasks.list_tasks import ListActiveTasksUseCase, ListCompletedTasksUseCase
 from app.application.tasks.update_task import UpdateTaskUseCase
 from app.application.tasks.create_task import CreateTaskUseCase
+from app.application.feedback.submit_feedback import SubmitFeedbackUseCase
 from app.presentation.deps.cache import CacheDep
 from app.presentation.deps.notifier import NotifierDep
 from app.presentation.deps.security import FileStorageDep, HasherDep
@@ -180,6 +211,46 @@ def get_register_shop(uow: PublicUowDep, hasher: HasherDep) -> RegisterShopUseCa
 
 def get_request_customer_login_link(uow: PublicUowDep) -> RequestCustomerLoginLinkUseCase:
     return RequestCustomerLoginLinkUseCase(uow)
+
+
+def get_register_customer(uow: PublicUowDep) -> RegisterCustomerUseCase:
+    return RegisterCustomerUseCase(uow)
+
+
+def get_login_customer(uow: PublicUowDep) -> LoginCustomerUseCase:
+    return LoginCustomerUseCase(uow)
+
+
+def get_request_phone_code(uow: PublicUowDep) -> RequestPhoneCodeUseCase:
+    return RequestPhoneCodeUseCase(uow, build_code_sender(settings.verification_sender))
+
+
+def get_verify_phone_code(uow: PublicUowDep) -> VerifyPhoneCodeUseCase:
+    return VerifyPhoneCodeUseCase(uow)
+
+
+def get_change_customer_password(factory: SessionFactoryDep) -> ChangeCustomerPasswordUseCase:
+    return ChangeCustomerPasswordUseCase(factory)
+
+
+def get_logout_all_customer(factory: SessionFactoryDep) -> LogoutAllCustomerUseCase:
+    return LogoutAllCustomerUseCase(factory)
+
+
+def get_list_customer_chats(factory: SessionFactoryDep) -> ListCustomerChatsUseCase:
+    return ListCustomerChatsUseCase(factory)
+
+
+def get_list_customer_chat_messages(
+    factory: SessionFactoryDep,
+) -> ListCustomerChatMessagesUseCase:
+    return ListCustomerChatMessagesUseCase(factory)
+
+
+def get_send_customer_chat_message(
+    factory: SessionFactoryDep, notifier: NotifierDep
+) -> SendCustomerChatMessageUseCase:
+    return SendCustomerChatMessageUseCase(factory, notifier)
 
 
 def get_customer_login_status(uow: PublicUowDep) -> GetCustomerLoginStatusUseCase:
@@ -243,6 +314,7 @@ get_update_product = _with_uow_and_cache(UpdateProductUseCase)
 get_delete_product = _with_uow_and_cache(DeleteProductUseCase)
 get_create_unit = _with_uow(CreateUnitUseCase)
 get_create_category = _with_uow_and_cache(CreateCategoryUseCase)
+get_update_category = _with_uow_and_cache(UpdateCategoryUseCase)
 get_import_products = _with_uow_and_cache(ImportProductsUseCase)
 get_preview_import_products = _with_uow(PreviewProductsUseCase)
 
@@ -268,6 +340,10 @@ get_update_warehouse_details = _with_uow_and_cache(UpdateWarehouseDetailsUseCase
 
 def get_set_warehouse_photo(uow: UowDep, storage: FileStorageDep) -> SetWarehousePhotoUseCase:
     return SetWarehousePhotoUseCase(uow, storage)
+
+
+def get_submit_feedback(uow: UowDep, storage: FileStorageDep) -> SubmitFeedbackUseCase:
+    return SubmitFeedbackUseCase(uow, storage)
 
 get_list_warehouses = _with_uow(ListWarehousesUseCase)
 get_list_stock = _with_uow(ListStockUseCase)
@@ -327,6 +403,18 @@ get_missed_sales = _with_uow(GetMissedSalesUseCase)
 get_apply_offline_sales = _with_uow_and_cache(ApplyOfflineSalesUseCase)
 get_connect_telegram = _with_uow(ConnectTelegramUseCase)
 get_update_shop = _with_uow_and_cache(UpdateShopUseCase)
+
+
+def get_set_shop_logo(
+    uow: UowDep, storage: FileStorageDep, cache: CacheDep
+) -> SetShopLogoUseCase:
+    return SetShopLogoUseCase(uow, storage, cache)
+
+
+def get_delete_shop_logo(
+    uow: UowDep, storage: FileStorageDep, cache: CacheDep
+) -> DeleteShopLogoUseCase:
+    return DeleteShopLogoUseCase(uow, storage, cache)
 get_mark_notification_read = _with_uow(MarkNotificationReadUseCase)
 get_mark_all_notifications_read = _with_uow(MarkAllNotificationsReadUseCase)
 get_list_notifications = _with_uow(ListNotificationsUseCase)
@@ -350,10 +438,50 @@ def get_marketplace_product(
     return GetMarketplaceProductUseCase(factory, cache)
 
 
+def get_list_platform_categories(
+    factory: SessionFactoryDep, cache: CacheDep
+) -> ListPlatformCategoriesUseCase:
+    return ListPlatformCategoriesUseCase(factory, cache)
+
+
+def get_list_cities(factory: SessionFactoryDep, cache: CacheDep) -> ListCitiesUseCase:
+    return ListCitiesUseCase(factory, cache)
+
+
+def get_marketplace_home(factory: SessionFactoryDep, cache: CacheDep) -> GetMarketplaceHomeUseCase:
+    return GetMarketplaceHomeUseCase(factory, cache)
+
+
+def get_list_shops(factory: SessionFactoryDep, cache: CacheDep) -> ListShopsUseCase:
+    return ListShopsUseCase(factory, cache)
+
+
+def get_suggest(factory: SessionFactoryDep, cache: CacheDep) -> SuggestUseCase:
+    return SuggestUseCase(factory, cache)
+
+
 def get_storefront_product(
     factory: SessionFactoryDep, cache: CacheDep
 ) -> GetStorefrontProductUseCase:
     return GetStorefrontProductUseCase(factory, cache)
+
+
+def get_storefront_profile(
+    factory: SessionFactoryDep, cache: CacheDep
+) -> GetStorefrontProfileUseCase:
+    return GetStorefrontProfileUseCase(factory, cache)
+
+
+def get_similar_products(
+    factory: SessionFactoryDep, cache: CacheDep
+) -> GetSimilarProductsUseCase:
+    return GetSimilarProductsUseCase(factory, cache)
+
+
+def get_record_product_view(
+    factory: SessionFactoryDep, cache: CacheDep
+) -> RecordProductViewUseCase:
+    return RecordProductViewUseCase(factory, cache)
 
 
 def get_storefront_request_status(factory: SessionFactoryDep) -> GetStorefrontRequestStatusUseCase:
@@ -374,10 +502,13 @@ def get_create_storefront_request(
 
 get_list_storefront_requests = _with_uow(ListStorefrontRequestsUseCase)
 get_storefront_request = _with_uow(GetStorefrontRequestUseCase)
-get_accept_storefront_request = _with_uow(AcceptStorefrontRequestUseCase)
+get_accept_storefront_request = _with_uow_and_cache(AcceptStorefrontRequestUseCase)
 get_reject_storefront_request = _with_uow(RejectStorefrontRequestUseCase)
 get_list_staff_storefront_messages = _with_uow(ListStaffStorefrontMessagesUseCase)
-get_send_staff_storefront_message = _with_uow(SendStaffStorefrontMessageUseCase)
+def get_send_staff_storefront_message(
+    uow: UowDep, notifier: NotifierDep
+) -> SendStaffStorefrontMessageUseCase:
+    return SendStaffStorefrontMessageUseCase(uow, notifier)
 
 
 def get_list_storefront_messages(factory: SessionFactoryDep) -> ListStorefrontMessagesUseCase:
@@ -390,16 +521,31 @@ def get_send_storefront_message(
     return SendStorefrontMessageUseCase(factory, notifier)
 
 
-def get_create_review(factory: SessionFactoryDep) -> CreateReviewUseCase:
-    return CreateReviewUseCase(factory)
+def get_create_review(factory: SessionFactoryDep, cache: CacheDep) -> CreateReviewUseCase:
+    return CreateReviewUseCase(factory, cache)
 
 
 def get_list_product_reviews(factory: SessionFactoryDep) -> ListProductReviewsUseCase:
     return ListProductReviewsUseCase(factory)
 
 
+def get_upload_review_photo(
+    factory: SessionFactoryDep, storage: FileStorageDep
+) -> UploadReviewPhotoUseCase:
+    return UploadReviewPhotoUseCase(factory, storage)
+
+
+def get_vote_review(factory: SessionFactoryDep) -> VoteReviewUseCase:
+    return VoteReviewUseCase(factory)
+
+
+def get_check_review_eligibility(factory: SessionFactoryDep) -> CheckReviewEligibilityUseCase:
+    return CheckReviewEligibilityUseCase(factory)
+
+
 get_list_reviews_for_owner = _with_uow(ListReviewsForOwnerUseCase)
-get_set_review_hidden = _with_uow(SetReviewHiddenUseCase)
+get_list_all_reviews_for_owner = _with_uow(ListAllReviewsForOwnerUseCase)
+get_set_review_hidden = _with_uow_and_cache(SetReviewHiddenUseCase)
 
 
 def get_create_task(uow: UowDep, notifier: NotifierDep) -> CreateTaskUseCase:
@@ -424,6 +570,21 @@ RegisterShopDep = Annotated[RegisterShopUseCase, Depends(get_register_shop)]
 RequestCustomerLoginLinkDep = Annotated[
     RequestCustomerLoginLinkUseCase, Depends(get_request_customer_login_link)
 ]
+RegisterCustomerDep = Annotated[RegisterCustomerUseCase, Depends(get_register_customer)]
+RequestPhoneCodeDep = Annotated[RequestPhoneCodeUseCase, Depends(get_request_phone_code)]
+VerifyPhoneCodeDep = Annotated[VerifyPhoneCodeUseCase, Depends(get_verify_phone_code)]
+ChangeCustomerPasswordDep = Annotated[
+    ChangeCustomerPasswordUseCase, Depends(get_change_customer_password)
+]
+LogoutAllCustomerDep = Annotated[LogoutAllCustomerUseCase, Depends(get_logout_all_customer)]
+ListCustomerChatsDep = Annotated[ListCustomerChatsUseCase, Depends(get_list_customer_chats)]
+ListCustomerChatMessagesDep = Annotated[
+    ListCustomerChatMessagesUseCase, Depends(get_list_customer_chat_messages)
+]
+SendCustomerChatMessageDep = Annotated[
+    SendCustomerChatMessageUseCase, Depends(get_send_customer_chat_message)
+]
+LoginCustomerDep = Annotated[LoginCustomerUseCase, Depends(get_login_customer)]
 GetCustomerLoginStatusDep = Annotated[
     GetCustomerLoginStatusUseCase, Depends(get_customer_login_status)
 ]
@@ -441,6 +602,7 @@ UpdateProductDep = Annotated[UpdateProductUseCase, Depends(get_update_product)]
 DeleteProductDep = Annotated[DeleteProductUseCase, Depends(get_delete_product)]
 CreateUnitDep = Annotated[CreateUnitUseCase, Depends(get_create_unit)]
 CreateCategoryDep = Annotated[CreateCategoryUseCase, Depends(get_create_category)]
+UpdateCategoryDep = Annotated[UpdateCategoryUseCase, Depends(get_update_category)]
 ImportProductsDep = Annotated[ImportProductsUseCase, Depends(get_import_products)]
 PreviewImportProductsDep = Annotated[PreviewProductsUseCase, Depends(get_preview_import_products)]
 GenerateBarcodeDep = Annotated[GenerateBarcodeUseCase, Depends(get_generate_barcode)]
@@ -474,6 +636,7 @@ UpdateWarehouseDetailsDep = Annotated[
     UpdateWarehouseDetailsUseCase, Depends(get_update_warehouse_details)
 ]
 SetWarehousePhotoDep = Annotated[SetWarehousePhotoUseCase, Depends(get_set_warehouse_photo)]
+SubmitFeedbackDep = Annotated[SubmitFeedbackUseCase, Depends(get_submit_feedback)]
 ListWarehousesDep = Annotated[ListWarehousesUseCase, Depends(get_list_warehouses)]
 ListStockDep = Annotated[ListStockUseCase, Depends(get_list_stock)]
 ListDocumentsDep = Annotated[ListDocumentsUseCase, Depends(get_list_documents)]
@@ -538,6 +701,8 @@ ApplyOfflineSalesDep = Annotated[
 ]
 ConnectTelegramDep = Annotated[ConnectTelegramUseCase, Depends(get_connect_telegram)]
 UpdateShopDep = Annotated[UpdateShopUseCase, Depends(get_update_shop)]
+SetShopLogoDep = Annotated[SetShopLogoUseCase, Depends(get_set_shop_logo)]
+DeleteShopLogoDep = Annotated[DeleteShopLogoUseCase, Depends(get_delete_shop_logo)]
 ChangePasswordDep = Annotated[ChangePasswordUseCase, Depends(get_change_password)]
 LogoutAllDep = Annotated[LogoutAllUseCase, Depends(get_logout_all)]
 CreateTaskDep = Annotated[CreateTaskUseCase, Depends(get_create_task)]
@@ -563,8 +728,24 @@ ListMarketplaceProductsDep = Annotated[
 GetMarketplaceProductDep = Annotated[
     GetMarketplaceProductUseCase, Depends(get_marketplace_product)
 ]
+ListPlatformCategoriesDep = Annotated[
+    ListPlatformCategoriesUseCase, Depends(get_list_platform_categories)
+]
+ListCitiesDep = Annotated[ListCitiesUseCase, Depends(get_list_cities)]
+GetMarketplaceHomeDep = Annotated[GetMarketplaceHomeUseCase, Depends(get_marketplace_home)]
+ListShopsDep = Annotated[ListShopsUseCase, Depends(get_list_shops)]
+SuggestDep = Annotated[SuggestUseCase, Depends(get_suggest)]
 GetStorefrontProductDep = Annotated[
     GetStorefrontProductUseCase, Depends(get_storefront_product)
+]
+GetStorefrontProfileDep = Annotated[
+    GetStorefrontProfileUseCase, Depends(get_storefront_profile)
+]
+GetSimilarProductsDep = Annotated[
+    GetSimilarProductsUseCase, Depends(get_similar_products)
+]
+RecordProductViewDep = Annotated[
+    RecordProductViewUseCase, Depends(get_record_product_view)
 ]
 GetStorefrontRequestStatusDep = Annotated[
     GetStorefrontRequestStatusUseCase, Depends(get_storefront_request_status)
@@ -601,8 +782,16 @@ SendStaffStorefrontMessageDep = Annotated[
 ]
 CreateReviewDep = Annotated[CreateReviewUseCase, Depends(get_create_review)]
 ListProductReviewsDep = Annotated[ListProductReviewsUseCase, Depends(get_list_product_reviews)]
+UploadReviewPhotoDep = Annotated[UploadReviewPhotoUseCase, Depends(get_upload_review_photo)]
+VoteReviewDep = Annotated[VoteReviewUseCase, Depends(get_vote_review)]
+CheckReviewEligibilityDep = Annotated[
+    CheckReviewEligibilityUseCase, Depends(get_check_review_eligibility)
+]
 ListReviewsForOwnerDep = Annotated[
     ListReviewsForOwnerUseCase, Depends(get_list_reviews_for_owner)
+]
+ListAllReviewsForOwnerDep = Annotated[
+    ListAllReviewsForOwnerUseCase, Depends(get_list_all_reviews_for_owner)
 ]
 SetReviewHiddenDep = Annotated[SetReviewHiddenUseCase, Depends(get_set_review_hidden)]
  

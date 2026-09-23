@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, UploadFile
 
+from app.application.auth.set_shop_logo import SetShopLogoCommand
 from app.domain.identity.entities import User
 from app.domain.identity.permissions import Permission
 from app.infrastructure.rate_limit import limiter
@@ -21,11 +22,13 @@ from app.presentation.deps import (
     ChangePasswordDep,
     ConnectTelegramDep,
     CreateEmployeeDep,
+    DeleteShopLogoDep,
     GetShopDep,
     ListEmployeesDep,
     LoginDep,
     LogoutAllDep,
     RegisterShopDep,
+    SetShopLogoDep,
     UpdateEmployeeDep,
     UpdateShopDep,
 )
@@ -94,6 +97,19 @@ async def update_shop(
     body: UpdateShopRequest, actor: ActorDep, use_case: UpdateShopDep
 ) -> TenantResponse:
     return TenantResponse.from_entity(await use_case.execute(actor, body.to_command()))
+
+
+@router.post("/shop/logo", status_code=201)
+async def set_shop_logo(
+    actor: ActorDep, file: UploadFile, use_case: SetShopLogoDep
+) -> TenantResponse:
+    command = SetShopLogoCommand(file.filename or "logo.jpg", await file.read())
+    return TenantResponse.from_entity(await use_case.execute(actor, command))
+
+
+@router.delete("/shop/logo")
+async def delete_shop_logo(actor: ActorDep, use_case: DeleteShopLogoDep) -> TenantResponse:
+    return TenantResponse.from_entity(await use_case.execute(actor))
 
 
 @router.patch("/me/password")

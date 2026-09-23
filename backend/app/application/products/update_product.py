@@ -21,6 +21,7 @@ class UpdateVariantInput:
     photo: str = ""
     # None — цена не переопределена, берётся retail_price товара
     price: Decimal | None = None
+    name: str = ""
 
 
 @dataclass(frozen=True)
@@ -30,12 +31,14 @@ class UpdateProductCommand:
     unit_code: str
     purchase_price: Decimal
     retail_price: Decimal
+    compare_at_price: Decimal | None = None
     sku: str = ""
     barcode: str | None = None
     category_id: int | None = None
     min_stock: Decimal = Decimal("0")
     photo: str = ""
     description: str = ""
+    warranty_text: str = ""
     show_on_storefront: bool = False
     storefront_min_qty: Decimal | None = None
     storefront_step_qty: Decimal | None = None
@@ -68,18 +71,44 @@ class UpdateProductUseCase:
                 if qty is not None and qty <= 0:
                     raise DomainError("Мин. количество и шаг заказа на витрине должны быть больше нуля")
 
+            # без фото товар на витрине выглядит как мусор (плейсхолдер в каждой
+            # карточке) — не даём включить показ, пока фото не загружено
+            if cmd.show_on_storefront and not cmd.photo:
+                raise DomainError("Добавьте фото товара, прежде чем показывать его на витрине")
+
+            existing_product = await uow.products.get(cmd.product_id)
+            existing_compare_at_price = (
+                existing_product.compare_at_price.amount
+                if existing_product.compare_at_price is not None
+                else None
+            )
+            # валидация только при попытке ЗАДАТЬ/ИЗМЕНИТЬ старую цену — если её
+            # не трогают, а просто подняли retail_price выше уже сохранённой
+            # compare_at_price, запрос не должен падать (см. промпт M-B1 п.4:
+            # «в БД не трогать», старая цена просто перестаёт быть видна на витрине)
+            if (
+                cmd.compare_at_price is not None
+                and cmd.compare_at_price != existing_compare_at_price
+                and cmd.compare_at_price <= cmd.retail_price
+            ):
+                raise DomainError("Старая цена должна быть больше текущей")
+
             product = Product(
                 id=cmd.product_id,
                 name=cmd.name,
                 unit=unit,
                 purchase_price=Money.of(cmd.purchase_price),
                 retail_price=Money.of(cmd.retail_price),
+                compare_at_price=Money.of(cmd.compare_at_price)
+                if cmd.compare_at_price is not None
+                else None,
                 sku=cmd.sku,
                 barcode=Barcode(cmd.barcode) if cmd.barcode else None,
                 category_id=cmd.category_id,
                 min_stock=cmd.min_stock,
                 photo=cmd.photo,
                 description=cmd.description,
+                warranty_text=cmd.warranty_text,
                 show_on_storefront=cmd.show_on_storefront,
                 storefront_min_qty=cmd.storefront_min_qty,
                 storefront_step_qty=cmd.storefront_step_qty,
@@ -91,6 +120,7 @@ class UpdateProductUseCase:
                         barcode=Barcode(v.barcode) if v.barcode else None,
                         photo=v.photo,
                         price=Money.of(v.price) if v.price is not None else None,
+                        name=v.name,
                     )
                     for v in cmd.variants
                 ],

@@ -2,8 +2,15 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+psycopg://waysklad:change-me@localhost:5432/waysklad"
-    secret_key: str = "dev-secret-change-me"
+    # Без дефолта намеренно — раньше "postgresql+psycopg://waysklad:change-me@..."
+    # и "dev-secret-change-me" тихо работали и без .env, включая в проде при
+    # забытой настройке (см. main.py — раньше был отдельный guard только на
+    # secret_key, DATABASE_URL мог утечь дефолтным паролем незамеченным).
+    # Теперь приложение просто не стартует без .env — Settings() кидает
+    # pydantic.ValidationError на первом импорте app.main, а не работает
+    # молча с чужим для прода паролем/секретом.
+    database_url: str
+    secret_key: str
     access_token_expire_minutes: int = 60 * 24 * 30
     debug: bool = False
     telegram_bot_token: str = ""
@@ -53,8 +60,54 @@ class Settings(BaseSettings):
     # Срок жизни admin-токена короче обычного (access_token_expire_minutes) —
     # привилегированный доступ ко всей платформе, риск от утечки выше.
     admin_token_expire_minutes: int = 120
+    # Белый список origin для CORS, через запятую (например
+    # "https://waysklad.gwensoft.ru,https://waysklad.ru"). Пусто (дефолт) —
+    # CORSMiddleware не подключается вовсе: свой фронт всегда ходит на тот же
+    # origin (см. frontend/nginx.conf в проде, Vite proxy в dev) и в CORS не
+    # нуждается. Заполнять только при реальной необходимости у стороннего
+    # origin достучаться до API напрямую из браузера — никогда не "*" в проде.
+    cors_origins: str = ""
+    # Маркетплейс (общая витрина всех магазинов платформы: /api/marketplace/*,
+    # межмагазинный блок «похожие товары в других магазинах») выключен по
+    # умолчанию — продукт сейчас продаётся как отдельная витрина магазина
+    # (/store/<slug>), а не как общая площадка. Выключенный флаг = роутер не
+    # подключается вовсе (app/__init__.py), FastAPI отдаёт обычный 404; код
+    # use-case'ов и репозиториев остаётся на месте, возврат — одна переменная
+    # MARKETPLACE_ENABLED=true в .env.
+    marketplace_enabled: bool = False
+    # Чем слать код подтверждения телефона покупателю: telegram (бот витрины,
+    # работает и бесплатен) или console (код в лог — только dev и тесты).
+    # SMS появится здесь же, когда будет провайдер (см. code_senders.py).
+    verification_sender: str = "telegram"
+    # Каталог, куда внешние скрипты кладут метаданные для админки:
+    # tls.json (certbot-хук) и backup.json (deploy/backup.sh). Backend только
+    # читает эти файлы и никуда больше не лезет — ни в /etc/letsencrypt, ни в
+    # чужие каталоги. Файлов нет — соответствующие блоки отдают null.
+    status_dir: str = "/app/status"
+    # Проставляются при сборке образа (ARG GIT_SHA / BUILD_TIME в Dockerfile).
+    # "dev" — локальная сборка без аргументов, чтобы она не падала.
+    git_sha: str = "dev"
+    build_time: str = ""
+    # Стоимость bcrypt (2^N раундов). 12 — прод-значение, ~0.17s на хеш: это
+    # намеренно дорого, чтобы перебор украденной базы был невыгоден. В тестах
+    # такая цена умножается на сотни регистраций/логинов в фикстурах и даёт
+    # основную долю времени прогона, поэтому conftest.py ставит 4 (~0.001s).
+    # Менять в .env прода не нужно: пароль, захешированный с другим фактором,
+    # проверяется корректно — фактор хранится внутри самого хеша.
+    bcrypt_rounds: int = 12
 
     model_config = {"env_file": ".env", "extra": "ignore"}
+
+    @property
+    def telegram_bot_username_clean(self) -> str:
+        """username без ведущего "@" — в .env его легко вписать с собакой
+        (так бот показан в самом Telegram), а в ссылку t.me/<username> она
+        попасть не должна: t.me/@bot не открывается."""
+        return self.telegram_bot_username.strip().lstrip("@")
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
 settings = Settings()

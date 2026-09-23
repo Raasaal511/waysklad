@@ -13,6 +13,10 @@ from app.application.products.create_product import (
     CreateProductUseCase,
     VariantInput,
 )
+from app.application.products.add_storefront_photo import (
+    AddStorefrontPhotoCommand,
+    AddStorefrontPhotoUseCase,
+)
 from app.application.products.create_unit import CreateUnitCommand, CreateUnitUseCase
 from app.application.products.delete_product import DeleteProductCommand, DeleteProductUseCase
 from app.application.products.import_excel import ImportProductsCommand, ImportProductsUseCase
@@ -84,13 +88,13 @@ async def test_register_shop_generates_unique_slug_on_name_collision(
     first = await RegisterShopUseCase(make_uow(), hasher).execute(
         RegisterShopCommand(
             shop_name="Магазин Беркат", owner_name="Ахмед",
-            phone=random_phone(), password="secret123",
+            phone=random_phone(), personal_data_consent=True, password="secret123",
         )
     )
     second = await RegisterShopUseCase(make_uow(), hasher).execute(
         RegisterShopCommand(
             shop_name="Магазин Беркат", owner_name="Муса",
-            phone=random_phone(), password="secret123",
+            phone=random_phone(), personal_data_consent=True, password="secret123",
         )
     )
     assert first.shop_slug == "magazin-berkat"
@@ -101,7 +105,7 @@ async def test_duplicate_phone_registration_fails(make_uow, hasher, registered_s
     _, phone, _ = registered_shop
     with pytest.raises(DomainError):
         await RegisterShopUseCase(make_uow(), hasher).execute(
-            RegisterShopCommand("Другой", "Муса", phone, "secret123")
+            RegisterShopCommand("Другой", "Муса", phone, "secret123", personal_data_consent=True)
         )
 
 
@@ -634,3 +638,47 @@ async def test_set_variant_photo_rejects_unknown_variant(
         await SetVariantPhotoUseCase(make_uow(tenant_id), LocalFileStorage(tmp_path)).execute(
             owner, SetVariantPhotoCommand(product.id, 999999, "photo.png", _test_png_bytes())
         )
+
+
+async def test_update_product_persists_description(make_uow, registered_shop, create_product):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Кружка")
+
+    updated = await UpdateProductUseCase(make_uow(tenant_id)).execute(
+        owner,
+        UpdateProductCommand(
+            product_id=product.id, name=product.name, unit_code="pcs",
+            purchase_price=Decimal("50"), retail_price=Decimal("100"),
+            description="Керамическая кружка 350 мл",
+        ),
+    )
+    assert updated.description == "Керамическая кружка 350 мл"
+
+    async with make_uow(tenant_id) as uow:
+        fresh = await uow.products.get(product.id)
+        assert fresh.description == "Керамическая кружка 350 мл"
+
+
+async def test_add_storefront_photo_accumulates_across_calls(
+    make_uow, registered_shop, create_product, tmp_path
+):
+    tenant_id, _, owner = registered_shop
+    product = await create_product(tenant_id, name="Кружка")
+    storage = LocalFileStorage(tmp_path)
+    use_case = AddStorefrontPhotoUseCase(make_uow(tenant_id), storage)
+
+    first = await use_case.execute(
+        owner, AddStorefrontPhotoCommand(product.id, "a.png", _test_png_bytes())
+    )
+    assert len(first.storefront_photos) == 1
+
+    second = await use_case.execute(
+        owner, AddStorefrontPhotoCommand(product.id, "b.png", _test_png_bytes())
+    )
+    # каждый вызов добавляет фото к уже сохранённым, а не перезаписывает список
+    assert len(second.storefront_photos) == 2
+    assert second.storefront_photos[0] == first.storefront_photos[0]
+
+    async with make_uow(tenant_id) as uow:
+        fresh = await uow.products.get(product.id)
+        assert len(fresh.storefront_photos) == 2

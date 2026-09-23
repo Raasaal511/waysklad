@@ -220,7 +220,7 @@ async def test_sale_receipt_via_api(client, owner_headers):
     assert response.status_code == 200, response.text
     receipt = response.json()
     assert "Мёд горный" in receipt["text"]
-    assert "Итого: 700.00 ₽" in receipt["text"]
+    assert "Итого: 700 ₽" in receipt["text"]
     assert receipt["whatsapp_link"] is None
 
     # продажа клиенту с телефоном — ссылка должна появиться

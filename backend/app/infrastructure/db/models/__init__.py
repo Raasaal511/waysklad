@@ -5,6 +5,8 @@ from app.infrastructure.db.models import (  # noqa: F401
     counterparties,
     customers,
     debts,
+    errors,
+    feedback,
     identity,
     inventory,
     notifications,

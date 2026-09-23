@@ -133,6 +133,7 @@ async def test_admin_status_shows_recent_tenant(client, random_phone):
             "owner_name": "Владелец",
             "phone": random_phone(),
             "password": "secret123",
+            "personal_data_consent": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -152,6 +153,7 @@ async def test_admin_list_and_suspend_tenant(client, random_phone):
             "owner_name": "Владелец",
             "phone": random_phone(),
             "password": "secret123",
+            "personal_data_consent": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -184,7 +186,7 @@ async def test_admin_list_and_suspend_tenant(client, random_phone):
 
     # новый логин тоже заблокирован
     login_attempt = await client.post(
-        "/api/auth/login", json={"phone": owner_phone, "password": "secret123"}
+        "/api/auth/login", json={"phone": owner_phone, "password": "secret123", "personal_data_consent": True}
     )
     assert login_attempt.status_code == 403, login_attempt.text
 

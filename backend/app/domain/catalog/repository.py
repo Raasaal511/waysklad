@@ -46,6 +46,11 @@ class IProductRepository(Protocol):
         variant_size: str | None = None,
         variant_color: str | None = None,
     ) -> tuple[list[Product], int]: ...
+    async def list_by_ids(self, product_ids: list[int]) -> list[Product]:
+        """Товары одним запросом — для списков, где иначе был бы N+1
+        (карточки заказов покупателя). Пропавшие id просто отсутствуют."""
+        ...
+
     async def get_by_barcode(self, barcode: Barcode) -> Product | None: ...
     async def find_duplicates(self, keys: list[DuplicateLookupKey]) -> list[DuplicateMatch]: ...
     async def count_storefront_by_category(self) -> dict[int | None, int]:
@@ -58,6 +63,20 @@ class IProductRepository(Protocol):
         витрине (show_on_storefront=True) — для построения фильтра «Размер»/
         «Цвет» на публичной странице. Возвращает (sizes, colors)."""
         ...
+    async def list_similar_in_shop(
+        self,
+        product_id: int,
+        category_id: int | None,
+        parent_category_id: int | None,
+        warehouse_ids: list[int],
+        limit: int,
+    ) -> list[Product]:
+        """Похожие товары этого же магазина (промпт B4 п.1) — кроме самого
+        product_id, только show_on_storefront=True. Порядок: сначала та же
+        категория, затем та же родительская категория, затем остальные;
+        внутри группы — сначала в наличии (по warehouse_ids), затем по
+        sold_count за всё время по убыванию."""
+        ...
 
 
 class IUnitRepository(Protocol):
@@ -68,6 +87,7 @@ class IUnitRepository(Protocol):
 
 class ICategoryRepository(Protocol):
     async def add(self, category: Category) -> Category: ...
+    async def save(self, category: Category) -> Category: ...
     async def get(self, category_id: int) -> Category: ...
     async def list(self) -> list[Category]: ...
 

@@ -14,12 +14,20 @@ class CategoryMapper:
     @staticmethod
     def to_orm(category: Category, tenant_id: int) -> CategoryModel:
         return CategoryModel(
-            tenant_id=tenant_id, name=category.name, parent_id=category.parent_id
+            tenant_id=tenant_id,
+            name=category.name,
+            parent_id=category.parent_id,
+            platform_category_id=category.platform_category_id,
         )
 
     @staticmethod
     def to_entity(model: CategoryModel) -> Category:
-        return Category(id=model.id, name=model.name, parent_id=model.parent_id)
+        return Category(
+            id=model.id,
+            name=model.name,
+            parent_id=model.parent_id,
+            platform_category_id=model.platform_category_id,
+        )
 
 
 class UnitMapper:
@@ -44,6 +52,7 @@ class ProductVariantMapper:
             barcode=variant.barcode.value if variant.barcode else None,
             photo=variant.photo,
             price=variant.price.amount if variant.price else None,
+            name=variant.name,
         )
 
     @staticmethod
@@ -55,6 +64,7 @@ class ProductVariantMapper:
             barcode=Barcode(model.barcode) if model.barcode else None,
             photo=model.photo,
             price=Money(model.price) if model.price is not None else None,
+            name=model.name,
         )
 
 
@@ -70,9 +80,13 @@ class ProductMapper:
             unit_code=product.unit.code,
             purchase_price=product.purchase_price.amount,
             retail_price=product.retail_price.amount,
+            compare_at_price=product.compare_at_price.amount
+            if product.compare_at_price is not None
+            else None,
             min_stock=product.min_stock,
             photo=product.photo,
             description=product.description,
+            warranty_text=product.warranty_text,
             storefront_photos=list(product.storefront_photos),
             show_on_storefront=product.show_on_storefront,
             storefront_min_qty=product.storefront_min_qty,
@@ -89,11 +103,15 @@ class ProductMapper:
             unit=units.get(model.unit_code, fallback),
             purchase_price=Money(model.purchase_price),
             retail_price=Money(model.retail_price),
+            compare_at_price=Money(model.compare_at_price)
+            if model.compare_at_price is not None
+            else None,
             sku=model.sku or "",
             barcode=Barcode(model.barcode) if model.barcode else None,
             category_id=model.category_id,
             photo=model.photo,
             description=model.description,
+            warranty_text=model.warranty_text,
             storefront_photos=list(model.storefront_photos or []),
             min_stock=model.min_stock,
             show_on_storefront=model.show_on_storefront,

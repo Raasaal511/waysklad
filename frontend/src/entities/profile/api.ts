@@ -32,6 +32,17 @@ export interface Tenant {
   summary_weekly_enabled: boolean
   summary_monthly_enabled: boolean
   summary_daily_hour_msk: number
+  logo: string
+  storefront_show_stock_qty: boolean
+  storefront_description: string
+  contact_phone: string
+  contact_whatsapp: string
+  contact_telegram: string
+  storefront_min_order_total: string | null
+  policy_refund_money: string
+  policy_payment: string
+  policy_delivery: string
+  policy_returns: string
 }
 
 export function connectTelegram(chatId: string) {
@@ -49,10 +60,30 @@ export interface UpdateShopInput {
   summary_weekly_enabled?: boolean
   summary_monthly_enabled?: boolean
   summary_daily_hour_msk?: number
+  storefront_show_stock_qty?: boolean
+  storefront_description?: string
+  contact_phone?: string
+  contact_whatsapp?: string
+  contact_telegram?: string
+  storefront_min_order_total?: string | null
+  policy_refund_money?: string
+  policy_payment?: string
+  policy_delivery?: string
+  policy_returns?: string
 }
 
 export function updateShop(input: UpdateShopInput) {
   return api.patch<Tenant>('/auth/shop', input)
+}
+
+export function uploadShopLogo(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return api.postForm<Tenant>('/auth/shop/logo', form)
+}
+
+export function deleteShopLogo() {
+  return api.delete<Tenant>('/auth/shop/logo')
 }
 
 export function changePassword(input: { current_password: string; new_password: string }) {

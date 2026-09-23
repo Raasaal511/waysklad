@@ -15,6 +15,19 @@ const ACCENT_KEY = 'waysklad:theme-accent'
 
 const ThemeContext = createContext<ThemeState | null>(null)
 
+/**
+ * theme-color в index.html захардкожен под светлую зелёную тему и не менялся —
+ * на тёмной теме или другом акценте цвет вкладки/статус-бара браузера не совпадал
+ * с реальной шапкой (P6, «мелочи», favicon и theme-color). Берём фактический
+ * var(--bg) после применения data-theme/data-accent — это и есть фон шапки.
+ */
+function syncThemeColorMeta() {
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (!meta) return
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()
+  if (bg) meta.setAttribute('content', bg)
+}
+
 function readMode(): ThemeMode {
   return localStorage.getItem(MODE_KEY) === 'dark' ? 'dark' : 'light'
 }
@@ -31,11 +44,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', mode)
     localStorage.setItem(MODE_KEY, mode)
+    syncThemeColorMeta()
   }, [mode])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-accent', accent)
     localStorage.setItem(ACCENT_KEY, accent)
+    syncThemeColorMeta()
   }, [accent])
 
   return (

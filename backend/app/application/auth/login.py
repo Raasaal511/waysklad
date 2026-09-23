@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from app.domain.common.exceptions import AccessDeniedError, DomainError
 from app.domain.common.phone import Phone
@@ -36,8 +37,15 @@ class LoginUseCase:
 
         async with self._uow as uow:
             tenant = await uow.tenants.get(user.tenant_id)
-        if tenant.is_suspended:
-            # пароль уже проверен верно — законный владелец, честное сообщение не палит
-            # посторонним ничего лишнего (для неверного пароля выше отдаём общую фразу)
-            raise AccessDeniedError("Магазин заблокирован. Свяжитесь с поддержкой.")
+            if tenant.is_suspended:
+                # пароль уже проверен верно — законный владелец, честное сообщение не палит
+                # посторонним ничего лишнего (для неверного пароля выше отдаём общую фразу)
+                raise AccessDeniedError("Магазин заблокирован. Свяжитесь с поддержкой.")
+
+            # отметка входа — здесь же, последним действием успешного логина.
+            # Отдельным UoW делать нельзя: это третья транзакция за запрос, она
+            # конкурирует с остальными за блокировки той же строки.
+            await uow.users.touch_last_login(user.id, datetime.now(timezone.utc))
+            await uow.commit()
+
         return user

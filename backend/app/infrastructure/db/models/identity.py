@@ -1,5 +1,9 @@
+from datetime import datetime
+from decimal import Decimal
+
+from sqlalchemy import DateTime
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, Integer, SmallInteger, String
+from sqlalchemy import ForeignKey, Integer, Numeric, SmallInteger, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domain.identity.entities import Role
@@ -24,6 +28,19 @@ class TenantModel(Base, TimestampMixin):
     summary_monthly_enabled: Mapped[bool] = mapped_column(default=False)
     summary_daily_hour_msk: Mapped[int] = mapped_column(SmallInteger, default=20)
     is_suspended: Mapped[bool] = mapped_column(default=False)
+    city: Mapped[str | None] = mapped_column(String(100))
+    is_verified: Mapped[bool] = mapped_column(default=False)
+    logo: Mapped[str] = mapped_column(String(500), default="")
+    storefront_show_stock_qty: Mapped[bool] = mapped_column(default=False)
+    storefront_description: Mapped[str] = mapped_column(String(500), default="")
+    contact_phone: Mapped[str] = mapped_column(String(20), default="")
+    contact_whatsapp: Mapped[str] = mapped_column(String(20), default="")
+    contact_telegram: Mapped[str] = mapped_column(String(32), default="")
+    storefront_min_order_total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    policy_refund_money: Mapped[str] = mapped_column(Text, default="")
+    policy_payment: Mapped[str] = mapped_column(Text, default="")
+    policy_delivery: Mapped[str] = mapped_column(Text, default="")
+    policy_returns: Mapped[str] = mapped_column(Text, default="")
 
 
 class WarehouseModel(Base, TenantMixin, TimestampMixin):
@@ -48,6 +65,14 @@ class UserModel(Base, TenantMixin, TimestampMixin):
     # Инкрементируется при смене пароля/принудительном разлогине — токены,
     # выданные с прежним значением, перестают проходить проверку (см. get_current_user).
     token_version: Mapped[int] = mapped_column(Integer, default=0)
+    # последний успешный вход — нужен админке платформы, чтобы отличать
+    # живой магазин от заброшенного (NULL = ни разу не входил после введения поля)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # последний запрос с действующим токеном (с точностью до LAST_SEEN_STEP):
+    # токен живёт неделями, поэтому «вход» не говорит, работает ли человек сейчас
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # согласие на обработку телефона (152-ФЗ); NULL — зарегистрирован до введения поля
+    personal_data_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class WarehouseAssignmentModel(Base):

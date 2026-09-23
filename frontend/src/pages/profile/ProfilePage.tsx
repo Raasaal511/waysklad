@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { connectTelegram, updateShop, changePassword, logoutAll } from '../../entities/profile/api'
 import type { Role } from '../../entities/auth/api'
 import type { Tenant, UpdateShopInput } from '../../entities/profile/api'
@@ -14,6 +14,7 @@ import { IconCheck, IconBuildingWarehouse, IconChevronRight, IconPencil } from '
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
+import { AppInstallCard } from './AppInstallCard'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './ProfilePage.module.css'
 
@@ -27,10 +28,24 @@ const ROLE_LABELS: Record<Role, string> = {
 
 type Tab = 'personalization' | 'account' | 'connections'
 
+/** Вкладка из ссылки (?tab=…): так неактивный пункт «Витрина» открывает сразу нужную. */
+function tabFromQuery(value: string | null, canManageSettings: boolean): Tab | null {
+  if (value === 'account') return 'account'
+  if ((value === 'personalization' || value === 'connections') && canManageSettings) return value
+  return null
+}
+
 export function ProfilePage() {
   const { user } = useAuth()
   const canManageSettings = user?.role === 'owner'
-  const [tab, setTab] = useState<Tab>('account')
+  const [searchParams] = useSearchParams()
+  const queryTab = tabFromQuery(searchParams.get('tab'), canManageSettings)
+  const [tab, setTab] = useState<Tab>(queryTab ?? 'account')
+
+  // Повторный переход по ссылке, когда профиль уже открыт, тоже переключает вкладку.
+  useEffect(() => {
+    if (queryTab) setTab(queryTab)
+  }, [queryTab])
 
   const TABS: { id: Tab; label: string }[] = [
     { id: 'account', label: 'Аккаунт' },
@@ -139,26 +154,81 @@ function PersonalizationTab() {
 }
 
 function StorefrontSettings({ shop }: { shop: Tenant }) {
+  const { setShop } = useShop()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const storeUrl = shop.slug ? `${window.location.origin}/store/${shop.slug}` : null
+  const { hash, key } = useLocation()
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [highlighted, setHighlighted] = useState(false)
+
+  // Пришли из меню по ссылке …#storefront — показываем, где включается витрина.
+  useEffect(() => {
+    if (hash !== '#storefront') return
+    cardRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    setHighlighted(true)
+    const timer = setTimeout(() => setHighlighted(false), 1600)
+    return () => clearTimeout(timer)
+  }, [hash, key])
+
+  async function handleToggle(enabled: boolean) {
+    setError(null)
+    setSaving(true)
+    try {
+      const updated = await updateShop({ name: shop.name, storefront_enabled: enabled })
+      setShop(updated)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось сохранить')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
-    <div className={[layoutStyles.stack, layoutStyles.card, layoutStyles.cardFull].join(' ')}>
+    <div
+      ref={cardRef}
+      id="storefront"
+      className={[
+        layoutStyles.stack,
+        layoutStyles.card,
+        layoutStyles.cardFull,
+        styles.storefrontCard,
+        highlighted && styles.storefrontCardHighlighted,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <div>
         <h3>Публичная витрина</h3>
         <p className={layoutStyles.textMuted}>
           Включение, товары и заявки — в отдельном разделе меню.
         </p>
       </div>
-      <div className={layoutStyles.row} style={{ gap: 8, flexWrap: 'wrap' }}>
-        <Link to="/storefront">
-          <Button>Открыть раздел «Витрина»</Button>
-        </Link>
-        {shop.storefront_enabled && storeUrl && (
-          <a href={storeUrl} target="_blank" rel="noreferrer" className={styles.storefrontLink}>
-            {storeUrl}
-          </a>
-        )}
-      </div>
+      <label className="sale-checkbox">
+        <input
+          type="checkbox"
+          checked={shop.storefront_enabled}
+          disabled={saving}
+          onChange={(e) => handleToggle(e.target.checked)}
+        />
+        Онлайн-витрина
+      </label>
+      <p className={layoutStyles.textMuted} style={{ margin: '-6px 0 0', fontSize: 13, lineHeight: 1.4 }}>
+        Бета: каталог магазина по публичной ссылке
+      </p>
+      {error && <span className={layoutStyles.textDanger}>{error}</span>}
+      {shop.storefront_enabled && (
+        <div className={layoutStyles.row} style={{ gap: 8, flexWrap: 'wrap' }}>
+          <Link to="/storefront">
+            <Button>Открыть раздел «Витрина»</Button>
+          </Link>
+          {storeUrl && (
+            <a href={storeUrl} target="_blank" rel="noreferrer" className={styles.storefrontLink}>
+              {storeUrl}
+            </a>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -262,6 +332,8 @@ function AccountTab() {
           </Button>
         </div>
       </div>
+
+      <AppInstallCard />
 
       {showPasswordForm && (
         <Modal title="Сменить пароль" onClose={() => setShowPasswordForm(false)}>
@@ -381,12 +453,22 @@ function TelegramSettings() {
       )}
 
       {!loading && !connectedChatId && (
-        <Button onClick={() => setShowForm(true)}>
-          Подключить
-        </Button>
+        <>
+          <p className={styles.telegramWarning} role="status">
+            Сводки сейчас никуда не уходят: Telegram не подключён. Подключите chat_id и
+            нажмите «Старт» у бота ВайСклад в Telegram — иначе ежедневный отчёт не придёт.
+          </p>
+          <Button onClick={() => setShowForm(true)}>Подключить</Button>
+        </>
       )}
 
-      {!loading && connectedChatId && shop && <SummaryScheduleSettings shop={shop} onSaved={setShop} />}
+      {!loading && shop && (
+        <SummaryScheduleSettings
+          shop={shop}
+          onSaved={setShop}
+          disabled={!connectedChatId}
+        />
+      )}
 
       {showForm && (
         <Modal title="Telegram-сводка" onClose={() => setShowForm(false)}>
@@ -410,14 +492,18 @@ const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
 function SummaryScheduleSettings({
   shop,
   onSaved,
+  disabled = false,
 }: {
   shop: Tenant
   onSaved: (shop: Tenant) => void
+  /** Пока chat_id не подключён — расписание видно, но менять нельзя. */
+  disabled?: boolean
 }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function toggle(patch: Partial<UpdateShopInput>) {
+    if (disabled) return
     setError(null)
     setSaving(true)
     try {
@@ -430,16 +516,23 @@ function SummaryScheduleSettings({
     }
   }
 
+  const locked = disabled || saving
+
   return (
     <div className={[layoutStyles.stack, styles.summarySchedule].join(' ')}>
       <span className={layoutStyles.fieldLabel}>Когда присылать сводку</span>
+      {disabled && (
+        <p className={layoutStyles.textMuted}>
+          Сначала подключите Telegram — иначе расписание не сработает.
+        </p>
+      )}
 
       <div className={styles.summaryRow}>
         <label className={styles.summaryCheckbox}>
           <input
             type="checkbox"
             checked={shop.summary_daily_enabled}
-            disabled={saving}
+            disabled={locked}
             onChange={(e) => toggle({ summary_daily_enabled: e.target.checked })}
           />
           Ежедневно
@@ -450,7 +543,7 @@ function SummaryScheduleSettings({
             value={String(shop.summary_daily_hour_msk)}
             onChange={(v) => toggle({ summary_daily_hour_msk: Number(v) })}
             options={HOUR_OPTIONS}
-            disabled={saving}
+            disabled={locked}
           />
         )}
       </div>
@@ -459,7 +552,7 @@ function SummaryScheduleSettings({
         <input
           type="checkbox"
           checked={shop.summary_weekly_enabled}
-          disabled={saving}
+          disabled={locked}
           onChange={(e) => toggle({ summary_weekly_enabled: e.target.checked })}
         />
         Еженедельно, по воскресеньям
@@ -469,7 +562,7 @@ function SummaryScheduleSettings({
         <input
           type="checkbox"
           checked={shop.summary_monthly_enabled}
-          disabled={saving}
+          disabled={locked}
           onChange={(e) => toggle({ summary_monthly_enabled: e.target.checked })}
         />
         Ежемесячно, в последний день месяца
@@ -519,6 +612,13 @@ function TelegramConnectForm({ onDone }: { onDone: () => void }) {
         <div className={[layoutStyles.row, styles.telegramStep].join(' ')}>
           <span className={styles.telegramStepNumber}>3</span>
           <span>Вставьте это число ниже и нажмите «Подключить»</span>
+        </div>
+        <div className={[layoutStyles.row, styles.telegramStep].join(' ')}>
+          <span className={styles.telegramStepNumber}>4</span>
+          <span>
+            Откройте бота ВайСклад (тот же, что в ссылках витрины) и нажмите «Старт» —
+            иначе сообщения до вас не дойдут
+          </span>
         </div>
       </div>
 
