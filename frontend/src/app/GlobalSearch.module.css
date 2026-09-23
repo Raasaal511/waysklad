@@ -283,13 +283,13 @@
   }
 }
 
-/* на узких экранах поиск занимает всю доступную ширину шапки */
-@media (max-width: 767px) {
+/* Планшеты ≤899: 16px, иначе iOS зумит; специфичность выше базовых 13.5px. */
+@media (max-width: 899px) {
   .wrap {
     max-width: none;
   }
 
   .field input:not([type='checkbox']):not([type='radio']) {
-    font-size: 16px; /* меньше 16px — iOS зумит страницу при фокусе */
+    font-size: 16px;
   }
 }
