@@ -18,6 +18,7 @@ import {
   IconDots,
   IconUser,
   IconLogout,
+  IconMessageCircle,
   type Icon as TablerIcon,
 } from '@tabler/icons-react'
 import { useAuth } from './AuthContext'
@@ -28,6 +29,7 @@ import { NotificationBell } from './NotificationBell'
 import { GlobalSearch } from './GlobalSearch'
 import { Button } from '../shared/ui/Button'
 import { IconButton } from '../shared/ui/IconButton'
+import { FeedbackModal } from '../widgets/feedback/FeedbackModal'
 import { useOfflineSync } from '../shared/offline/useOfflineSync'
 import { useFeature } from '../shared/lib/useFeature'
 import { useKeyboardOpen } from '../shared/lib/useKeyboardOpen'
@@ -270,6 +272,7 @@ function MoreSheet({
   open,
   onClose,
   onNavigate,
+  onFeedback,
   onLogout,
 }: {
   items: NavItem[]
@@ -277,6 +280,7 @@ function MoreSheet({
   onClose: () => void
   /** Переход из шторки: закрывает её без history.back(), иначе back съедает navigate. */
   onNavigate: (to: string) => void
+  onFeedback: () => void
   onLogout: () => void
 }) {
   const { pathname } = useLocation()
@@ -381,6 +385,19 @@ function MoreSheet({
             className={styles['app-more-item']}
             onClick={() => {
               onClose()
+              onFeedback()
+            }}
+          >
+            <span className={styles['app-more-icon']}>
+              <IconMessageCircle size={22} stroke={1.8} />
+            </span>
+            <span>Обратная связь</span>
+          </button>
+          <button
+            type="button"
+            className={styles['app-more-item']}
+            onClick={() => {
+              onClose()
               onLogout()
             }}
           >
@@ -404,6 +421,9 @@ export function AppLayout() {
   const { pathname } = useLocation()
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1')
   const [moreOpen, setMoreOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const openFeedback = useCallback(() => setFeedbackOpen(true), [])
+  const closeFeedback = useCallback(() => setFeedbackOpen(false), [])
   const [offlineTip, setOfflineTip] = useState(false)
   const [narrowHeader, setNarrowHeader] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 599px)').matches,
@@ -582,6 +602,18 @@ export function AppLayout() {
         </nav>
 
         <div className={styles['app-sidebar-footer']}>
+          <button
+            type="button"
+            className={[styles['app-sidebar-item'], styles['app-sidebar-feedback']].join(' ')}
+            onClick={openFeedback}
+            data-tooltip={collapsed ? 'Обратная связь' : undefined}
+            aria-label={collapsed ? 'Обратная связь' : undefined}
+          >
+            <span className={styles['app-sidebar-icon']}>
+              <IconMessageCircle size={19} stroke={1.8} />
+            </span>
+            {!collapsed && <span>Обратная связь</span>}
+          </button>
           <Button
             variant="secondary"
             className={styles['app-logout']}
@@ -707,8 +739,11 @@ export function AppLayout() {
           open={moreOpen}
           onClose={closeMore}
           onNavigate={navigateFromMore}
+          onFeedback={openFeedback}
           onLogout={logout}
         />
+
+        {feedbackOpen && <FeedbackModal onClose={closeFeedback} />}
       </div>
     </div>
   )
