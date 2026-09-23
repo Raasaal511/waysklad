@@ -58,6 +58,15 @@
   gap: 8px;
 }
 
+/* Основные действия заголовка — не меньше 44×44 (и на планшете, где виден desktop-ряд). */
+.pageTitleActionsDesktop a,
+.pageTitleActionsDesktop button,
+.pageTitleActionsMobile a,
+.pageTitleActionsMobile button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
 .pageTitleActionsMobile {
   display: none;
   align-items: center;

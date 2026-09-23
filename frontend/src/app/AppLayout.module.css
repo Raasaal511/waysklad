@@ -92,7 +92,8 @@
   font-size: 13px;
 }
 
-@media (max-width: 599px) {
+/* До 899: компактный бейдж 44×44 (на 600–899 раньше оставался 33px по высоте). */
+@media (max-width: 899px) {
   .app-header {
     gap: 8px;
     padding: 8px 12px;
@@ -127,6 +128,8 @@
   .app-header-user .app-user-badge {
     width: 44px;
     height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     justify-content: center;
     gap: 0;
   }

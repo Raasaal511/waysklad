@@ -22,7 +22,9 @@ export function PrivacyPage() {
           <PersonalDataNotice />
         </div>
         <p style={{ marginTop: 24 }}>
-          <Link to="/login">← Назад ко входу</Link>
+          <Link to="/login" className={styles['auth-back-link']}>
+            ← Назад ко входу
+          </Link>
         </p>
       </div>
     </div>

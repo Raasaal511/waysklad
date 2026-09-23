@@ -54,6 +54,9 @@
 }
 
 .link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   font-size: 14px;
   color: var(--text-muted);
   transition: color 150ms ease-out;

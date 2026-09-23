@@ -9,6 +9,9 @@
   align-items: center;
   justify-content: center;
   border-radius: 8px;
+  min-width: 44px;
+  min-height: 44px;
+  box-sizing: border-box;
 }
 
 .icon-button-danger {

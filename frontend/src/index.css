@@ -266,11 +266,11 @@ button:disabled {
     min-height: 44px;
   }
 
-  /* Исключения: компактные степперы/крестики внутри карточек */
+  /* Исключения: компактные степперы/крестики внутри карточек.
+     IconButton намеренно ≥44px — не исключаем. */
   button.product-tile-remove,
   button.cart-qty-step,
   [class*='nav-sell-btn'],
-  [class*='icon-button']:not([class*='icon-button-lg']),
   [class*='password-toggle'],
   [class*='clear'],
   [class*='iconOnly'] {

@@ -297,7 +297,7 @@
 
 .metaField input {
   flex: 1;
-  min-width: 0;
+  min-width: 44px;
   font-size: 13.5px !important;
   padding: 4px 0 !important;
   border: none !important;
@@ -309,7 +309,8 @@
 @media (max-width: 899px) {
   .metaField input {
     font-size: 16px !important;
-    min-height: 36px;
+    min-width: 44px;
+    min-height: 44px;
     padding: 8px 0 !important;
   }
 }
