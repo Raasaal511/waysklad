@@ -86,6 +86,12 @@
   }
 }
 
+/* Экранная клавиатура открыта: на сжатом окне прилипшая панель закрыла бы поле количества.
+   Возвращаем её в поток — она остаётся в конце формы. */
+:global(html[data-keyboard='open']) .salePageActions {
+  position: static;
+}
+
 @media (max-width: 640px) {
   .salePageActions {
     flex-direction: column;

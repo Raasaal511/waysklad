@@ -29,6 +29,7 @@ import { Button } from '../shared/ui/Button'
 import { IconButton } from '../shared/ui/IconButton'
 import { useOfflineSync } from '../shared/offline/useOfflineSync'
 import { useFeature } from '../shared/lib/useFeature'
+import { useKeyboardOpen } from '../shared/lib/useKeyboardOpen'
 import type { Role } from '../entities/auth/api'
 import styles from './AppLayout.module.css'
 
@@ -328,6 +329,7 @@ export function AppLayout() {
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 599px)').matches,
   )
   const headerRef = useRef<HTMLElement>(null)
+  useKeyboardOpen()
   /** История для «назад» закрывает шторку только если её открыл пользователь (не онбординг). */
   const moreHistoryPushed = useRef(false)
   const { pendingCount, notice, dismissNotice } = useOfflineSync()

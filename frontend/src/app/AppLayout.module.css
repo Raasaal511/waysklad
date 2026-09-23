@@ -263,6 +263,11 @@
   overflow: visible;
 }
 
+/* Экранная клавиатура открыта (useKeyboardOpen): меню не должно закрывать поле ввода. */
+:global(html[data-keyboard='open']) .app-nav {
+  display: none;
+}
+
 .app-content-with-sell {
   /* Не меньше отступа sticky-панелей над меню, иначе в конце прокрутки они налезут на контент. */
   padding-bottom: calc(var(--app-nav-clearance) + 12px);
