@@ -11,6 +11,7 @@ from app.domain.identity.repository import (
     ITenantRepository,
     IUserRepository,
     IWarehouseRepository,
+    UserSession,
 )
 from app.infrastructure.db.mappers.identity import TenantMapper, UserMapper, WarehouseMapper
 from app.infrastructure.db.models.catalog import UnitModel
@@ -103,7 +104,14 @@ class SqlAlchemyUserRepository(SqlAlchemyRepository, IUserRepository):
     async def touch_last_login(self, user_id: int, at: datetime) -> None:
         # точечный UPDATE: вход не должен перезаписывать остальные поля
         await self._session.execute(
-            update(UserModel).where(UserModel.id == user_id).values(last_login_at=at)
+            update(UserModel)
+            .where(UserModel.id == user_id)
+            .values(last_login_at=at, last_seen_at=at)
+        )
+
+    async def touch_last_seen(self, user_id: int, at: datetime) -> None:
+        await self._session.execute(
+            update(UserModel).where(UserModel.id == user_id).values(last_seen_at=at)
         )
 
     async def add(self, user: User) -> User:
@@ -133,17 +141,17 @@ class SqlAlchemyUserRepository(SqlAlchemyRepository, IUserRepository):
         ).scalar_one_or_none()
         return UserMapper.to_entity(model) if model else None
 
-    async def get_token_version(self, user_id: int) -> int | None:
+    async def get_session(self, user_id: int) -> UserSession | None:
         row = (
             await self._session.execute(
-                select(UserModel.token_version).where(
+                select(UserModel.token_version, UserModel.last_seen_at).where(
                     UserModel.id == user_id,
                     UserModel.tenant_id == self._tenant,
                     UserModel.is_active.is_(True),
                 )
             )
-        ).scalar_one_or_none()
-        return row
+        ).one_or_none()
+        return UserSession(token_version=row[0], last_seen_at=row[1]) if row else None
 
     async def list_by_tenant(self) -> list[User]:
         models = (
