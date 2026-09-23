@@ -97,6 +97,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
+            set -e
             cd ${{ secrets.DEPLOY_PATH }}
             PREV=$(git rev-parse HEAD)
             echo "Deploy previous SHA (для отката): $PREV"
