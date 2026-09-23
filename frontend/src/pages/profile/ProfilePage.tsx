@@ -14,6 +14,7 @@ import { IconCheck, IconBuildingWarehouse, IconChevronRight, IconPencil } from '
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
+import { AppInstallCard } from './AppInstallCard'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './ProfilePage.module.css'
 
@@ -331,6 +332,8 @@ function AccountTab() {
           </Button>
         </div>
       </div>
+
+      <AppInstallCard />
 
       {showPasswordForm && (
         <Modal title="Сменить пароль" onClose={() => setShowPasswordForm(false)}>

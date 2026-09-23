@@ -1,0 +1,126 @@
+/* Карточка «Приложение на телефоне» и шторка с подсказками — AppInstallCard.tsx */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.headText h3 {
+  margin: 0;
+}
+
+/* Смена «кнопка → Готово / Установлено» — мягкое появление, а не скачок. */
+.done {
+  font-weight: 600;
+  color: var(--accent);
+  animation: app-install-in 0.25s ease;
+}
+
+/* Галочка — строчная, чтобы при переносе оставалась рядом с последним словом. */
+.doneIcon {
+  margin-left: 6px;
+  vertical-align: -4px;
+}
+
+.action {
+  align-self: flex-start;
+  min-height: 44px;
+  font-size: 15px;
+  padding-inline: 18px;
+}
+
+.sheetBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lead {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  animation: app-install-in 0.25s ease both;
+}
+
+.step:nth-child(2) {
+  animation-delay: 0.06s;
+}
+
+.step:nth-child(3) {
+  animation-delay: 0.12s;
+}
+
+.stepText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+@keyframes app-install-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .done,
+  .step {
+    animation: none;
+  }
+}
+
+/* Телефон: кнопка на всю ширину — под большой палец. */
+@media (max-width: 599px) {
+  .action {
+    align-self: stretch;
+  }
+}

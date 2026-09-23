@@ -37,6 +37,9 @@ export default defineConfig({
           { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },
           { src: 'pwa-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
+        // Ссылка на самих себя: так navigator.getInstalledRelatedApps() в обычной вкладке
+        // Chrome отвечает, стоит ли приложение (карточка в профиле).
+        related_applications: [{ platform: 'webapp', url: '/manifest.webmanifest' }],
       },    }),
   ],
   server: {
