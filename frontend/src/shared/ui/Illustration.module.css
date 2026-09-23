@@ -13,11 +13,10 @@
   object-fit: contain;
 }
 
-/* В тёмной теме иллюстрации (часто на светлом холсте) проваливаются в фон —
-   лёгкая светлая подложка возвращает контраст, как у карточек empty-state. */
-:global([data-theme='dark']) .wrap {
-  background: color-mix(in srgb, #ffffff 92%, var(--bg));
-  border-radius: 20px;
-  padding: 12px;
-  box-sizing: content-box;
+/*
+ * Тёмная тема: мягкая тёмная тень — силуэт чуть «садится» на --bg,
+ * без светлого ореола.
+ */
+:global([data-theme='dark']) .img {
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
 }
