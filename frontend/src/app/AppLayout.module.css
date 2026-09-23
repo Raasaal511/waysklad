@@ -469,6 +469,57 @@
   background: var(--accent-soft);
 }
 
+/* Выключенный раздел (витрина): виден приглушённым и ведёт туда, где его включают.
+   Приглушаем цветом, а не opacity, иначе вместе с пунктом побледнеет и подсказка. */
+.app-sidebar-item.locked,
+.app-more-item.locked {
+  color: color-mix(in srgb, var(--text-muted) 55%, transparent);
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+/* Подсказка неактивного пункта: как [data-tooltip] меню, но fixed — поверх прокрутки списка. */
+.app-sidebar-tooltip {
+  position: fixed;
+  z-index: 200;
+  width: max-content;
+  max-width: 220px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  pointer-events: none;
+  transform: translateY(-50%);
+  animation: appSidebarTooltipIn 0.12s ease;
+}
+
+@keyframes appSidebarTooltipIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-4px);
+  }
+}
+
+/* Пункты шторки центрированы группой (иконка + текст) — строки тоже по центру. */
+.app-more-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  text-align: center;
+}
+
+.app-more-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
 .app-more-icon {
   display: flex;
   flex-shrink: 0;

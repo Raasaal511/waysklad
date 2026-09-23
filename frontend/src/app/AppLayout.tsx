@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   IconShoppingCart,
@@ -39,6 +40,8 @@ interface NavItem {
   icon: TablerIcon
   roles?: Role[]
   feature?: 'storefront'
+  /** Раздел выключен флагом магазина: пункт виден неактивным и ведёт туда, где его включают. */
+  locked?: boolean
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -93,12 +96,20 @@ const ROLE_LABELS: Record<Role, string> = {
   analyst: 'Аналитик',
 }
 
+/** Где владелец включает витрину — туда ведёт неактивный пункт «Витрина». */
+const STOREFRONT_SETTINGS_PATH = '/profile?tab=personalization#storefront'
+const STOREFRONT_LOCKED_HINT = 'Витрина выключена. Включите её в профиле, вкладка «Персонализация»'
+
 function filterNavItems(role: Role | undefined, storefrontEnabled: boolean): NavItem[] {
-  return NAV_ITEMS.filter(
-    (item) =>
-      (!item.roles || (role && item.roles.includes(role))) &&
-      (item.feature !== 'storefront' || storefrontEnabled),
-  )
+  return NAV_ITEMS.flatMap((item) => {
+    if (item.roles && !(role && item.roles.includes(role))) return []
+    if (item.feature === 'storefront' && !storefrontEnabled) {
+      // Выключенную витрину видит только владелец: включить её может только он,
+      // остальным неактивный пункт был бы лишним шумом.
+      return role === 'owner' ? [{ ...item, locked: true }] : []
+    }
+    return [item]
+  })
 }
 
 /** С FAB «Продать» в баре 3 вкладки + кнопка + «Ещё» (5 слотов); без FAB — 4 вкладки + «Ещё». */
@@ -111,9 +122,11 @@ function splitMobileNav(
     (item): item is NavItem => item != null,
   )
   const primaryCount = canSell ? 3 : 4
+  // Неактивный пункт не занимает место в нижней панели — только в шторке.
+  const primary = ordered.filter((item) => !item.locked).slice(0, primaryCount)
   return {
-    primary: ordered.slice(0, primaryCount),
-    more: ordered.slice(primaryCount),
+    primary,
+    more: ordered.filter((item) => !primary.includes(item)),
   }
 }
 
@@ -138,7 +151,10 @@ function SidebarNavItems({
   const items = filterNavItems(role, storefrontEnabled)
   return (
     <>
-      {items.map((item) => (
+      {items.map((item) =>
+        item.locked ? (
+          <LockedSidebarItem key={item.to} item={item} collapsed={collapsed} />
+        ) : (
         <NavLink
           key={item.to}
           to={item.to}
@@ -155,7 +171,52 @@ function SidebarNavItems({
           </span>
           {!collapsed && <span>{item.label}</span>}
         </NavLink>
-      ))}
+        ),
+      )}
+    </>
+  )
+}
+
+/**
+ * Неактивный пункт бокового меню (выключенная витрина). Подсказка рисуется порталом
+ * с position: fixed: список пунктов прокручивается (overflow-y: auto), и обычный
+ * [data-tooltip] справа от пункта он обрезает.
+ */
+function LockedSidebarItem({ item, collapsed }: { item: NavItem; collapsed?: boolean }) {
+  const [tip, setTip] = useState<{ top: number; left: number } | null>(null)
+
+  function show(el: HTMLElement) {
+    const rect = el.getBoundingClientRect()
+    setTip({ top: rect.top + rect.height / 2, left: rect.right + 10 })
+  }
+
+  return (
+    <>
+      <Link
+        to={STOREFRONT_SETTINGS_PATH}
+        className={[styles['app-sidebar-item'], styles.locked].join(' ')}
+        aria-label={STOREFRONT_LOCKED_HINT}
+        onMouseEnter={(e) => show(e.currentTarget)}
+        onFocus={(e) => show(e.currentTarget)}
+        onMouseLeave={() => setTip(null)}
+        onBlur={() => setTip(null)}
+      >
+        <span className={styles['app-sidebar-icon']}>
+          <item.icon size={19} stroke={1.8} />
+        </span>
+        {!collapsed && <span>{item.label}</span>}
+      </Link>
+      {tip &&
+        createPortal(
+          <div
+            className={styles['app-sidebar-tooltip']}
+            style={{ top: tip.top, left: tip.left }}
+            role="tooltip"
+          >
+            {STOREFRONT_LOCKED_HINT}
+          </div>,
+          document.body,
+        )}
     </>
   )
 }
@@ -259,6 +320,25 @@ function MoreSheet({
         <div className={styles['app-more-handle']} aria-hidden="true" />
         <nav className={styles['app-more-nav']}>
           {items.map((item) => {
+            if (item.locked) {
+              // На телефоне нет наведения — подсказка видна строкой под названием.
+              return (
+                <button
+                  key={item.to}
+                  type="button"
+                  className={[styles['app-more-item'], styles.locked].join(' ')}
+                  onClick={() => onNavigate(STOREFRONT_SETTINGS_PATH)}
+                >
+                  <span className={styles['app-more-icon']}>
+                    <item.icon size={22} stroke={1.8} />
+                  </span>
+                  <span className={styles['app-more-text']}>
+                    <span>{item.label}</span>
+                    <span className={styles['app-more-hint']}>Выключена · включить в профиле</span>
+                  </span>
+                </button>
+              )
+            }
             const isActive =
               item.to === '/'
                 ? pathname === '/'
