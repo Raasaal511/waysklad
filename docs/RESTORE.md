@@ -10,7 +10,7 @@ rclone-remote).
 репозитория на `main`, `.env` с боевыми секретами (не дефолтными).
 
 ```bash
-cd /home/deploy/apps/waysklad
+cd /home/deploy/waysklad
 cp .env.example .env
 nano .env   # POSTGRES_PASSWORD, SECRET_KEY, TELEGRAM_*, BACKUP_RCLONE_REMOTE…
 chmod 600 .env
@@ -82,12 +82,12 @@ A-запись домена на IP нового VPS. **Без оранжево�
 backend берутся из временной копии develop в `/tmp`.
 
 ```bash
-cd /home/deploy/apps/waysklad
+cd /home/deploy/waysklad
 ./deploy/backup.sh                                    # свежий дамп в backups/
 git fetch origin develop
 git worktree add --detach /tmp/waysklad-next origin/develop
 docker build -t waysklad-backend:rehearsal /tmp/waysklad-next/backend
-WAYSKLAD_PROJECT_DIR=/home/deploy/apps/waysklad \
+WAYSKLAD_PROJECT_DIR=/home/deploy/waysklad \
   /tmp/waysklad-next/deploy/rehearse-migrations.sh --image waysklad-backend:rehearsal \
   "$(ls -1t backups/waysklad-*.sql.gz | head -n 1)"
 ```

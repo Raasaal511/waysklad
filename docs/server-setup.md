@@ -107,7 +107,7 @@ chmod 600 ~/.ssh/authorized_keys
 в `~/.ssh/authorized_keys` перед публичным ключом можно добавить restriction:
 
 ```
-command="cd /home/deploy/apps/waysklad && PREV=\$(git rev-parse HEAD) && echo Deploy previous SHA: \$PREV && git pull origin main && docker compose -f docker-compose.prod.yml build && docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head && docker compose -f docker-compose.prod.yml up -d --wait db redis backend frontend scheduler storefront_bot && docker compose -f docker-compose.prod.yml up -d certbot",no-port-forwarding,no-X11-forwarding,no-agent-forwarding ssh-ed25519 AAAA...
+command="cd /home/deploy/waysklad && PREV=\$(git rev-parse HEAD) && echo Deploy previous SHA: \$PREV && git pull origin main && docker compose -f docker-compose.prod.yml build && docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head && docker compose -f docker-compose.prod.yml up -d --wait db redis backend frontend && docker compose -f docker-compose.prod.yml up -d scheduler storefront_bot certbot",no-port-forwarding,no-X11-forwarding,no-agent-forwarding ssh-ed25519 AAAA...
 ```
 
 Это жёстко ограничивает ключ одной командой — даже если приватный ключ
@@ -120,7 +120,7 @@ command="cd /home/deploy/apps/waysklad && PREV=\$(git rev-parse HEAD) && echo De
 деплоями (docker compose просто продолжит его читать).
 
 ```bash
-cd /home/deploy/apps/waysklad
+cd /home/deploy/waysklad
 cp .env.example .env
 nano .env   # заполнить реальными значениями
 ```
@@ -151,7 +151,7 @@ repository secret**. Добавить:
 | `DEPLOY_HOST`      | IP-адрес или домен сервера                                        |
 | `DEPLOY_USER`      | `deploy`                                                           |
 | `DEPLOY_SSH_KEY`   | содержимое приватного файла `deploy_key` целиком, включая заголовки |
-| `DEPLOY_PATH`      | `/home/deploy/apps/waysklad`                                       |
+| `DEPLOY_PATH`      | `/home/deploy/waysklad`                                       |
 
 ## 7. Первый запуск
 
@@ -159,7 +159,7 @@ repository secret**. Добавить:
 всё собирается и БД накатывает миграции) — дальше это уже будет делать CI.
 
 ```bash
-cd /home/deploy/apps/waysklad
+cd /home/deploy/waysklad
 docker compose -f docker-compose.prod.yml build
 docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
 docker compose -f docker-compose.prod.yml up -d --wait db redis backend frontend scheduler storefront_bot
@@ -183,7 +183,7 @@ crontab -e
 ```
 
 ```
-0 3 * * * /home/deploy/apps/waysklad/deploy/backup.sh
+0 3 * * * /home/deploy/waysklad/deploy/backup.sh
 ```
 
 **Важно:** без дополнительной настройки бэкапы складываются только локально
@@ -254,7 +254,7 @@ docker compose -f docker-compose.prod.yml logs -f backend
 `git pull`. Откат на сервере одной серией команд:
 
 ```bash
-cd /home/deploy/apps/waysklad
+cd /home/deploy/waysklad
 git checkout <sha>
 docker compose -f docker-compose.prod.yml build
 docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
