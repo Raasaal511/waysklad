@@ -2,6 +2,9 @@
 docs/screens/
 docs/lighthouse/
 
+# Исходники иллюстраций (сборка → public/illustrations/*.webp)
+frontend/design-src/
+
 /.claude
 # --- Python ---
 __pycache__/
