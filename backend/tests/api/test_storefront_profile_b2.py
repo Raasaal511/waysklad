@@ -464,7 +464,7 @@ async def test_storefront_request_below_min_order_total_rejected_via_api(client,
         json={"customer_name": "Покупатель", "items": [{"product_id": product["id"], "quantity": "1"}]},
     )
     assert response.status_code == 400, response.text
-    assert response.json()["detail"] == "Минимальная сумма заказа в этом магазине — 1000 ₽"
+    assert response.json()["detail"] == "Минимальная сумма заказа в этом магазине — 1\u202f000 ₽"
 
 
 async def test_storefront_request_exact_min_order_total_passes_via_api(client, owner_headers, customer_headers):

@@ -34,6 +34,7 @@ async def test_register_then_confirm_then_login(client, make_uow, random_phone):
             "phone": phone,
             "password": "secret12345",
             "password_confirm": "secret12345",
+            "personal_data_consent": True,
         },
     )
     assert response.status_code == 201, response.text
@@ -72,6 +73,7 @@ async def test_login_rejects_wrong_password(client, make_uow, random_phone):
             "phone": phone,
             "password": "secret12345",
             "password_confirm": "secret12345",
+            "personal_data_consent": True,
         },
     )
     await confirm_in_bot(make_uow, response.json()["token"])
@@ -103,6 +105,7 @@ async def test_register_validation(client, random_phone, payload, expected):
         "phone": random_phone(),
         "password": "secret12345",
         "password_confirm": "secret12345",
+        "personal_data_consent": True,
     }
     body.update(payload)
     response = await client.post(REGISTER_URL, json=body)
@@ -118,6 +121,7 @@ async def test_register_rejects_taken_username(client, make_uow, random_phone):
             "phone": random_phone(),
             "password": "secret12345",
             "password_confirm": "secret12345",
+            "personal_data_consent": True,
         },
     )
     await confirm_in_bot(make_uow, first.json()["token"])
@@ -130,6 +134,7 @@ async def test_register_rejects_taken_username(client, make_uow, random_phone):
             "phone": random_phone(),
             "password": "secret12345",
             "password_confirm": "secret12345",
+            "personal_data_consent": True,
         },
     )
     assert second.status_code == 400
@@ -152,6 +157,7 @@ async def test_register_upgrades_telegram_only_account(client, make_uow, random_
             "phone": phone,
             "password": "secret12345",
             "password_confirm": "secret12345",
+            "personal_data_consent": True,
         },
     )
     assert response.status_code == 201, response.text
@@ -173,6 +179,7 @@ async def test_register_rejects_phone_with_password(client, make_uow, random_pho
             "phone": phone,
             "password": "secret12345",
             "password_confirm": "secret12345",
+            "personal_data_consent": True,
         },
     )
     await confirm_in_bot(make_uow, first.json()["token"])
@@ -184,6 +191,7 @@ async def test_register_rejects_phone_with_password(client, make_uow, random_pho
             "phone": phone,
             "password": "secret12345",
             "password_confirm": "secret12345",
+            "personal_data_consent": True,
         },
     )
     assert second.status_code == 400
@@ -204,6 +212,7 @@ async def register_and_login(client, make_uow, random_phone, username: str) -> t
             "phone": phone,
             "password": "secret12345",
             "password_confirm": "secret12345",
+            "personal_data_consent": True,
         },
     )
     await confirm_in_bot(make_uow, response.json()["token"], chat_id=username)

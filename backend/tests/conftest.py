@@ -27,8 +27,10 @@ os.environ.setdefault("CACHE_REDIS_URL", "redis://localhost:6379/15")
 # вход и регистрация покупателя завязаны на Telegram-бота — без username бота
 # use-case отказывает ещё до обращения к БД (см. request_login_link.py)
 os.environ.setdefault("TELEGRAM_BOT_USERNAME", "waysklad_test_bot")
-# фиксированные логин/пароль — тесты admin-роутера логинятся через POST /api/admin/login
-os.environ.setdefault("ADMIN_LOGIN", "test-admin")
+# фиксированные логин/пароль — тесты admin-роутера логинятся через POST /api/admin/login.
+# Присваиваем, а не setdefault: docker compose exec подтягивает .env с прод-хешом,
+# и setdefault его не перебивает → все admin-тесты падают «Неверный логин или пароль».
+os.environ["ADMIN_LOGIN"] = "test-admin"
 # bcrypt с прод-фактором 12 стоит ~0.17s на хеш и ~0.19s на проверку. Фикстуры
 # owner_headers/registered_shop регистрируют магазин в сотнях тестов, и эта
 # цена, умноженная на число тестов, была основной статьёй времени прогона.
@@ -39,12 +41,11 @@ os.environ.setdefault("BCRYPT_ROUNDS", "4")
 # флаг здесь, до импорта app.main, иначе роутер просто не подключится.
 # Поведение при выключенном флаге проверяет test_marketplace_disabled.py,
 # который поднимает отдельное приложение.
-os.environ.setdefault("MARKETPLACE_ENABLED", "true")
-os.environ.setdefault(
-    "ADMIN_PASSWORD_HASH",
+os.environ["MARKETPLACE_ENABLED"] = "true"
+os.environ["ADMIN_PASSWORD_HASH"] = (
     # фактор 4 в тон BCRYPT_ROUNDS выше — проверка пароля с фактором 12 стоила
     # бы 0.19s в каждом тесте admin-роутера
-    "$2b$04$Jrj4Ec92zrIx8po/D/s6kelfq8aBBpOfXMwyaG2Fti0TCbJ5Nqra6",  # "test-admin-password"
+    "$2b$04$Jrj4Ec92zrIx8po/D/s6kelfq8aBBpOfXMwyaG2Fti0TCbJ5Nqra6"  # "test-admin-password"
 )
 
 import pytest

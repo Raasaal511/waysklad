@@ -169,10 +169,10 @@ async def test_debt_receipt_message_for_installment(make_uow, registered_shop, w
     assert data.client.id == client.id
     text = render_debt_message(data.tenant.name, data.debt, data.client.name)
     assert "Юсупов Расул" in text
-    assert "84700" in text
-    assert "Ежемесячный платёж: 11200" in text
+    assert "84\u202f700" in text
+    assert "Ежемесячный платёж: 11\u202f200" in text
     assert "10-е число" in text
-    assert "Остаток: 84700" in text
+    assert "Остаток: 84\u202f700" in text
 
 
 async def test_create_installment_schedule_must_match_balance(make_uow, registered_shop, warehouse_id):
