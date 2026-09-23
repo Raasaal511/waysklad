@@ -137,6 +137,8 @@ export interface AdminTenantListItem {
   products_count: number
   last_sale_at: string | null
   last_login_at: string | null
+  /** последний запрос владельца с токеном (не только ввод пароля), шаг 5 минут */
+  owner_last_seen_at: string | null
   sales_7d: number
   sales_30d: number
   sales_sum_30d: string
@@ -181,6 +183,7 @@ export interface AdminTenantUser {
   role: string
   is_active: boolean
   last_login_at: string | null
+  last_seen_at: string | null
 }
 
 export interface AdminTenantWarehouse {
@@ -236,7 +239,7 @@ export interface AdminTenantDetail {
   is_suspended: boolean
   is_verified: boolean
   created_at: string
-  owner: { name: string; phone: string } | null
+  owner: { name: string; phone: string; last_seen_at: string | null } | null
   users_count: number
   products_count: number
   warehouses_count: number

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { listAdminTenants, type AdminTenantListItem } from '../../../entities/admin/api'
+import { formatExactDateTime, formatRelativeTime } from '../../../shared/lib/format'
 import layoutStyles from '../../../shared/ui/Layout.module.css'
 import { handleAdminError } from '../shared'
 import styles from '../AdminPage.module.css'
@@ -104,6 +105,12 @@ export function TenantsSection({ logout, refreshKey, onLoaded }: SectionProps) {
                 </span>
               </div>
               <span className={styles.tenantSlug}>{t.slug ? `/store/${t.slug}` : 'без slug'}</span>
+              <span
+                className={styles.tenantSlug}
+                title={formatExactDateTime(t.owner_last_seen_at) || undefined}
+              >
+                Владелец был в сети {formatRelativeTime(t.owner_last_seen_at)}
+              </span>
               <div className={styles.tenantCardFoot}>
                 <span className={t.storefront_enabled ? undefined : styles.tenantDim}>
                   {t.storefront_enabled ? 'Витрина включена' : 'Витрина выключена'}

@@ -12,6 +12,7 @@ import {
 } from '../../../entities/admin/api'
 import { Button } from '../../../shared/ui/Button'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
+import { formatRelativeTime } from '../../../shared/lib/format'
 import layoutStyles from '../../../shared/ui/Layout.module.css'
 import { handleAdminError } from '../shared'
 import styles from '../AdminPage.module.css'
@@ -120,6 +121,14 @@ export function TenantDetailSection({ logout, refreshKey, onLoaded }: SectionPro
         <div>
           <span className={layoutStyles.textMuted}>Последняя продажа</span>
           <strong>{tenant.last_sale_at ? formatDateTime(tenant.last_sale_at) : '—'}</strong>
+        </div>
+        <div>
+          <span className={layoutStyles.textMuted}>Владелец был в сети</span>
+          <strong
+            title={tenant.owner?.last_seen_at ? formatDateTime(tenant.owner.last_seen_at) : undefined}
+          >
+            {formatRelativeTime(tenant.owner?.last_seen_at)}
+          </strong>
         </div>
       </div>
 
