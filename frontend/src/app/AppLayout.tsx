@@ -207,13 +207,17 @@ function MoreSheet({
   items,
   open,
   onClose,
+  onNavigate,
   onLogout,
 }: {
   items: NavItem[]
   open: boolean
   onClose: () => void
+  /** Переход из шторки: закрывает её без history.back(), иначе back съедает navigate. */
+  onNavigate: (to: string) => void
   onLogout: () => void
 }) {
+  const { pathname } = useLocation()
   const touchStartY = useRef<number | null>(null)
 
   useEffect(() => {
@@ -253,32 +257,44 @@ function MoreSheet({
       >
         <div className={styles['app-more-handle']} aria-hidden="true" />
         <nav className={styles['app-more-nav']}>
-          {items.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              className={({ isActive }) =>
-                [styles['app-more-item'], isActive && styles.active].filter(Boolean).join(' ')
-              }
-              data-onboarding={item.to}
-              data-nav={item.to === '/tasks' ? 'tasks' : undefined}
-              onClick={onClose}
-            >
-              <span className={styles['app-more-icon']}>
-                <item.icon size={22} stroke={1.8} />
-              </span>
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
+          {items.map((item) => {
+            const isActive =
+              item.to === '/'
+                ? pathname === '/'
+                : pathname === item.to || pathname.startsWith(`${item.to}/`)
+            return (
+              <button
+                key={item.to}
+                type="button"
+                className={[styles['app-more-item'], isActive && styles.active].filter(Boolean).join(' ')}
+                data-onboarding={item.to}
+                data-nav={item.to === '/tasks' ? 'tasks' : undefined}
+                onClick={() => onNavigate(item.to)}
+              >
+                <span className={styles['app-more-icon']}>
+                  <item.icon size={22} stroke={1.8} />
+                </span>
+                <span>{item.label}</span>
+              </button>
+            )
+          })}
         </nav>
         <div className={styles['app-more-footer']}>
-          <Link to="/profile" className={styles['app-more-item']} onClick={onClose}>
+          <button
+            type="button"
+            className={[
+              styles['app-more-item'],
+              (pathname === '/profile' || pathname.startsWith('/profile/')) && styles.active,
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            onClick={() => onNavigate('/profile')}
+          >
             <span className={styles['app-more-icon']}>
               <IconUser size={22} stroke={1.8} />
             </span>
             <span>Профиль</span>
-          </Link>
+          </button>
           <button
             type="button"
             className={styles['app-more-item']}
@@ -341,6 +357,17 @@ export function AppLayout() {
       }
     }
   }, [])
+
+  /** Клик по пункту шторки: нельзя звать history.back() — он откатывает сам переход. */
+  const navigateFromMore = useCallback(
+    (to: string) => {
+      const replace = moreHistoryPushed.current
+      moreHistoryPushed.current = false
+      setMoreOpen(false)
+      navigate(to, { replace })
+    },
+    [navigate],
+  )
 
   const openMore = useCallback((withHistory: boolean) => {
     setMoreOpen(true)
@@ -593,7 +620,13 @@ export function AppLayout() {
           </button>
         </nav>
 
-        <MoreSheet items={more} open={moreOpen} onClose={closeMore} onLogout={logout} />
+        <MoreSheet
+          items={more}
+          open={moreOpen}
+          onClose={closeMore}
+          onNavigate={navigateFromMore}
+          onLogout={logout}
+        />
       </div>
     </div>
   )

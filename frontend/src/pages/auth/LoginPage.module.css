@@ -2,13 +2,42 @@
 
 .auth-screen {
   position: relative;
+  box-sizing: border-box;
+  /* 100svh + max-height: иначе при высокой «Регистрации» экран
+     растягивается вместе с карточкой и overflow-y не срабатывает —
+     низ обрезается без прокрутки. */
   min-height: 100svh;
+  max-height: 100svh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px 16px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: color-mix(in srgb, var(--accent) 48%, #0a0d0c);
+}
+
+@media (max-height: 720px) {
+  .auth-screen {
+    align-items: flex-start;
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+}
+
+@media (max-height: 640px) {
+  .auth-card {
+    padding: 20px 18px 18px;
+  }
+
+  .auth-brand {
+    margin-bottom: 16px;
+  }
+
+  .auth-tabs {
+    margin-bottom: 14px;
+  }
 }
 
 .auth-backdrop {
@@ -44,6 +73,7 @@
   z-index: 1;
   width: 100%;
   max-width: 400px;
+  flex-shrink: 0;
   background: color-mix(in srgb, var(--bg) 96%, transparent);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -93,6 +123,12 @@
   margin: 0;
   font-size: 13px;
   color: var(--text-muted);
+}
+
+.auth-back-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 
 .auth-tabs {
@@ -161,8 +197,17 @@
   padding: 2px;
 }
 
+/* Неактивная форма не должна раздувать высоту карточки (регистрация выше входа).
+   visibility:hidden сам по себе место сохраняет; height:0 без min-height:0
+   тоже не схлопывает grid-item (min-height:auto = высота контента) —
+   карточка вылезала за экран с пустотой под «Войти». */
 .auth-form[aria-hidden='true'] {
   visibility: hidden;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  pointer-events: none;
 }
 
 .auth-remember {
