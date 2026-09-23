@@ -8,6 +8,7 @@ import { TenantsSection } from './sections/TenantsSection'
 import { TenantDetailSection } from './sections/TenantDetailSection'
 import { ServerSection } from './sections/ServerSection'
 import { ErrorsSection } from './sections/ErrorsSection'
+import { FeedbackSection } from './sections/FeedbackSection'
 
 /** Заголовок раздела по текущему пути — шапка каркаса показывает его в H1. */
 function sectionTitle(pathname: string): string {
@@ -15,6 +16,7 @@ function sectionTitle(pathname: string): string {
   if (pathname.startsWith('/admin/tenants')) return 'Магазины'
   if (pathname.startsWith('/admin/server')) return 'Сервер'
   if (pathname.startsWith('/admin/errors')) return 'Ошибки'
+  if (pathname.startsWith('/admin/feedback')) return 'Обратная связь'
   return 'Обзор'
 }
 
@@ -66,6 +68,7 @@ export function AdminPage() {
         <Route path="tenants/:id" element={<TenantDetailSection {...sectionProps} />} />
         <Route path="server" element={<ServerSection {...sectionProps} />} />
         <Route path="errors" element={<ErrorsSection {...sectionProps} />} />
+        <Route path="feedback" element={<FeedbackSection {...sectionProps} />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </AdminLayout>

@@ -4,6 +4,7 @@ import {
   IconAlertTriangle,
   IconBuildingStore,
   IconLayoutDashboard,
+  IconMessageCircle,
   IconRefresh,
   IconServer,
 } from '@tabler/icons-react'
@@ -23,6 +24,7 @@ const SECTIONS = [
   { to: '/admin/tenants', label: 'Магазины', icon: IconBuildingStore, end: false },
   { to: '/admin/server', label: 'Сервер', icon: IconServer, end: false },
   { to: '/admin/errors', label: 'Ошибки', icon: IconAlertTriangle, end: false },
+  { to: '/admin/feedback', label: 'Обратная связь', icon: IconMessageCircle, end: false },
 ]
 
 const AUTO_REFRESH_MS = 60_000
