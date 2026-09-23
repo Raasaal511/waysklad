@@ -876,12 +876,25 @@ a.badge:hover {
 button.product-tile-remove {
   flex-shrink: 0;
   padding: 0 !important;
-  width: 16px !important;
-  height: 16px !important;
+  width: 18px !important;
+  height: 18px !important;
+  /* IconButton задаёт min-width/min-height 44px, а минимум сильнее width: без
+     сброса крестик раздувало в круг 44px поверх счётчика. Видимый круг —
+     маленький, зону касания расширяет ::before. */
+  min-width: 0 !important;
+  min-height: 0 !important;
+  position: relative;
   background: var(--accent) !important;
   color: #fff !important;
   border: 1.5px solid #fff !important;
   border-radius: 50% !important;
+}
+
+button.product-tile-remove::before {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
 }
 
 button.product-tile-remove:hover:not(:disabled) {
