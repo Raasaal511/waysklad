@@ -147,6 +147,11 @@ async def _db_engine(_test_db_ready) -> AsyncIterator:
     engine = create_async_engine(db_url, poolclass=NullPool)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    # Отдельной транзакцией: в одной drop+create держат до коммита блокировку на
+    # каждую таблицу, индекс и sequence дважды. Все xdist-воркеры делают это разом
+    # и упирались в общий лимит блокировок Postgres («out of shared memory»,
+    # max_locks_per_transaction) — через раз, начиная с таблицы feedback.
+    async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     factory = async_sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     async with factory() as session:
