@@ -73,3 +73,38 @@ A-запись домена на IP нового VPS. **Без оранжево�
 - вход владельца, список товаров с фото;
 - одна тестовая продажа;
 - `deploy/backup.sh` отрабатывает и пишет `backup.json`.
+
+## 8. Репетиция миграций перед релизом
+
+Перед вливанием develop в main (CI сразу деплоит main) прогоните миграции
+новой ветки на копии боевых данных. Боевая БД и боевой checkout не меняются:
+дамп восстанавливается в отдельную БД `waysklad_rehearsal`, а скрипт и образ
+backend берутся из временной копии develop в `/tmp`.
+
+```bash
+cd /home/deploy/apps/waysklad
+./deploy/backup.sh                                    # свежий дамп в backups/
+git fetch origin develop
+git worktree add --detach /tmp/waysklad-next origin/develop
+docker build -t waysklad-backend:rehearsal /tmp/waysklad-next/backend
+WAYSKLAD_PROJECT_DIR=/home/deploy/apps/waysklad \
+  /tmp/waysklad-next/deploy/rehearse-migrations.sh --image waysklad-backend:rehearsal \
+  "$(ls -1t backups/waysklad-*.sql.gz | head -n 1)"
+```
+
+Скрипт печатает ревизию до и после, время `alembic upgrade head` и число строк в
+tenants, users, products, sales, debts, reviews до и после. Если миграции
+упали, он пишет «МИГРАЦИИ УПАЛИ» и выходит с ненулевым кодом: вливать нельзя.
+
+Уборка после проверки:
+
+```bash
+docker compose -f docker-compose.prod.yml exec -T db \
+  sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE waysklad_rehearsal;"'
+git worktree remove --force /tmp/waysklad-next
+docker image rm waysklad-backend:rehearsal
+```
+
+Сборка образа на однопроцессорном сервере занимает несколько минут и нагружает
+CPU, поэтому лучше запускать её вне часов пик. Копия БД временно занимает
+столько же места на диске, сколько боевая.

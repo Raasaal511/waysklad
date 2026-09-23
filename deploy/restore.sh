@@ -5,9 +5,18 @@
 # Использование:
 #   ./deploy/restore.sh backups/waysklad-….sql.gz [backups/waysklad-uploads-….tgz]
 #   ./deploy/restore.sh --into-prod backups/waysklad-….sql.gz [uploads.tgz]
+#
+# Переменные окружения:
+#   RESTORE_DB             — имя проверочной БД (по умолчанию waysklad_restore_check;
+#                            deploy/rehearse-migrations.sh передаёт waysklad_rehearsal).
+#                            Совпадать с боевой нельзя — для этого есть --into-prod.
+#   WAYSKLAD_COMPOSE_FILE  — compose-файл (по умолчанию docker-compose.prod.yml;
+#                            для локальной проверки — docker-compose.yml).
+#   WAYSKLAD_PROJECT_DIR   — каталог с .env и запущенным compose-проектом
+#                            (по умолчанию — корень репозитория этого скрипта).
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "${WAYSKLAD_PROJECT_DIR:-$(dirname "$0")/..}"
 source .env
 
 INTO_PROD=0
@@ -24,7 +33,7 @@ if [ -z "$DUMP" ] || [ ! -f "$DUMP" ]; then
   exit 1
 fi
 
-COMPOSE=(docker compose -f docker-compose.prod.yml)
+COMPOSE=(docker compose -f "${WAYSKLAD_COMPOSE_FILE:-docker-compose.prod.yml}")
 PSQL=("${COMPOSE[@]}" exec -T db psql -U "$POSTGRES_USER")
 
 if [ "$INTO_PROD" -eq 1 ]; then
@@ -38,7 +47,15 @@ if [ "$INTO_PROD" -eq 1 ]; then
   fi
   TARGET_DB="$POSTGRES_DB"
 else
-  TARGET_DB="waysklad_restore_check"
+  TARGET_DB="${RESTORE_DB:-waysklad_restore_check}"
+  if ! [[ "$TARGET_DB" =~ ^[a-z_][a-z0-9_]*$ ]]; then
+    echo "Недопустимое имя проверочной БД: «${TARGET_DB}»" >&2
+    exit 1
+  fi
+  if [ "$TARGET_DB" = "$POSTGRES_DB" ]; then
+    echo "RESTORE_DB совпадает с боевой БД «${POSTGRES_DB}». Для боевой — только --into-prod." >&2
+    exit 1
+  fi
   echo "Восстановление в проверочную БД «${TARGET_DB}»…"
   "${PSQL[@]}" -d postgres -v ON_ERROR_STOP=1 <<SQL
 SELECT pg_terminate_backend(pid) FROM pg_stat_activity
@@ -81,5 +98,5 @@ fi
 if [ "$INTO_PROD" -eq 0 ]; then
   echo
   echo "Проверка завершена. Боевая БД не изменялась."
-  echo "Удалить проверочную: docker compose -f docker-compose.prod.yml exec -T db psql -U \$POSTGRES_USER -d postgres -c 'DROP DATABASE waysklad_restore_check;'"
+  echo "Удалить проверочную: ${COMPOSE[*]} exec -T db psql -U \$POSTGRES_USER -d postgres -c 'DROP DATABASE ${TARGET_DB};'"
 fi
