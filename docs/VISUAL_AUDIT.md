@@ -1,51 +1,50 @@
 # Визуальный аудит (блок 4.5)
 
-Дата: 2026-09-22T21:12:57.634Z
+Дата: 2026-09-23T09:35:50.114Z
 База: `http://localhost:5173`
-Всего проблем (с повторами по ширинам/темам): **31**
-Уникальных корней: **1**
+Всего проблем (с повторами по ширинам/темам): **18**
+Уникальных корней: **2**
+
+## Сводка после правок
+
+**Было 24 → стало 18.** `fixed-stacking` 6 → 0. На sales-new и products-new
+срабатываний нет. Все 18 оставшихся — старые проблемы аналитики на телефоне
+(см. ниже).
+
+| Корень | Было | Стало | Что сделано |
+|--------|------|-------|-------------|
+| `fixed-stacking` | 6 | 0 | С 11.08 не работал ни один `position: sticky`: `overflow-x: hidden` у html/body делал body отдельным scroll-контейнером. Теперь `clip`. Панель продажи стоит над меню вместе с FAB (`--app-nav-clearance`), при открытой клавиатуре возвращается в поток, меню скрывается. |
+| `touch-targets` | 18 | 12 | products-new: поле штрихкода занимает всю строку (input был 4px), у «i» зона 44×44. Оставшиеся 12 — столбики графика аналитики. |
+| `text-ellipsis` | 0 | 6 | Новые срабатывания: таблицы аналитики на 320–360px. |
+| `typography-min` | 0 | 0 | В промежуточном прогоне всплыло 15 на графике аналитики, подписи подняты до 12px. |
+
+### Оставшиеся 18: аналитика на телефоне, проблемы старше этой задачи
+
+Раньше аудит их не видел: график и таблицы не успевали загрузиться за 400 мс
+после открытия страницы. Сейчас срабатывания тоже нестабильны и скачут по
+ширинам и темам. Исправление записано в «Не вошло» `TASK_RELEASE_V1.md`.
+
+- Столбики графика по месяцам на 320–412px шириной 12–15px: 12 колонок в ~250px.
+- Таблицы «Топ товаров» и «Замороженный товар» на 320–360px: строка шире
+  карточки на 9–21px, у `.dataTable` стоит `overflow: hidden`, поэтому правая
+  колонка обрезается.
 
 ## Топ корней
 
 | # | Корень | Кол-во |
 |---|--------|--------|
-| 1 | `touch-targets` | 31 |
+| 1 | `touch-targets` | 12 |
+| 2 | `text-ellipsis` | 6 |
 
 ## Таблица проблем
 
 | Страница / состояние | Ширина | Тема | Роль | Проблема | Элемент | Деталь | Корень |
 |---------------------|--------|------|------|----------|---------|--------|--------|
-| privacy / default | 375, 412 | light | anon | touch-target | `div._auth-screen_1e286_3 > div._auth-card_1e286_42 > p > a` | 134×18 | touch-targets |
-| store-catalog / default | 375, 412 | light | anon | touch-target | `footer._footer_nbni4_3 > div._inner_nbni4_15 > div._shopBlock_nbni4_33 > a._link_nbni4_56` | 343×20 | touch-targets |
-| store-cart / default | 375, 412 | light | anon | touch-target | `footer._footer_nbni4_3 > div._inner_nbni4_15 > div._shopBlock_nbni4_33 > a._link_nbni4_56` | 343×20 | touch-targets |
-| store-favorites / default | 375, 412 | light | anon | touch-target | `footer._footer_nbni4_3 > div._inner_nbni4_15 > div._shopBlock_nbni4_33 > a._link_nbni4_56` | 343×20 | touch-targets |
-| store-login / default | 375, 412 | light | anon | touch-target | `footer._footer_nbni4_3 > div._inner_nbni4_15 > div._shopBlock_nbni4_33 > a._link_nbni4_56` | 343×20 | touch-targets |
-| account / default | 375, 412 | light | anon | touch-target | `footer._footer_nbni4_3 > div._inner_nbni4_15 > div._shopBlock_nbni4_33 > a._link_nbni4_56` | 343×20 | touch-targets |
-| products-new / default | 375, 412 | light | owner | touch-target | `div._heroHeading_6ya23_58 > div._heroTags_6ya23_75 > label._skuEdit_5w4jp_188 > button._icon-button_oexw4_3._icon-button-muted_oexw4_22` | 26×26 | touch-targets |
-| products-new / default | 375, 412 | light | owner | touch-target | `div._heroBody_6ya23_37 > div._heroMeta_6ya23_118._metaEdit_5w4jp_270 > label._metaField_5w4jp_274 > button._icon-button_oexw4_3._icon-button-muted_oexw4_22` | 27×27 | touch-targets |
-| products-new / default | 375, 412 | light | owner | touch-target | `label._metric_6ya23_132 > span._metricBody_6ya23_185 > span._metricLabelWithHint_5w4jp_91 > button._info-hint-trigger_tbth3_3` | 15×44 | touch-targets |
-| orders / default | 375, 412 | light | owner | touch-target | `main._app-content_9ce3y_128._app-content-with-sell_9ce3y_162 > div._stack_wn974_6 > div._card_wn974_77._cardFull_wn974_86 > button._icon-button_oexw4_3._icon-button-muted_oexw4_22` | 28×28 | touch-targets |
-| orders-new / default | 375, 412 | light | owner | touch-target | `main._app-content_9ce3y_128._app-content-with-sell_9ce3y_162 > div._stack_wn974_6 > form._form_wn974_12 > button.btn._btn-primary_1kbmi_6` | 129×42 | touch-targets |
-| debts-new / default | 412 | light | owner | touch-target | `form._form_1h8v5_1 > section._section_6ya23_244._reveal_6ya23_274 > div._dueDatePresets_1h8v5_14 > button._dueDatePreset_1h8v5_14` | 43×44 | touch-targets |
-| orders / default | 375, 412 | light | seller | touch-target | `main._app-content_9ce3y_128._app-content-with-sell_9ce3y_162 > div._stack_wn974_6 > div._card_wn974_77._cardFull_wn974_86 > button._icon-button_oexw4_3._icon-button-muted_oexw4_22` | 28×28 | touch-targets |
-| orders-new / default | 375, 412 | light | seller | touch-target | `main._app-content_9ce3y_128._app-content-with-sell_9ce3y_162 > div._stack_wn974_6 > form._form_wn974_12 > button.btn._btn-primary_1kbmi_6` | 129×42 | touch-targets |
-| debts-new / default | 375, 412 | light | seller | touch-target | `form._form_1h8v5_1 > section._section_6ya23_244._reveal_6ya23_274 > div._dueDatePresets_1h8v5_14 > button._dueDatePreset_1h8v5_14` | 43×44 | touch-targets |
+| analytics / default | 320, 360 | light | owner | clipped-text | `main._app-content_1v7hr_138._app-content-with-sell_1v7hr_172 > div._stack_bb66d_6 > div._stack_bb66d_6 > div._dataTable_bb66d_199` | scrollW=307 clientW=286 text="ТоварОстатокЗамороженоБез продажСумка ко" | text-ellipsis |
+| analytics / default | 360, 412 | light | owner | touch-target | `div._plotRow_hxmuv_7 > div._plotArea_hxmuv_32 > div._plot_hxmuv_7 > button._barCol_hxmuv_67` | 15×223 | touch-targets |
+| analytics / default | 320, 360, 393, 412 | dark | owner | touch-target | `div._plotRow_hxmuv_7 > div._plotArea_hxmuv_32 > div._plot_hxmuv_7 > button._barCol_hxmuv_67` | 12×223 | touch-targets |
+| analytics / default | 320, 360 | dark | owner | clipped-text | `main._app-content_1v7hr_138._app-content-with-sell_1v7hr_172 > div._stack_bb66d_6 > div._stack_bb66d_6 > div._dataTable_bb66d_199` | scrollW=295 clientW=286 text="ТоварПроданоВыручкаСр. чекДоляПлатье лет" | text-ellipsis |
 
 ## Скриншоты
 
 Файлы в `docs/screens/visual-audit/` (gitignored вместе с `docs/screens/`).
-
-## Исключения (не убираем сейчас)
-
-Остаток после шага 2 (QUICK-прогон): только `touch-targets` на второстепенных
-контролах. Критичные корни с `/products` (шапка, «+», EmptyState, «Продать»,
-горизонтальный scroll) закрыты.
-
-| Что | Почему оставляем |
-|-----|------------------|
-| Ссылки в футере витрины и на `/privacy` (высота ~18–20px) | Текстовые ссылки в абзаце/футере; раздувать до 44px ломает типографику. Основные действия — кнопки ≥44px. |
-| IconButton 26–28px рядом с inline-полями SKU/метрик на форме товара | Компактный «карандаш» внутри строки героя; соседние инпуты на телефоне уже ≥44× и 16px. |
-| Кнопка «+» в шапке колонки канбана заказов (28×28) | Второстепенный add в колонке; главное «+ Заказ» в заголовке страницы — 44px. |
-| Метрика с подсказкой (15×44) на форме товара | Узкий hit-area у `has-hint`; сама метрика не основной CTA. |
-
-Полный матричный прогон (все ширины + dark): `cd frontend && node scripts/visual-audit.mjs`
