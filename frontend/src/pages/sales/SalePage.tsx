@@ -24,6 +24,7 @@ import {
 import { ApiError } from '../../shared/api/client'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { Select } from '../../shared/ui/Select'
 import { DateInput } from '../../shared/ui/DateInput'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
@@ -519,9 +520,17 @@ async function loadSalesPage(params: {
       {loading ? (
         <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : filteredSales.length === 0 ? (
-        <p className={layoutStyles.textMuted}>
-          {total === 0 ? 'Продаж пока нет — начните первую' : 'За этот период продаж нет'}
-        </p>
+        total === 0 ? (
+          <EmptyState
+            illustration="empty-sales"
+            title="Продаж пока нет — начните первую"
+            description="Оформите продажу: товар, количество, оплата — и чек готов."
+            actionLabel="Новая продажа"
+            onAction={() => navigate('/sales/new')}
+          />
+        ) : (
+          <p className={layoutStyles.textMuted}>За этот период продаж нет</p>
+        )
       ) : (
         <div key={`${dateRange.from}-${dateRange.to}`} className={layoutStyles.stack} style={{ gap: 16 }}>
           {groups.map((group) => (

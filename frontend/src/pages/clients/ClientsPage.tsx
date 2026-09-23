@@ -13,6 +13,7 @@ import { Modal } from '../../shared/ui/Modal'
 import { IconPlus, IconChevronRight, IconUser, IconTruck, IconPhone, IconMapPin } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
 import { formatMoney, normalizeDecimalInput } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
@@ -129,7 +130,13 @@ export function ClientsPage() {
         <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : tab === 'clients' ? (
         clients.length === 0 ? (
-          <p className={layoutStyles.textMuted}>Клиентов пока нет</p>
+          <EmptyState
+            illustration="empty-clients"
+            title="Клиентов пока нет"
+            description="Добавьте клиента, чтобы продавать в долг и вести историю."
+            actionLabel="Добавить клиента"
+            onAction={() => setShowForm(true)}
+          />
         ) : (
           <div className={styles['contact-row-list']}>
             {clients.map((c, i) => (
@@ -173,7 +180,13 @@ export function ClientsPage() {
           </div>
         )
       ) : suppliers.length === 0 ? (
-        <p className={layoutStyles.textMuted}>Поставщиков пока нет</p>
+        <EmptyState
+          illustration="empty-clients"
+          title="Поставщиков пока нет"
+          description="Добавьте поставщика, чтобы принимать товар и вести закупки."
+          actionLabel="Добавить поставщика"
+          onAction={() => setShowForm(true)}
+        />
       ) : (
         <div className={styles['contact-row-list']}>
           {suppliers.map((s, i) => (

@@ -37,6 +37,7 @@ import {
 import { IconButton } from '../../shared/ui/IconButton'
 import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { ResetFiltersButton } from '../../shared/ui/ResetFiltersButton'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { StockWarningIcon } from '../../shared/ui/StockWarningIcon'
@@ -422,7 +423,13 @@ export function WarehouseDetailPage() {
         <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : !allStock.some((item) => item.warehouse_id === warehouseId) && !showAllProducts ? (
         <div className={`${layoutStyles.stack} ${detail.reveal}`} style={{ gap: 8, '--reveal-delay': '110ms' } as CSSProperties}>
-          <p className={layoutStyles.textMuted}>На этом складе остатков пока нет</p>
+          <EmptyState
+            illustration="empty-stock"
+            title="На этом складе остатков пока нет"
+            description="Примите товар на склад — или покажите весь каталог компании и выберите позиции."
+            actionLabel="Принять товар"
+            onAction={() => navigate(`/stock/${warehouseId}/movement/receive`)}
+          />
           {products.length > 0 && (
             <button type="button" className="disclosure-link" onClick={() => setShowAllProducts(true)}>
               Показать все товары компании, чтобы принять сюда

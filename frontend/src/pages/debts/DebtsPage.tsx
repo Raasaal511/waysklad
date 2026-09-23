@@ -27,6 +27,7 @@ import {
 } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
 import { IconButton } from '../../shared/ui/IconButton'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { DropdownMenu } from '../../shared/ui/DropdownMenu'
 import { formatMoney } from '../../shared/lib/format'
 import { DEBT_STATUS_BADGE_CLASS, DEBT_STATUS_LABELS } from '../../entities/debt/debtStatus'
@@ -445,13 +446,19 @@ export function DebtsPage() {
         loading ? (
           <p className={layoutStyles.textMuted}>Загрузка…</p>
         ) : debts.length === 0 ? (
-          <p className={layoutStyles.textMuted}>
-            {debouncedQuery.trim()
-              ? 'Ничего не найдено'
-              : statusFilter === 'all'
-                ? 'Долгов нет'
-                : 'Долгов с таким статусом нет'}
-          </p>
+          debouncedQuery.trim() || statusFilter !== 'all' ? (
+            <p className={layoutStyles.textMuted}>
+              {debouncedQuery.trim() ? 'Ничего не найдено' : 'Долгов с таким статусом нет'}
+            </p>
+          ) : (
+            <EmptyState
+              illustration="state-no-debts"
+              title="Никто не должен — все рассчитались"
+              description="Когда появится продажа в долг или выдача — она будет здесь."
+              actionLabel="Выдать долг"
+              onAction={() => navigate('/debts/new')}
+            />
+          )
         ) : (
           <div key={`${direction}-${statusFilter}`} className={layoutStyles.stack}>
             <div className={styles['debt-row-list']}>
@@ -476,7 +483,15 @@ export function DebtsPage() {
       ) : loadingClosed && !closedLoaded ? (
         <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : closedGroups.length === 0 ? (
-        <p className={layoutStyles.textMuted}>{debouncedQuery.trim() ? 'Ничего не найдено' : 'Погашенных долгов нет'}</p>
+        debouncedQuery.trim() ? (
+          <p className={layoutStyles.textMuted}>Ничего не найдено</p>
+        ) : (
+          <EmptyState
+            illustration="empty-archive"
+            title="Погашенных долгов нет"
+            description="Закрытые долги появятся здесь после полного погашения."
+          />
+        )
       ) : (
         <div className={layoutStyles.stack}>
           {closedGroups.map((group) => (

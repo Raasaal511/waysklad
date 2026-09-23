@@ -5,6 +5,7 @@ import { Modal } from '../../shared/ui/Modal'
 import { IconPlus, IconBuildingWarehouse, IconChevronRight, IconHistory } from '@tabler/icons-react'
 import { IconButton } from '../../shared/ui/IconButton'
 import { Button } from '../../shared/ui/Button'
+import { EmptyState } from '../../shared/ui/EmptyState'
 import { isLowStock } from '../../shared/lib/format'
 import { NewWarehouseForm } from './shared'
 import { useCatalog } from '../../app/CatalogContext'
@@ -111,7 +112,13 @@ export function StockPage() {
       {loading ? (
         <p className={layoutStyles.textMuted}>Загрузка…</p>
       ) : warehouses.length === 0 ? (
-        <p className={layoutStyles.textMuted}>Складов пока нет</p>
+        <EmptyState
+          illustration="empty-stock"
+          title="Складов пока нет"
+          description="Создайте склад — туда будете принимать товар и списывать продажи."
+          actionLabel="Добавить склад"
+          onAction={() => setShowWarehouseForm(true)}
+        />
       ) : (
         <div className={layoutStyles.warehouseTiles}>
           {warehouses.map((w, i) => {

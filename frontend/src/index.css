@@ -253,9 +253,10 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* Телефон: зона касания ≥ 44px и шрифт инпутов ≥ 16px (иначе iOS зумит). */
+/* Телефон: зона касания ≥ 44px и шрифт инпутов ≥ 16px (иначе iOS зумит).
+   min-height и у disabled: основной CTA формы часто disabled, пока поля пустые. */
 @media (max-width: 899px) {
-  button:not(:disabled),
+  button,
   a.btn,
   [role='button'] {
     min-height: 44px;
