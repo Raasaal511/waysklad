@@ -231,6 +231,36 @@
   flex-direction: column;
 }
 
+/*
+ * Таблица с общей сеткой и горизонтальной прокруткой. Колонки задаются один раз
+ * на .dataTable (style gridTemplateColumns), шапка и строки берут их через subgrid.
+ * Ширина колонки общая для всех строк, а если колонкам тесно (аналитика на
+ * 320–412px), таблица прокручивается внутри карточки и не режет правую колонку.
+ */
+.dataTableScroll {
+  display: grid;
+  column-gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+}
+
+.dataTableScroll > .dataTableHead,
+.dataTableScroll > .dataTableBody,
+.dataTableScroll .dataRow {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+}
+
+/* Раз таблица прокручивается, числа и заголовки не переносим: иначе «₽» уезжает
+   на вторую строку. Переносится только название. */
+.dataTableScroll > .dataTableHead > *,
+.dataTableScroll .dataRow > :not(.dataRowName) {
+  white-space: nowrap;
+}
+
 .dataRow {
   width: 100%;
   padding: 12px 14px;
