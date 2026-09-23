@@ -104,6 +104,9 @@ jobs:
             git pull origin main
             docker compose -f docker-compose.prod.yml build
             docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
-            # certbot — бесконечный цикл без healthcheck; ждём только сервисы с health
-            docker compose -f docker-compose.prod.yml up -d --wait db redis backend frontend scheduler storefront_bot
-            docker compose -f docker-compose.prod.yml up -d certbot
+            # Ждём только сервисы с настоящим healthcheck. scheduler и storefront_bot
+            # собраны из образа backend: его HEALTHCHECK опрашивает :8000, который они
+            # не слушают, поэтому они всегда unhealthy, и --wait по ним валил бы деплой.
+            # certbot — бесконечный цикл без healthcheck.
+            docker compose -f docker-compose.prod.yml up -d --wait db redis backend frontend
+            docker compose -f docker-compose.prod.yml up -d scheduler storefront_bot certbot
