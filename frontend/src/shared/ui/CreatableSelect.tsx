@@ -10,6 +10,13 @@ interface CreatableSelectProps {
   options: SelectOption[]
   /** Создать значение из текста поиска. После успеха обычно обновляют options и вызывают onChange. */
   onCreate: (query: string) => void | Promise<void>
+  /**
+   * Пункт внизу списка при пустом поиске (например «+ Клиент»).
+   * Без него создание видно только после ввода имени — на кассе это легко не заметить.
+   */
+  createActionLabel?: string
+  /** Клик по createActionLabel — открыть форму с именем/телефоном и т.п. */
+  onCreateAction?: () => void
   placeholder?: string
   searchPlaceholder?: string
   createLabel?: (query: string) => string
@@ -25,6 +32,8 @@ export function CreatableSelect({
   onChange,
   options,
   onCreate,
+  createActionLabel,
+  onCreateAction,
   placeholder,
   searchPlaceholder = 'Поиск или новая…',
   createLabel = (query) => `Создать «${query}»`,
@@ -60,14 +69,18 @@ export function CreatableSelect({
     (o) => (o.searchText ?? o.label).trim().toLowerCase() === trimmedQuery.toLowerCase(),
   )
   const canCreate = trimmedQuery.length > 0 && !exactMatch && !creating
+  const showCreateAction =
+    Boolean(createActionLabel && onCreateAction) && trimmedQuery.length === 0 && !creating
 
   type Row =
     | { kind: 'option'; option: SelectOption; index: number }
     | { kind: 'create'; query: string }
+    | { kind: 'create-action' }
 
   const rows: Row[] = [
     ...filtered.map((option, index) => ({ kind: 'option' as const, option, index })),
     ...(canCreate ? [{ kind: 'create' as const, query: trimmedQuery }] : []),
+    ...(showCreateAction ? [{ kind: 'create-action' as const }] : []),
   ]
 
   useLayoutEffect(() => {
@@ -102,7 +115,7 @@ export function CreatableSelect({
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [open, filtered.length, canCreate, createError])
+  }, [open, filtered.length, canCreate, showCreateAction, createError])
 
   useEffect(() => {
     if (!open) return
@@ -137,6 +150,11 @@ export function CreatableSelect({
     if (option.disabled || creating) return
     onChange(option.value)
     close()
+  }
+
+  function runCreateAction() {
+    close()
+    onCreateAction?.()
   }
 
   async function createFromQuery(text: string) {
@@ -176,10 +194,12 @@ export function CreatableSelect({
       const row = rows[highlighted]
       if (!row) {
         if (canCreate) void createFromQuery(trimmedQuery)
+        else if (showCreateAction) runCreateAction()
         return
       }
       if (row.kind === 'option') commit(row.option)
-      else void createFromQuery(row.query)
+      else if (row.kind === 'create') void createFromQuery(row.query)
+      else runCreateAction()
     }
   }
 
@@ -230,26 +250,50 @@ export function CreatableSelect({
               {rows.length === 0 && (
                 <li className={layoutStyles.selectMenuEmpty}>Ничего не найдено</li>
               )}
-              {rows.map((row, i) =>
-                row.kind === 'option' ? (
-                  <li
-                    key={row.option.value || `opt-${row.index}`}
-                    role="option"
-                    aria-selected={row.option.value === value}
-                    className={[
-                      layoutStyles.selectMenuItem,
-                      i === highlighted ? layoutStyles.selectMenuItemHighlighted : '',
-                      row.option.value === value ? layoutStyles.selectMenuItemSelected : '',
-                      row.option.disabled ? layoutStyles.selectMenuItemDisabled : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    onMouseEnter={() => setHighlighted(i)}
-                    onClick={() => commit(row.option)}
-                  >
-                    {row.option.label}
-                  </li>
-                ) : (
+              {rows.map((row, i) => {
+                if (row.kind === 'option') {
+                  return (
+                    <li
+                      key={row.option.value || `opt-${row.index}`}
+                      role="option"
+                      aria-selected={row.option.value === value}
+                      className={[
+                        layoutStyles.selectMenuItem,
+                        i === highlighted ? layoutStyles.selectMenuItemHighlighted : '',
+                        row.option.value === value ? layoutStyles.selectMenuItemSelected : '',
+                        row.option.disabled ? layoutStyles.selectMenuItemDisabled : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      onMouseEnter={() => setHighlighted(i)}
+                      onClick={() => commit(row.option)}
+                    >
+                      {row.option.label}
+                    </li>
+                  )
+                }
+                if (row.kind === 'create-action') {
+                  return (
+                    <li
+                      key="__create-action__"
+                      role="option"
+                      aria-selected={false}
+                      className={[
+                        layoutStyles.selectMenuItem,
+                        layoutStyles.selectMenuCreate,
+                        i === highlighted ? layoutStyles.selectMenuItemHighlighted : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      onMouseEnter={() => setHighlighted(i)}
+                      onClick={runCreateAction}
+                    >
+                      <IconPlus size={14} stroke={1.8} />
+                      {createActionLabel}
+                    </li>
+                  )
+                }
+                return (
                   <li
                     key="__create__"
                     role="option"
@@ -267,8 +311,8 @@ export function CreatableSelect({
                     <IconPlus size={14} stroke={1.8} />
                     {creating ? 'Создание…' : createLabel(row.query)}
                   </li>
-                ),
-              )}
+                )
+              })}
             </ul>
             {createError && <p className={layoutStyles.selectMenuError}>{createError}</p>}
           </div>,
