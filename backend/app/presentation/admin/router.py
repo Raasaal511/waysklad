@@ -287,7 +287,8 @@ async def admin_list_tenants(
 ) -> TenantListResponse:
     """Агрегаты по всем магазинам — кросс-тенантные запросы, см.
     application/admin/list_tenants.py. Кеш общий на набор параметров."""
-    key = f"admin:tenants:{query}:{status}:{storefront}:{sort}:{limit}:{offset}"
+    # v2: в строке появился owner_last_seen_at — старый кеш не собрался бы в dataclass
+    key = f"admin:tenants:v2:{query}:{status}:{storefront}:{sort}:{limit}:{offset}"
     result = await cached(
         cache,
         key,

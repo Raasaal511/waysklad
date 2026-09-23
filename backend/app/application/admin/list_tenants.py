@@ -43,6 +43,8 @@ class TenantListItem:
     products_count: int
     last_sale_at: str | None
     last_login_at: str | None
+    # когда владелец последний раз работал в кабинете (не только вводил пароль)
+    owner_last_seen_at: str | None
     sales_7d: int
     sales_30d: int
     sales_sum_30d: Decimal
@@ -83,7 +85,7 @@ async def list_tenants(
 
         sales = await _sales_aggregates(session, d7, d30)
         counts = await _entity_counts(session)
-        owners = await _owner_names(session)
+        owners = await _owners(session)
         logins = await _last_logins(session)
         debts = await _open_debts(session)
         requests = await _storefront_requests(session, d30)
@@ -91,6 +93,7 @@ async def list_tenants(
         items: list[TenantListItem] = []
         for tenant in tenants:
             sale = sales.get(tenant.id)
+            owner_name, owner_seen_at = owners.get(tenant.id, ("", None))
             last_sale_at = sale["last_at"] if sale else None
             health = tenant_health(tenant.created_at, last_sale_at, now)
             items.append(
@@ -103,12 +106,13 @@ async def list_tenants(
                     is_suspended=tenant.is_suspended,
                     is_verified=tenant.is_verified,
                     storefront_enabled=tenant.storefront_enabled,
-                    owner_name=owners.get(tenant.id, ""),
+                    owner_name=owner_name,
                     users_count=counts.get(tenant.id, {}).get("users", 0),
                     warehouses_count=counts.get(tenant.id, {}).get("warehouses", 0),
                     products_count=counts.get(tenant.id, {}).get("products", 0),
                     last_sale_at=_to_iso(last_sale_at),
                     last_login_at=_to_iso(logins.get(tenant.id)),
+                    owner_last_seen_at=_to_iso(owner_seen_at),
                     sales_7d=sale["count_7d"] if sale else 0,
                     sales_30d=sale["count_30d"] if sale else 0,
                     sales_sum_30d=sale["sum_30d"] if sale else Decimal("0"),
@@ -212,14 +216,16 @@ async def _entity_counts(session) -> dict[int, dict[str, int]]:
     return result
 
 
-async def _owner_names(session) -> dict[int, str]:
+async def _owners(session) -> dict[int, tuple[str, datetime | None]]:
     rows = (
         await session.execute(
-            select(UserModel.tenant_id, UserModel.name).where(UserModel.role == Role.OWNER)
+            select(UserModel.tenant_id, UserModel.name, UserModel.last_seen_at).where(
+                UserModel.role == Role.OWNER
+            )
         )
     ).all()
     # у магазина один владелец; если их несколько — берём первого попавшегося
-    return {tenant_id: name for tenant_id, name in rows}
+    return {tenant_id: (name, seen) for tenant_id, name, seen in rows}
 
 
 async def _last_logins(session) -> dict[int, datetime]:

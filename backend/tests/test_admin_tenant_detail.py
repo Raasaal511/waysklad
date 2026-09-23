@@ -102,7 +102,7 @@ async def test_detail_has_all_blocks(client, admin_client_headers, tenant_id):
 
     assert isinstance(body["users"], list) and body["users"]
     user = body["users"][0]
-    assert {"id", "name", "role", "is_active", "last_login_at"} == set(user)
+    assert {"id", "name", "role", "is_active", "last_login_at", "last_seen_at"} == set(user)
 
     assert isinstance(body["warehouses"], list)
     assert body["storefront"] is not None

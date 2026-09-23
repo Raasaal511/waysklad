@@ -47,6 +47,7 @@ class TenantListItemResponse(BaseModel):
     products_count: int
     last_sale_at: str | None
     last_login_at: str | None
+    owner_last_seen_at: str | None
     sales_7d: int
     sales_30d: int
     sales_sum_30d: Decimal
@@ -69,6 +70,7 @@ class TenantListResponse(BaseModel):
 class TenantOwnerResponse(BaseModel):
     name: str
     phone: str
+    last_seen_at: str | None = None
 
 
 class TenantUserResponse(BaseModel):
@@ -79,6 +81,7 @@ class TenantUserResponse(BaseModel):
     role: str
     is_active: bool
     last_login_at: str | None
+    last_seen_at: str | None = None
 
 
 class TenantWarehouseResponse(BaseModel):
@@ -163,7 +166,7 @@ class TenantDetailResponse(BaseModel):
             is_suspended=d.is_suspended,
             is_verified=d.is_verified,
             created_at=d.created_at,
-            owner=TenantOwnerResponse(name=d.owner.name, phone=d.owner.phone) if d.owner else None,
+            owner=TenantOwnerResponse(**asdict(d.owner)) if d.owner else None,
             users_count=d.users_count,
             products_count=d.products_count,
             warehouses_count=d.warehouses_count,

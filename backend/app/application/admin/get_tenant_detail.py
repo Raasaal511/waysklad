@@ -23,6 +23,7 @@ CACHE_TTL_SECONDS = 30
 class TenantOwnerInfo:
     name: str
     phone: str
+    last_seen_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,7 @@ class TenantUserInfo:
     role: str
     is_active: bool
     last_login_at: str | None
+    last_seen_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -125,14 +127,22 @@ async def get_tenant_detail(session_factory, tenant_id: int) -> TenantDetail | N
 
         owner_row = (
             await session.execute(
-                select(UserModel.name, UserModel.phone).where(
+                select(UserModel.name, UserModel.phone, UserModel.last_seen_at).where(
                     UserModel.tenant_id == tenant_id,
                     UserModel.role == Role.OWNER,
                     UserModel.is_active.is_(True),
                 )
             )
         ).first()
-        owner = TenantOwnerInfo(name=owner_row.name, phone=owner_row.phone) if owner_row else None
+        owner = (
+            TenantOwnerInfo(
+                name=owner_row.name,
+                phone=owner_row.phone,
+                last_seen_at=_iso(owner_row.last_seen_at),
+            )
+            if owner_row
+            else None
+        )
 
         users_count = (
             await session.execute(
@@ -273,6 +283,7 @@ async def _users(session, tenant_id: int) -> list[TenantUserInfo]:
                 UserModel.role,
                 UserModel.is_active,
                 UserModel.last_login_at,
+                UserModel.last_seen_at,
             )
             .where(UserModel.tenant_id == tenant_id)
             .order_by(UserModel.id)
@@ -281,7 +292,12 @@ async def _users(session, tenant_id: int) -> list[TenantUserInfo]:
     # телефоны сотрудников сюда не попадают — это персональные данные
     return [
         TenantUserInfo(
-            id=r[0], name=r[1], role=r[2].value, is_active=r[3], last_login_at=_iso(r[4])
+            id=r[0],
+            name=r[1],
+            role=r[2].value,
+            is_active=r[3],
+            last_login_at=_iso(r[4]),
+            last_seen_at=_iso(r[5]),
         )
         for r in rows
     ]
