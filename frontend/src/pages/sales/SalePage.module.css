@@ -77,12 +77,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Над нижним меню кабинета вместе с выступающей FAB «Продать» (переменная — в AppLayout).
+   Отступ меньше нижнего padding контента, поэтому в конце прокрутки панель стоит на своём
+   месте в потоке и последние строки формы не прячет. */
+@media (max-width: 899px) {
+  .salePageActions {
+    bottom: calc(var(--app-nav-clearance, 0px) + 8px);
+  }
+}
+
 @media (max-width: 640px) {
   .salePageActions {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
-    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
     padding: 14px;
   }
 

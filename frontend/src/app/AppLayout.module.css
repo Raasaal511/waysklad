@@ -3,6 +3,13 @@
 .app-layout {
   min-height: 100svh;
   display: flex;
+  /* Нижнее меню (<900px): полоса 52px + бордер 1px, FAB «Продать» выступает над ней на 22px.
+     Всё, что прилипает к низу экрана, ставится выше этой отметки. */
+  --app-nav-height: 53px;
+  --app-nav-fab-rise: 22px;
+  --app-nav-clearance: calc(
+    var(--app-nav-height) + var(--app-nav-fab-rise) + env(safe-area-inset-bottom, 0px)
+  );
 }
 
 .app-sidebar {
@@ -254,7 +261,8 @@
 }
 
 .app-content-with-sell {
-  padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  /* Не меньше отступа sticky-панелей над меню, иначе в конце прокрутки они налезут на контент. */
+  padding-bottom: calc(var(--app-nav-clearance) + 12px);
 }
 
 .app-nav-item {

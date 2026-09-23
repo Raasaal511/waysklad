@@ -110,14 +110,18 @@
   box-sizing: border-box;
 }
 
-html {
+/* clip, а не hidden: hidden у body делает его отдельным scroll-контейнером, и все
+   position: sticky (шапки, панель продажи, фильтры) перестают прилипать.
+   hidden оставлен запасным вариантом для браузеров без clip (Safari < 16). */
+html,
+body {
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
   margin: 0;
   background: var(--bg-muted);
-  overflow-x: hidden;
 }
 
 /* Выделение текста — фирменный акцент вместо дефолтного синего браузера (P6, «мелочи»). */
