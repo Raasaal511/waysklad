@@ -6,6 +6,7 @@ from app.infrastructure.db.models import (  # noqa: F401
     customers,
     debts,
     errors,
+    feedback,
     identity,
     inventory,
     notifications,

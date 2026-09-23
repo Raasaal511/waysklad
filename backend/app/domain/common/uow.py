@@ -18,6 +18,7 @@ if TYPE_CHECKING:
         IPhoneVerificationCodeRepository,
     )
     from app.domain.debts.repository import IDebtRepository
+    from app.domain.feedback.repository import IFeedbackRepository
     from app.domain.identity.repository import (
         ITenantRepository,
         IUserRepository,
@@ -82,6 +83,7 @@ class IUnitOfWork(ABC):
     marketplace_products: IMarketplaceProductRepository
     platform_categories: IPlatformCategoryRepository
     platform_banners: IPlatformBannerRepository
+    feedback: IFeedbackRepository
 
     async def __aenter__(self) -> IUnitOfWork:
         return self

@@ -18,6 +18,7 @@ from app.infrastructure.db.repositories.customers import (
     SqlAlchemyPhoneVerificationCodeRepository,
 )
 from app.infrastructure.db.repositories.debts import SqlAlchemyDebtRepository
+from app.infrastructure.db.repositories.feedback import SqlAlchemyFeedbackRepository
 from app.infrastructure.db.repositories.identity import (
     SqlAlchemyTenantRepository,
     SqlAlchemyUserRepository,
@@ -95,6 +96,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.marketplace_products = SqlAlchemyMarketplaceProductRepository(self.session)
         self.platform_categories = SqlAlchemyPlatformCategoryRepository(self.session)
         self.platform_banners = SqlAlchemyPlatformBannerRepository(self.session)
+        self.feedback = SqlAlchemyFeedbackRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
