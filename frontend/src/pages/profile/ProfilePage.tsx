@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { connectTelegram, updateShop, changePassword, logoutAll } from '../../entities/profile/api'
 import type { Role } from '../../entities/auth/api'
 import type { Tenant, UpdateShopInput } from '../../entities/profile/api'
@@ -27,10 +27,24 @@ const ROLE_LABELS: Record<Role, string> = {
 
 type Tab = 'personalization' | 'account' | 'connections'
 
+/** Вкладка из ссылки (?tab=…): так неактивный пункт «Витрина» открывает сразу нужную. */
+function tabFromQuery(value: string | null, canManageSettings: boolean): Tab | null {
+  if (value === 'account') return 'account'
+  if ((value === 'personalization' || value === 'connections') && canManageSettings) return value
+  return null
+}
+
 export function ProfilePage() {
   const { user } = useAuth()
   const canManageSettings = user?.role === 'owner'
-  const [tab, setTab] = useState<Tab>('account')
+  const [searchParams] = useSearchParams()
+  const queryTab = tabFromQuery(searchParams.get('tab'), canManageSettings)
+  const [tab, setTab] = useState<Tab>(queryTab ?? 'account')
+
+  // Повторный переход по ссылке, когда профиль уже открыт, тоже переключает вкладку.
+  useEffect(() => {
+    if (queryTab) setTab(queryTab)
+  }, [queryTab])
 
   const TABS: { id: Tab; label: string }[] = [
     { id: 'account', label: 'Аккаунт' },
@@ -143,6 +157,18 @@ function StorefrontSettings({ shop }: { shop: Tenant }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const storeUrl = shop.slug ? `${window.location.origin}/store/${shop.slug}` : null
+  const { hash, key } = useLocation()
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [highlighted, setHighlighted] = useState(false)
+
+  // Пришли из меню по ссылке …#storefront — показываем, где включается витрина.
+  useEffect(() => {
+    if (hash !== '#storefront') return
+    cardRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    setHighlighted(true)
+    const timer = setTimeout(() => setHighlighted(false), 1600)
+    return () => clearTimeout(timer)
+  }, [hash, key])
 
   async function handleToggle(enabled: boolean) {
     setError(null)
@@ -158,7 +184,19 @@ function StorefrontSettings({ shop }: { shop: Tenant }) {
   }
 
   return (
-    <div className={[layoutStyles.stack, layoutStyles.card, layoutStyles.cardFull].join(' ')}>
+    <div
+      ref={cardRef}
+      id="storefront"
+      className={[
+        layoutStyles.stack,
+        layoutStyles.card,
+        layoutStyles.cardFull,
+        styles.storefrontCard,
+        highlighted && styles.storefrontCardHighlighted,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <div>
         <h3>Публичная витрина</h3>
         <p className={layoutStyles.textMuted}>
