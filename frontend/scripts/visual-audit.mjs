@@ -16,6 +16,8 @@
  *   AUDIT_SELLER_PASSWORD=audit12345
  *   AUDIT_STORE_SLUG=audit-vizual
  *   AUDIT_QUICK=1  — меньше ширин/тем (smoke)
+ *   AUDIT_ONLY=profile,login — только эти маршруты (ключи из списков ниже);
+ *     отчёт тогда пишется в docs/screens/visual-audit/, а не поверх VISUAL_AUDIT.md
  */
 
 import { chromium } from 'playwright'
@@ -26,7 +28,10 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..', '..')
 const OUT_DIR = path.join(ROOT, 'docs', 'screens', 'visual-audit')
-const REPORT_MD = path.join(ROOT, 'docs', 'VISUAL_AUDIT.md')
+const ONLY = process.env.AUDIT_ONLY ? new Set(process.env.AUDIT_ONLY.split(',')) : null
+const REPORT_MD = ONLY
+  ? path.join(ROOT, 'docs', 'screens', 'visual-audit', 'VISUAL_AUDIT_ONLY.md')
+  : path.join(ROOT, 'docs', 'VISUAL_AUDIT.md')
 const BASE = process.env.AUDIT_BASE_URL ?? 'http://localhost:5173'
 
 const OWNER = {
@@ -626,7 +631,7 @@ async function main() {
       })
       const page = await context.newPage()
       await setTheme(page, theme)
-      for (const route of PUBLIC_ROUTES) {
+      for (const route of PUBLIC_ROUTES.filter((r) => !ONLY || ONLY.has(r.key))) {
         await auditRoute(page, route, vp, theme, 'anon', allIssues)
       }
       await context.close()
@@ -663,12 +668,12 @@ async function main() {
           continue
         }
 
-        for (const route of CABINET_ROUTES) {
+        for (const route of CABINET_ROUTES.filter((r) => !ONLY || ONLY.has(r.key))) {
           // seller may 403 on some — still scan UI
           await auditRoute(page, route, vp, theme, creds.role, allIssues)
         }
 
-        if (creds.role === 'owner' && theme === 'light' && [375, 393, 412].includes(vp.w)) {
+        if (!ONLY && creds.role === 'owner' && theme === 'light' && [375, 393, 412].includes(vp.w)) {
           await runOnboardingSteps(page, vp, theme, creds.role, allIssues)
         }
 
