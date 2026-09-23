@@ -1,0 +1,23 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* В тёмной теме иллюстрации (часто на светлом холсте) проваливаются в фон —
+   лёгкая светлая подложка возвращает контраст, как у карточек empty-state. */
+:global([data-theme='dark']) .wrap {
+  background: color-mix(in srgb, #ffffff 92%, var(--bg));
+  border-radius: 20px;
+  padding: 12px;
+  box-sizing: content-box;
+}

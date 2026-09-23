@@ -1,7 +1,8 @@
 import { Button } from './Button'
+import { Illustration, type IllustrationName } from './Illustration'
 import styles from './EmptyState.module.css'
 
-export type ErrorIllustrationName = 'error-404-not-found' | 'error-403-blocked'
+export type ErrorIllustrationName = Extract<IllustrationName, 'error-404-not-found' | 'error-403-blocked'>
 
 interface ErrorStateProps {
   illustration: ErrorIllustrationName
@@ -15,13 +16,7 @@ interface ErrorStateProps {
 export function ErrorState({ illustration, title, description, actionLabel, onAction }: ErrorStateProps) {
   return (
     <div className={styles.wrap}>
-      <img
-        src={`/illustrations/${illustration}.png`}
-        alt=""
-        width={120}
-        height={120}
-        className={styles.illustration}
-      />
+      <Illustration name={illustration} size={160} />
       <h2 className={styles.title}>{title}</h2>
       {description && <p className={styles.description}>{description}</p>}
       {actionLabel && onAction && (

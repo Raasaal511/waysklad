@@ -1,16 +1,11 @@
 import { Button } from './Button'
+import { Illustration, type IllustrationName } from './Illustration'
 import styles from './EmptyState.module.css'
 
-export type EmptyIllustrationName =
-  | 'empty-archive'
-  | 'empty-box'
-  | 'empty-cart'
-  | 'empty-reviews'
-  | 'empty-shelf'
-  | 'state-telegram-confirm'
+export type EmptyIllustrationName = IllustrationName
 
 interface EmptyStateProps {
-  /** Имя файла в public/illustrations (без картинки — просто текст, см. п.4 блока «Д»: "ничего не найдено"). */
+  /** Имя файла в public/illustrations (без картинки — просто текст: «ничего не найдено»). */
   illustration?: EmptyIllustrationName
   title: string
   description?: string
@@ -22,15 +17,7 @@ interface EmptyStateProps {
 export function EmptyState({ illustration, title, description, actionLabel, onAction }: EmptyStateProps) {
   return (
     <div className={styles.wrap}>
-      {illustration && (
-        <img
-          src={`/illustrations/${illustration}.png`}
-          alt=""
-          width={120}
-          height={120}
-          className={styles.illustration}
-        />
-      )}
+      {illustration && <Illustration name={illustration} size={160} />}
       <h2 className={styles.title}>{title}</h2>
       {description && <p className={styles.description}>{description}</p>}
       {actionLabel && onAction && (
