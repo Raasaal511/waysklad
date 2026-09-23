@@ -1,6 +1,5 @@
-# Документация в git (md), тяжёлые артефакты — нет
-docs/screens/
-docs/lighthouse/
+# Документация — только локально, не на GitHub (решение владельца 23.09)
+docs/
 
 # Исходники иллюстраций (сборка → public/illustrations/*.webp)
 frontend/design-src/
