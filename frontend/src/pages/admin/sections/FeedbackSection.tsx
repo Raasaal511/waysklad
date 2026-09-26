@@ -9,6 +9,7 @@ import {
 } from '../../../entities/admin/feedbackApi'
 import { Lightbox } from '../../../shared/ui/Lightbox'
 import layoutStyles from '../../../shared/ui/Layout.module.css'
+import { useAutoRefresh } from '../AdminLayout'
 import { handleAdminError } from '../shared'
 import adminStyles from '../AdminPage.module.css'
 import styles from './FeedbackSection.module.css'
@@ -73,6 +74,8 @@ export function FeedbackSection({ logout, refreshKey, onLoaded }: SectionProps) 
   useEffect(() => {
     load()
   }, [load, refreshKey])
+
+  useAutoRefresh(load)
 
   async function toggleResolved(item: AdminFeedbackItem) {
     setBusyId(item.id)

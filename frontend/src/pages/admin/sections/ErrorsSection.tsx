@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { getAdminErrorLogs, type AdminErrorLog } from '../../../entities/admin/api'
 import layoutStyles from '../../../shared/ui/Layout.module.css'
+import { useAutoRefresh } from '../AdminLayout'
 import { handleAdminError } from '../shared'
 import styles from '../AdminPage.module.css'
-
-const ERROR_AUTO_REFRESH_MS = 15000
 
 interface SectionProps {
   logout: () => void
@@ -35,9 +34,9 @@ export function ErrorsSection({ logout, refreshKey, onLoaded }: SectionProps) {
 
   useEffect(() => {
     load()
-    const id = window.setInterval(load, ERROR_AUTO_REFRESH_MS)
-    return () => window.clearInterval(id)
   }, [load, refreshKey])
+
+  useAutoRefresh(load)
 
   if (loading) return <p className={layoutStyles.textMuted}>Загрузка…</p>
   if (error) return <p className={layoutStyles.error}>{error}</p>
