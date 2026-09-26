@@ -166,23 +166,45 @@ async def _db_engine(_test_db_ready) -> AsyncIterator:
 # сид-миграцией и дальше не меняется, тесты его только читают. Поэтому он
 # сеется один раз на сессию (в _db_engine) и переживает очистку между тестами,
 # вместо того чтобы вычищаться и пересеваться 12 строками на каждый тест.
-_MUTABLE_TABLES = [t for t in Base.metadata.tables if t != PlatformCategoryModel.__tablename__]
+#
+# Очистка — DELETE, а не TRUNCATE: TRUNCATE пересоздаёт файлы каждой из 42
+# таблиц и берёт на них эксклюзивные блокировки (~56 мс на тест, под
+# параллельными воркерами — больше), а DELETE по пустой таблице почти
+# бесплатен, тест же обычно наполняет лишь несколько таблиц. Проверки FK на
+# время очистки выключены (session_replication_role = replica, только в этой
+# транзакции): между orders и sales цикл ссылок, и никакой порядок DELETE его
+# не обходит, а чистятся всё равно все таблицы.
+_MUTABLE_TABLES = [t for t in Base.metadata.sorted_tables if t.name != PlatformCategoryModel.__tablename__]
 
-# TRUNCATE всех таблиц разом: один оператор дешевле, чем DROP/CREATE схемы, а
-# RESTART IDENTITY возвращает последовательности к 1 — тесты, которые ждут
-# id=1 у первой созданной записи, продолжают работать как при чистой схеме.
-# CASCADE нужен из-за внешних ключей между таблицами.
-_TRUNCATE_ALL = text(
-    "TRUNCATE " + ", ".join(f'"{table}"' for table in _MUTABLE_TABLES) + " RESTART IDENTITY CASCADE"
+# Последовательности сбрасываются к 1, как делал RESTART IDENTITY: тесты, которые
+# ждут id=1 у первой созданной записи, продолжают работать как при чистой схеме.
+# setval нетранзакционен и не трогает файлы — один запрос на все таблицы.
+_SERIAL_SEQUENCES = text(
+    "SELECT seq FROM ("
+    "  SELECT pg_get_serial_sequence(quote_ident(table_name), column_name) AS seq"
+    "  FROM information_schema.columns"
+    "  WHERE table_schema = 'public' AND table_name = ANY(:tables)"
+    ") s WHERE seq IS NOT NULL"
 )
+_RESET_SEQUENCES = text("SELECT setval(CAST(seq AS regclass), 1, false) FROM unnest(CAST(:seqs AS text[])) AS seq")
+
+
+@pytest.fixture(scope="session")
+async def _serial_sequences(_db_engine) -> list[str]:
+    async with _db_engine.connect() as conn:
+        result = await conn.execute(_SERIAL_SEQUENCES, {"tables": [t.name for t in _MUTABLE_TABLES]})
+        return [row.seq for row in result]
 
 
 @pytest.fixture
-async def db_session_factory(_db_engine) -> AsyncIterator[async_sessionmaker]:
+async def db_session_factory(_db_engine, _serial_sequences) -> AsyncIterator[async_sessionmaker]:
     """Пустая БД на каждый тест, в БД, выделенной текущему xdist-воркеру."""
     engine = _db_engine
     async with engine.begin() as conn:
-        await conn.execute(_TRUNCATE_ALL)
+        await conn.execute(text("SET LOCAL session_replication_role = replica"))
+        for table in _MUTABLE_TABLES:
+            await conn.execute(table.delete())
+        await conn.execute(_RESET_SEQUENCES, {"seqs": _serial_sequences})
     yield async_sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
