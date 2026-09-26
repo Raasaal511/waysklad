@@ -1,8 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { listAdminTenants, type AdminTenantListItem } from '../../../entities/admin/api'
 import { formatExactDateTime, formatRelativeTime } from '../../../shared/lib/format'
 import layoutStyles from '../../../shared/ui/Layout.module.css'
+import { useAutoRefresh } from '../AdminLayout'
 import { handleAdminError } from '../shared'
 import styles from '../AdminPage.module.css'
 
@@ -31,26 +32,24 @@ export function TenantsSection({ logout, refreshKey, onLoaded }: SectionProps) {
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<TenantStatusFilter>('all')
 
+  const load = useCallback(async () => {
+    try {
+      const data = await listAdminTenants()
+      setTenants(data.tenants)
+      setError(null)
+    } catch (err) {
+      setError(handleAdminError(err, logout))
+    } finally {
+      setLoading(false)
+      onLoaded()
+    }
+  }, [logout, onLoaded])
+
   useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
-        const data = await listAdminTenants()
-        if (!cancelled) setTenants(data.tenants)
-      } catch (err) {
-        if (!cancelled) setError(handleAdminError(err, logout))
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-          onLoaded()
-        }
-      }
-    }
     load()
-    return () => {
-      cancelled = true
-    }
-  }, [logout, onLoaded, refreshKey])
+  }, [load, refreshKey])
+
+  useAutoRefresh(load)
 
   if (loading) return <p className={layoutStyles.textMuted}>Загрузка…</p>
   if (error) return <p className={layoutStyles.error}>{error}</p>

@@ -30,11 +30,12 @@ const SECTIONS = [
 const AUTO_REFRESH_MS = 60_000
 
 /**
- * Автообновление раздела раз в минуту. На скрытой вкладке таймер не тикает:
- * админку держат открытой часами, и фоновые запросы к платформе всё это
- * время не нужны. При возвращении на вкладку данные обновляются сразу.
+ * Автообновление раздела (по умолчанию раз в минуту). На скрытой вкладке
+ * таймер не тикает: админку держат открытой часами, и фоновые запросы к
+ * платформе всё это время не нужны. При возвращении на вкладку данные
+ * обновляются сразу.
  */
-export function useAutoRefresh(reload: () => void, enabled = true) {
+export function useAutoRefresh(reload: () => void, intervalMs = AUTO_REFRESH_MS, enabled = true) {
   const reloadRef = useRef(reload)
   reloadRef.current = reload
 
@@ -44,7 +45,7 @@ export function useAutoRefresh(reload: () => void, enabled = true) {
 
     function start() {
       stop()
-      timer = window.setInterval(() => reloadRef.current(), AUTO_REFRESH_MS)
+      timer = window.setInterval(() => reloadRef.current(), intervalMs)
     }
     function stop() {
       if (timer) window.clearInterval(timer)
@@ -65,7 +66,7 @@ export function useAutoRefresh(reload: () => void, enabled = true) {
       stop()
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [enabled])
+  }, [intervalMs, enabled])
 }
 
 interface AdminLayoutProps {

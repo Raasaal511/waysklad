@@ -14,6 +14,7 @@ import { Button } from '../../../shared/ui/Button'
 import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { formatRelativeTime } from '../../../shared/lib/format'
 import layoutStyles from '../../../shared/ui/Layout.module.css'
+import { useAutoRefresh } from '../AdminLayout'
 import { handleAdminError } from '../shared'
 import styles from '../AdminPage.module.css'
 
@@ -54,6 +55,8 @@ export function TenantDetailSection({ logout, refreshKey, onLoaded }: SectionPro
   useEffect(() => {
     load()
   }, [load, refreshKey])
+
+  useAutoRefresh(load)
 
   if (error) return <p className={layoutStyles.error}>{error}</p>
   if (!tenant) return <p className={layoutStyles.textMuted}>Загрузка…</p>

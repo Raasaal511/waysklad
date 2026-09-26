@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getAdminStatus, type AdminMetricsPoint, type AdminStatus } from '../../../entities/admin/api'
 import layoutStyles from '../../../shared/ui/Layout.module.css'
+import { useAutoRefresh } from '../AdminLayout'
 import { handleAdminError } from '../shared'
 import styles from '../AdminPage.module.css'
 
@@ -18,6 +19,8 @@ function formatDateTime(value: string) {
     minute: '2-digit',
   })
 }
+
+const SERVER_AUTO_REFRESH_MS = 30_000
 
 interface SectionProps {
   logout: () => void
@@ -42,9 +45,11 @@ export function ServerSection({ logout, refreshKey, onLoaded }: SectionProps) {
 
   useEffect(() => {
     load()
-    const id = window.setInterval(load, 8000)
-    return () => window.clearInterval(id)
   }, [load, refreshKey])
+
+  // нагрузка сервера меняется быстрее прочих данных, но чаще раза в полминуты
+  // смотреть на неё незачем: история метрик и так идёт с шагом в минуты
+  useAutoRefresh(load, SERVER_AUTO_REFRESH_MS)
 
   if (error) return <p className={layoutStyles.error}>{error}</p>
   if (!status) return <p className={layoutStyles.textMuted}>Загрузка…</p>
