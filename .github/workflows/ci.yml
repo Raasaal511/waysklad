@@ -60,7 +60,10 @@ jobs:
 
       - name: Run tests
         working-directory: backend
-        run: pytest -n auto
+        # -n auto считает физические ядра: на раннере с 2 vCPU это одно ядро
+        # и один воркер. Тесты большую часть времени ждут PostgreSQL, а не
+        # процессор, поэтому воркеров держим больше, чем ядер
+        run: pytest -n 4
 
   frontend-checks:
     runs-on: ubuntu-latest
