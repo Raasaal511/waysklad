@@ -254,6 +254,8 @@ export function StorefrontProductPage() {
         const qty = initialOrderQty(product.min_order_qty, product.order_step_qty)
         addToCart(slug, {
           product_id: product.id,
+          min_order_qty: product.min_order_qty,
+          order_step_qty: product.order_step_qty,
           name: product.name,
           retail_price: product.retail_price,
           photo: product.photo,
@@ -271,6 +273,8 @@ export function StorefrontProductPage() {
         const qty = initialOrderQty(product.min_order_qty, product.order_step_qty)
         addToCart(slug, {
           product_id: product.id,
+          min_order_qty: product.min_order_qty,
+          order_step_qty: product.order_step_qty,
           name: product.name,
           retail_price: variantPrice(product, firstAvailable),
           photo: firstAvailable.photo || product.photo,
@@ -294,6 +298,8 @@ export function StorefrontProductPage() {
       const variant = key === 'base' ? undefined : product.variants.find((v) => v.id === key)
       addToCart(slug, {
         product_id: product.id,
+        min_order_qty: product.min_order_qty,
+        order_step_qty: product.order_step_qty,
         name: product.name,
         retail_price: variantPrice(product, variant),
         photo: variant?.photo || product.photo,

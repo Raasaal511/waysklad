@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { IconChevronDown, IconInfoCircle, IconTrash, IconUserCircle } from '@tabler/icons-react'
 import {
@@ -11,13 +11,14 @@ import {
   type CustomerProfile,
 } from '../../entities/auth/customerApi'
 import {
+  bumpOrderQty,
   createStorefrontRequest,
   getStorefrontShopProfileCached,
   peekCachedStorefrontShopProfile,
   saveRequestToken,
 } from '../../entities/storefront/api'
 import { ApiError } from '../../shared/api/client'
-import { formatMoney, normalizeDecimalInput, plural } from '../../shared/lib/format'
+import { formatMoney, formatQuantity, normalizeDecimalInput, plural } from '../../shared/lib/format'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { Button } from '../../shared/ui/Button'
 import { EmptyState } from '../../shared/ui/EmptyState'
@@ -26,6 +27,11 @@ import { loadCart, saveCart, type StorefrontCartItem } from './cart'
 import { notifyCustomerAuthChanged } from './customerAuthEvents'
 import { QtyStepper } from './QtyStepper'
 import styles from './StorefrontCartPage.module.css'
+
+function minQty(item: StorefrontCartItem): number {
+  const min = Number(item.min_order_qty)
+  return Number.isFinite(min) && min > 0 ? min : 1
+}
 
 /** Как магазин увидит покупателя: имя из профиля, иначе логин, иначе телефон —
  *  то же правило, что на сервере (create_request.py), поле «Ваше имя» не нужно. */
@@ -46,6 +52,13 @@ export function StorefrontCartPage() {
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
   const [shopName, setShopName] = useState(() => peekCachedStorefrontShopProfile(slug)?.name ?? null)
+  const errorRef = useRef<HTMLParagraphElement>(null)
+
+  // На телефоне кнопка «Оформить» в липкой панели, а ошибка — в потоке страницы:
+  // без прокрутки к ней нажатие выглядело бы так, будто ничего не произошло.
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [error])
 
   useEffect(() => {
     setCart(loadCart(slug))
@@ -132,9 +145,10 @@ export function StorefrontCartPage() {
   }
 
   function stepQty(index: number, delta: 1 | -1) {
-    const next = Number(cart[index].quantity || 0) + delta
-    if (next <= 0) return
-    setQty(index, String(next))
+    const item = cart[index]
+    // минимум и шаг товара — те же правила, что на странице товара и на сервере:
+    // иначе «−» до 9 при минимуме 10 давал ошибку уже при оформлении
+    setQty(index, String(bumpOrderQty(Number(item.quantity || 0), delta, item.min_order_qty, item.order_step_qty)))
   }
 
   function typeQty(index: number, raw: string) {
@@ -153,11 +167,28 @@ export function StorefrontCartPage() {
     navigate(`/store/${slug}/login?next=${next}`)
   }
 
+  /** Пустое или нулевое количество (стёрли цифру в поле) — сказать, а не выкинуть
+   *  строку молча: корзина после отправки очищается, и товар бы потерялся. */
+  function quantityProblem(items: StorefrontCartItem[]): string | null {
+    for (const item of items) {
+      const qty = Number(item.quantity)
+      if (!Number.isFinite(qty) || qty <= 0) return `Укажите количество для «${item.name}»`
+      const min = minQty(item)
+      if (qty < min) return `«${item.name}»: минимум ${formatQuantity(min)}`
+    }
+    return null
+  }
+
   async function submit(token: string, noteText: string) {
+    const items = loadCart(slug)
+    const problem = quantityProblem(items)
+    if (problem) {
+      setError(problem)
+      return
+    }
     setError(null)
     setSaving(true)
     try {
-      const items = loadCart(slug).filter((i) => Number(i.quantity) > 0)
       const created = await createStorefrontRequest(
         slug,
         {
@@ -270,7 +301,7 @@ export function StorefrontCartPage() {
                       onStep={(d) => stepQty(index, d)}
                       onDirectInput={(raw) => typeQty(index, raw)}
                       inputAriaLabel={`Количество: ${item.name}`}
-                      disableDecrease={qty <= 1}
+                      disableDecrease={qty <= minQty(item)}
                       inputMode="decimal"
                     />
                     <strong className={styles.lineTotal}>{formatMoney(Number(item.retail_price) * qty)} ₽</strong>
@@ -358,7 +389,7 @@ export function StorefrontCartPage() {
           </section>
 
           {error && (
-            <p className={styles.error} role="alert">
+            <p ref={errorRef} className={styles.error} role="alert">
               {error}
             </p>
           )}

@@ -220,6 +220,8 @@ export function StorefrontCatalogPage() {
       photo: product.photo,
       quantity: String(initialOrderQty(product.min_order_qty, product.order_step_qty)),
       variant_id: null,
+      min_order_qty: product.min_order_qty,
+      order_step_qty: product.order_step_qty,
     })
   }
 
