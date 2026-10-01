@@ -34,6 +34,7 @@ import { useOfflineSync } from '../shared/offline/useOfflineSync'
 import { useFeature } from '../shared/lib/useFeature'
 import { useKeyboardOpen } from '../shared/lib/useKeyboardOpen'
 import type { Role } from '../entities/auth/api'
+import { TelegramBanner } from './TelegramBanner'
 import styles from './AppLayout.module.css'
 
 interface NavItem {
@@ -661,6 +662,7 @@ export function AppLayout() {
             .filter(Boolean)
             .join(' ')}
         >
+          <TelegramBanner />
           <Outlet />
         </main>
 

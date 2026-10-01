@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
-import { connectTelegram, updateShop, changePassword, logoutAll } from '../../entities/profile/api'
+import {
+  confirmTelegramLink,
+  startTelegramLink,
+  updateShop,
+  changePassword,
+  logoutAll,
+} from '../../entities/profile/api'
+import type { TelegramStart } from '../../entities/auth/api'
+import { TelegramVerify } from '../../widgets/telegram-verify/TelegramVerify'
 import type { Role } from '../../entities/auth/api'
 import type { Tenant, UpdateShopInput } from '../../entities/profile/api'
 import { ApiError } from '../../shared/api/client'
@@ -10,9 +18,8 @@ import { useShop } from '../../app/ShopContext'
 import { useCatalog } from '../../app/CatalogContext'
 import { Modal } from '../../shared/ui/Modal'
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
-import { IconCheck, IconBuildingWarehouse, IconChevronRight, IconPencil } from '@tabler/icons-react'
+import { IconBrandTelegram, IconCheck, IconBuildingWarehouse, IconChevronRight } from '@tabler/icons-react'
 import { Button } from '../../shared/ui/Button'
-import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
 import { AppInstallCard } from './AppInstallCard'
 import layoutStyles from '../../shared/ui/Layout.module.css'
@@ -411,72 +418,75 @@ function ConnectionsTab() {
 }
 
 function TelegramSettings() {
-  const { shop, setShop, refreshShop } = useShop()
-  const [showForm, setShowForm] = useState(false)
+  const { shop, setShop } = useShop()
+  const [link, setLink] = useState<TelegramStart | null>(null)
+  const [starting, setStarting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const loading = shop === null
+  const connected = Boolean(shop?.owner_telegram_chat_id)
 
-  const connectedChatId = shop?.owner_telegram_chat_id ?? null
+  async function startLink() {
+    setError(null)
+    setStarting(true)
+    try {
+      setLink(await startTelegramLink())
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось начать подключение')
+    } finally {
+      setStarting(false)
+    }
+  }
+
+  async function confirm(code: string) {
+    if (!link) return
+    setShop(await confirmTelegramLink(link.token, code))
+    setLink(null)
+  }
 
   return (
     <div className={[layoutStyles.card, layoutStyles.cardFull, layoutStyles.stack].join(' ')}>
       <div className={[layoutStyles.row, layoutStyles.between].join(' ')}>
         <div>
-          <h3>Telegram-сводка</h3>
+          <h3>Telegram</h3>
           <p className={layoutStyles.textMuted}>
-            Бот присылает сообщение с продажами, выручкой, прибылью и долгами, а следом — файл
-            Excel с подробностями на нескольких страницах: «Итоги», «Товары», «Долги», и «По
-            складам», если складов больше одного.
+            Новые заявки с витрины, напоминания о долгах и вечерняя сводка с файлом Excel.
           </p>
         </div>
         {!loading && (
-          <span className={`badge${connectedChatId ? ' accent' : ''}`}>
-            {connectedChatId ? 'Подключено' : 'Не подключено'}
-          </span>
+          <span className={`badge${connected ? ' accent' : ''}`}>{connected ? 'Подключён' : 'Не подключён'}</span>
         )}
       </div>
 
-      {!loading && connectedChatId && (
-        <div className={[layoutStyles.row, layoutStyles.between].join(' ')}>
-          <span className={layoutStyles.row} style={{ gap: 6 }}>
-            <IconCheck size={16} stroke={1.8} className={styles.iconAccent} />
-            Chat ID: {connectedChatId}
-          </span>
-          <IconButton
-            variant="muted"
-            tooltip="Изменить"
-            aria-label="Изменить подключение Telegram"
-            onClick={() => setShowForm(true)}
-          >
-            <IconPencil size={16} stroke={1.8} />
-          </IconButton>
-        </div>
+      {!loading && !connected && (
+        <p className={styles.telegramWarning} role="status">
+          Уведомления сейчас никуда не уходят: Telegram не подключён.
+        </p>
       )}
-
-      {!loading && !connectedChatId && (
-        <>
-          <p className={styles.telegramWarning} role="status">
-            Сводки сейчас никуда не уходят: Telegram не подключён. Подключите chat_id и
-            нажмите «Старт» у бота ВайСклад в Telegram — иначе ежедневный отчёт не придёт.
-          </p>
-          <Button onClick={() => setShowForm(true)}>Подключить</Button>
-        </>
+      {error && <p className={layoutStyles.error}>{error}</p>}
+      {!loading && (
+        <Button
+          variant={connected ? 'secondary' : 'primary'}
+          className={styles.telegramAction}
+          onClick={startLink}
+          disabled={starting}
+        >
+          <IconBrandTelegram size={20} stroke={1.8} />
+          {starting ? 'Готовим ссылку…' : connected ? 'Подключить другой Telegram' : 'Подключить Telegram'}
+        </Button>
       )}
 
       {!loading && shop && (
-        <SummaryScheduleSettings
-          shop={shop}
-          onSaved={setShop}
-          disabled={!connectedChatId}
-        />
+        <SummaryScheduleSettings shop={shop} onSaved={setShop} disabled={!connected} />
       )}
 
-      {showForm && (
-        <Modal title="Telegram-сводка" onClose={() => setShowForm(false)}>
-          <TelegramConnectForm
-            onDone={() => {
-              setShowForm(false)
-              refreshShop()
-            }}
+      {link && (
+        <Modal title="Подключение Telegram" onClose={() => setLink(null)}>
+          <TelegramVerify
+            start={link}
+            onConfirm={confirm}
+            onRestart={startLink}
+            restartLabel="Получить новую ссылку"
+            lead="Бот проверит, что номер ваш, и сюда начнут приходить заявки и сводки."
           />
         </Modal>
       )}
@@ -569,69 +579,6 @@ function SummaryScheduleSettings({
       </label>
 
       {error && <p className={layoutStyles.error}>{error}</p>}
-    </div>
-  )
-}
-
-function TelegramConnectForm({ onDone }: { onDone: () => void }) {
-  const [chatId, setChatId] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setSaving(true)
-    try {
-      await connectTelegram(chatId)
-      onDone()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Не удалось подключить Telegram')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className={layoutStyles.stack}>
-      <div className={[layoutStyles.stack, styles.telegramSteps].join(' ')}>
-        <div className={[layoutStyles.row, styles.telegramStep].join(' ')}>
-          <span className={styles.telegramStepNumber}>1</span>
-          <span>
-            Откройте бота{' '}
-            <a href="https://t.me/userinfobot" target="_blank" rel="noreferrer">
-              @userinfobot
-            </a>{' '}
-            в Telegram и нажмите «Start»
-          </span>
-        </div>
-        <div className={[layoutStyles.row, styles.telegramStep].join(' ')}>
-          <span className={styles.telegramStepNumber}>2</span>
-          <span>Скопируйте число из поля «Id» в его ответе</span>
-        </div>
-        <div className={[layoutStyles.row, styles.telegramStep].join(' ')}>
-          <span className={styles.telegramStepNumber}>3</span>
-          <span>Вставьте это число ниже и нажмите «Подключить»</span>
-        </div>
-        <div className={[layoutStyles.row, styles.telegramStep].join(' ')}>
-          <span className={styles.telegramStepNumber}>4</span>
-          <span>
-            Откройте бота ВайСклад (тот же, что в ссылках витрины) и нажмите «Старт» —
-            иначе сообщения до вас не дойдут
-          </span>
-        </div>
-      </div>
-
-      <form className={layoutStyles.form} onSubmit={handleSubmit}>
-        <label className={layoutStyles.field}>
-          Telegram chat_id
-          <input value={chatId} onChange={(e) => setChatId(e.target.value)} placeholder="123456789" required />
-        </label>
-        {error && <p className={layoutStyles.error}>{error}</p>}
-        <Button type="submit" disabled={saving}>
-          {saving ? 'Сохранение…' : 'Подключить'}
-        </Button>
-      </form>
     </div>
   )
 }
