@@ -93,6 +93,11 @@ from app.application.marketplace.list_products import ListMarketplaceProductsUse
 from app.application.marketplace.list_shops import ListShopsUseCase
 from app.application.marketplace.suggest import SuggestUseCase
 from app.application.notifications.list_notifications import ListNotificationsUseCase
+from app.application.notifications.push_subscriptions import (
+    SendTestPushUseCase,
+    SubscribePushUseCase,
+    UnsubscribePushUseCase,
+)
 from app.application.notifications.mark_read import (
     MarkAllNotificationsReadUseCase,
     MarkNotificationReadUseCase,
@@ -172,7 +177,7 @@ from app.application.tasks.update_task import UpdateTaskUseCase
 from app.application.tasks.create_task import CreateTaskUseCase
 from app.application.feedback.submit_feedback import SubmitFeedbackUseCase
 from app.presentation.deps.cache import CacheDep
-from app.presentation.deps.notifier import NotifierDep
+from app.presentation.deps.notifier import NotifierDep, PushSenderDep
 from app.presentation.deps.security import FileStorageDep, HasherDep
 from app.presentation.deps.session import SessionFactoryDep
 from app.presentation.deps.uow import PublicUowDep, UowDep
@@ -418,6 +423,15 @@ def get_delete_shop_logo(
 get_mark_notification_read = _with_uow(MarkNotificationReadUseCase)
 get_mark_all_notifications_read = _with_uow(MarkAllNotificationsReadUseCase)
 get_list_notifications = _with_uow(ListNotificationsUseCase)
+get_unsubscribe_push = _with_uow(UnsubscribePushUseCase)
+
+
+def get_subscribe_push(uow: UowDep, sender: PushSenderDep) -> SubscribePushUseCase:
+    return SubscribePushUseCase(uow, sender)
+
+
+def get_send_test_push(uow: UowDep, sender: PushSenderDep) -> SendTestPushUseCase:
+    return SendTestPushUseCase(uow, sender)
 
 
 def get_storefront_catalog(
@@ -719,6 +733,9 @@ MarkAllNotificationsReadDep = Annotated[
     MarkAllNotificationsReadUseCase, Depends(get_mark_all_notifications_read)
 ]
 ListNotificationsDep = Annotated[ListNotificationsUseCase, Depends(get_list_notifications)]
+SubscribePushDep = Annotated[SubscribePushUseCase, Depends(get_subscribe_push)]
+UnsubscribePushDep = Annotated[UnsubscribePushUseCase, Depends(get_unsubscribe_push)]
+SendTestPushDep = Annotated[SendTestPushUseCase, Depends(get_send_test_push)]
 GetStorefrontCatalogDep = Annotated[
     GetStorefrontCatalogUseCase, Depends(get_storefront_catalog)
 ]

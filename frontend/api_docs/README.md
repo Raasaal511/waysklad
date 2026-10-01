@@ -5,6 +5,30 @@
 
 ---
 
+## 2026-10-01 — Web Push: уведомления на экран телефона (не breaking)
+
+Задача `docs/TASK_WEB_PUSH.md`. Только новые эндпоинты, все — для вошедшего
+сотрудника (любая роль). Существующие не менялись.
+
+| Метод | Путь | Тело | Ответ |
+|---|---|---|---|
+| GET | `/api/notifications/push/key` | — | `{public_key: string \| null}` — `null`: push на сервере выключен, карточку не показывать |
+| PUT | `/api/notifications/push/subscription` | `PushSubscription.toJSON()` браузера: `{endpoint, keys: {p256dh, auth}}` | 204; повторный вызов — обновление, не дубль |
+| POST | `/api/notifications/push/unsubscribe` | `{endpoint}` | 204 (и когда подписки не было) |
+| POST | `/api/notifications/push/test` | `{endpoint}` | `{delivered: bool}` — пробное уведомление на это устройство |
+
+- 400: push выключен на сервере, `endpoint` не https/IP/внутреннее имя, ключи не base64url.
+- Push приходит по тем же событиям, что и колокольчик, payload:
+  `{title, body, link, tag}`; `link` — путь в кабинете, `tag` — замена прежнего
+  уведомления по той же сущности. Показ и касание — `public/push-sw.js`.
+- Подписка перестаёт работать после смены пароля / «Выйти везде» / блокировки
+  сотрудника — кабинет при открытии повторяет PUT (`syncPushSubscription`).
+- Уже выведено: карточка «Уведомления на телефоне» в профиле
+  (`pages/profile/PushCard.tsx`), отписка при выходе (`AuthContext.logout`).
+- Сервер: `VAPID_PRIVATE_KEY` в `.env` (`python scripts/gen_vapid_keys.py`).
+
+---
+
 ## 2026-09-23 — «Был в сети» в админке платформы (не breaking)
 
 Новые поля, старые не менялись. Время — ISO с таймзоной, `null` — ни разу.

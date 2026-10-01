@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.domain.notifications.entities import Notification, NotificationKind
 
@@ -29,3 +29,32 @@ class NotificationListResponse(BaseModel):
 
 class MarkAllReadResponse(BaseModel):
     marked: int
+
+
+class PushKeyResponse(BaseModel):
+    # None — push на сервере не настроен, карточку в профиле не показываем
+    public_key: str | None
+
+
+class PushSubscriptionKeys(BaseModel):
+    p256dh: str = Field(max_length=200)
+    auth: str = Field(max_length=200)
+
+
+class PushSubscriptionRequest(BaseModel):
+    """Ровно то, что отдаёт PushSubscription.toJSON() в браузере."""
+
+    endpoint: str = Field(max_length=1024)
+    keys: PushSubscriptionKeys
+
+
+class PushEndpointRequest(BaseModel):
+    """Какое устройство — отписать или проверить пробным уведомлением."""
+
+    endpoint: str = Field(max_length=1024)
+
+
+class PushTestResponse(BaseModel):
+    # False — push-сервис не принял (сеть, подписка устарела): кабинет просит
+    # проверить интернет, а не делает вид, что всё в порядке
+    delivered: bool
