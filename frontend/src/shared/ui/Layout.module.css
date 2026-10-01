@@ -689,6 +689,14 @@
   border-top: 1px solid var(--border);
 }
 
+/* Три показателя делят ширину плитки: с фиксированными 190px «Ответственных»
+   уезжало за край плитки даже на компьютере. */
+.warehouseTileStats .stat {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+
 /* Product picker (Продажа/Заказы/Приёмка/Товары) */
 
 .productGrid {

@@ -55,7 +55,9 @@ import layoutStyles from '../../shared/ui/Layout.module.css'
 import detail from '../products/ProductDetailPage.module.css'
 import styles from './WarehouseDetailPage.module.css'
 
-const STOCK_COLUMNS = '2fr 1fr 1fr 1fr'
+// артикул — строкой под названием: отдельной колонкой на телефоне он разбивался
+// на три строки и сжимал остаток
+const STOCK_COLUMNS = 'minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr)'
 
 function pulseTasksNav() {
   document.querySelectorAll('[data-nav="tasks"]').forEach((el) => {
@@ -294,7 +296,7 @@ export function WarehouseDetailPage() {
               <IconPackage size={28} stroke={1.6} />
             </div>
             <div className={detail.heroBody}>
-              <div className={detail.heroTop}>
+              <div className={`${detail.heroTop} ${styles.heroTopRow}`}>
                 <div className={detail.heroHeading}>
                   <h2 className={detail.heroTitle}>{warehouse.name}</h2>
                   <div className={detail.heroTags}>
@@ -330,20 +332,6 @@ export function WarehouseDetailPage() {
                       <IconPencil size={20} stroke={1.8} />
                     </IconButton>
                   )}
-                  {(Object.keys(MODE_LABELS) as MovementMode[]).map((m) => {
-                    const Icon = MODE_ICONS[m]
-                    return (
-                      <IconButton
-                        key={m}
-                        variant="accent"
-                        size="lg"
-                        tooltip={MODE_LABELS[m]}
-                        onClick={() => navigate(`/stock/${warehouseId}/movement/${m}`)}
-                      >
-                        <Icon size={22} stroke={1.8} />
-                      </IconButton>
-                    )
-                  })}
                 </div>
               </div>
               <div className={detail.heroMeta}>
@@ -360,6 +348,31 @@ export function WarehouseDetailPage() {
               </div>
             </div>
           </section>
+
+          {/* Операции — подписанными кнопками, а не шестью одинаковыми иконками в
+              шапке: на телефоне они переносились 5+1, и было не понять, какая что делает */}
+          <nav
+            className={`${styles.ops} ${detail.reveal}`}
+            style={{ '--reveal-delay': '30ms' } as CSSProperties}
+            aria-label="Операции со складом"
+          >
+            {(Object.keys(MODE_LABELS) as MovementMode[])
+              .filter((m) => m !== 'transfer' || warehouses.length > 1)
+              .map((m) => {
+                const Icon = MODE_ICONS[m]
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    className={styles.op}
+                    onClick={() => navigate(`/stock/${warehouseId}/movement/${m}`)}
+                  >
+                    <Icon size={22} stroke={1.8} />
+                    {MODE_LABELS[m]}
+                  </button>
+                )
+              })}
+          </nav>
 
           <section
             className={`${detail.metrics} ${detail.reveal}`}
@@ -487,9 +500,8 @@ export function WarehouseDetailPage() {
             <div className="data-table">
               <div className="data-table-head" style={{ gridTemplateColumns: STOCK_COLUMNS }}>
                 <span>Товар</span>
-                <span>Артикул</span>
                 <span>Остаток</span>
-                <span>Мин. остаток</span>
+                <span>Минимум</span>
               </div>
               <div className="data-table-body">
                 {stock.map((item, i) => {
@@ -509,8 +521,10 @@ export function WarehouseDetailPage() {
                       }
                       onClick={() => product && navigate(`/products/${product.id}`)}
                     >
-                      <span className="data-row-name">{productName(item.product_id)}</span>
-                      <span className="text-muted">{product?.sku || '—'}</span>
+                      <span className={styles.stockName}>
+                        <span className="data-row-name">{productName(item.product_id)}</span>
+                        {product?.sku && <span className={styles.stockSku}>{product.sku}</span>}
+                      </span>
                       <span
                         className={`data-row-qty${out ? ' data-row-qty-out' : low ? ' data-row-qty-low' : ''}`}
                       >
