@@ -117,8 +117,12 @@
   top: 8px;
   right: 8px;
   z-index: 2;
-  width: 36px;
-  height: 36px;
+  /* padding/min-height явно: глобальный button { padding: 10px 14px } и
+     min-height 44px на телефоне сжимали иконку до 8px и тянули круг в овал */
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -165,7 +169,8 @@
 }
 
 .body {
-  padding: 12px 4px 4px;
+  /* 8px по бокам: «+» и цена не прилипают к краю карточки */
+  padding: 12px 8px 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -210,9 +215,18 @@
 
 .priceRow {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: 4px 8px;
   flex-wrap: wrap;
+}
+
+.footer {
+  margin-top: auto;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .price {
@@ -228,22 +242,25 @@
 }
 
 .rating {
-  margin-left: auto;
   font-size: 14px;
   font-weight: 600;
   color: var(--warning);
   white-space: nowrap;
 }
 
+.ratingCount {
+  margin-left: 4px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
 .quickAdd {
   position: relative;
   z-index: 2;
-  /* всегда у правого края строки: без этого кнопка липнет вплотную к цене
-     (когда рейтинга нет) или к рейтингу (у него margin-left: auto) */
-  margin-left: auto;
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
+  min-height: 0;
   padding: 0;
   display: inline-flex;
   align-items: center;
