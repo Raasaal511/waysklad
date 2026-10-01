@@ -127,8 +127,15 @@ export function NewSaleForm({
     return () => clearTimeout(timer)
   }, [query])
 
+  // Номер последнего запроса списка: ответ на устаревший (склад подставляется
+  // после первого рендера, поиск печатают быстрее, чем отвечает сервер) не должен
+  // затирать свежий — иначе при выключенном «Показать и то, чего нет на складе»
+  // в списке оказывались товары с нулевым остатком.
+  const productsRequestRef = useRef(0)
+
   // Фильтр наличия и сортировка по остатку — на сервере по выбранному складу.
   useEffect(() => {
+    const request = ++productsRequestRef.current
     setProductsLoading(true)
     setProducts([])
     listProducts({
@@ -141,16 +148,20 @@ export function NewSaleForm({
       offset: 0,
     })
       .then(({ items, total }) => {
+        if (request !== productsRequestRef.current) return
         setProducts(items)
         setProductsTotal(total)
       })
       .catch(() => {})
-      .finally(() => setProductsLoading(false))
+      .finally(() => {
+        if (request === productsRequestRef.current) setProductsLoading(false)
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQuery, categoryId, sortMode, warehouseId, showAllStock])
 
   function loadMoreProducts() {
     if (productsLoadingMore || products.length >= productsTotal) return
+    const request = productsRequestRef.current
     setProductsLoadingMore(true)
     listProducts({
       query: debouncedQuery,
@@ -162,6 +173,8 @@ export function NewSaleForm({
       offset: products.length,
     })
       .then(({ items, total }) => {
+        // фильтры сменились, пока грузилась страница, — она от другого списка
+        if (request !== productsRequestRef.current) return
         setProducts((prev) => [...prev, ...items])
         setProductsTotal(total)
       })
