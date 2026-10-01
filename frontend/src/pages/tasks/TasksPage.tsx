@@ -437,6 +437,7 @@ export function TasksPage() {
             return (
               <div
                 key={status}
+                data-empty={columnTasks.length === 0 || undefined}
                 className={`${kanban.column}${dragOverStatus === status ? ` ${kanban.columnOver}` : ''}`}
                 style={{ '--col-accent': STATUS_ACCENT[status] } as CSSProperties}
                 onDragOver={(e) => handleColumnDragOver(e, status)}

@@ -13,6 +13,21 @@
   .board {
     grid-template-columns: 1fr;
   }
+
+  /* Колонки друг под другом: пустая — одна строка «● В работе 0», а не
+     коробка с «Пусто» на полэкрана. Кнопка «Создать» в пустой колонке остаётся. */
+  .column[data-empty] {
+    gap: 8px;
+    padding: 10px 14px;
+  }
+
+  .column[data-empty] .columnBody {
+    min-height: 0;
+  }
+
+  .column[data-empty] .empty:not(.emptyAction) {
+    display: none;
+  }
 }
 
 .column {

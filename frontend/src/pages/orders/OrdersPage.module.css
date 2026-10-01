@@ -442,3 +442,29 @@ button.cartQtyStep:hover:not(:disabled) {
   color: var(--danger);
   white-space: nowrap;
 }
+
+/* Телефон: пояснение «Заказ → Выдача» — два шага рядом мелким текстом, без
+   иконок-украшений: раньше оно занимало полэкрана до первого закрытия. */
+@media (max-width: 599px) {
+  .ordersIntro {
+    padding: 12px 40px 12px 14px;
+  }
+
+  .ordersIntroFlow {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .ordersIntroStep {
+    min-width: 0;
+    align-items: flex-start;
+  }
+
+  .ordersIntroIcon,
+  .ordersIntroArrow {
+    display: none;
+  }
+}
