@@ -29,7 +29,7 @@ export function SaleNewPage() {
           Number.isFinite(initialProductId) && initialProductId > 0 ? initialProductId : null
         }
         onClose={() => navigate('/')}
-        onDone={(sale) => navigate(`/sales/${sale.id}`, { replace: true })}
+        onDone={(sale) => navigate(`/sales/${sale.id}`, { replace: true, state: { justSold: true } })}
       />
     </div>
   )
