@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from tests.conftest import register_via_bot
 
 
 async def test_storekeeper_limited_to_assigned_warehouse_via_api(
@@ -535,8 +536,8 @@ async def test_task_client_link_via_api(client, owner_headers, random_phone):
 async def test_task_client_link_tenant_isolation_via_api(client, owner_headers, random_phone):
     # клиент другого магазина не должен быть доступен для привязки задачи
     other_owner_phone = random_phone()
-    await client.post(
-        "/api/auth/register",
+    await register_via_bot(
+        client,
         json={
             "shop_name": "Чужой магазин", "owner_name": "Другой", "phone": other_owner_phone,
             "password": "secret123",

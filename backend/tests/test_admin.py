@@ -3,6 +3,7 @@
 tenant (см. presentation/deps/admin.py)."""
 
 from app.infrastructure.observability.admin_alerts import report_unhandled_error
+from tests.conftest import register_via_bot
 
 _LOGIN = "test-admin"  # см. tests/conftest.py: os.environ["ADMIN_LOGIN"]
 _PASSWORD = "test-admin-password"  # соответствует ADMIN_PASSWORD_HASH в conftest.py
@@ -126,8 +127,8 @@ async def test_admin_error_logs_hide_sql_details(client):
 
 
 async def test_admin_status_shows_recent_tenant(client, random_phone):
-    register = await client.post(
-        "/api/auth/register",
+    register = await register_via_bot(
+        client,
         json={
             "shop_name": "Магазин для недавних",
             "owner_name": "Владелец",
@@ -146,8 +147,8 @@ async def test_admin_status_shows_recent_tenant(client, random_phone):
 
 
 async def test_admin_list_and_suspend_tenant(client, random_phone):
-    register = await client.post(
-        "/api/auth/register",
+    register = await register_via_bot(
+        client,
         json={
             "shop_name": "Магазин для теста блокировки",
             "owner_name": "Владелец",

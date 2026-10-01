@@ -27,49 +27,96 @@ class RegisterShopResult:
 
 
 class RegisterShopUseCase:
+    """Создать магазин с владельцем без Telegram — для сидов и тестов. Сайт
+    регистрирует только через бота: StartSignupUseCase → CompleteSignupUseCase."""
+
     def __init__(self, uow: IUnitOfWork, hasher: IPasswordHasher):
         self._uow = uow
         self._hasher = hasher
 
     async def execute(self, cmd: RegisterShopCommand) -> RegisterShopResult:
-        if not cmd.personal_data_consent:
-            raise DomainError("Нужно согласие на обработку персональных данных")
-        if len(cmd.password) < 6:
-            raise DomainError("Пароль должен быть не короче 6 символов")
-        phone = Phone(cmd.phone)
-
+        phone = validate_signup(cmd)
         async with self._uow as uow:
-            if await uow.users.get_by_phone(str(phone)) is not None:
-                raise DomainError("Этот телефон уже зарегистрирован")
-
-            slug = await self._unique_slug(uow, cmd.shop_name)
-            tenant = await uow.tenants.add(Tenant(id=None, name=cmd.shop_name, slug=slug))
-            uow.tenant_id = tenant.id
-
-            owner = await uow.users.add(
-                User(
-                    id=None,
-                    name=cmd.owner_name,
-                    phone=phone,
-                    role=Role.OWNER,
-                    password_hash=self._hasher.hash(cmd.password),
-                    personal_data_consent_at=datetime.now(timezone.utc),
-                )
-            )
-            await uow.audit.add(
-                AuditEntry.record(
-                    Actor(id=owner.id, role=owner.role), "shop.register", tenant.id
-                )
+            result = await create_shop(
+                uow,
+                shop_name=cmd.shop_name,
+                owner_name=cmd.owner_name,
+                phone=phone,
+                password_hash=self._hasher.hash(cmd.password),
+                consent_at=datetime.now(timezone.utc),
             )
             await uow.commit()
-            return RegisterShopResult(owner=owner, shop_slug=slug)
+            return result
 
-    @staticmethod
-    async def _unique_slug(uow: IUnitOfWork, shop_name: str) -> str:
-        base = generate_slug(shop_name)
-        candidate = base
-        suffix = 2
-        while await uow.tenants.get_by_slug(candidate) is not None:
-            candidate = f"{base}-{suffix}"
-            suffix += 1
-        return candidate
+
+def validate_signup(cmd: RegisterShopCommand) -> Phone:
+    """Проверки формы регистрации — до бота, чтобы не гонять человека в
+    Telegram с заведомо неверными данными."""
+    if not cmd.personal_data_consent:
+        raise DomainError("Нужно согласие на обработку персональных данных")
+    if not cmd.shop_name.strip():
+        raise DomainError("Укажите название магазина")
+    if not cmd.owner_name.strip():
+        raise DomainError("Укажите ваше имя")
+    if len(cmd.password) < 6:
+        raise DomainError("Пароль должен быть не короче 6 символов")
+    return Phone(cmd.phone)
+
+
+async def create_shop(
+    uow: IUnitOfWork,
+    *,
+    shop_name: str,
+    owner_name: str,
+    phone: Phone,
+    password_hash: str,
+    consent_at: datetime,
+    telegram_user_id: str | None = None,
+    telegram_chat_id: str | None = None,
+) -> RegisterShopResult:
+    """Магазин + владелец в открытой транзакции uow (commit — у вызывающего).
+    Telegram, подтверждённый ботом, сразу становится каналом сводок и уведомлений."""
+    if await uow.users.get_by_phone(str(phone)) is not None:
+        raise DomainError("Этот телефон уже зарегистрирован")
+
+    slug = await _unique_slug(uow, shop_name)
+    tenant = await uow.tenants.add(
+        Tenant(
+            id=None,
+            name=shop_name.strip(),
+            slug=slug,
+            owner_telegram_chat_id=telegram_chat_id,
+        )
+    )
+    uow.tenant_id = tenant.id
+
+    now = datetime.now(timezone.utc)
+    owner = await uow.users.add(
+        User(
+            id=None,
+            name=owner_name.strip(),
+            phone=phone,
+            role=Role.OWNER,
+            password_hash=password_hash,
+            personal_data_consent_at=consent_at,
+            telegram_user_id=telegram_user_id,
+            telegram_verified_at=now if telegram_user_id else None,
+        )
+    )
+    await uow.audit.add(
+        AuditEntry.record(
+            Actor(id=owner.id, role=owner.role), "shop.register", tenant.id,
+            telegram=bool(telegram_user_id),
+        )
+    )
+    return RegisterShopResult(owner=owner, shop_slug=slug)
+
+
+async def _unique_slug(uow: IUnitOfWork, shop_name: str) -> str:
+    base = generate_slug(shop_name)
+    candidate = base
+    suffix = 2
+    while await uow.tenants.get_by_slug(candidate) is not None:
+        candidate = f"{base}-{suffix}"
+        suffix += 1
+    return candidate

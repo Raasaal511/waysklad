@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from io import BytesIO
 
 from PIL import Image
+from tests.conftest import register_via_bot
 
 
 async def _admin_headers(client) -> dict:
@@ -17,8 +18,8 @@ async def _admin_headers(client) -> dict:
 
 
 async def _register_shop(client, random_phone, shop_name: str, city: str | None = None):
-    response = await client.post(
-        "/api/auth/register",
+    response = await register_via_bot(
+        client,
         json={
             "shop_name": shop_name,
             "owner_name": "Продавец",
@@ -499,8 +500,8 @@ async def test_home_excludes_suspended_and_hidden_shops(client, random_phone):
     )
     await _add_product(client, visible_headers, visible_wh, "Видимый товар", "100")
 
-    hidden_response = await client.post(
-        "/api/auth/register",
+    hidden_response = await register_via_bot(
+        client,
         json={
             "shop_name": "Скрытый магазин", "owner_name": "Продавец",
             "phone": random_phone(), "password": "secret123",

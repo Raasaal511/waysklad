@@ -5,6 +5,36 @@
 
 ---
 
+## 2026-10-01 — Регистрация владельца через Telegram, лимит сотрудников (BREAKING)
+
+Задача `docs/TASK_OWNER_TELEGRAM.md`.
+
+**Breaking:** `POST /api/auth/register` больше не создаёт магазин и не отдаёт токен.
+Ответ — `{token, telegram_link, expires_at}` (ссылка `t.me/<бот>?start=reg_<token>`,
+30 мин). Магазин создаёт:
+
+| Метод | Путь | Тело | Ответ |
+|---|---|---|---|
+| POST | `/api/auth/register/confirm` | `{token, code}` (6 цифр из бота) | 201, `TokenResponse` как раньше от `/register` |
+| GET | `/api/auth/telegram/verification?token=` | — | `{contact_confirmed, completed, expired, expires_at, code_sent_at}` |
+| POST | `/api/auth/telegram/verification/resend` | `{token}` | 204; 429 — раньше минуты |
+| POST | `/api/auth/telegram/link` | — (владелец) | 201, как `/register` (`start=link_…`) |
+| POST | `/api/auth/telegram/link/confirm` | `{token, code}` | `TenantResponse` с `owner_telegram_chat_id` |
+
+- 503 у `/register` и `/telegram/link` — бот не настроен (`TELEGRAM_BOT_USERNAME`).
+- Неверный код — 400 «Осталось попыток: N», после 5 — 429.
+- **Удалено:** `POST /api/auth/telegram` (ручной chat_id).
+- `UserResponse.telegram_verified: bool` — новое поле.
+- `PATCH /api/auth/employees/{id}`: необязательный `password` — сброс пароля сотруднику
+  (его старые сессии закрываются).
+- Создание/включение сотрудника сверх 10 включённых (без владельца) — 400.
+
+Уже выведено: шаг Telegram в регистрации (`widgets/telegram-verify`), подключение в
+профиле → Подключения, баннер для владельцев без Telegram, сотрудники «N из 10»,
+генерация пароля и окно с данными для входа.
+
+---
+
 ## 2026-10-01 — Имя в заявке с витрины необязательно (не breaking)
 
 `POST /api/storefront/{slug}/requests`: поле `customer_name` теперь необязательное

@@ -10,6 +10,7 @@ import pytest
 
 from app.domain.platform.health import TenantHealth, tenant_health
 from tests.test_admin import _admin_headers
+from tests.conftest import register_via_bot
 
 TENANTS_URL = "/api/admin/tenants"
 NOW = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
@@ -133,8 +134,8 @@ async def test_no_private_data_in_list(client, admin_client_headers, owner_heade
 
 @pytest.fixture
 async def second_shop(client, random_phone) -> dict:
-    response = await client.post(
-        "/api/auth/register",
+    response = await register_via_bot(
+        client,
         json={
             "shop_name": "Второй магазин",
             "owner_name": "Магомед",

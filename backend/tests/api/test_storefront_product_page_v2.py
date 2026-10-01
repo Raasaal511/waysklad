@@ -4,6 +4,7 @@
 from decimal import Decimal
 
 from app.application.storefront.get_product import StorefrontProductResult
+from tests.conftest import register_via_bot
 
 
 def test_storefront_product_result_from_json_survives_old_cache_entry():
@@ -510,8 +511,8 @@ async def test_views_90d_ignores_older_than_90_days_via_api(client, owner_header
 
 async def test_storefront_product_page_v2_tenant_isolation_via_api(client, owner_headers, random_phone):
     """Товар другого магазина по чужому product_id — 404, как и раньше."""
-    other_response = await client.post(
-        "/api/auth/register",
+    other_response = await register_via_bot(
+        client,
         json={
             "shop_name": "Другой магазин",
             "owner_name": "Другой владелец",
