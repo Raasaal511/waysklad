@@ -36,8 +36,11 @@
   outline-offset: 1px;
 }
 
+/* Карточку владельца нельзя открыть (она disabled), но это не «заблокирован»:
+   глобальный button:disabled делал её полупрозрачной, как отключённого сотрудника. */
 .employeeCard:disabled {
   cursor: default;
+  opacity: 1;
 }
 
 .employeeCardInactive {
