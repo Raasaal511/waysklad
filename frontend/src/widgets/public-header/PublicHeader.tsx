@@ -192,7 +192,14 @@ export function PublicHeader() {
         )}
 
         {(slug || authed || location.pathname.startsWith('/account')) && (
-          <div className={styles.actions}>
+          <div
+            className={[
+              styles.actions,
+              // на телефоне те же кнопки есть в нижнем меню (PublicBottomNav) — второй раз
+              // в шапке они только теснят название магазина и вылезали за край
+              slug || location.pathname.startsWith('/account') ? styles.actionsDuplicatedBelow : '',
+            ].join(' ')}
+          >
             {slug && (
               <>
                 <Link

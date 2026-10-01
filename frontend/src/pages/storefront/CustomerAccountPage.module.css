@@ -45,6 +45,23 @@
   text-decoration: none;
 }
 
+/* Телефон: пять разделов в одну строку — «Витрины» больше не переносится
+   одна на вторую строку, ряд читается как один переключатель. */
+@media (max-width: 599px) {
+  .tabs {
+    flex-wrap: nowrap;
+    gap: 2px;
+  }
+
+  .tab {
+    flex: 1 1 auto;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 4px;
+    font-size: 13px;
+  }
+}
+
 .tabActive {
   background: var(--bg);
   color: var(--text);
