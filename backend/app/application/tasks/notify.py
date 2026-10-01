@@ -2,10 +2,12 @@ import asyncio
 
 from decimal import Decimal
 
+from app.application.notifications.push import build_push_message, push_to_user
 from app.domain.common.notifier import INotifier
 from app.domain.common.uow import IUnitOfWork
 from app.domain.identity.entities import Role
 from app.domain.notifications.entities import Notification, NotificationKind
+from app.infrastructure.notifications import web_push
 from app.infrastructure.notifications.ws_broadcast import broadcaster, user_channel
 
 
@@ -21,7 +23,8 @@ async def notify_user(
     snapshot_value: Decimal | None = None,
 ) -> None:
     """In-app уведомление — всем; WebSocket-push — всем с открытым соединением;
-    Telegram — только владельцу (один чат на магазин)."""
+    Web Push — на телефоны, где сотрудник включил уведомления; Telegram — только
+    владельцу (один чат на магазин)."""
     saved = await uow.notifications.add(
         Notification(
             id=None, user_id=user_id, kind=kind, text=text, link=link,
@@ -42,9 +45,20 @@ async def notify_user(
     except Exception:
         pass  # WS-push не должен валить бизнес-операцию — клиент досчитает через REST
 
-    if notifier is None:
+    sender = web_push.push_sender
+    if sender.public_key is None and notifier is None:
         return
     recipient = await uow.users.get(user_id)
+
+    # повтор по той же сущности (новое сообщение по заявке, остаток того же
+    # товара) заменяет прежнее уведомление на экране, а не копится стопкой
+    tag = f"{kind.value}:{entity_id}" if entity_id is not None else f"n:{saved.id}"
+    await push_to_user(
+        uow, sender, recipient=recipient, message=build_push_message(kind, text, link, tag),
+    )
+
+    if notifier is None:
+        return
     if recipient.role is not Role.OWNER:
         return
     tenant = await uow.tenants.get(uow.tenant_id)

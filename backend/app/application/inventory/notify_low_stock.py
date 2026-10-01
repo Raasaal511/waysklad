@@ -14,6 +14,7 @@ from app.application.analytics.restock_recommendations import SALE_PERIOD_DAYS
 from app.domain.common.notifier import INotifier
 from app.domain.identity.entities import Role
 from app.domain.notifications.entities import NotificationKind
+from app.infrastructure.background import drain
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 
 # роли, чьи алерты фильтруются по назначенным складам — тот же список, что
@@ -71,6 +72,9 @@ async def _run_async(notifier: INotifier) -> None:
         async with SqlAlchemyUnitOfWork(tenant.id) as uow:
             await _notify_tenant(uow, notifier)
             await uow.commit()
+
+    # push уходят после commit в фоне — asyncio.run отменил бы их на выходе
+    await drain()
 
 
 def notify_low_stock() -> None:
