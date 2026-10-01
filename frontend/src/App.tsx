@@ -22,6 +22,7 @@ import { FavoritesPage } from './pages/storefront/FavoritesPage'
 import { PublicNotFoundPage } from './pages/storefront/PublicNotFoundPage'
 import { RedirectToLastStore } from './pages/storefront/RedirectToLastStore'
 import { PublicLayout } from './widgets/public-header/PublicLayout'
+import { CabinetNotFoundPage } from './pages/CabinetNotFoundPage'
 
 // Кабинет владельца и админка не нужны покупателю на публичных страницах —
 // вынесены в отдельные чанки, чтобы публичные страницы (/store/*) не тянули их JS первой загрузкой (P7 п.2).
@@ -156,6 +157,19 @@ export function App() {
                   </PublicLayout>
                 }
               />
+              {/* неизвестный адрес витрины или кабинета покупателя — публичная «не найдено»,
+                  а не вход владельца (ловушка * ниже — только для кабинета) */}
+              {['/store/:slug/*', '/account/*'].map((path) => (
+                <Route
+                  key={path}
+                  path={path}
+                  element={
+                    <PublicLayout>
+                      <PublicNotFoundPage />
+                    </PublicLayout>
+                  }
+                />
+              ))}
               <Route
                 path="/marketplace/*"
                 element={
@@ -268,6 +282,8 @@ export function App() {
                 <Route path="/analytics" element={<AnalyticsPage />} />
                 <Route path="/employees" element={<EmployeesPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                {/* неизвестный адрес: сотрудник видит «Такой страницы нет», гость — вход */}
+                <Route path="*" element={<CabinetNotFoundPage />} />
               </Route>
             </Routes>
           </Suspense>
