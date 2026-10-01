@@ -15,6 +15,7 @@ import { loadCustomerToken } from '../../entities/auth/customerApi'
 import { cartCountForSlug, favoritesCountForSlug } from '../../shared/lib/storefrontCounters'
 import { FAVORITES_EVENT } from '../../shared/lib/favorites'
 import styles from './PublicHeader.module.css'
+import { useTheme } from '../../app/ThemeContext'
 
 const STORE_ROUTE = '/store/:slug/*'
 
@@ -29,6 +30,7 @@ function CountBadge({ count }: { count: number }) {
  * логотип и название → каталог, поиск по магазину, избранное, корзина, профиль/вход.
  */
 export function PublicHeader() {
+  const { mode: themeMode } = useTheme()
   const location = useLocation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -155,6 +157,13 @@ export function PublicHeader() {
           </Link>
         ) : (
           <div className={styles.brand}>
+            <img
+              src={themeMode === 'dark' ? '/logo-mark-dark.png' : '/logo-mark.png'}
+              alt=""
+              width={32}
+              height={32}
+              className={styles.logoMark}
+            />
             <span className={styles.brandName}>ВайСклад</span>
           </div>
         )}
