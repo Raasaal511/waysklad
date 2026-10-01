@@ -17,6 +17,18 @@ from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 _MAX_PENDING_REQUESTS_PER_PHONE = 5
 
 
+def _goods_count(n: int) -> str:
+    """«1 товар», «3 товара», «11 товаров» — текст уведомления видно на экране
+    блокировки, «1 товаров» там режет глаз."""
+    if n % 10 == 1 and n % 100 != 11:
+        word = "товар"
+    elif n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+        word = "товара"
+    else:
+        word = "товаров"
+    return f"{n} {word}"
+
+
 def _line_unit_price(product: Product, variant_id: int | None) -> Decimal:
     """Цена строки заявки — цена варианта, если задана, иначе retail_price
     товара (тот же приоритет, что у StorefrontProductVariantResponse.price
@@ -167,7 +179,7 @@ class CreateStorefrontRequestUseCase:
                     kind=NotificationKind.STOREFRONT_REQUEST_NEW,
                     text=(
                         f"Новая заявка с витрины: {request.customer_name}, "
-                        f"{len(request.lines)} товаров на сумму {format_rub(total_amount)}"
+                        f"{_goods_count(len(request.lines))} на сумму {format_rub(total_amount)}"
                     ),
                     link="/orders/storefront-requests",
                     entity_id=request.id,
