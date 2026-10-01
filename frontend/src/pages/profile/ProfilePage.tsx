@@ -57,7 +57,7 @@ export function ProfilePage() {
     <div className={layoutStyles.stack}>
       <h2>Профиль</h2>
 
-      <div className={layoutStyles.row}>
+      <div className={styles.tabs}>
         {TABS.map((t) => (
           <Button
             key={t.id}
@@ -316,7 +316,7 @@ function AccountTab() {
               {user?.name} — {user ? ROLE_LABELS[user.role] : ''}
             </strong>
           </div>
-          <Button variant="secondary" onClick={() => setShowPasswordForm(true)}>
+          <Button variant="secondary" className={styles.accountAction} onClick={() => setShowPasswordForm(true)}>
             Сменить пароль
           </Button>
         </div>
@@ -327,7 +327,7 @@ function AccountTab() {
               Выйти на всех устройствах, включая текущее
             </span>
           </div>
-          <Button variant="secondary" onClick={() => setShowLogoutAllConfirm(true)}>
+          <Button variant="secondary" className={styles.accountAction} onClick={() => setShowLogoutAllConfirm(true)}>
             Выйти везде
           </Button>
         </div>

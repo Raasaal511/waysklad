@@ -156,3 +156,31 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
   }
 }
+
+/* Вкладки профиля: на телефоне «Подключения» уезжала за край — делим ширину поровну. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 599px) {
+  .tabs {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .tabs > button {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-inline: 8px;
+    font-size: 13px;
+  }
+}
+
+/* «Сменить пароль», «Выйти везде» — в одну строку: сжимается текст слева,
+   а не кнопка (на телефоне она складывалась в два слова столбиком). */
+.accountAction {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
