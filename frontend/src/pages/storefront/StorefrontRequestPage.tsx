@@ -70,12 +70,11 @@ export function StorefrontRequestPage() {
         setStatus(st)
         setMessages(chat)
         // Состав заказа — из «Моих заказов» покупателя (status по токену его не отдаёт)
-        if (loadCustomerToken()) {
+        if (navState?.requestId != null && loadCustomerToken()) {
           const mine = await listMyStorefrontRequests({ limit: 20 }).catch(() => null)
-          const found =
-            mine?.items.find((r) => r.id === navState?.requestId) ??
-            mine?.items.find((r) => r.shop_slug === slug) ??
-            null
+          // только точно известный заказ: «последний в этом магазине» мог оказаться
+          // другим (заказ из Telegram-бота, с другого устройства) — со своим чатом
+          const found = mine?.items.find((r) => r.id === navState?.requestId) ?? null
           if (!cancelled) setMyRequest(found)
         }
       } catch (err) {
