@@ -12,7 +12,6 @@
    сами держат ширину и боковые поля. StorefrontCartPage теперь под
    PublicLayout и эти классы для ширины не использует. */
 .headerCompact,
-.cartPage,
 .requestPage {
   width: min(1100px, 100%);
   margin: 0 auto;
@@ -59,6 +58,7 @@
   justify-content: center;
   width: 44px;
   height: 44px;
+  padding: 0;
   border: 0;
   border-radius: 12px;
   background: transparent;
@@ -145,16 +145,6 @@
   box-shadow: 0 16px 36px color-mix(in srgb, var(--text) 9%, transparent);
 }
 
-.cartRow :global(img),
-.cartRow :global(.product-tile-photo) {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none;
-  object-fit: cover;
-  border-radius: 0;
-  border: 0;
-}
-
 .emptyState {
   text-align: center;
   padding: 56px 16px;
@@ -211,10 +201,7 @@
 
 .field input,
 .field textarea,
-.checkoutForm input,
-.checkoutForm textarea,
-.chatForm input,
-.qtyInput {
+.chatForm input {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg);
@@ -223,111 +210,15 @@
   font: inherit;
 }
 
-.cartPage,
 .requestPage {
   padding-top: 8px;
   padding-bottom: 48px;
 }
 
-.cartPage h1,
 .requestPage h1 {
   margin: 0 0 8px;
   font-size: 1.5rem;
   letter-spacing: -0.02em;
-}
-
-/* StorefrontCartPage — под PublicLayout, ширину не держит, только вертикальный ритм */
-.cartPageContent {
-  padding-bottom: 48px;
-}
-
-.cartPageContent .pageTitle {
-  margin: 0 0 8px;
-}
-
-.cartList {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 16px 0;
-}
-
-.cartRow {
-  display: grid;
-  grid-template-columns: 72px 1fr auto;
-  gap: 12px;
-  align-items: center;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--bg);
-}
-
-.cartRow :global(.product-tile-photo),
-.cartRow :global(img) {
-  width: 72px !important;
-  height: 72px !important;
-  object-fit: cover;
-  border-radius: 12px;
-}
-
-.cartRowBody {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 14px;
-}
-
-.qtyInput {
-  width: 76px;
-  padding: 7px 9px;
-}
-
-.cartTotal {
-  font-size: 15px;
-}
-
-.checkoutForm {
-  margin-top: 20px;
-  padding: 18px;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: var(--bg);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  box-shadow: 0 8px 28px color-mix(in srgb, var(--text) 5%, transparent);
-}
-
-.checkoutForm h2 {
-  margin: 0;
-  font-size: 1.1rem;
-}
-
-.statusCard {
-  padding: 16px 18px;
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
-  background: var(--accent-soft);
-  margin-bottom: 16px;
-}
-
-.stockWarning {
-  margin: 0 0 14px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: color-mix(in srgb, #eab308 14%, transparent);
-  color: var(--text);
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.statusDetails {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
-  font-size: 14px;
 }
 
 .chat {
