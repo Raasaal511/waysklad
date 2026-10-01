@@ -22,6 +22,7 @@ import { FavoritesPage } from './pages/storefront/FavoritesPage'
 import { PublicNotFoundPage } from './pages/storefront/PublicNotFoundPage'
 import { RedirectToLastStore } from './pages/storefront/RedirectToLastStore'
 import { PublicLayout } from './widgets/public-header/PublicLayout'
+import { ServiceWorkerNavigation } from './app/ServiceWorkerNavigation'
 
 // Кабинет владельца и админка не нужны покупателю на публичных страницах —
 // вынесены в отдельные чанки, чтобы публичные страницы (/store/*) не тянули их JS первой загрузкой (P7 п.2).
@@ -99,6 +100,7 @@ export function App() {
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
+          <ServiceWorkerNavigation />
           <Suspense fallback={null}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
