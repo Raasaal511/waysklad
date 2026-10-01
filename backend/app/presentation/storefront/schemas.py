@@ -450,7 +450,8 @@ class StorefrontRequestItemRequest(BaseModel):
 
 
 class CreateStorefrontRequestRequest(BaseModel):
-    customer_name: str = Field(min_length=1, max_length=200)
+    # пусто — имя берётся из профиля покупателя (иначе логин, иначе телефон)
+    customer_name: str = Field("", max_length=200)
     items: list[StorefrontRequestItemRequest] = Field(min_length=1)
     note: str = Field("", max_length=1000)
 

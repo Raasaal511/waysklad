@@ -54,7 +54,7 @@ class StorefrontRequestItemInput:
 class CreateStorefrontRequestCommand:
     slug: str
     customer_id: int  # авторизованный покупатель — см. CurrentCustomerDep
-    customer_name: str
+    customer_name: str = ""
     items: list[StorefrontRequestItemInput] = field(default_factory=list)
     note: str = ""
     customer_telegram_chat_id: str = ""  # заполнено, только если заявка из Telegram-бота витрины
@@ -79,6 +79,12 @@ class CreateStorefrontRequestUseCase:
             return None
 
         phone = customer.phone
+        # Вошедшего покупателя магазин и так знает — имя из профиля, иначе логин,
+        # иначе телефон. Поле «Ваше имя» в корзине было лишним шагом: человек
+        # только что зарегистрировался, а его спрашивают, кто он.
+        customer_name = (
+            cmd.customer_name.strip() or customer.name.strip() or customer.username.strip() or str(phone)
+        )
 
         async with SqlAlchemyUnitOfWork(tenant.id, session_factory=self._session_factory) as uow:
             pending = await uow.storefront_requests.count_new_by_phone(str(phone))
@@ -131,7 +137,7 @@ class CreateStorefrontRequestUseCase:
 
             request = StorefrontRequest(
                 id=None,
-                customer_name=cmd.customer_name.strip(),
+                customer_name=customer_name,
                 customer_id=cmd.customer_id,
                 customer_phone=str(phone),
                 customer_telegram_chat_id=cmd.customer_telegram_chat_id,
