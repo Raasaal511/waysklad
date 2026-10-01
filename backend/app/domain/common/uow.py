@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     )
     from app.domain.debts.repository import IDebtRepository
     from app.domain.feedback.repository import IFeedbackRepository
+    from app.domain.identity.telegram_verification import ITelegramVerificationRepository
     from app.domain.identity.repository import (
         ITenantRepository,
         IUserRepository,
@@ -84,6 +85,7 @@ class IUnitOfWork(ABC):
     platform_categories: IPlatformCategoryRepository
     platform_banners: IPlatformBannerRepository
     feedback: IFeedbackRepository
+    telegram_verifications: ITelegramVerificationRepository
 
     async def __aenter__(self) -> IUnitOfWork:
         return self

@@ -50,6 +50,7 @@ from app.infrastructure.db.repositories.storefront import (
     SqlAlchemyStorefrontRequestRepository,
 )
 from app.infrastructure.db.repositories.tasks import SqlAlchemyTaskRepository
+from app.infrastructure.db.repositories.telegram_verifications import SqlAlchemyTelegramVerificationRepository
 from app.infrastructure.db.session import SessionLocal
 
 
@@ -97,6 +98,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.platform_categories = SqlAlchemyPlatformCategoryRepository(self.session)
         self.platform_banners = SqlAlchemyPlatformBannerRepository(self.session)
         self.feedback = SqlAlchemyFeedbackRepository(self.session)
+        self.telegram_verifications = SqlAlchemyTelegramVerificationRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
