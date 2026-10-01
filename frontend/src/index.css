@@ -4,11 +4,13 @@
      (Lighthouse color-contrast), затемнено до прохождения на всех фонах */
   --text-muted: #5f6673;
   --bg: #ffffff;
-  --bg-muted: #f1f3f5;
+  /* 01.10: фон чуть светлее, акцент чуть свежее — тот же стиль, меньше «тяжести»
+     на телефоне; контраст акцента 6.6:1 на белом, 5.7:1 на --accent-soft */
+  --bg-muted: #f3f5f6;
   --border: #e2e5e9;
-  --accent: #1f5c3f;
-  --accent-hover: #17492f;
-  --accent-soft: #e8f0ea;
+  --accent: #1d6a46;
+  --accent-hover: #175539;
+  --accent-soft: #e6f2eb;
   --ink: #14251c;
   --ink-hover: #0c1913;
   --danger: #c0392b;
@@ -21,8 +23,9 @@
   --board-new: #5b6b93;
   --board-progress: #c17d2e;
   --board-ready: #2f8f5b;
-  --radius: 10px;
-  --radius-sm: 8px;
+  /* как у публичных страниц (карточка 12, вложенное 10) — один язык форм */
+  --radius: 12px;
+  --radius-sm: 10px;
   font: 16px/1.4 system-ui, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light;
   color: var(--text);
@@ -50,9 +53,9 @@
 
 /* Акцентный цвет — палитра на выбор в Профиль → Персонализация */
 :root[data-accent='green'] {
-  --accent: #1f5c3f;
-  --accent-hover: #17492f;
-  --accent-soft: #e8f0ea;
+  --accent: #1d6a46;
+  --accent-hover: #175539;
+  --accent-soft: #e6f2eb;
 }
 
 :root[data-accent='blue'] {

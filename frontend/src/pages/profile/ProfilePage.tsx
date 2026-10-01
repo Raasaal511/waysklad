@@ -241,7 +241,7 @@ function StorefrontSettings({ shop }: { shop: Tenant }) {
 }
 
 const ACCENT_OPTIONS: { id: AccentColor; label: string; swatch: string }[] = [
-  { id: 'green', label: 'Зелёный', swatch: '#1f5c3f' },
+  { id: 'green', label: 'Зелёный', swatch: '#1d6a46' },
   { id: 'blue', label: 'Синий', swatch: '#2456a6' },
   { id: 'terracotta', label: 'Терракотовый', swatch: '#b5502e' },
   { id: 'violet', label: 'Фиолетовый', swatch: '#5b3f9e' },

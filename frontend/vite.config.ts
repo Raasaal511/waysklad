@@ -28,7 +28,7 @@ export default defineConfig({
         name: 'WaySklad',
         short_name: 'WaySklad',
         description: 'Товарный учёт, продажи и долги для малого бизнеса',
-        theme_color: '#1f5c3f',
+        theme_color: '#1d6a46',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
