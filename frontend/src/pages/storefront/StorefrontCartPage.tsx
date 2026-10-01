@@ -25,7 +25,7 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { loadCart, saveCart, type StorefrontCartItem } from './cart'
 import { notifyCustomerAuthChanged } from './customerAuthEvents'
-import { QtyStepper } from './QtyStepper'
+import { QtyStepper } from '../../shared/ui/QtyStepper'
 import styles from './StorefrontCartPage.module.css'
 
 function minQty(item: StorefrontCartItem): number {

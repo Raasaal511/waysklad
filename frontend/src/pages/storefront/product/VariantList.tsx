@@ -7,7 +7,7 @@ import { formatPriceOrRequest, formatQuantity } from '../../../shared/lib/format
 import { Lightbox } from '../../../shared/ui/Lightbox'
 import { stockText, variantPrice } from './productUtils'
 import type { SelectionKey } from './useSelection'
-import { QtyStepper } from '../QtyStepper'
+import { QtyStepper } from '../../../shared/ui/QtyStepper'
 import styles from './VariantList.module.css'
 
 const SEARCH_THRESHOLD = 6
