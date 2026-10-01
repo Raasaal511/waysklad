@@ -9,6 +9,7 @@ import {
   IconSquarePlus,
   IconCheck,
 } from '@tabler/icons-react'
+import { copyText } from '../../shared/lib/clipboard'
 import { usePwaInstall, type PwaInstallState } from '../../shared/lib/pwaInstall'
 import { Button } from '../../shared/ui/Button'
 import { Modal } from '../../shared/ui/Modal'
@@ -151,25 +152,6 @@ function Step({ icon, title, children }: { icon: ReactNode; title: string; child
       </span>
     </li>
   )
-}
-
-/** Во встроенных браузерах clipboard API бывает недоступен — запасной путь через execCommand. */
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    const area = document.createElement('textarea')
-    area.value = text
-    area.setAttribute('readonly', '')
-    area.style.position = 'fixed'
-    area.style.opacity = '0'
-    document.body.appendChild(area)
-    area.select()
-    const ok = document.execCommand('copy')
-    area.remove()
-    return ok
-  }
 }
 
 function CopyLinkButton() {
