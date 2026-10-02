@@ -45,10 +45,23 @@ def code_message(code: str) -> str:
     )
 
 
-async def _get_active(uow: IUnitOfWork, token: str) -> TelegramVerification:
+async def _get_active(
+    uow: IUnitOfWork, token: str, actor: Actor | None = None, *, from_bot: bool = False
+) -> TelegramVerification:
+    """actor — кто спрашивает со стороны сайта. Ссылка привязки принадлежит
+    конкретному владельцу: по одному токену (а он уходит в Telegram) нельзя ни
+    смотреть чужой статус, ни слать код в чужой чат. Регистрация идёт до входа,
+    поэтому там актора нет; у бота его нет никогда — он проверяет не аккаунт
+    сайта, а сам Telegram (свой контакт, тот же telegram_user_id)."""
     verification = await uow.telegram_verifications.get_by_token(token)
     if verification is None:
         raise NotFoundError("Ссылка не найдена — начните заново на сайте")
+    if (
+        not from_bot
+        and verification.purpose is VerificationPurpose.LINK
+        and (actor is None or verification.user_id != actor.id)
+    ):
+        raise AccessDeniedError("Эта ссылка не для вашего аккаунта")
     return verification
 
 
@@ -121,7 +134,7 @@ class DescribeVerificationUseCase:
 
     async def execute(self, token: str) -> VerificationInfo:
         async with self._uow as uow:
-            v = await _get_active(uow, token)
+            v = await _get_active(uow, token, from_bot=True)
             v.ensure_active(_now())
             if v.signup is not None:
                 shop_name, owner_name = v.signup.shop_name, v.signup.owner_name
@@ -156,7 +169,7 @@ class AcceptContactUseCase:
 
     async def execute(self, cmd: ContactCommand) -> ContactResult:
         async with self._uow as uow:
-            v = await _get_active(uow, cmd.token)
+            v = await _get_active(uow, cmd.token, from_bot=True)
             v.ensure_active(_now())
             check = v.check_contact(cmd.contact_phone, cmd.contact_user_id, cmd.sender_user_id)
             if check is not ContactCheck.OK:
@@ -186,9 +199,9 @@ class GetVerificationStatusUseCase:
     def __init__(self, uow: IUnitOfWork):
         self._uow = uow
 
-    async def execute(self, token: str) -> VerificationStatus:
+    async def execute(self, token: str, actor: Actor | None = None) -> VerificationStatus:
         async with self._uow as uow:
-            v = await _get_active(uow, token)
+            v = await _get_active(uow, token, actor)
             return VerificationStatus(
                 contact_confirmed=v.contact_confirmed,
                 completed=v.completed_at is not None,
@@ -257,9 +270,9 @@ class CompleteLinkUseCase:
 
     async def execute(self, actor: Actor, token: str, code: str) -> LinkCompleted:
         async with self._uow as uow:
-            v = await _get_active(uow, token)
-            if v.purpose is not VerificationPurpose.LINK or v.user_id != actor.id:
-                raise AccessDeniedError("Эта ссылка не для вашего аккаунта")
+            v = await _get_active(uow, token, actor)
+            if v.purpose is not VerificationPurpose.LINK:
+                raise AccessDeniedError("Эта ссылка не для подключения Telegram")
             await _check_code(uow, self._hasher, v, code)
             user = await uow.users.get(actor.id)
             user.telegram_user_id = v.telegram_user_id
@@ -288,9 +301,9 @@ class ResendCodeUseCase:
         self._uow = uow
         self._hasher = hasher
 
-    async def execute(self, token: str) -> ResentCode:
+    async def execute(self, token: str, actor: Actor | None = None) -> ResentCode:
         async with self._uow as uow:
-            v = await _get_active(uow, token)
+            v = await _get_active(uow, token, actor)
             v.ensure_can_resend(_now())
             code = generate_code()
             v.issue_code(

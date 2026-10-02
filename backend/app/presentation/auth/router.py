@@ -39,6 +39,7 @@ from app.presentation.deps import (
     ListEmployeesDep,
     LoginDep,
     LogoutAllDep,
+    OptionalActorDep,
     NotifierDep,
     ResendCodeDep,
     StartLinkDep,
@@ -119,10 +120,11 @@ async def confirm_register(
 @router.get("/telegram/verification")
 @limiter.limit("120/minute")
 async def telegram_verification_status(
-    request: Request, token: str, use_case: VerificationStatusDep
+    request: Request, token: str, actor: OptionalActorDep, use_case: VerificationStatusDep
 ) -> TelegramVerificationStatusResponse:
-    """Сайт опрашивает, пока человек в Telegram делится номером."""
-    status = await use_case.execute(token)
+    """Сайт опрашивает, пока человек в Telegram делится номером. Регистрация —
+    без входа; ссылка привязки — только своему владельцу (см. _get_active)."""
+    status = await use_case.execute(token, actor)
     return TelegramVerificationStatusResponse(
         contact_confirmed=status.contact_confirmed,
         completed=status.completed,
@@ -135,9 +137,10 @@ async def telegram_verification_status(
 @router.post("/telegram/verification/resend", status_code=204)
 @limiter.limit("10/hour")
 async def resend_telegram_code(
-    request: Request, body: TelegramTokenRequest, use_case: ResendCodeDep, notifier: NotifierDep
+    request: Request, body: TelegramTokenRequest, actor: OptionalActorDep,
+    use_case: ResendCodeDep, notifier: NotifierDep,
 ) -> Response:
-    sent = await use_case.execute(body.token)
+    sent = await use_case.execute(body.token, actor)
     await _tell(notifier, sent.chat_id, code_message(sent.code))
     return Response(status_code=204)
 

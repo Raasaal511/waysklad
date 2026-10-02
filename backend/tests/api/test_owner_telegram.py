@@ -9,6 +9,7 @@ from app.application.auth.telegram_signup import (
     ContactCommand,
     ResendCodeUseCase,
 )
+from app.domain.common.exceptions import TooManyAttemptsError
 from app.domain.identity.telegram_verification import ContactCheck
 from app.infrastructure.config import settings
 from app.infrastructure.db.models.identity import TelegramVerificationModel
@@ -283,3 +284,81 @@ async def test_owner_resets_employee_password(client, owner_headers, random_phon
     assert (await client.post("/api/auth/login", json={"phone": phone, "password": "new-pass2"})).status_code == 200
     # старая сессия сотрудника закрыта
     assert (await client.get("/api/notifications", headers=old_headers)).status_code == 401
+
+
+async def test_attempts_are_not_reset_by_new_code(client, random_phone):
+    """Пять попыток — на всю заявку, а не на каждый код: иначе «ошибся пять раз →
+    запросил новый код → ещё пять» перебирал бы шестизначный код бесконечно."""
+    phone = random_phone()
+    token = (await client.post("/api/auth/register", json=_form(phone))).json()["token"]
+    code = (await _contact(client, token, phone)).code
+    wrong = "000000" if code != "000000" else "111111"
+
+    for _ in range(4):
+        assert (
+            await client.post("/api/auth/register/confirm", json={"token": token, "code": wrong})
+        ).status_code == 400
+
+    await _shift(client, token, code_sent_at=datetime.now(timezone.utc) - timedelta(minutes=2))
+    fresh = await ResendCodeUseCase(
+        SqlAlchemyUnitOfWork(None, session_factory=client.session_factory), BcryptPasswordHasher()
+    ).execute(token)
+
+    # пятая попытка — последняя, дальше не пускает даже верный код
+    assert (
+        await client.post("/api/auth/register/confirm", json={"token": token, "code": wrong})
+    ).status_code == 429
+    final = await client.post("/api/auth/register/confirm", json={"token": token, "code": fresh.code})
+    assert final.status_code == 429
+
+
+async def test_code_issues_are_capped(client, random_phone):
+    """Бесконечно слать коды в чат нельзя — ограничено число выдач на заявку."""
+    phone = random_phone()
+    token = (await client.post("/api/auth/register", json=_form(phone))).json()["token"]
+    await _contact(client, token, phone)  # 1-я выдача
+
+    resend = ResendCodeUseCase(
+        SqlAlchemyUnitOfWork(None, session_factory=client.session_factory), BcryptPasswordHasher()
+    )
+    for _ in range(4):
+        await _shift(client, token, code_sent_at=datetime.now(timezone.utc) - timedelta(minutes=2))
+        await resend.execute(token)
+
+    await _shift(client, token, code_sent_at=datetime.now(timezone.utc) - timedelta(minutes=2))
+    with pytest.raises(TooManyAttemptsError):
+        await resend.execute(token)
+
+
+async def test_link_token_is_not_usable_by_others(client, make_uow, random_phone, owner_headers):
+    """Токен привязки уходит в Telegram. По нему нельзя ни узнать статус чужой
+    привязки, ни отправить код в чужой чат — ни анонимно, ни из другого аккаунта."""
+    headers, phone = await _legacy_owner(client, make_uow, random_phone)
+    token = (await client.post("/api/auth/telegram/link", headers=headers)).json()["token"]
+    await _contact(client, token, phone)
+    await _shift(client, token, code_sent_at=datetime.now(timezone.utc) - timedelta(minutes=2))
+
+    for other in (None, owner_headers):
+        kwargs = {"headers": other} if other else {}
+        assert (await client.get(f"/api/auth/telegram/verification?token={token}", **kwargs)).status_code == 403
+        assert (
+            await client.post("/api/auth/telegram/verification/resend", json={"token": token}, **kwargs)
+        ).status_code == 403
+
+    # владельцу ссылки — можно
+    assert (await client.get(f"/api/auth/telegram/verification?token={token}", headers=headers)).status_code == 200
+    assert (
+        await client.post("/api/auth/telegram/verification/resend", json={"token": token}, headers=headers)
+    ).status_code == 204
+
+
+async def test_signup_status_stays_public(client, random_phone):
+    """Регистрация идёт до входа: её статус и повтор кода должны работать без токена."""
+    phone = random_phone()
+    token = (await client.post("/api/auth/register", json=_form(phone))).json()["token"]
+    assert (await client.get(f"/api/auth/telegram/verification?token={token}")).status_code == 200
+    await _contact(client, token, phone)
+    await _shift(client, token, code_sent_at=datetime.now(timezone.utc) - timedelta(minutes=2))
+    assert (
+        await client.post("/api/auth/telegram/verification/resend", json={"token": token})
+    ).status_code == 204

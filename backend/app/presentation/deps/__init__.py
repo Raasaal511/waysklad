@@ -2,6 +2,7 @@ from app.presentation.deps.auth import (  # noqa: F401
     ActorDep,
     CurrentUser,
     CurrentUserDep,
+    OptionalActorDep,
     ShowPurchaseDep,
     get_actor,
     get_current_user,
