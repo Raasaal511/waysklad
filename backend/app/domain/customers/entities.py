@@ -141,6 +141,19 @@ class CustomerLoginLink:
     def is_registration(self) -> bool:
         return bool(self.password_hash)
 
+    def matches_contact(self, contact_phone: str) -> bool:
+        """Совпадает ли номер из формы с номером аккаунта Telegram.
+
+        Telegram отдаёт номер без «+», в международном формате. Сверка нужна,
+        потому что номер в форме покупатель пишет руками: без неё код уходил
+        в его же чат, но подтверждал произвольную строку, и магазин получал
+        заявку с номером, по которому не дозвониться."""
+        digits = "".join(ch for ch in contact_phone if ch.isdigit())
+        try:
+            return Phone("+" + digits) == self.phone
+        except DomainError:
+            return False
+
     @property
     def is_expired(self) -> bool:
         return datetime.now(timezone.utc) > self.created_at + LOGIN_LINK_TTL
