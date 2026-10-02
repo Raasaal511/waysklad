@@ -419,6 +419,7 @@ function ConnectionsTab() {
 
 function TelegramSettings() {
   const { shop, setShop } = useShop()
+  const { patchUser } = useAuth()
   const [link, setLink] = useState<TelegramStart | null>(null)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -440,6 +441,8 @@ function TelegramSettings() {
   async function confirm(code: string) {
     if (!link) return
     setShop(await confirmTelegramLink(link.token, code))
+    // иначе «Telegram подтверждён» у пользователя обновится только после перевхода
+    patchUser({ telegram_verified: true })
     setLink(null)
   }
 
@@ -482,6 +485,9 @@ function TelegramSettings() {
       {link && (
         <Modal title="Подключение Telegram" onClose={() => setLink(null)}>
           <TelegramVerify
+            // ключ по токену: новая ссылка — чистое состояние шага, иначе
+            // в поле кода остались бы прежние цифры и ошибка от старого кода
+            key={link.token}
             start={link}
             onConfirm={confirm}
             onRestart={startLink}

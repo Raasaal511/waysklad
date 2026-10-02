@@ -15,6 +15,8 @@ function saleDraftKey(): string {
 interface AuthState {
   user: User | null
   login: (result: TokenResponse, remember?: boolean) => void
+  /** Поля своего профиля изменились без нового токена (например, привязали Telegram). */
+  patchUser: (patch: Partial<User>) => void
   logout: () => void
 }
 
@@ -50,6 +52,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(result.user)
   }
 
+  function patchUser(patch: Partial<User>) {
+    setUser((prev) => {
+      if (!prev) return prev
+      const next = { ...prev, ...patch }
+      // туда же, где лежит сессия, — иначе после перезагрузки снова старое значение
+      const storage = localStorage.getItem('user') !== null ? localStorage : sessionStorage
+      storage.setItem('user', JSON.stringify(next))
+      return next
+    })
+  }
+
   function logout() {
     // scopedKey() читает 'user' из storage — чистим scoped-данные ДО того,
     // как его сотрём, иначе не найдём ключи именно этого (выходящего) пользователя.
@@ -66,7 +79,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, login, patchUser, logout }}>{children}</AuthContext.Provider>
+  )
 }
 
 export function useAuth(): AuthState {
