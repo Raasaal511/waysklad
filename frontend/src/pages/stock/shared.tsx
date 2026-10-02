@@ -310,6 +310,17 @@ export function MovementForm({
     })
   }
 
+  /** Шаг ± у весового товара — 0,1: целый −1 обнулял бы 0,5 кг одним нажатием.
+   *  Больше остатка не даём (списание и перемещение), как и при выборе плитки. */
+  function stepQuantity(product: Product, current: number, delta: 1 | -1): string {
+    const max = stockLimited ? stockFor(product.id) : null
+    const next = isFractional(product.unit_code)
+      ? // через целые десятые — 0.3 - 0.1 в double даёт 0.19999999999999998
+        Math.max(0, Math.round(current * 10) + delta) / 10
+      : Math.max(0, current + delta)
+    return String(max !== null ? Math.min(next, max) : next)
+  }
+
   function updateLine(productId: number, field: 'quantity' | 'cost', rawValue: string) {
     const normalized = normalizeDecimalInput(rawValue)
     if (normalized === null) return
@@ -580,9 +591,7 @@ export function MovementForm({
                     <QtyStepper
                       value={line.quantity}
                       onStep={(d) =>
-                        d > 0 && !isStocktake
-                          ? addLine(line.product)
-                          : updateLine(line.product.id, 'quantity', String(Math.max(0, qty + d)))
+                        updateLine(line.product.id, 'quantity', stepQuantity(line.product, qty, d))
                       }
                       onDirectInput={(raw) => updateLine(line.product.id, 'quantity', raw)}
                       inputAriaLabel={`Количество: ${line.product.name}`}
