@@ -19,10 +19,8 @@ import {
   listMyStorefrontRequests,
   loadCustomerToken,
   logoutCustomerEverywhere,
-  requestCustomerPhoneCode,
   saveCustomerToken,
   updateCustomerProfile,
-  verifyCustomerPhoneCode,
   type CustomerChatSummary,
   type CustomerProfile,
   type MyRequest,
@@ -34,7 +32,6 @@ import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { Button } from '../../shared/ui/Button'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Modal } from '../../shared/ui/Modal'
-import { PhoneInput } from '../../shared/ui/PhoneInput'
 import { loadLastStoreSlug } from '../../shared/lib/lastStore'
 import { notifyCustomerAuthChanged } from './customerAuthEvents'
 import { RequestSummary } from './RequestSummary'
@@ -152,16 +149,9 @@ export function CustomerAccountPage() {
 
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
-  const [editPhone, setEditPhone] = useState('')
   const [editError, setEditError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const [verifyOpen, setVerifyOpen] = useState(false)
-  const [verifyStep, setVerifyStep] = useState<'send' | 'bot' | 'code'>('send')
-  const [verifyCode, setVerifyCode] = useState('')
-  const [verifyError, setVerifyError] = useState<string | null>(null)
-  const [botLink, setBotLink] = useState('')
-  const [retryAfter, setRetryAfter] = useState(0)
 
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
@@ -193,7 +183,6 @@ export function CustomerAccountPage() {
         setOrders(reqs.items)
         setChats(chatList)
         setEditName(me.name)
-        setEditPhone(me.phone)
       } catch (err) {
         if (cancelled) return
         if (err instanceof ApiError && err.status === 401) {
@@ -212,12 +201,6 @@ export function CustomerAccountPage() {
       cancelled = true
     }
   }, [token])
-
-  useEffect(() => {
-    if (retryAfter <= 0) return
-    const t = setTimeout(() => setRetryAfter((s) => s - 1), 1000)
-    return () => clearTimeout(t)
-  }, [retryAfter])
 
   const unreadCount = useMemo(() => countUnreadCustomerChats(chats), [chats])
 
@@ -276,11 +259,7 @@ export function CustomerAccountPage() {
     setEditError(null)
     setSaving(true)
     try {
-      const phoneChanged = editPhone.trim() !== (profile?.phone ?? '')
-      const updated = await updateCustomerProfile({
-        name: editName.trim(),
-        phone: phoneChanged ? editPhone.trim() : undefined,
-      })
+      const updated = await updateCustomerProfile({ name: editName.trim() })
       setProfile((p) =>
         p
           ? {
@@ -297,44 +276,6 @@ export function CustomerAccountPage() {
       setEditError(err instanceof ApiError ? err.message : 'Не удалось сохранить')
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function sendCode() {
-    setVerifyError(null)
-    try {
-      const res = await requestCustomerPhoneCode()
-      setRetryAfter(res.retry_after)
-      if (res.telegram_deep_link) {
-        setBotLink(res.telegram_deep_link)
-        setVerifyStep('bot')
-      } else {
-        setVerifyStep('code')
-      }
-    } catch (err) {
-      setVerifyError(err instanceof ApiError ? err.message : 'Не удалось отправить код')
-    }
-  }
-
-  async function submitCode(e: FormEvent) {
-    e.preventDefault()
-    setVerifyError(null)
-    try {
-      const res = await verifyCustomerPhoneCode(verifyCode.trim())
-      setProfile((p) =>
-        p
-          ? {
-              ...p,
-              phone_verified: res.phone_verified,
-              phone_verified_at: res.phone_verified_at,
-            }
-          : p,
-      )
-      setVerifyOpen(false)
-      setVerifyCode('')
-      setVerifyStep('send')
-    } catch (err) {
-      setVerifyError(err instanceof ApiError ? err.message : 'Неверный код')
     }
   }
 
@@ -452,19 +393,9 @@ export function CustomerAccountPage() {
             </div>
 
             {!profile.phone_verified && (
-              <div className={styles.verifyNotice}>
-                <span>Подтвердите телефон — магазин увидит, что номер настоящий.</span>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setVerifyOpen(true)
-                    setVerifyStep('send')
-                    setVerifyError(null)
-                  }}
-                >
-                  Подтвердить
-                </Button>
-              </div>
+              <p className={styles.verifyNotice}>
+                Номер подтвердится сам при следующем входе через Telegram — отдельный код не нужен.
+              </p>
             )}
 
             {editing && (
@@ -478,15 +409,9 @@ export function CustomerAccountPage() {
                     maxLength={200}
                   />
                 </label>
-                <label className={styles.field}>
-                  Телефон
-                  <PhoneInput value={editPhone} onChange={setEditPhone} />
-                </label>
-                {editPhone.trim() !== profile.phone && (
-                  <p className={styles.warn}>
-                    При смене телефона подтверждение сбросится — номер нужно будет подтвердить снова.
-                  </p>
-                )}
+                <p className={styles.muted}>
+                  Телефон {profile.phone} — из вашего Telegram, поэтому его нельзя изменить здесь.
+                </p>
                 {editError && <p className={styles.error}>{editError}</p>}
                 <Button type="submit" disabled={saving}>
                   {saving ? 'Сохранение…' : 'Сохранить'}
@@ -671,69 +596,6 @@ export function CustomerAccountPage() {
             </ul>
           )}
         </section>
-      )}
-
-      {verifyOpen && (
-        <Modal title="Подтверждение телефона" onClose={() => setVerifyOpen(false)}>
-          {verifyStep === 'send' && (
-            <div className={styles.modalBody}>
-              <p className={styles.muted}>
-                Отправим код в Telegram. Можно ввести его здесь или командой{' '}
-                <code>/confirm 123456</code> в боте.
-              </p>
-              {verifyError && <p className={styles.error}>{verifyError}</p>}
-              <Button type="button" onClick={sendCode}>
-                Отправить код
-              </Button>
-            </div>
-          )}
-          {verifyStep === 'bot' && (
-            <div className={styles.modalBody}>
-              <p>
-                Откройте бота и нажмите «Старт» — после этого запросите код снова. Позже код можно
-                подтвердить командой <code>/confirm</code>.
-              </p>
-              {botLink && (
-                <a href={botLink} target="_blank" rel="noreferrer" className={styles.textLink}>
-                  Открыть бота
-                </a>
-              )}
-              {verifyError && <p className={styles.error}>{verifyError}</p>}
-              <Button type="button" onClick={sendCode} disabled={retryAfter > 0}>
-                {retryAfter > 0 ? `Повторить через ${retryAfter} с` : 'Код отправлен? Запросить снова'}
-              </Button>
-            </div>
-          )}
-          {verifyStep === 'code' && (
-            <form className={styles.modalBody} onSubmit={submitCode}>
-              <label className={styles.field}>
-                Код из Telegram
-                <input
-                  value={verifyCode}
-                  onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="000000"
-                  required
-                  minLength={6}
-                />
-              </label>
-              <p className={styles.muted}>
-                Или отправьте боту: <code>/confirm {verifyCode || '123456'}</code>
-              </p>
-              {verifyError && <p className={styles.error}>{verifyError}</p>}
-              <Button type="submit">Подтвердить</Button>
-              <button
-                type="button"
-                className={styles.textBtn}
-                disabled={retryAfter > 0}
-                onClick={sendCode}
-              >
-                {retryAfter > 0 ? `Отправить повторно через ${retryAfter} с` : 'Отправить код ещё раз'}
-              </button>
-            </form>
-          )}
-        </Modal>
       )}
 
       {passwordOpen && (

@@ -85,7 +85,8 @@ export function getCustomerProfile() {
   return api.get<CustomerProfile>('/auth/customer/me', { headers: customerAuthHeader() })
 }
 
-export function updateCustomerProfile(input: { name: string; phone?: string | null }) {
+/** Только имя: телефон приходит из контакта Telegram при входе. */
+export function updateCustomerProfile(input: { name: string }) {
   return api.put<CustomerShort>('/auth/customer/me', input, { headers: customerAuthHeader() })
 }
 
