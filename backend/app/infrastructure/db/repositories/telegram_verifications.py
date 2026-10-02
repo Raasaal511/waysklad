@@ -37,6 +37,7 @@ def _to_entity(m: TelegramVerificationModel) -> TelegramVerification:
         code_expires_at=m.code_expires_at,
         code_sent_at=m.code_sent_at,
         attempts=m.attempts,
+        code_issues=m.code_issues,
         completed_at=m.completed_at,
     )
 
@@ -59,6 +60,7 @@ def _apply(m: TelegramVerificationModel, v: TelegramVerification) -> None:
     m.code_expires_at = v.code_expires_at
     m.code_sent_at = v.code_sent_at
     m.attempts = v.attempts
+    m.code_issues = v.code_issues
     m.expires_at = v.expires_at
     m.created_at = v.created_at
     m.completed_at = v.completed_at

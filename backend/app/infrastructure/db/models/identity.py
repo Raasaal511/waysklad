@@ -114,6 +114,7 @@ class TelegramVerificationModel(Base):
     code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     code_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     attempts: Mapped[int] = mapped_column(SmallInteger, default=0)
+    code_issues: Mapped[int] = mapped_column(SmallInteger, default=0)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
