@@ -3,6 +3,7 @@ import type { TokenResponse, User } from '../entities/auth/api'
 import { clearReceiveDraft } from '../pages/stock/receiveDraft'
 import { clearAllRestockCarts } from '../pages/stock/restockCart'
 import { scopedKey } from '../shared/lib/scopedStorage'
+import { disablePush } from '../entities/notification/push'
 
 // Черновик "Новой продажи" (SalePage.tsx) хранит полные объекты товаров
 // (название, цену) в localStorage — держим ключ строкой здесь, а не
@@ -15,6 +16,8 @@ function saleDraftKey(): string {
 interface AuthState {
   user: User | null
   login: (result: TokenResponse, remember?: boolean) => void
+  /** Поля своего профиля изменились без нового токена (например, привязали Telegram). */
+  patchUser: (patch: Partial<User>) => void
   logout: () => void
 }
 
@@ -50,7 +53,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(result.user)
   }
 
+  function patchUser(patch: Partial<User>) {
+    setUser((prev) => {
+      if (!prev) return prev
+      const next = { ...prev, ...patch }
+      // туда же, где лежит сессия, — иначе после перезагрузки снова старое значение
+      const storage = localStorage.getItem('user') !== null ? localStorage : sessionStorage
+      storage.setItem('user', JSON.stringify(next))
+      return next
+    })
+  }
+
   function logout() {
+    // Уведомления на телефон уходят тому, кто их включил: после выхода этому
+    // браузеру больше ничего не шлём. Токен — сейчас, ниже он стирается.
+    void disablePush(
+      localStorage.getItem('access_token') ?? sessionStorage.getItem('access_token') ?? undefined,
+    )
+
     // scopedKey() читает 'user' из storage — чистим scoped-данные ДО того,
     // как его сотрём, иначе не найдём ключи именно этого (выходящего) пользователя.
     // Реальная защита от утечки между аккаунтами — сам scopedKey (данные разных
@@ -66,7 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, login, patchUser, logout }}>{children}</AuthContext.Provider>
+  )
 }
 
 export function useAuth(): AuthState {

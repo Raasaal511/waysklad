@@ -268,6 +268,11 @@ export function DebtsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightId])
 
+  // Долгов нет вовсе — поиск и пять фильтров статусов над пустым экраном только
+  // шумят; остаётся объяснение и кнопка «Выдать долг».
+  const nothingToFilter =
+    view === 'active' && debts.length === 0 && !query.trim() && !debouncedQuery.trim() && statusFilter === 'all'
+
   return (
     <div className={layoutStyles.stack}>
       <div className={layoutStyles.sectionTitle}>
@@ -410,7 +415,7 @@ export function DebtsPage() {
         </div>
       )}
 
-      {!loading && (
+      {!loading && !nothingToFilter && (
         <div className="sale-search-panel">
           <div className="sale-search-row">
             <IconSearch size={16} stroke={1.8} className="sale-search-icon" />
@@ -424,7 +429,7 @@ export function DebtsPage() {
         </div>
       )}
 
-      {!loading && view === 'active' && (
+      {!loading && view === 'active' && !nothingToFilter && (
         <div className={styles['debt-status-filters']}>
           {STATUS_FILTERS.map((f) => (
             <button

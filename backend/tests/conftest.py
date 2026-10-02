@@ -42,6 +42,10 @@ os.environ.setdefault("BCRYPT_ROUNDS", "4")
 # Поведение при выключенном флаге проверяет test_marketplace_disabled.py,
 # который поднимает отдельное приложение.
 os.environ["MARKETPLACE_ENABLED"] = "true"
+# Web Push выключен: docker compose exec подтягивает .env с настоящим ключом
+# VAPID, и любое событие с подпиской ушло бы в Google/Apple. Тесты push
+# подменяют отправщик фейком (tests/api/test_web_push.py).
+os.environ["VAPID_PRIVATE_KEY"] = ""
 os.environ["ADMIN_PASSWORD_HASH"] = (
     # фактор 4 в тон BCRYPT_ROUNDS выше — проверка пароля с фактором 12 стоила
     # бы 0.19s в каждом тесте admin-роутера
@@ -341,6 +345,8 @@ async def client(db_session_factory, tmp_path) -> AsyncIterator[AsyncClient]:
     fastapi_app.dependency_overrides[get_notifier] = lambda: None  # без реальных HTTP-запросов в Telegram
     transport = ASGITransport(app=fastapi_app)
     async with AsyncClient(transport=transport, base_url="http://test") as http:
+        # register_via_bot проходит шаг бота в той же БД, что видит приложение
+        http.session_factory = db_session_factory
         yield http
     if original_error_log_redis is not None:
         admin_alerts.error_log._redis = original_error_log_redis
@@ -440,8 +446,8 @@ async def owner_headers(client, random_phone) -> dict:
     """Authorization-заголовок владельца только что зарегистрированного через API магазина.
     Склад больше не создаётся автоматически при регистрации — заводим его явно тем же
     HTTP-запросом, каким это сделал бы владелец в онбординге."""
-    response = await client.post(
-        "/api/auth/register",
+    response = await register_via_bot(
+        client,
         json={
             "shop_name": "Магазин Беркат",
             "owner_name": "Ахмед",
@@ -457,3 +463,30 @@ async def owner_headers(client, random_phone) -> dict:
     )
     assert warehouse_response.status_code == 201, warehouse_response.text
     return headers
+
+
+async def register_via_bot(client: AsyncClient, json: dict):
+    """Регистрация магазина целиком, как у живого владельца: форма → бот
+    принимает контакт (тот же use case, что вызывает бот) → код на сайте.
+    Ответ — от подтверждения (токен, user, shop_slug), как раньше от /register;
+    ошибка формы (400/422) возвращается как есть."""
+    from app.application.auth.telegram_signup import AcceptContactUseCase, ContactCommand
+    from app.domain.common.phone import Phone
+
+    start = await client.post("/api/auth/register", json=json)
+    if start.status_code != 201:
+        return start
+    token = start.json()["token"]
+    telegram_id = str(random.randint(10**8, 10**9))
+    result = await AcceptContactUseCase(
+        SqlAlchemyUnitOfWork(None, session_factory=client.session_factory), BcryptPasswordHasher()
+    ).execute(
+        ContactCommand(
+            token=token,
+            contact_phone=str(Phone(json["phone"])).lstrip("+"),
+            contact_user_id=telegram_id,
+            sender_user_id=telegram_id,
+            chat_id=telegram_id,
+        )
+    )
+    return await client.post("/api/auth/register/confirm", json={"token": token, "code": result.code})

@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   listProducts,
@@ -138,7 +138,12 @@ export function ProductsPage() {
     return () => clearTimeout(timer)
   }, [query])
 
+  const requestRef = useRef(0)
+
   async function loadProducts() {
+    // ответ на устаревший запрос (поиск печатают быстрее, чем отвечает сервер)
+    // не должен затирать свежий список
+    const request = ++requestRef.current
     setLoading(true)
     setError(null)
     try {
@@ -151,16 +156,19 @@ export function ProductsPage() {
         inStockOnly,
         warehouseId: warehouseId === 'all' ? null : warehouseId,
       })
+      if (request !== requestRef.current) return
       setProducts(items)
       setTotal(t)
     } catch (err) {
+      if (request !== requestRef.current) return
       setError(err instanceof ApiError ? err.message : 'Не удалось загрузить товары')
     } finally {
-      setLoading(false)
+      if (request === requestRef.current) setLoading(false)
     }
   }
 
   async function loadMore() {
+    const request = requestRef.current
     setLoadingMore(true)
     try {
       const { items, total: t } = await listProducts({
@@ -172,6 +180,7 @@ export function ProductsPage() {
         inStockOnly,
         warehouseId: warehouseId === 'all' ? null : warehouseId,
       })
+      if (request !== requestRef.current) return // фильтры сменились — страница от другого списка
       setProducts((prev) => [...prev, ...items])
       setTotal(t)
     } catch (err) {

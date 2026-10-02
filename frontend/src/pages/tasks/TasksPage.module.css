@@ -20,6 +20,26 @@
   flex-shrink: 0;
 }
 
+/* Телефон: четыре вида не помещались в строку, и «Календарь» уезжал за край —
+   прокрутку вбок никто не замечает. Ровная сетка: иконка над подписью. */
+@media (max-width: 599px) {
+  .viewSwitcher {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  .viewSwitcher > button {
+    flex-direction: column;
+    gap: 2px;
+    min-height: 52px;
+    padding: 6px 2px;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+}
+
 /* Календарь */
 
 .viewCalendar {

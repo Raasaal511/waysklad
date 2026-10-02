@@ -30,6 +30,8 @@ SOFTEN_1X = 1.1
 SOFTEN_2X = 1.4
 WHITE_THRESH = 248
 ALPHA_THRESH = 8
+# С alpha-исходником белое не ниже этого alpha считается содержимым
+OPAQUE_WHITE_ALPHA = 250
 # Байк-ин светлая тень/glow: низкий alpha + серый/светлый, не antialias объекта
 SOFT_GLOW_ALPHA = 70
 SOFT_GLOW_LUMA = 140
@@ -52,13 +54,25 @@ def is_backdrop(r: int, g: int, b: int, a: int) -> bool:
     return False
 
 
+def has_real_alpha(rgba: Image.Image) -> bool:
+    """Исходник уже вырезан (есть заметная прозрачность) — фон задан alpha."""
+    hist = rgba.getchannel("A").histogram()
+    return sum(hist[: ALPHA_THRESH + 1]) >= 0.05 * sum(hist)
+
+
 def remove_backdrop(rgba: Image.Image) -> Image.Image:
+    # С настоящей alpha непрозрачное белое — это содержимое (бумага чека,
+    # экран), а не фон: иначе в тёмной теме сквозь него видно --bg.
+    # Полупрозрачное белое — запечённое свечение, его по-прежнему убираем.
+    keep_opaque_white = has_real_alpha(rgba)
     out = rgba.copy()
     pixels = out.load()
     w, h = out.size
     for y in range(h):
         for x in range(w):
             r, g, b, a = pixels[x, y]
+            if keep_opaque_white and a >= OPAQUE_WHITE_ALPHA:
+                continue
             if is_backdrop(r, g, b, a):
                 # RGB=0 при a=0 — иначе LANCZOS смешает белый → светлая кайма
                 pixels[x, y] = (0, 0, 0, 0)

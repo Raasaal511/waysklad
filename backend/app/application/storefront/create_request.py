@@ -17,6 +17,18 @@ from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 _MAX_PENDING_REQUESTS_PER_PHONE = 5
 
 
+def _goods_count(n: int) -> str:
+    """«1 товар», «3 товара», «11 товаров» — текст уведомления видно на экране
+    блокировки, «1 товаров» там режет глаз."""
+    if n % 10 == 1 and n % 100 != 11:
+        word = "товар"
+    elif n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+        word = "товара"
+    else:
+        word = "товаров"
+    return f"{n} {word}"
+
+
 def _line_unit_price(product: Product, variant_id: int | None) -> Decimal:
     """Цена строки заявки — цена варианта, если задана, иначе retail_price
     товара (тот же приоритет, что у StorefrontProductVariantResponse.price
@@ -54,7 +66,7 @@ class StorefrontRequestItemInput:
 class CreateStorefrontRequestCommand:
     slug: str
     customer_id: int  # авторизованный покупатель — см. CurrentCustomerDep
-    customer_name: str
+    customer_name: str = ""
     items: list[StorefrontRequestItemInput] = field(default_factory=list)
     note: str = ""
     customer_telegram_chat_id: str = ""  # заполнено, только если заявка из Telegram-бота витрины
@@ -79,6 +91,12 @@ class CreateStorefrontRequestUseCase:
             return None
 
         phone = customer.phone
+        # Вошедшего покупателя магазин и так знает — имя из профиля, иначе логин,
+        # иначе телефон. Поле «Ваше имя» в корзине было лишним шагом: человек
+        # только что зарегистрировался, а его спрашивают, кто он.
+        customer_name = (
+            cmd.customer_name.strip() or customer.name.strip() or customer.username.strip() or str(phone)
+        )
 
         async with SqlAlchemyUnitOfWork(tenant.id, session_factory=self._session_factory) as uow:
             pending = await uow.storefront_requests.count_new_by_phone(str(phone))
@@ -131,7 +149,7 @@ class CreateStorefrontRequestUseCase:
 
             request = StorefrontRequest(
                 id=None,
-                customer_name=cmd.customer_name.strip(),
+                customer_name=customer_name,
                 customer_id=cmd.customer_id,
                 customer_phone=str(phone),
                 customer_telegram_chat_id=cmd.customer_telegram_chat_id,
@@ -167,7 +185,7 @@ class CreateStorefrontRequestUseCase:
                     kind=NotificationKind.STOREFRONT_REQUEST_NEW,
                     text=(
                         f"Новая заявка с витрины: {request.customer_name}, "
-                        f"{len(request.lines)} товаров на сумму {format_rub(total_amount)}"
+                        f"{_goods_count(len(request.lines))} на сумму {format_rub(total_amount)}"
                     ),
                     link="/orders/storefront-requests",
                     entity_id=request.id,

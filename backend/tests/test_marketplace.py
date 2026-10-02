@@ -3,11 +3,12 @@
 
 from datetime import date, timedelta
 from decimal import Decimal
+from tests.conftest import register_via_bot
 
 
 async def _register_shop(client, random_phone, shop_name: str, storefront_enabled: bool = True):
-    response = await client.post(
-        "/api/auth/register",
+    response = await register_via_bot(
+        client,
         json={
             "shop_name": shop_name,
             "owner_name": "Продавец",

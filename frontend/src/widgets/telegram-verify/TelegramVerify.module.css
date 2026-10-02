@@ -1,0 +1,272 @@
+/* Подтверждение номера через Telegram — TelegramVerify.tsx */
+
+.wrap {
+  /* фирменный цвет Telegram: кнопку узнают сразу, не читая подпись */
+  --tg: #2aabee;
+  --tg-hover: #229ed9;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: tg-in 0.25s ease both;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tg) 14%, transparent);
+  color: var(--tg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.lead {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.stepMark {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.step[data-done] .stepMark {
+  background: transparent;
+  color: var(--accent);
+}
+
+.step[data-active] .stepMark {
+  background: var(--accent);
+  color: #fff;
+}
+
+.stepBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 3px;
+  font-size: 15px;
+}
+
+.stepHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.step[data-done] .stepHint {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.spinner {
+  flex-shrink: 0;
+  animation: tg-spin 1s linear infinite;
+}
+
+.telegramButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 12px;
+  background: var(--tg);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease;
+}
+
+.telegramButton:hover {
+  background: var(--tg-hover);
+}
+
+.telegramButton:active {
+  transform: scale(0.99);
+}
+
+.telegramButton:focus-visible {
+  outline: 2px solid var(--tg);
+  outline-offset: 2px;
+}
+
+.copyLink {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.copyLink:hover {
+  color: var(--text);
+}
+
+/* Поле кода: крупные цифры с разрядкой — видно, сколько ещё вводить */
+input.code.code {
+  width: 100%;
+  min-height: 56px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.4em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+input.code.code:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+input.code.code[aria-invalid='true'] {
+  border-color: var(--danger);
+  animation: tg-shake 0.3s ease;
+}
+
+input.code.code:disabled {
+  background: var(--bg-muted);
+  cursor: not-allowed;
+}
+
+.error {
+  margin: 0;
+  font-size: 14px;
+  color: var(--danger);
+}
+
+.note {
+  margin: 0;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.primary {
+  width: 100%;
+  min-height: 48px;
+  font-size: 16px;
+}
+
+.link {
+  align-self: center;
+  min-height: 44px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.link:disabled {
+  color: var(--text-muted);
+  font-weight: 500;
+  cursor: default;
+  opacity: 1;
+}
+
+@keyframes tg-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes tg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes tg-shake {
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wrap,
+  .spinner,
+  input.code.code[aria-invalid='true'] {
+    animation: none;
+  }
+}

@@ -11,6 +11,7 @@ from app.application.storefront.get_catalog import GetStorefrontCatalogCommand, 
 from app.domain.common.exceptions import DomainError
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.telegram_bot.formatting import catalog_page_text
+from app.infrastructure.telegram_bot.handlers import owner_verification
 from app.infrastructure.telegram_bot.keyboards import catalog_keyboard
 from app.infrastructure.telegram_bot.states import StorefrontFlow
 
@@ -39,6 +40,12 @@ async def _confirm_login(token: str, chat_id: int, message: Message, session_fac
 @router.message(CommandStart())
 async def start(message: Message, command: CommandObject, state: FSMContext, session_factory) -> None:
     arg = (command.args or "").strip()
+    for prefix in (owner_verification.SIGNUP_PREFIX, owner_verification.LINK_PREFIX):
+        if arg.startswith(prefix):
+            await owner_verification.start_owner_verification(
+                message, state, arg[len(prefix):], session_factory
+            )
+            return
     if arg.startswith(_LOGIN_LINK_PREFIX):
         token = arg[len(_LOGIN_LINK_PREFIX):]
         await _confirm_login(token, message.chat.id, message, session_factory)

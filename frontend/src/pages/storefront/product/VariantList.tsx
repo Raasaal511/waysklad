@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { IconMinus, IconPlus, IconSearch, IconInfoCircle, IconArrowsMaximize } from '@tabler/icons-react'
+import { IconPlus, IconSearch, IconInfoCircle, IconArrowsMaximize } from '@tabler/icons-react'
 import type { StorefrontProductDetail, StorefrontVariant } from '../../../entities/storefront/api'
 import { initialOrderQty, bumpOrderQty } from '../../../entities/storefront/api'
 import { formatPriceOrRequest, formatQuantity } from '../../../shared/lib/format'
 import { Lightbox } from '../../../shared/ui/Lightbox'
 import { stockText, variantPrice } from './productUtils'
 import type { SelectionKey } from './useSelection'
+import { QtyStepper } from '../../../shared/ui/QtyStepper'
 import styles from './VariantList.module.css'
 
 const SEARCH_THRESHOLD = 6
@@ -27,53 +28,6 @@ interface VariantListProps {
   /** Ключ строки, которую нужно однократно подсветить пульсацией — например,
    * после того как «В корзину» сама выбрала вариант за покупателя (п.6 промпта P4). */
   flashKey?: SelectionKey | null
-}
-
-interface QtyStepperProps {
-  value: number
-  onStep: (delta: 1 | -1) => void
-  onDirectInput: (raw: string) => void
-  inputAriaLabel: string
-  decreaseAriaLabel?: string
-  increaseAriaLabel?: string
-  disableDecrease?: boolean
-}
-
-/** Степпер количества — используется и для товара без вариантов, и для строки
- *  варианта (было продублировано дважды в этом файле, вынесено в шаге P7). */
-function QtyStepper({
-  value,
-  onStep,
-  onDirectInput,
-  inputAriaLabel,
-  decreaseAriaLabel = 'Уменьшить количество',
-  increaseAriaLabel = 'Увеличить количество',
-  disableDecrease,
-}: QtyStepperProps) {
-  return (
-    <div className={styles.stepper}>
-      <button
-        type="button"
-        className={`${styles.stepBtn} ${styles.stepMinus}`}
-        onClick={() => onStep(-1)}
-        aria-label={decreaseAriaLabel}
-        disabled={disableDecrease}
-      >
-        <IconMinus size={16} stroke={2} />
-      </button>
-      <input
-        className={styles.stepValue}
-        type="text"
-        inputMode="numeric"
-        value={String(value)}
-        onChange={(e) => onDirectInput(e.target.value)}
-        aria-label={inputAriaLabel}
-      />
-      <button type="button" className={`${styles.stepBtn} ${styles.stepPlus}`} onClick={() => onStep(1)} aria-label={increaseAriaLabel}>
-        <IconPlus size={16} stroke={2} />
-      </button>
-    </div>
-  )
 }
 
 export function VariantList({ product, selection, onQtyChange, onShowToast, flashKey }: VariantListProps) {
@@ -333,7 +287,7 @@ export function VariantList({ product, selection, onQtyChange, onShowToast, flas
               >
                 <img src={row.photo} alt="" />
                 <span className={styles.rowThumbExpand}>
-                  <IconArrowsMaximize size={10} stroke={2} />
+                  <IconArrowsMaximize size={14} stroke={2} />
                 </span>
               </button>
             ) : (

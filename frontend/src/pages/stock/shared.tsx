@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   createWarehouse,
   receiveGoods,
@@ -20,12 +20,12 @@ import { Modal } from '../../shared/ui/Modal'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
 import { InfoHint } from '../../shared/ui/InfoHint'
 import { DateInput } from '../../shared/ui/DateInput'
-import { normalizeDecimalInput, formatQuantity } from '../../shared/lib/format'
+import { normalizeDecimalInput, formatQuantity, plural } from '../../shared/lib/format'
+import { QtyStepper } from '../../shared/ui/QtyStepper'
 import { isBarcodeScannerSupported } from '../../entities/barcode/barcodeSupport'
 import {
   IconBarcode,
   IconTrash,
-  IconChevronRight,
   IconArrowBarToDown,
   IconArrowBarUp,
   IconArrowsRightLeft,
@@ -34,6 +34,7 @@ import {
   type Icon,
 } from '@tabler/icons-react'
 import layoutStyles from '../../shared/ui/Layout.module.css'
+import formStyles from './MovementForm.module.css'
 
 const BarcodeScanner = lazy(() =>
   import('../../entities/barcode/BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })),
@@ -226,6 +227,7 @@ export function MovementForm({
   const [scanError, setScanError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const linesRef = useRef<HTMLElement>(null)
   const { suppliers, ensureSuppliers } = useCatalog()
   const [withDebt, setWithDebt] = useState(false)
   const [supplierId, setSupplierId] = useState<number | null>(null)
@@ -249,7 +251,6 @@ export function MovementForm({
   // Инвентаризация: вводим фактический остаток (может быть больше учёта).
   const stockLimited = mode === 'write_off' || mode === 'transfer'
   const isStocktake = mode === 'stocktake'
-  const movementColumns = mode === 'receive' ? '45% 30% 17% 8%' : isStocktake ? '55% 20% 17% 8%' : '70% 22% 8%'
   const stockFor = (productId: number) =>
     warehouseId == null
       ? null
@@ -303,8 +304,21 @@ export function MovementForm({
         ? clamp(quantityOnHand(product.id) ?? 0)
         : clamp(max !== null ? Math.min(1, max) : 1)
       if (!isStocktake && initial <= 0) return prev
-      return [...prev, { product, quantity: String(initial), cost: product.purchase_price ?? '' }]
+      // «480.00» с бэкенда → «480»: в поле цены лишние нули только мешают править
+      const cost = product.purchase_price ? String(Number(product.purchase_price)) : ''
+      return [...prev, { product, quantity: String(initial), cost }]
     })
+  }
+
+  /** Шаг ± у весового товара — 0,1: целый −1 обнулял бы 0,5 кг одним нажатием.
+   *  Больше остатка не даём (списание и перемещение), как и при выборе плитки. */
+  function stepQuantity(product: Product, current: number, delta: 1 | -1): string {
+    const max = stockLimited ? stockFor(product.id) : null
+    const next = isFractional(product.unit_code)
+      ? // через целые десятые — 0.3 - 0.1 в double даёт 0.19999999999999998
+        Math.max(0, Math.round(current * 10) + delta) / 10
+      : Math.max(0, current + delta)
+    return String(max !== null ? Math.min(next, max) : next)
   }
 
   function updateLine(productId: number, field: 'quantity' | 'cost', rawValue: string) {
@@ -440,7 +454,7 @@ export function MovementForm({
         {scanError && <p className={layoutStyles.error}>{scanError}</p>}
       </div>
 
-      <div className="sale-results-panel">
+      <div className={`sale-results-panel ${formStyles.results}`}>
         <div className="sale-results-header">
           <span>Товары</span>
           <span className={layoutStyles.textMuted}>{filtered.length} найдено</span>
@@ -450,7 +464,7 @@ export function MovementForm({
             {stockLimited ? 'На складе нет товаров, доступных для этой операции' : 'Ничего не найдено'}
           </p>
         ) : (
-          <div className="product-grid" style={{ maxHeight: 480, minHeight: 220, overflowY: 'auto' }}>
+          <div className={`product-grid ${formStyles.tiles}`}>
             {filtered.map((p) => {
               const inLineQty = lines.find((l) => l.product.id === p.id)?.quantity
               const available = stockFor(p.id)
@@ -526,121 +540,91 @@ export function MovementForm({
       )}
 
       {lines.length > 0 && (
-        <div className={[layoutStyles.stack, layoutStyles.card, layoutStyles.cardFull].join(' ')}>
-          <div className={layoutStyles.sectionTitle}>
+        <section ref={linesRef} className={formStyles.lines} aria-label={MODE_LABELS[mode]}>
+          <div className={formStyles.linesHead}>
             <h3>{MODE_LABELS[mode]}</h3>
-            <span className={layoutStyles.textMuted}>{lines.length} поз.</span>
+            <span className={layoutStyles.textMuted}>
+              {lines.length} {plural(lines.length, ['позиция', 'позиции', 'позиций'])}
+            </span>
           </div>
-          <div className="table-wrap cart-table-wrap">
-            <div className="cart-table-head" style={{ gridTemplateColumns: movementColumns }}>
-              <span>Товар</span>
-              <span>{isStocktake ? 'Факт' : 'Кол-во'}</span>
-              {mode === 'receive' && <span>Закуп. цена</span>}
-              {isStocktake && <span>Учёт</span>}
-              <span />
-            </div>
-            <div>
-              {lines.map((line) => {
-                const available = stockFor(line.product.id)
-                const onHand = quantityOnHand(line.product.id)
-                const overStock = stockLimited && available !== null && Number(line.quantity || 0) > available
-                const delta =
-                  isStocktake && onHand !== null ? Number(line.quantity || 0) - onHand : null
-                return (
-                  <div
-                    key={line.product.id}
-                    className="cart-table-row"
-                    style={{ gridTemplateColumns: movementColumns }}
-                  >
-                    <div className="cart-table-name">
-                      <div>{line.product.name}</div>
-                      {available !== null && !isStocktake && (
-                        <div className="cart-table-stock">
-                          Остаток: {formatQuantity(available)} {unitName(line.product.unit_code)}
-                        </div>
-                      )}
-                      {isStocktake && delta !== null && delta !== 0 && (
-                        <div className="cart-table-stock">
-                          Расхождение: {delta > 0 ? '+' : ''}
-                          {formatQuantity(String(delta))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="cart-table-qty-cell">
-                      <div className="cart-qty-stepper">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          className={overStock ? 'cart-input-warning' : undefined}
-                          value={line.quantity}
-                          onChange={(e) => updateLine(line.product.id, 'quantity', e.target.value)}
-                        />
-                        <div className="cart-qty-step-column">
-                          <IconButton
-                            variant="muted"
-                            className="cart-qty-step"
-                            onClick={() =>
-                              isStocktake
-                                ? updateLine(
-                                    line.product.id,
-                                    'quantity',
-                                    String(Math.max(0, Number(line.quantity) + 1)),
-                                  )
-                                : addLine(line.product)
-                            }
-                            aria-label="Увеличить количество"
-                          >
-                            <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-up" />
-                          </IconButton>
-                          <IconButton
-                            variant="muted"
-                            className="cart-qty-step"
-                            onClick={() =>
-                              updateLine(line.product.id, 'quantity', String(Math.max(0, Number(line.quantity) - 1)))
-                            }
-                            aria-label="Уменьшить количество"
-                          >
-                            <IconChevronRight size={10} stroke={1.8} className="cart-qty-step-icon-down" />
-                          </IconButton>
-                        </div>
-                      </div>
-                      {overStock && available !== null && (
-                        <div className="cart-table-warning">больше остатка ({formatQuantity(available)})</div>
-                      )}
-                    </div>
-                    {isStocktake && (
-                      <div className="cart-table-stock">
-                        {onHand !== null ? formatQuantity(String(onHand)) : '—'}
-                      </div>
+          {lines.map((line) => {
+            const available = stockFor(line.product.id)
+            const onHand = quantityOnHand(line.product.id)
+            const qty = Number(line.quantity || 0)
+            const overStock = stockLimited && available !== null && qty > available
+            const delta = isStocktake && onHand !== null ? qty - onHand : null
+            const unit = unitName(line.product.unit_code)
+            return (
+              <div key={line.product.id} className={formStyles.line}>
+                <div className={formStyles.lineHead}>
+                  <div className={formStyles.lineName}>
+                    <strong>{line.product.name}</strong>
+                    {available !== null && !isStocktake && (
+                      <span className={layoutStyles.textMuted}>
+                        На складе: {formatQuantity(available)} {unit}
+                      </span>
                     )}
-                    {mode === 'receive' && (
-                      <div className="cart-table-price-cell">
+                    {isStocktake && onHand !== null && (
+                      <span className={layoutStyles.textMuted}>
+                        По учёту: {formatQuantity(String(onHand))} {unit}
+                        {delta !== null && delta !== 0 && (
+                          <span className={delta > 0 ? formStyles.deltaPlus : formStyles.deltaMinus}>
+                            {' '}· {delta > 0 ? '+' : ''}
+                            {formatQuantity(String(delta))}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className={formStyles.remove}
+                    onClick={() => removeLine(line.product.id)}
+                    aria-label={`Убрать «${line.product.name}»`}
+                  >
+                    <IconTrash size={20} stroke={1.8} />
+                  </button>
+                </div>
+                <div className={formStyles.lineFields}>
+                  <div className={formStyles.qtyField}>
+                    <span className={formStyles.fieldLabel}>{isStocktake ? 'Факт' : 'Количество'}</span>
+                    <QtyStepper
+                      value={line.quantity}
+                      onStep={(d) =>
+                        updateLine(line.product.id, 'quantity', stepQuantity(line.product, qty, d))
+                      }
+                      onDirectInput={(raw) => updateLine(line.product.id, 'quantity', raw)}
+                      inputAriaLabel={`Количество: ${line.product.name}`}
+                      disableDecrease={qty <= 0}
+                      inputMode={isFractional(line.product.unit_code) ? 'decimal' : 'numeric'}
+                    />
+                  </div>
+                  {mode === 'receive' && (
+                    <label className={formStyles.costField}>
+                      <span className={formStyles.fieldLabel}>Закупка за {unit}</span>
+                      <span className={formStyles.costInput}>
                         <input
                           type="text"
                           inputMode="decimal"
                           value={line.cost}
+                          placeholder="0"
                           onChange={(e) => updateLine(line.product.id, 'cost', e.target.value)}
                         />
-                        <span className="cart-table-price-suffix">₽</span>
-                      </div>
-                    )}
-                    <div>
-                      <IconButton
-                        variant="danger"
-                        onClick={() => removeLine(line.product.id)}
-                        aria-label="Убрать позицию"
-                      >
-                        <IconTrash size={16} stroke={1.8} />
-                      </IconButton>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
+                        <span aria-hidden="true">₽</span>
+                      </span>
+                    </label>
+                  )}
+                </div>
+                {overStock && available !== null && (
+                  <p className={formStyles.warning}>
+                    Больше, чем есть на складе ({formatQuantity(available)} {unit})
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </section>
       )}
-
       {mode === 'receive' && lines.length > 0 && (
         <div className={layoutStyles.stack} style={{ gap: 10 }}>
           <label className="sale-checkbox">
@@ -671,19 +655,34 @@ export function MovementForm({
       )}
 
       {error && <p className={layoutStyles.error}>{error}</p>}
-      <Button
-        type="submit"
-        disabled={
-          saving ||
-          !warehouseId ||
-          lines.length === 0 ||
-          (mode === 'transfer' && !toWarehouseId) ||
-          (mode === 'receive' && withDebt && (!supplierId || !debtDueDate)) ||
-          lines.some((l) => Number(l.quantity) <= 0)
-        }
-      >
-        {saving ? 'Сохраняем…' : MODE_ACTIONS[mode]}
-      </Button>
+      {/* На телефоне — липкая панель над меню: кнопка всегда под пальцем, а
+          счётчик позиций прокручивает к списку выбранного под плитками */}
+      <div className={formStyles.submitBar}>
+        <button
+          type="button"
+          className={formStyles.count}
+          onClick={() => linesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          disabled={lines.length === 0}
+        >
+          {lines.length > 0
+            ? `${lines.length} ${plural(lines.length, ['позиция', 'позиции', 'позиций'])}`
+            : 'Выберите товары'}
+        </button>
+        <Button
+          type="submit"
+          className={formStyles.submit}
+          disabled={
+            saving ||
+            !warehouseId ||
+            lines.length === 0 ||
+            (mode === 'transfer' && !toWarehouseId) ||
+            (mode === 'receive' && withDebt && (!supplierId || !debtDueDate)) ||
+            lines.some((l) => Number(l.quantity) <= 0)
+          }
+        >
+          {saving ? 'Сохраняем…' : MODE_ACTIONS[mode]}
+        </Button>
+      </div>
     </form>
   )
 }

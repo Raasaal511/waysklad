@@ -766,3 +766,37 @@ async def test_storefront_request_min_and_step_qty_via_api(client, owner_headers
         },
     )
     assert response.status_code == 201, response.text  # 5+5=10 — валидно, хотя каждая строка меньше минимума
+
+
+async def test_storefront_request_name_comes_from_profile(client, owner_headers, customer_headers):
+    """Вошедшего покупателя не спрашиваем «Ваше имя»: без имени в запросе берётся
+    имя из профиля, а у кого его нет — телефон, чтобы магазин всё равно знал, кто это."""
+    buyer_headers, buyer_phone = await customer_headers()
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    product = (
+        await client.post(
+            "/api/products", headers=owner_headers,
+            json={"name": "Товар", "purchase_price": "50", "retail_price": "120"},
+        )
+    ).json()
+    await client.put(
+        f"/api/products/{product['id']}", headers=owner_headers,
+        json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
+    )
+
+    async def order() -> dict:
+        response = await client.post(
+            "/api/storefront/magazin-berkat/requests",
+            headers=buyer_headers,
+            json={"items": [{"product_id": product["id"], "quantity": "1"}]},
+        )
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    assert (await order())["customer_name"] == buyer_phone
+
+    response = await client.put("/api/auth/customer/me", headers=buyer_headers, json={"name": "Ахмед"})
+    assert response.status_code == 200, response.text
+    assert (await order())["customer_name"] == "Ахмед"

@@ -5,12 +5,15 @@ from app.infrastructure.telegram_bot.handlers import (
     checkout,
     confirm_phone,
     owner_actions,
+    owner_verification,
     product,
     start,
 )
 
 router = Router(name="storefront_bot")
 router.include_router(start.router)
+# до confirm_phone: в состоянии «ждём контакт» шестизначный текст — не код покупателя
+router.include_router(owner_verification.router)
 router.include_router(confirm_phone.router)
 # перед catalog/checkout — их callback-паттерны не пересекаются с
 # "reject_request:", но регистрация раньше делает намерение явным:

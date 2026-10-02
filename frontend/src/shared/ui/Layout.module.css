@@ -592,11 +592,31 @@
   row-gap: 16px;
 }
 
+/* Телефон: 190px на показатель ставили «Итого» продаж и сотрудников столбиком
+   на весь первый экран, а в карточке склада уводили показатели за край. Здесь
+   показатели делят строку по своей ширине и переносятся, только если не влезли. */
+@media (max-width: 599px) {
+  .gridStats {
+    column-gap: 20px;
+  }
+
+  .stat {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  .statValue {
+    font-size: 20px;
+  }
+}
+
 /* Warehouse tiles — StockPage, ProfilePage */
 
 .warehouseTiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  /* min(): на телефоне 320px контенту доступно 288 — плитка вылезала за край */
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -667,6 +687,14 @@
   gap: 24px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
+}
+
+/* Три показателя делят ширину плитки: с фиксированными 190px «Ответственных»
+   уезжало за край плитки даже на компьютере. */
+.warehouseTileStats .stat {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
 }
 
 /* Product picker (Продажа/Заказы/Приёмка/Товары) */
@@ -929,4 +957,19 @@
 
 .onboardingBanner a {
   text-decoration: none;
+}
+
+/* после базового .warehouseTileStats — иначе тот перебил бы отступ */
+@media (max-width: 599px) {
+  .warehouseTileStats {
+    gap: 12px;
+  }
+}
+
+/* Телефон: 10px вокруг сетки плиток сдвигали их внутрь относительно остального
+   экрана (на компьютере это место под увеличение плитки при наведении). */
+@media (max-width: 599px) {
+  .productGrid {
+    padding: 0;
+  }
 }

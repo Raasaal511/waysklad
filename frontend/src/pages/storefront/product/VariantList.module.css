@@ -163,9 +163,9 @@
   position: absolute;
   right: 2px;
   bottom: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
   display: flex;
@@ -207,82 +207,10 @@
   margin: 2px 0 0;
 }
 
-.stepper {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.stepBtn {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border-radius: 999px;
-  border: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  cursor: pointer;
-  transition:
-    transform 0.1s ease,
-    opacity 0.15s ease;
-}
-
-.stepBtn svg {
-  flex-shrink: 0;
-}
-
-.stepBtn:hover:not(:disabled) {
-  transform: scale(1.06);
-}
-
-.stepBtn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.stepBtn:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.stepPlus {
-  background: var(--accent);
-  color: #fff;
-}
-
-.stepMinus {
-  background: var(--bg-muted);
-  color: var(--text);
-}
-
-input.stepValue.stepValue {
-  width: 32px;
-  height: 32px;
-  min-width: 28px;
-  text-align: center;
-  font: inherit;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: none;
-  color: var(--text);
-  padding: 0;
-}
-
-input.stepValue.stepValue:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-color: transparent;
-}
-
 .addOnlyBtn {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
+  min-height: 0;
   padding: 0;
   border-radius: 999px;
   border: none;

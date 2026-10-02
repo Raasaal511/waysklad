@@ -78,7 +78,16 @@
   gap: 10px;
   min-height: 44px;
   color: var(--text);
+  text-decoration: none;
   border-radius: var(--radius-sm);
+}
+
+/* Телефон: шапка — только название, длинному названию отдаём всю ширину. */
+@media (max-width: 767px) {
+  .brand {
+    flex-shrink: 1;
+    min-width: 0;
+  }
 }
 
 .brand:focus-visible {
@@ -119,7 +128,7 @@
 
 @media (max-width: 767px) {
   .brandName {
-    max-width: 140px;
+    max-width: none;
   }
 }
 
@@ -243,6 +252,12 @@
   margin-left: auto;
 }
 
+@media (max-width: 767px) {
+  .actionsDuplicatedBelow {
+    display: none;
+  }
+}
+
 .allShopsLink {
   display: inline-flex;
   align-items: center;
@@ -330,6 +345,7 @@
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
+  text-decoration: none;
   transition: background 150ms ease-out, transform 150ms ease-out;
 }
 

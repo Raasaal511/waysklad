@@ -226,6 +226,15 @@ function fillTimelineGaps(
   return result
 }
 
+/** Подпись оси значений: колонка 52px — без «₽» и с одним знаком только когда
+ * он что-то меняет («5 млн», «3,8 млн», «750 тыс»); иначе «5.0 мл…». */
+function formatAxisMoney(value: number): string {
+  const short = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.', ','))
+  if (Math.abs(value) >= 1_000_000) return `${short(Math.round(value / 100_000) / 10)} млн`
+  if (Math.abs(value) >= 1_000) return `${Math.round(value / 1_000)} тыс`
+  return String(Math.round(value))
+}
+
 function formatMoneyShort(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} млн ₽`
   if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(0)} тыс ₽`
@@ -523,7 +532,7 @@ export function AnalyticsPage() {
           {periodLoading ? (
             <p className={layoutStyles.textMuted}>Загрузка…</p>
           ) : (
-            <BarChart points={chartPoints} formatValue={formatMoneyShort} emptyMessage="Продаж за период нет" />
+            <BarChart points={chartPoints} formatValue={formatAxisMoney} emptyMessage="Продаж за период нет" />
           )}
         </div>
       </div>
@@ -541,7 +550,7 @@ export function AnalyticsPage() {
           />
         ) : (
           <div
-            className={`${layoutStyles.dataTable} ${layoutStyles.dataTableScroll}`}
+            className={`${layoutStyles.dataTable} ${layoutStyles.dataTableScroll} ${styles.compactTable}`}
             style={{ gridTemplateColumns: TOP_PRODUCTS_COLUMNS }}
           >
             <div className={layoutStyles.dataTableHead}>
@@ -591,7 +600,7 @@ export function AnalyticsPage() {
           />
         ) : (
           <div
-            className={`${layoutStyles.dataTable} ${layoutStyles.dataTableScroll}`}
+            className={`${layoutStyles.dataTable} ${layoutStyles.dataTableScroll} ${styles.compactTable}`}
             style={{ gridTemplateColumns: CATEGORY_PROFIT_COLUMNS }}
           >
             <div className={layoutStyles.dataTableHead}>
@@ -648,7 +657,7 @@ export function AnalyticsPage() {
           />
         ) : (
           <div
-            className={`${layoutStyles.dataTable} ${layoutStyles.dataTableScroll}`}
+            className={`${layoutStyles.dataTable} ${layoutStyles.dataTableScroll} ${styles.compactTable}`}
             style={{ gridTemplateColumns: DEAD_STOCK_COLUMNS }}
           >
             <div className={layoutStyles.dataTableHead}>
@@ -704,7 +713,7 @@ export function AnalyticsPage() {
           />
         ) : (
           <div
-            className={`${layoutStyles.dataTable} ${layoutStyles.dataTableScroll}`}
+            className={`${layoutStyles.dataTable} ${layoutStyles.dataTableScroll} ${styles.compactTable}`}
             style={{ gridTemplateColumns: MISSED_SALES_COLUMNS }}
           >
             <div className={layoutStyles.dataTableHead}>

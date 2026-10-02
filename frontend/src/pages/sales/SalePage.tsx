@@ -396,7 +396,7 @@ async function loadSalesPage(params: {
             className={[styles.saleClientSearch, clientQuery.trim() !== '' && styles.saleFilterActive]
               .filter(Boolean)
               .join(' ')}
-            placeholder="Поиск по клиенту"
+            placeholder="Найти клиента"
             aria-label="Поиск по клиенту"
             value={clientQuery}
             onChange={(e) => setClientQuery(e.target.value)}
@@ -683,7 +683,7 @@ function ProductFilterSearch({
         // списка (value), а не просто напечатан текст: иначе рамка загоралась
         // до применения фильтра и создавала впечатление, что он уже сработал.
         className={[className, value && activeClassName].filter(Boolean).join(' ')}
-        placeholder="Поиск по товару"
+        placeholder="Найти товар"
         aria-label="Поиск по товару"
         value={query}
         onChange={(e) => handleQueryChange(e.target.value)}

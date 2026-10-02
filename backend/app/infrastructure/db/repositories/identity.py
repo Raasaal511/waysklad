@@ -178,6 +178,8 @@ class SqlAlchemyUserRepository(SqlAlchemyRepository, IUserRepository):
         model.is_active = user.is_active
         model.password_hash = user.password_hash
         model.token_version = user.token_version
+        model.telegram_user_id = user.telegram_user_id
+        model.telegram_verified_at = user.telegram_verified_at
         await self._session.flush()
         return user
 

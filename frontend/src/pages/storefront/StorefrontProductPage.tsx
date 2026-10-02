@@ -1,9 +1,9 @@
 import { useParams, useSearchParams } from 'react-router-dom'
 import { IconHeart, IconHeartFilled } from '@tabler/icons-react'
-import { useState, useEffect, useRef, Suspense, lazy } from 'react'
+import { useCallback, useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { FAVORITES_EVENT, loadFavorites, toggleFavorite } from '../../shared/lib/favorites'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
-import { formatMoney, plural } from '../../shared/lib/format'
+import { formatMoney, formatQuantity, plural } from '../../shared/lib/format'
 import {
   useStorefrontProduct,
   useShopProfile,
@@ -29,7 +29,7 @@ import { useSelection } from './product/useSelection'
 import { variantPrice, galleryForVariant, buildProductBreadcrumbs } from './product/productUtils'
 import { pushRecentlyViewed } from './product/recentlyViewed'
 import { addToCart, loadCart } from './cart'
-import { initialOrderQty } from '../../entities/storefront/api'
+import { initialOrderQty, type StorefrontProductDetail } from '../../entities/storefront/api'
 import shellStyles from './Storefront.module.css'
 import styles from './product/ProductPage.module.css'
 
@@ -51,6 +51,20 @@ export function StorefrontProductPage() {
   const [cartItems, setCartItems] = useState(() => loadCart(slug))
   const [favorites, setFavorites] = useState(() => loadFavorites(slug))
   const { selection, setQty, clear, totalQty, linesCount } = useSelection()
+
+  /** Сброс выбора. Товар без вариантов (или с одним) в наличии сразу получает
+   *  минимальное количество: раньше степпер стоял на 0, «Итого —», и было неясно,
+   *  что нажимать первым — плюс или «В корзину». */
+  const resetSelection = useCallback(
+    (p: StorefrontProductDetail) => {
+      clear()
+      if (p.variants.length > 1) return
+      const single = p.variants[0]
+      if (single ? !single.in_stock : !p.in_stock) return
+      setQty(single ? single.id : 'base', initialOrderQty(p.min_order_qty, p.order_step_qty))
+    },
+    [clear, setQty],
+  )
   const [added, setAdded] = useState(false)
   const [activePhoto, setActivePhoto] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
@@ -67,7 +81,7 @@ export function StorefrontProductPage() {
     if (!product) return
     window.scrollTo({ top: 0 })
     setActivePhoto(0)
-    clear()
+    resetSelection(product)
     // если в URL указан конкретный вариант — сразу выделяем его фото в галерее
     if (highlightVariantId) {
       const idx = product.variants.findIndex((v) => String(v.id) === highlightVariantId)
@@ -240,6 +254,8 @@ export function StorefrontProductPage() {
         const qty = initialOrderQty(product.min_order_qty, product.order_step_qty)
         addToCart(slug, {
           product_id: product.id,
+          min_order_qty: product.min_order_qty,
+          order_step_qty: product.order_step_qty,
           name: product.name,
           retail_price: product.retail_price,
           photo: product.photo,
@@ -248,7 +264,7 @@ export function StorefrontProductPage() {
         })
         setCartItems(loadCart(slug))
         setAdded(true)
-        setToast(`Добавлено: ${qty} шт`)
+        setToast(`Добавлено: ${formatQuantity(qty)} ${product.unit_label || 'шт'}`)
         setTimeout(() => setAdded(false), 1600)
         return
       }
@@ -257,6 +273,8 @@ export function StorefrontProductPage() {
         const qty = initialOrderQty(product.min_order_qty, product.order_step_qty)
         addToCart(slug, {
           product_id: product.id,
+          min_order_qty: product.min_order_qty,
+          order_step_qty: product.order_step_qty,
           name: product.name,
           retail_price: variantPrice(product, firstAvailable),
           photo: firstAvailable.photo || product.photo,
@@ -266,7 +284,7 @@ export function StorefrontProductPage() {
         })
         setCartItems(loadCart(slug))
         setAdded(true)
-        setToast(`Добавлено: ${qty} шт`)
+        setToast(`Добавлено: ${formatQuantity(qty)} ${product.unit_label || 'шт'}`)
         setFlashVariantKey(firstAvailable.id)
         setTimeout(() => setAdded(false), 1600)
         setTimeout(() => setFlashVariantKey(null), 1700)
@@ -280,6 +298,8 @@ export function StorefrontProductPage() {
       const variant = key === 'base' ? undefined : product.variants.find((v) => v.id === key)
       addToCart(slug, {
         product_id: product.id,
+        min_order_qty: product.min_order_qty,
+        order_step_qty: product.order_step_qty,
         name: product.name,
         retail_price: variantPrice(product, variant),
         photo: variant?.photo || product.photo,
@@ -290,7 +310,7 @@ export function StorefrontProductPage() {
       count += 1
     }
     setCartItems(loadCart(slug))
-    clear()
+    resetSelection(product)
     setAdded(true)
     setToast(`Добавлено: ${count} ${plural(count, ['товар', 'товара', 'товаров'])}`)
     setTimeout(() => setAdded(false), 1600)

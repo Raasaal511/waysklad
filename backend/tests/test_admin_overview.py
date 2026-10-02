@@ -8,6 +8,7 @@
 import pytest
 
 from tests.test_admin import _admin_headers
+from tests.conftest import register_via_bot
 
 OVERVIEW_URL = "/api/admin/overview"
 
@@ -65,8 +66,8 @@ def make_sale(client):
 @pytest.fixture
 async def second_shop_headers(client, random_phone) -> dict:
     """Второй магазин — для проверки, что tenant-scoping не ослаб."""
-    response = await client.post(
-        "/api/auth/register",
+    response = await register_via_bot(
+        client,
         json={
             "shop_name": "Другой магазин",
             "owner_name": "Магомед",

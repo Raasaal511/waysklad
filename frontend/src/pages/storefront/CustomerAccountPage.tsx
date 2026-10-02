@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
-  IconCheck,
+  IconBuildingStore,
+  IconChevronDown,
   IconChevronRight,
+  IconCircleCheck,
   IconLogout,
   IconMessage,
+  IconUser,
 } from '@tabler/icons-react'
 import {
   changeCustomerPassword,
@@ -26,7 +29,7 @@ import {
 } from '../../entities/auth/customerApi'
 import { peekCachedStorefrontShopProfile } from '../../entities/storefront/api'
 import { ApiError } from '../../shared/api/client'
-import { formatMoney } from '../../shared/lib/format'
+import { formatMoney, plural } from '../../shared/lib/format'
 import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { Button } from '../../shared/ui/Button'
 import { EmptyState } from '../../shared/ui/EmptyState'
@@ -34,6 +37,7 @@ import { Modal } from '../../shared/ui/Modal'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
 import { loadLastStoreSlug } from '../../shared/lib/lastStore'
 import { notifyCustomerAuthChanged } from './customerAuthEvents'
+import { RequestSummary } from './RequestSummary'
 import styles from './CustomerAccountPage.module.css'
 
 const STATUS_LABEL: Record<MyRequest['status'], string> = {
@@ -77,54 +81,50 @@ function OrderCard({ req }: { req: MyRequest }) {
       ? req.accepted_total
       : req.order_total
   const shopSlug = req.shop_slug
+  const positions = req.order_lines.length
 
   return (
     <li className={styles.orderCard}>
-      <button type="button" className={styles.orderHead} onClick={() => setOpen((v) => !v)}>
+      <button
+        type="button"
+        className={styles.orderHead}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
         <span className={styles.orderShop}>
           {req.shop_logo ? (
-            <img src={req.shop_logo} alt="" width={36} height={36} className={styles.orderLogo} />
+            <img src={req.shop_logo} alt="" width={40} height={40} className={styles.orderLogo} />
           ) : (
             <span className={styles.orderLogoFallback} aria-hidden="true">
               {req.shop_name.charAt(0)}
             </span>
           )}
-          <span>
-            <strong>{req.shop_name}</strong>
+          <span className={styles.orderTitle}>
+            <strong>
+              №{req.id}
+              {total ? ` · ${formatMoney(total)} ₽` : ''}
+            </strong>
             <span className={styles.orderMeta}>
-              {formatDate(req.created_at)}
-              {total ? ` · ${formatMoney(total)}` : ''}
+              {req.shop_name} · {formatDate(req.created_at)} · {positions}{' '}
+              {plural(positions, ['товар', 'товара', 'товаров'])}
             </span>
           </span>
         </span>
         <span className={styles.orderStatus} data-status={req.status}>
           {STATUS_LABEL[req.status]}
         </span>
+        <IconChevronDown size={20} stroke={1.8} className={styles.orderChevron} data-open={open || undefined} />
       </button>
       {open && (
         <div className={styles.orderBody}>
-          <ul className={styles.orderLines}>
-            {req.order_lines.map((line) => (
-              <li key={`${line.product_id}-${line.name}`}>
-                {line.name} × {line.quantity}
-              </li>
-            ))}
-          </ul>
-          {req.status === 'accepted' && req.due_date && (
-            <p className={styles.muted}>
-              Готово к {req.due_date}
-              {req.to_pay ? ` · к оплате ${formatMoney(req.to_pay)}` : ''}
-            </p>
-          )}
+          <RequestSummary req={req} />
           <div className={styles.orderActions}>
+            <Link to={`/account/chats/${req.id}`} className={styles.orderAction}>
+              <IconMessage size={18} stroke={1.8} /> Чат с магазином
+            </Link>
             {shopSlug && (
-              <Link to={`/account/chats/${req.id}`} className={styles.textLink}>
-                Чат с магазином
-              </Link>
-            )}
-            {shopSlug && (
-              <Link to={`/store/${shopSlug}`} className={styles.textLink}>
-                В магазин «{req.shop_name}»
+              <Link to={`/store/${shopSlug}`} className={styles.orderAction}>
+                <IconBuildingStore size={18} stroke={1.8} /> В магазин
               </Link>
             )}
           </div>
@@ -428,38 +428,44 @@ export function CustomerAccountPage() {
         <>
           <section className={styles.card}>
             <div className={styles.profileRow}>
+              {/* без имени — логин: человек регистрировался по логину, «Без имени» и «?» его путали */}
               <span className={styles.avatar} aria-hidden="true">
-                {(profile.name || '?').charAt(0).toUpperCase()}
+                {profile.name || profile.username ? (
+                  (profile.name || profile.username).charAt(0).toUpperCase()
+                ) : (
+                  <IconUser size={28} stroke={1.7} />
+                )}
               </span>
               <div className={styles.profileInfo}>
-                <strong className={styles.profileName}>{profile.name || 'Без имени'}</strong>
-                {profile.username && <span className={styles.muted}>@{profile.username}</span>}
-                <span className={styles.phoneLine}>{profile.phone}</span>
-                {profile.phone_verified ? (
-                  <span className={styles.verified}>
-                    <IconCheck size={14} stroke={2} /> Телефон подтверждён
-                  </span>
-                ) : (
-                  <span className={styles.unverified}>
-                    Телефон не подтверждён
-                    <button
-                      type="button"
-                      className={styles.textBtn}
-                      onClick={() => {
-                        setVerifyOpen(true)
-                        setVerifyStep('send')
-                        setVerifyError(null)
-                      }}
-                    >
-                      Подтвердить
-                    </button>
-                  </span>
-                )}
+                <strong className={styles.profileName}>{profile.name || profile.username || 'Покупатель'}</strong>
+                {profile.name && profile.username && <span className={styles.muted}>@{profile.username}</span>}
+                <span className={styles.phoneLine}>
+                  {profile.phone}
+                  {profile.phone_verified && (
+                    <IconCircleCheck size={18} stroke={2} className={styles.verifiedIcon} aria-label="Телефон подтверждён" />
+                  )}
+                </span>
               </div>
               <Button variant="secondary" type="button" onClick={() => setEditing((v) => !v)}>
                 {editing ? 'Отмена' : 'Изменить'}
               </Button>
             </div>
+
+            {!profile.phone_verified && (
+              <div className={styles.verifyNotice}>
+                <span>Подтвердите телефон — магазин увидит, что номер настоящий.</span>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setVerifyOpen(true)
+                    setVerifyStep('send')
+                    setVerifyError(null)
+                  }}
+                >
+                  Подтвердить
+                </Button>
+              </div>
+            )}
 
             {editing && (
               <form className={styles.editForm} onSubmit={saveProfile}>
@@ -488,15 +494,9 @@ export function CustomerAccountPage() {
               </form>
             )}
 
-            <p className={styles.stats}>
-              {[
-                formatSince(profile.created_at),
-                `Заказов: ${profile.stats.requests_total}, активных: ${profile.stats.requests_active}`,
-                profile.stats.shops_count ? `Витрин: ${profile.stats.shops_count}` : '',
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
+            {profile.created_at && (
+              <p className={styles.stats}>Покупатель {formatSince(profile.created_at).toLowerCase()}</p>
+            )}
           </section>
 
           {unreadCount > 0 && (
@@ -512,15 +512,6 @@ export function CustomerAccountPage() {
               </div>
               <Link to="/account/chats" className={styles.textLink}>
                 Открыть
-              </Link>
-            </section>
-          )}
-
-          {shops.length > 0 && (
-            <section className={styles.section}>
-              <Link to="/account/shops" className={styles.navRow}>
-                Мои витрины ({shops.length})
-                <IconChevronRight size={18} />
               </Link>
             </section>
           )}
@@ -668,8 +659,9 @@ export function CustomerAccountPage() {
                     <span className={styles.shopMain}>
                       <strong>{shop.name}</strong>
                       <span className={styles.muted}>
-                        /store/{shop.slug}
-                        {shop.orders > 0 ? ` · заказов: ${shop.orders}` : ''}
+                        {shop.orders > 0
+                          ? `${shop.orders} ${plural(shop.orders, ['заказ', 'заказа', 'заказов'])}`
+                          : 'Вы смотрели товары'}
                       </span>
                     </span>
                     <IconChevronRight size={18} />

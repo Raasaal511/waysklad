@@ -15,14 +15,20 @@ from app.application.analytics.top_products import (
     GetTopProductsUseCase,
 )
 from app.application.auth.change_password import ChangePasswordUseCase
-from app.application.auth.connect_telegram import ConnectTelegramUseCase
 from app.application.auth.create_employee import CreateEmployeeUseCase
 from app.application.auth.delete_shop_logo import DeleteShopLogoUseCase
 from app.application.auth.get_shop import GetShopUseCase
 from app.application.auth.list_employees import ListEmployeesUseCase
 from app.application.auth.login import LoginUseCase
 from app.application.auth.logout_all import LogoutAllUseCase
-from app.application.auth.register_shop import RegisterShopUseCase
+from app.application.auth.telegram_signup import (
+    CompleteLinkUseCase,
+    CompleteSignupUseCase,
+    GetVerificationStatusUseCase,
+    ResendCodeUseCase,
+    StartLinkUseCase,
+    StartSignupUseCase,
+)
 from app.application.auth.set_shop_logo import SetShopLogoUseCase
 from app.application.auth.update_employee import UpdateEmployeeUseCase
 from app.application.auth.update_shop import UpdateShopUseCase
@@ -93,6 +99,11 @@ from app.application.marketplace.list_products import ListMarketplaceProductsUse
 from app.application.marketplace.list_shops import ListShopsUseCase
 from app.application.marketplace.suggest import SuggestUseCase
 from app.application.notifications.list_notifications import ListNotificationsUseCase
+from app.application.notifications.push_subscriptions import (
+    SendTestPushUseCase,
+    SubscribePushUseCase,
+    UnsubscribePushUseCase,
+)
 from app.application.notifications.mark_read import (
     MarkAllNotificationsReadUseCase,
     MarkNotificationReadUseCase,
@@ -172,7 +183,7 @@ from app.application.tasks.update_task import UpdateTaskUseCase
 from app.application.tasks.create_task import CreateTaskUseCase
 from app.application.feedback.submit_feedback import SubmitFeedbackUseCase
 from app.presentation.deps.cache import CacheDep
-from app.presentation.deps.notifier import NotifierDep
+from app.presentation.deps.notifier import NotifierDep, PushSenderDep
 from app.presentation.deps.security import FileStorageDep, HasherDep
 from app.presentation.deps.session import SessionFactoryDep
 from app.presentation.deps.uow import PublicUowDep, UowDep
@@ -205,8 +216,27 @@ def _with_uow_and_notifier(use_case_cls):
     return provider
 
 
-def get_register_shop(uow: PublicUowDep, hasher: HasherDep) -> RegisterShopUseCase:
-    return RegisterShopUseCase(uow, hasher)
+def get_start_signup(uow: PublicUowDep, hasher: HasherDep) -> StartSignupUseCase:
+    return StartSignupUseCase(uow, hasher)
+
+
+def get_complete_signup(uow: PublicUowDep, hasher: HasherDep) -> CompleteSignupUseCase:
+    return CompleteSignupUseCase(uow, hasher)
+
+
+def get_verification_status(uow: PublicUowDep) -> GetVerificationStatusUseCase:
+    return GetVerificationStatusUseCase(uow)
+
+
+def get_resend_code(uow: PublicUowDep, hasher: HasherDep) -> ResendCodeUseCase:
+    return ResendCodeUseCase(uow, hasher)
+
+
+def get_complete_link(uow: UowDep, hasher: HasherDep) -> CompleteLinkUseCase:
+    return CompleteLinkUseCase(uow, hasher)
+
+
+get_start_link = _with_uow(StartLinkUseCase)
 
 
 def get_request_customer_login_link(uow: PublicUowDep) -> RequestCustomerLoginLinkUseCase:
@@ -273,7 +303,8 @@ def get_create_employee(uow: UowDep, hasher: HasherDep) -> CreateEmployeeUseCase
     return CreateEmployeeUseCase(uow, hasher)
 
 
-get_update_employee = _with_uow(UpdateEmployeeUseCase)
+def get_update_employee(uow: UowDep, hasher: HasherDep) -> UpdateEmployeeUseCase:
+    return UpdateEmployeeUseCase(uow, hasher)
 get_list_employees = _with_uow(ListEmployeesUseCase)
 get_shop = _with_uow(GetShopUseCase)
 
@@ -401,7 +432,6 @@ get_stock_value = _with_uow(GetStockValueUseCase)
 get_restock_recommendations = _with_uow(GetRestockRecommendationsUseCase)
 get_missed_sales = _with_uow(GetMissedSalesUseCase)
 get_apply_offline_sales = _with_uow_and_cache(ApplyOfflineSalesUseCase)
-get_connect_telegram = _with_uow(ConnectTelegramUseCase)
 get_update_shop = _with_uow_and_cache(UpdateShopUseCase)
 
 
@@ -418,6 +448,15 @@ def get_delete_shop_logo(
 get_mark_notification_read = _with_uow(MarkNotificationReadUseCase)
 get_mark_all_notifications_read = _with_uow(MarkAllNotificationsReadUseCase)
 get_list_notifications = _with_uow(ListNotificationsUseCase)
+get_unsubscribe_push = _with_uow(UnsubscribePushUseCase)
+
+
+def get_subscribe_push(uow: UowDep, sender: PushSenderDep) -> SubscribePushUseCase:
+    return SubscribePushUseCase(uow, sender)
+
+
+def get_send_test_push(uow: UowDep, sender: PushSenderDep) -> SendTestPushUseCase:
+    return SendTestPushUseCase(uow, sender)
 
 
 def get_storefront_catalog(
@@ -566,7 +605,12 @@ get_task = _with_uow(GetTaskUseCase)
 get_task_history = _with_uow(GetTaskHistoryUseCase)
 
 # готовые зависимости для сигнатур роутов
-RegisterShopDep = Annotated[RegisterShopUseCase, Depends(get_register_shop)]
+StartSignupDep = Annotated[StartSignupUseCase, Depends(get_start_signup)]
+CompleteSignupDep = Annotated[CompleteSignupUseCase, Depends(get_complete_signup)]
+VerificationStatusDep = Annotated[GetVerificationStatusUseCase, Depends(get_verification_status)]
+ResendCodeDep = Annotated[ResendCodeUseCase, Depends(get_resend_code)]
+StartLinkDep = Annotated[StartLinkUseCase, Depends(get_start_link)]
+CompleteLinkDep = Annotated[CompleteLinkUseCase, Depends(get_complete_link)]
 RequestCustomerLoginLinkDep = Annotated[
     RequestCustomerLoginLinkUseCase, Depends(get_request_customer_login_link)
 ]
@@ -699,7 +743,6 @@ GetMissedSalesDep = Annotated[GetMissedSalesUseCase, Depends(get_missed_sales)]
 ApplyOfflineSalesDep = Annotated[
     ApplyOfflineSalesUseCase, Depends(get_apply_offline_sales)
 ]
-ConnectTelegramDep = Annotated[ConnectTelegramUseCase, Depends(get_connect_telegram)]
 UpdateShopDep = Annotated[UpdateShopUseCase, Depends(get_update_shop)]
 SetShopLogoDep = Annotated[SetShopLogoUseCase, Depends(get_set_shop_logo)]
 DeleteShopLogoDep = Annotated[DeleteShopLogoUseCase, Depends(get_delete_shop_logo)]
@@ -719,6 +762,9 @@ MarkAllNotificationsReadDep = Annotated[
     MarkAllNotificationsReadUseCase, Depends(get_mark_all_notifications_read)
 ]
 ListNotificationsDep = Annotated[ListNotificationsUseCase, Depends(get_list_notifications)]
+SubscribePushDep = Annotated[SubscribePushUseCase, Depends(get_subscribe_push)]
+UnsubscribePushDep = Annotated[UnsubscribePushUseCase, Depends(get_unsubscribe_push)]
+SendTestPushDep = Annotated[SendTestPushUseCase, Depends(get_send_test_push)]
 GetStorefrontCatalogDep = Annotated[
     GetStorefrontCatalogUseCase, Depends(get_storefront_catalog)
 ]

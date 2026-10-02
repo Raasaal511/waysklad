@@ -325,9 +325,24 @@
   }
 }
 
+/* Узкий телефон: пять показателей по одному на строку занимали полтора экрана.
+   Две колонки помещаются, если убрать иконки-украшения; нечётный последний —
+   во всю ширину. */
 @media (max-width: 420px) {
   .metrics {
-    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .metric {
+    padding: 12px 14px;
+  }
+
+  .metric:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .metricIcon {
+    display: none;
   }
 }
 

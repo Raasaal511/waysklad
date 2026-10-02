@@ -31,7 +31,7 @@ export function CustomerChatPage() {
   const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    setPageMeta({ title: `Чат · заказ #${requestId}` })
+    setPageMeta({ title: `Чат по заказу №${requestId}` })
     return () => resetPageMeta()
   }, [requestId])
 
@@ -99,12 +99,12 @@ export function CustomerChatPage() {
     <div className={styles.shell}>
       <header className={styles.headerCompact}>
         <Link to={"/account/chats"} className={styles.back}>
-          <IconChevronLeft size={16} /> К чатам
+          <IconChevronLeft size={20} /> К чатам
         </Link>
       </header>
 
       <main className={styles.requestPage}>
-        <h1>Чат · заказ #{requestId}</h1>
+        <h1>Чат по заказу №{requestId}</h1>
         {loading ? (
           <p className={styles.muted}>Загрузка…</p>
         ) : (

@@ -5,6 +5,70 @@
 
 ---
 
+## 2026-10-01 — Регистрация владельца через Telegram, лимит сотрудников (BREAKING)
+
+Задача `docs/TASK_OWNER_TELEGRAM.md`.
+
+**Breaking:** `POST /api/auth/register` больше не создаёт магазин и не отдаёт токен.
+Ответ — `{token, telegram_link, expires_at}` (ссылка `t.me/<бот>?start=reg_<token>`,
+30 мин). Магазин создаёт:
+
+| Метод | Путь | Тело | Ответ |
+|---|---|---|---|
+| POST | `/api/auth/register/confirm` | `{token, code}` (6 цифр из бота) | 201, `TokenResponse` как раньше от `/register` |
+| GET | `/api/auth/telegram/verification?token=` | — | `{contact_confirmed, completed, expired, expires_at, code_sent_at}` |
+| POST | `/api/auth/telegram/verification/resend` | `{token}` | 204; 429 — раньше минуты |
+| POST | `/api/auth/telegram/link` | — (владелец) | 201, как `/register` (`start=link_…`) |
+| POST | `/api/auth/telegram/link/confirm` | `{token, code}` | `TenantResponse` с `owner_telegram_chat_id` |
+
+- 503 у `/register` и `/telegram/link` — бот не настроен (`TELEGRAM_BOT_USERNAME`).
+- Неверный код — 400 «Осталось попыток: N», после 5 — 429.
+- **Удалено:** `POST /api/auth/telegram` (ручной chat_id).
+- `UserResponse.telegram_verified: bool` — новое поле.
+- `PATCH /api/auth/employees/{id}`: необязательный `password` — сброс пароля сотруднику
+  (его старые сессии закрываются).
+- Создание/включение сотрудника сверх 10 включённых (без владельца) — 400.
+
+Уже выведено: шаг Telegram в регистрации (`widgets/telegram-verify`), подключение в
+профиле → Подключения, баннер для владельцев без Telegram, сотрудники «N из 10»,
+генерация пароля и окно с данными для входа.
+
+---
+
+## 2026-10-01 — Имя в заявке с витрины необязательно (не breaking)
+
+`POST /api/storefront/{slug}/requests`: поле `customer_name` теперь необязательное
+(было `min_length=1`). Пусто или не передано — сервер берёт имя из профиля
+покупателя, иначе его логин, иначе телефон. Ответ не менялся: в
+`customer_name` приходит итоговое имя.
+
+Уже выведено: корзина больше не спрашивает «Ваше имя», вместо поля —
+блок «Кто заказывает» с кнопкой «Указать имя» (сохраняет в профиль,
+`PUT /api/auth/customer/me`).
+## 2026-10-01 — Web Push: уведомления на экран телефона (не breaking)
+
+Задача `docs/TASK_WEB_PUSH.md`. Только новые эндпоинты, все — для вошедшего
+сотрудника (любая роль). Существующие не менялись.
+
+| Метод | Путь | Тело | Ответ |
+|---|---|---|---|
+| GET | `/api/notifications/push/key` | — | `{public_key: string \| null}` — `null`: push на сервере выключен, карточку не показывать |
+| PUT | `/api/notifications/push/subscription` | `PushSubscription.toJSON()` браузера: `{endpoint, keys: {p256dh, auth}}` | 204; повторный вызов — обновление, не дубль |
+| POST | `/api/notifications/push/unsubscribe` | `{endpoint}` | 204 (и когда подписки не было) |
+| POST | `/api/notifications/push/test` | `{endpoint}` | `{delivered: bool}` — пробное уведомление на это устройство |
+
+- 400: push выключен на сервере, `endpoint` не https/IP/внутреннее имя, ключи не base64url.
+- Push приходит по тем же событиям, что и колокольчик, payload:
+  `{title, body, link, tag}`; `link` — путь в кабинете, `tag` — замена прежнего
+  уведомления по той же сущности. Показ и касание — `public/push-sw.js`.
+- Подписка перестаёт работать после смены пароля / «Выйти везде» / блокировки
+  сотрудника — кабинет при открытии повторяет PUT (`syncPushSubscription`).
+- Уже выведено: карточка «Уведомления на телефоне» в профиле
+  (`pages/profile/PushCard.tsx`), отписка при выходе (`AuthContext.logout`).
+- Сервер: `VAPID_PRIVATE_KEY` в `.env` (`python scripts/gen_vapid_keys.py`).
+
+---
+
 ## 2026-09-23 — «Был в сети» в админке платформы (не breaking)
 
 Новые поля, старые не менялись. Время — ISO с таймзоной, `null` — ни разу.

@@ -63,6 +63,7 @@
 .contactBtn {
   width: 44px;
   height: 44px;
+  padding: 0;
   border-radius: 12px;
   background: var(--accent-soft);
   color: var(--accent);

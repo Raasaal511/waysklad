@@ -1,10 +1,11 @@
 import pytest
+from tests.conftest import register_via_bot
 
 
 async def test_register_login_flow(client, random_phone):
     phone = random_phone()
-    response = await client.post(
-        "/api/auth/register",
+    response = await register_via_bot(
+        client,
         json={
             "shop_name": "Лавка",
             "owner_name": "Муса",
@@ -33,8 +34,8 @@ async def test_register_login_flow(client, random_phone):
 
 
 async def test_register_requires_personal_data_consent(client, random_phone):
-    response = await client.post(
-        "/api/auth/register",
+    response = await register_via_bot(
+        client,
         json={
             "shop_name": "Лавка",
             "owner_name": "Муса",
@@ -46,8 +47,8 @@ async def test_register_requires_personal_data_consent(client, random_phone):
     assert response.status_code == 400
     assert "согласи" in response.json()["detail"].lower()
 
-    response = await client.post(
-        "/api/auth/register",
+    response = await register_via_bot(
+        client,
         json={
             "shop_name": "Лавка",
             "owner_name": "Муса",
@@ -106,30 +107,6 @@ async def test_notifications_websocket_rejects_invalid_token(client, owner_heade
     with pytest.raises(WebSocketDisconnect):
         with sync_client.websocket_connect("/api/notifications/ws?token=garbage"):
             pass
-
-
-async def test_connect_telegram_via_api(client, owner_headers, random_phone):
-    response = await client.post(
-        "/api/auth/telegram", headers=owner_headers, json={"chat_id": "555444333"}
-    )
-    assert response.status_code == 200, response.text
-    assert response.json()["owner_telegram_chat_id"] == "555444333"
-
-    seller_phone = random_phone()
-    await client.post(
-        "/api/auth/employees",
-        headers=owner_headers,
-        json={"name": "Продавец", "phone": seller_phone, "password": "secret123", "role": "seller"},
-    )
-    login = await client.post(
-        "/api/auth/login", json={"phone": seller_phone, "password": "secret123", "personal_data_consent": True}
-    )
-    seller_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
-
-    response = await client.post(
-        "/api/auth/telegram", headers=seller_headers, json={"chat_id": "111"}
-    )
-    assert response.status_code == 403
 
 
 async def test_update_shop_summary_schedule_via_api(client, owner_headers):

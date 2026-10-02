@@ -58,10 +58,13 @@ export function ProductCard({ item, href, showShop, favorite, onToggleFavorite, 
 
   // Приоритет бейджей по блоку «Д» п.6: нет в наличии → скидка → хит → новинка, не больше двух.
   const badges: { key: string; label: string; tone: 'out' | 'discount' | 'hit' | 'new' }[] = []
+  // Товара нет — скидка и «хит» не помогут его купить, остаётся один бейдж.
   if (!item.in_stock) badges.push({ key: 'out', label: 'Нет в наличии', tone: 'out' })
-  if (item.discount_percent) badges.push({ key: 'discount', label: `−${item.discount_percent}%`, tone: 'discount' })
-  if (item.is_hit) badges.push({ key: 'hit', label: 'Хит', tone: 'hit' })
-  if (item.is_new) badges.push({ key: 'new', label: 'Новинка', tone: 'new' })
+  else {
+    if (item.discount_percent) badges.push({ key: 'discount', label: `−${item.discount_percent}%`, tone: 'discount' })
+    if (item.is_hit) badges.push({ key: 'hit', label: 'Хит', tone: 'hit' })
+    if (item.is_new) badges.push({ key: 'new', label: 'Новинка', tone: 'new' })
+  }
   const shownBadges = badges.slice(0, 2)
 
   return (
@@ -86,22 +89,34 @@ export function ProductCard({ item, href, showShop, favorite, onToggleFavorite, 
             onClick={onToggleFavorite}
             aria-label={favorite ? 'Убрать из избранного' : 'В избранное'}
           >
-            {favorite ? <IconHeartFilled size={18} /> : <IconHeart size={18} stroke={1.8} />}
+            {favorite ? <IconHeartFilled size={22} /> : <IconHeart size={22} stroke={1.8} />}
           </button>
         )}
       </div>
 
       <div className={styles.body}>
+        <div className={styles.priceRow}>
+          <span className={styles.price}>{formatPriceOrRequest(item.retail_price)}</span>
+          {hasOldPrice && <span className={styles.oldPrice}>{formatMoney(item.old_price!)} ₽</span>}
+        </div>
+
         <h3 className={styles.name}>
           <Link to={href} className={styles.link}>
             {item.name}
           </Link>
         </h3>
 
-        <div className={styles.priceRow}>
-          <span className={styles.price}>{formatPriceOrRequest(item.retail_price)}</span>
-          {hasOldPrice && <span className={styles.oldPrice}>{formatMoney(item.old_price!)} ₽</span>}
-          {hasRating && <span className={styles.rating}>★ {item.average_rating!.toFixed(1)}</span>}
+        {/* Низ всегда одной высоты: рейтинг слева, «+» справа — карточки в сетке ровные,
+            даже если у одной есть рейтинг и старая цена, а у соседней нет. */}
+        <div className={styles.footer}>
+          {hasRating ? (
+            <span className={styles.rating}>
+              ★ {item.average_rating!.toFixed(1)}
+              <span className={styles.ratingCount}>({item.reviews_count})</span>
+            </span>
+          ) : (
+            <span />
+          )}
           {item.in_stock && onQuickAdd && (
             <button
               type="button"
@@ -114,7 +129,7 @@ export function ProductCard({ item, href, showShop, favorite, onToggleFavorite, 
               }}
               aria-label="Добавить в корзину"
             >
-              <IconPlus size={18} stroke={2} />
+              <IconPlus size={20} stroke={2} />
             </button>
           )}
         </div>

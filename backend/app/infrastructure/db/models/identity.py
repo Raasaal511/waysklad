@@ -73,6 +73,8 @@ class UserModel(Base, TenantMixin, TimestampMixin):
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # согласие на обработку телефона (152-ФЗ); NULL — зарегистрирован до введения поля
     personal_data_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    telegram_user_id: Mapped[str | None] = mapped_column(String(32))
+    telegram_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class WarehouseAssignmentModel(Base):
@@ -85,3 +87,34 @@ class WarehouseAssignmentModel(Base):
         ForeignKey("warehouses.id", ondelete="CASCADE"), index=True
     )
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+
+
+class TelegramVerificationModel(Base):
+    """Подтверждение номера через бота — см. domain/identity/telegram_verification.py.
+    Без TenantMixin: при регистрации магазина ещё нет."""
+
+    __tablename__ = "telegram_verifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token: Mapped[str] = mapped_column(String(64), unique=True)
+    purpose: Mapped[str] = mapped_column(String(16))
+    phone: Mapped[str] = mapped_column(String(20))
+    # регистрация: данные формы до создания магазина
+    shop_name: Mapped[str | None] = mapped_column(String(200))
+    owner_name: Mapped[str | None] = mapped_column(String(200))
+    password_hash: Mapped[str | None] = mapped_column(String(200))
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # подключение из кабинета: кого привязываем
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    tenant_id: Mapped[int | None] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"))
+    telegram_user_id: Mapped[str | None] = mapped_column(String(32))
+    telegram_chat_id: Mapped[str | None] = mapped_column(String(32))
+    telegram_username: Mapped[str] = mapped_column(String(64), default="")
+    code_hash: Mapped[str | None] = mapped_column(String(200))
+    code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    code_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(SmallInteger, default=0)
+    code_issues: Mapped[int] = mapped_column(SmallInteger, default=0)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

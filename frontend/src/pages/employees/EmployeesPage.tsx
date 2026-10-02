@@ -12,7 +12,9 @@ import { IconButton } from '../../shared/ui/IconButton'
 import { Select } from '../../shared/ui/Select'
 import { PhoneInput } from '../../shared/ui/PhoneInput'
 import { Avatar } from '../../shared/ui/Avatar'
+import { generatePassword } from '../../shared/lib/password'
 import layoutStyles from '../../shared/ui/Layout.module.css'
+import { CredentialsModal, PasswordField, type Credentials } from './EmployeeCredentials'
 import styles from './EmployeesPage.module.css'
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -30,6 +32,10 @@ const ASSIGNABLE_ROLES: Role[] = ['manager', 'seller', 'storekeeper']
 // роли, для которых нужна привязка к складу (минимум один)
 const WAREHOUSE_SCOPED_ROLES: Role[] = ['manager', 'seller', 'storekeeper']
 
+// Тот же лимит, что на сервере (domain/identity/entities.py MAX_EMPLOYEES):
+// включённые сотрудники без владельца.
+const MAX_EMPLOYEES = 10
+
 const ROLE_BADGE_VARIANT: Record<Role, 'accent' | 'warning' | 'default'> = {
   owner: 'accent',
   manager: 'accent',
@@ -45,6 +51,7 @@ export function EmployeesPage() {
   const [error, setError] = useState<string | null>(null)
   const [showEmployeeForm, setShowEmployeeForm] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<User | null>(null)
+  const [credentials, setCredentials] = useState<{ title: string; data: Credentials } | null>(null)
 
   const canManageUsers = user?.role === 'owner' || user?.role === 'manager'
 
@@ -78,8 +85,10 @@ export function EmployeesPage() {
   }
 
   const warehouseNameById = new Map(warehouses.map((w) => [w.id, w.name]))
-  const activeCount = employees.filter((e) => e.is_active).length
-  const inactiveCount = employees.length - activeCount
+  const staff = employees.filter((e) => e.role !== 'owner')
+  const activeCount = staff.filter((e) => e.is_active).length
+  const inactiveCount = staff.length - activeCount
+  const atLimit = activeCount >= MAX_EMPLOYEES
 
   return (
     <div className={layoutStyles.stack}>
@@ -87,7 +96,7 @@ export function EmployeesPage() {
         <h2>Сотрудники</h2>
         <div className={layoutStyles.pageTitleActions}>
           <div className={layoutStyles.pageTitleActionsDesktop}>
-            <Button onClick={() => setShowEmployeeForm(true)}>
+            <Button onClick={() => setShowEmployeeForm(true)} disabled={atLimit}>
               <IconPlus size={16} stroke={1.8} /> Сотрудник
             </Button>
           </div>
@@ -97,6 +106,7 @@ export function EmployeesPage() {
               size="lg"
               aria-label="Добавить сотрудника"
               onClick={() => setShowEmployeeForm(true)}
+              disabled={atLimit}
             >
               <IconPlus size={20} stroke={2} />
             </IconButton>
@@ -108,17 +118,15 @@ export function EmployeesPage() {
         <div className={`${layoutStyles.card} ${layoutStyles.cardFull}`}>
           <div className={layoutStyles.gridStats}>
             <div className={layoutStyles.stat}>
-              <span className={layoutStyles.statLabel}>Всего</span>
-              <span className={layoutStyles.statValue}>{employees.length}</span>
-            </div>
-            <div className={layoutStyles.stat}>
-              <span className={layoutStyles.statLabel}>Активны</span>
-              <span className={layoutStyles.statValue}>{activeCount}</span>
+              <span className={layoutStyles.statLabel}>Сотрудников</span>
+              <span className={[layoutStyles.statValue, atLimit && layoutStyles.statValueWarning].filter(Boolean).join(' ')}>
+                {activeCount} <span className={styles.statOf}>из {MAX_EMPLOYEES}</span>
+              </span>
             </div>
             {inactiveCount > 0 && (
               <div className={layoutStyles.stat}>
                 <span className={layoutStyles.statLabel}>Отключены</span>
-                <span className={`${layoutStyles.statValue} ${layoutStyles.statValueWarning}`}>{inactiveCount}</span>
+                <span className={layoutStyles.statValue}>{inactiveCount}</span>
               </div>
             )}
             <div className={layoutStyles.stat}>
@@ -126,6 +134,11 @@ export function EmployeesPage() {
               <span className={layoutStyles.statValue}>{warehouses.length}</span>
             </div>
           </div>
+          {atLimit && (
+            <p className={styles.limitNote}>
+              Это максимум. Чтобы добавить нового, отключите кого-то в его карточке.
+            </p>
+          )}
         </div>
       )}
 
@@ -133,8 +146,9 @@ export function EmployeesPage() {
         <Modal title="Новый сотрудник" onClose={() => setShowEmployeeForm(false)}>
           <EmployeeForm
             warehouses={warehouses}
-            onDone={() => {
+            onDone={(data) => {
               setShowEmployeeForm(false)
+              if (data) setCredentials({ title: 'Сотрудник добавлен', data })
               refreshCatalog(['employees']).catch(() => {})
             }}
           />
@@ -146,12 +160,21 @@ export function EmployeesPage() {
           <EmployeeForm
             warehouses={warehouses}
             employee={editingEmployee}
-            onDone={() => {
+            onDone={(data) => {
               setEditingEmployee(null)
+              if (data) setCredentials({ title: 'Пароль изменён', data })
               refreshCatalog(['employees']).catch(() => {})
             }}
           />
         </Modal>
+      )}
+
+      {credentials && (
+        <CredentialsModal
+          title={credentials.title}
+          credentials={credentials.data}
+          onClose={() => setCredentials(null)}
+        />
       )}
 
       {error && <p className={layoutStyles.error}>{error}</p>}
@@ -246,12 +269,14 @@ function EmployeeForm({
 }: {
   warehouses: Warehouse[]
   employee?: User
-  onDone: () => void
+  /** credentials — только если появился пароль, который надо передать сотруднику */
+  onDone: (credentials?: Credentials) => void
 }) {
   const isEdit = employee != null
   const [name, setName] = useState(employee?.name ?? '')
   const [phone, setPhone] = useState('')
-  const [password, setPassword] = useState('')
+  // новый сотрудник — пароль уже придуман; в карточке — null, пока не нажали «Задать новый пароль»
+  const [password, setPassword] = useState<string | null>(employee ? null : generatePassword())
   const [role, setRole] = useState<Role>(employee?.role ?? 'seller')
   const [isActive, setIsActive] = useState(employee?.is_active ?? true)
   const [warehouseIds, setWarehouseIds] = useState<number[]>(employee?.warehouse_ids ?? [])
@@ -272,22 +297,28 @@ function EmployeeForm({
     setSaving(true)
     try {
       if (isEdit && employee) {
-        await updateEmployee(employee.id, {
+        const saved = await updateEmployee(employee.id, {
           name,
           role,
           is_active: isActive,
           warehouse_ids: WAREHOUSE_SCOPED_ROLES.includes(role) ? warehouseIds : null,
+          ...(password ? { password } : {}),
         })
+        onDone(
+          password
+            ? { name: saved.name, roleLabel: ROLE_LABELS[saved.role], phone: saved.phone, password }
+            : undefined,
+        )
       } else {
-        await createEmployee({
+        const created = await createEmployee({
           name,
           phone,
-          password,
+          password: password ?? '',
           role,
           warehouse_ids: WAREHOUSE_SCOPED_ROLES.includes(role) ? warehouseIds : undefined,
         })
+        onDone({ name: created.name, roleLabel: ROLE_LABELS[created.role], phone: created.phone, password: password ?? '' })
       }
-      onDone()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось сохранить сотрудника')
     } finally {
@@ -307,16 +338,7 @@ function EmployeeForm({
             Телефон
             <PhoneInput value={phone} onChange={setPhone} required />
           </label>
-          <label className={layoutStyles.field}>
-            Пароль
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-            />
-          </label>
+          <PasswordField value={password ?? ''} onChange={setPassword} />
         </>
       )}
       <label className={layoutStyles.field}>
@@ -337,6 +359,14 @@ function EmployeeForm({
           />
         </div>
       )}
+      {isEdit &&
+        (password === null ? (
+          <button type="button" className={styles.resetPassword} onClick={() => setPassword(generatePassword())}>
+            Сотрудник забыл пароль? Задать новый
+          </button>
+        ) : (
+          <PasswordField label="Новый пароль" value={password} onChange={setPassword} />
+        ))}
       {isEdit && (
         <label className={layoutStyles.row} style={{ gap: 8 }}>
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />

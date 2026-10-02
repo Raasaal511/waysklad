@@ -8,6 +8,10 @@ export interface StorefrontCartItem {
   quantity: string
   variant_id: number | null
   variant_label?: string
+  /** Минимум и шаг заказа товара — степпер корзины считает по тем же правилам,
+   *  что страница товара и сервер. У старых строк корзины их нет: тогда ±1. */
+  min_order_qty?: string | null
+  order_step_qty?: string | null
 }
 
 export function loadCart(slug: string): StorefrontCartItem[] {
@@ -36,6 +40,8 @@ export function addToCart(slug: string, item: StorefrontCartItem) {
   if (idx >= 0) {
     cart[idx] = {
       ...cart[idx],
+      min_order_qty: item.min_order_qty ?? cart[idx].min_order_qty,
+      order_step_qty: item.order_step_qty ?? cart[idx].order_step_qty,
       quantity: String(Number(cart[idx].quantity) + Number(item.quantity)),
     }
   } else {
