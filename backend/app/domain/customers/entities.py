@@ -82,15 +82,6 @@ class Customer:
         self.phone_verified = True
         self.phone_verified_at = at
 
-    def change_phone(self, phone: Phone) -> None:
-        """Смена номера сбрасывает подтверждение: подтверждён был старый
-        номер, новый ещё никто не проверял."""
-        if str(phone) == str(self.phone):
-            return
-        self.phone = phone
-        self.phone_verified = False
-        self.phone_verified_at = None
-
     def update_name(self, name: str) -> None:
         name = name.strip()
         if not name:

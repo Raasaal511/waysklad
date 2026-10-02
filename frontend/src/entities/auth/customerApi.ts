@@ -90,22 +90,6 @@ export function updateCustomerProfile(input: { name: string }) {
   return api.put<CustomerShort>('/auth/customer/me', input, { headers: customerAuthHeader() })
 }
 
-export function requestCustomerPhoneCode() {
-  return api.post<{
-    sent_via: 'telegram' | 'console'
-    retry_after: number
-    telegram_deep_link: string
-  }>('/auth/customer/phone/request-code', {}, { headers: customerAuthHeader() })
-}
-
-export function verifyCustomerPhoneCode(code: string) {
-  return api.post<{ phone_verified: boolean; phone_verified_at: string | null }>(
-    '/auth/customer/phone/verify',
-    { code },
-    { headers: customerAuthHeader() },
-  )
-}
-
 export function changeCustomerPassword(input: { new_password: string; current_password?: string }) {
   return api.patch<{ access_token: string }>(
     '/auth/customer/me/password',

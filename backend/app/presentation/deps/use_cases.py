@@ -249,10 +249,6 @@ def get_login_customer(uow: PublicUowDep) -> LoginCustomerUseCase:
     return LoginCustomerUseCase(uow)
 
 
-
-
-
-
 def get_change_customer_password(factory: SessionFactoryDep) -> ChangeCustomerPasswordUseCase:
     return ChangeCustomerPasswordUseCase(factory)
 
