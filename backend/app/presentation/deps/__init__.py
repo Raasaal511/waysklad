@@ -14,7 +14,12 @@ from app.presentation.deps.security import (  # noqa: F401
     get_file_storage,
     get_password_hasher,
 )
-from app.presentation.deps.notifier import NotifierDep, get_notifier  # noqa: F401
+from app.presentation.deps.notifier import (  # noqa: F401
+    NotifierDep,
+    PushSenderDep,
+    get_notifier,
+    get_push_sender,
+)
 from app.presentation.deps.uow import (  # noqa: F401
     PublicUowDep,
     SessionFactoryDep,
@@ -129,6 +134,9 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     LogoutAllDep,
     MarkAllNotificationsReadDep,
     MarkNotificationReadDep,
+    SendTestPushDep,
+    SubscribePushDep,
+    UnsubscribePushDep,
     PreviewImportProductsDep,
     ReceiveGoodsDep,
     RecordProductViewDep,

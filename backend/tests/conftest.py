@@ -42,6 +42,10 @@ os.environ.setdefault("BCRYPT_ROUNDS", "4")
 # Поведение при выключенном флаге проверяет test_marketplace_disabled.py,
 # который поднимает отдельное приложение.
 os.environ["MARKETPLACE_ENABLED"] = "true"
+# Web Push выключен: docker compose exec подтягивает .env с настоящим ключом
+# VAPID, и любое событие с подпиской ушло бы в Google/Apple. Тесты push
+# подменяют отправщик фейком (tests/api/test_web_push.py).
+os.environ["VAPID_PRIVATE_KEY"] = ""
 os.environ["ADMIN_PASSWORD_HASH"] = (
     # фактор 4 в тон BCRYPT_ROUNDS выше — проверка пароля с фактором 12 стоила
     # бы 0.19s в каждом тесте admin-роутера

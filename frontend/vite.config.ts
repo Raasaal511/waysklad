@@ -8,6 +8,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
+        // Обработчик push и касания уведомления — отдельным файлом из public/,
+        // чтобы не переводить весь SW на injectManifest ради двух событий.
+        importScripts: ['push-sw.js'],
         // NetworkFirst для read-эндпоинтов — экран продажи открывается даже офлайн,
         // хоть и с последними закэшированными товарами/остатками. Не кэшируем мутации.
         runtimeCaching: [

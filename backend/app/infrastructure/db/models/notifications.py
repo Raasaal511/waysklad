@@ -41,3 +41,23 @@ class NotificationModel(Base, TenantMixin):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class PushSubscriptionModel(Base, TenantMixin):
+    """Подписка браузера на Web Push — см. domain/notifications/push.py."""
+
+    __tablename__ = "push_subscriptions"
+    __table_args__ = (Index("ix_push_subscriptions_user", "tenant_id", "user_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    # адрес уникален во всём сервисе: один браузер — одна подписка, кто бы в нём ни вошёл
+    endpoint: Mapped[str] = mapped_column(String(1024), unique=True)
+    p256dh: Mapped[str] = mapped_column(String(200))
+    auth: Mapped[str] = mapped_column(String(200))
+    token_version: Mapped[int] = mapped_column(default=0)
+    # кабинет подтверждает подписку при каждом открытии — сверх лимита устройств
+    # забываем те, что дольше всех не открывали
+    confirmed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

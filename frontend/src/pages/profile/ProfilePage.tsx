@@ -22,6 +22,7 @@ import { IconBrandTelegram, IconCheck, IconBuildingWarehouse, IconChevronRight }
 import { Button } from '../../shared/ui/Button'
 import { Select } from '../../shared/ui/Select'
 import { AppInstallCard } from './AppInstallCard'
+import { PushCard } from './PushCard'
 import layoutStyles from '../../shared/ui/Layout.module.css'
 import styles from './ProfilePage.module.css'
 
@@ -341,6 +342,7 @@ function AccountTab() {
       </div>
 
       <AppInstallCard />
+      <PushCard />
 
       {showPasswordForm && (
         <Modal title="Сменить пароль" onClose={() => setShowPasswordForm(false)}>

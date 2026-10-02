@@ -82,7 +82,7 @@ const SHEET_TITLES: Record<PwaInstallState['platform'], string> = {
   browser: 'Установка через меню',
 }
 
-function InstallSheet({ pwa, onClose }: { pwa: PwaInstallState; onClose: () => void }) {
+export function InstallSheet({ pwa, onClose }: { pwa: PwaInstallState; onClose: () => void }) {
   const MenuIcon = pwa.os === 'ios' ? IconDots : IconDotsVertical
   const menuSign = pwa.os === 'ios' ? '•••' : '⋮'
 

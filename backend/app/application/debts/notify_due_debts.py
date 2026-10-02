@@ -12,6 +12,7 @@ from app.domain.common.notifier import INotifier
 from app.domain.debts.entities import Debt, DebtStatus
 from app.domain.identity.entities import Role
 from app.domain.notifications.entities import NotificationKind
+from app.infrastructure.background import drain
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 
 
@@ -64,6 +65,9 @@ async def _run_async(notifier: INotifier) -> None:
         async with SqlAlchemyUnitOfWork(tenant.id) as uow:
             await _notify_tenant(uow, notifier)
             await uow.commit()
+
+    # push уходят после commit в фоне — asyncio.run отменил бы их на выходе
+    await drain()
 
 
 def notify_due_debts() -> None:

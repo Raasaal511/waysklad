@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+
 from app.domain.common.uow import IUnitOfWork
+from app.infrastructure.background import spawn
 from app.infrastructure.db.repositories.analytics import SqlAlchemyAnalyticsRepository
 from app.infrastructure.db.repositories.audit import SqlAlchemyAuditRepository
 from app.infrastructure.db.repositories.catalog import (
@@ -30,6 +33,7 @@ from app.infrastructure.db.repositories.inventory import (
 )
 from app.infrastructure.db.repositories.marketplace import SqlAlchemyMarketplaceProductRepository
 from app.infrastructure.db.repositories.notifications import SqlAlchemyNotificationRepository
+from app.infrastructure.db.repositories.push_subscriptions import SqlAlchemyPushSubscriptionRepository
 from app.infrastructure.db.repositories.orders import SqlAlchemyOrderRepository
 from app.infrastructure.db.repositories.platform import (
     SqlAlchemyPlatformBannerRepository,
@@ -64,6 +68,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
     def __init__(self, tenant_id: int | None, session_factory=SessionLocal):
         self.tenant_id = tenant_id
         self._session_factory = session_factory
+        self._after_commit: list[Callable[[], Awaitable[None]]] = []
 
     async def __aenter__(self) -> SqlAlchemyUnitOfWork:
         self.session = self._session_factory()
@@ -92,6 +97,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.review_votes = SqlAlchemyReviewVoteRepository(self)
         self.tasks = SqlAlchemyTaskRepository(self)
         self.notifications = SqlAlchemyNotificationRepository(self)
+        self.push_subscriptions = SqlAlchemyPushSubscriptionRepository(self)
         self.audit = SqlAlchemyAuditRepository(self)
         self.analytics = SqlAlchemyAnalyticsRepository(self)
         self.marketplace_products = SqlAlchemyMarketplaceProductRepository(self.session)
@@ -103,10 +109,21 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await super().__aexit__(exc_type, exc, tb)
+        self._after_commit.clear()
         await self.session.close()
 
     async def commit(self) -> None:
         await self.session.commit()
+        actions, self._after_commit = self._after_commit, []
+        for action in actions:
+            spawn(action())
 
     async def rollback(self) -> None:
+        self._after_commit.clear()
         await self.session.rollback()
+
+    def after_commit(self, action: Callable[[], Awaitable[None]]) -> None:
+        self._after_commit.append(action)
+
+    def fork(self) -> SqlAlchemyUnitOfWork:
+        return SqlAlchemyUnitOfWork(self.tenant_id, self._session_factory)

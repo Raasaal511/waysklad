@@ -3,6 +3,7 @@ import type { TokenResponse, User } from '../entities/auth/api'
 import { clearReceiveDraft } from '../pages/stock/receiveDraft'
 import { clearAllRestockCarts } from '../pages/stock/restockCart'
 import { scopedKey } from '../shared/lib/scopedStorage'
+import { disablePush } from '../entities/notification/push'
 
 // Черновик "Новой продажи" (SalePage.tsx) хранит полные объекты товаров
 // (название, цену) в localStorage — держим ключ строкой здесь, а не
@@ -64,6 +65,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
+    // Уведомления на телефон уходят тому, кто их включил: после выхода этому
+    // браузеру больше ничего не шлём. Токен — сейчас, ниже он стирается.
+    void disablePush(
+      localStorage.getItem('access_token') ?? sessionStorage.getItem('access_token') ?? undefined,
+    )
+
     // scopedKey() читает 'user' из storage — чистим scoped-данные ДО того,
     // как его сотрём, иначе не найдём ключи именно этого (выходящего) пользователя.
     // Реальная защита от утечки между аккаунтами — сам scopedKey (данные разных
