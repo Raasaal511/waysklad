@@ -8,6 +8,7 @@ from app.domain.notifications.push import PushDeliveryResult, PushMessage, PushS
 from app.infrastructure.background import drain
 from app.infrastructure.notifications import web_push
 from app.infrastructure.security import decode_access_token
+from tests.conftest import register_via_bot
 
 FCM = "https://fcm.googleapis.com/fcm/send/"
 KEYS = {"p256dh": "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM", "auth": "tBHItJI5svbpez7KI4CCXg"}
@@ -49,9 +50,10 @@ async def _me(client, headers) -> dict:
 
 
 async def _second_owner(client, random_phone) -> dict:
-    response = await client.post(
-        "/api/auth/register",
-        json={
+    """Второй магазин — тем же путём, что и живой владелец (через бота)."""
+    response = await register_via_bot(
+        client,
+        {
             "shop_name": "Второй магазин",
             "owner_name": "Магомед",
             "phone": random_phone(),
