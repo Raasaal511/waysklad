@@ -3,9 +3,7 @@ from fastapi import APIRouter, Request
 from app.application.customers.get_login_status import GetCustomerLoginStatusCommand
 from app.application.customers.login_with_password import LoginCustomerCommand
 from app.application.customers.register_with_password import RegisterCustomerCommand
-from app.application.customers.request_phone_code import RequestPhoneCodeCommand
 from app.application.customers.change_password import ChangeCustomerPasswordCommand
-from app.application.customers.verify_phone_code import VerifyPhoneCodeCommand
 from app.application.customers.request_login_link import RequestCustomerLoginLinkCommand
 from app.infrastructure.rate_limit import limiter
 from app.presentation.customers.schemas import (
@@ -19,11 +17,8 @@ from app.presentation.customers.schemas import (
     CustomerChatSummaryResponse,
     CustomerTokenResponse,
     SendCustomerChatMessageRequest,
-    PhoneVerifiedResponse,
     RegisterCustomerRequest,
     RegisterCustomerResponse,
-    RequestPhoneCodeResponse,
-    VerifyPhoneCodeRequest,
     RequestCustomerLoginLinkRequest,
     RequestCustomerLoginLinkResponse,
     UpdateCustomerProfileRequest,
@@ -37,8 +32,6 @@ from app.presentation.deps import (
     ListCustomerChatsDep,
     SendCustomerChatMessageDep,
     LogoutAllCustomerDep,
-    RequestPhoneCodeDep,
-    VerifyPhoneCodeDep,
     GetCustomerProfileDep,
     RequestCustomerLoginLinkDep,
     UpdateCustomerProfileDep,
@@ -113,33 +106,6 @@ async def update_customer_profile(
 ) -> CustomerResponse:
     updated = await use_case.execute(body.to_command(customer.id))
     return CustomerResponse.from_entity(updated)
-
-
-@router.post("/phone/request-code")
-@limiter.limit("20/hour")
-async def request_phone_code(
-    request: Request, customer: CurrentCustomerDep, use_case: RequestPhoneCodeDep
-) -> RequestPhoneCodeResponse:
-    """Телефон берётся из аккаунта — тело запроса пустое, иначе кодом можно
-    было бы засыпать произвольный чужой номер."""
-    result = await use_case.execute(RequestPhoneCodeCommand(customer_id=customer.id))
-    return RequestPhoneCodeResponse.from_result(result)
-
-
-@router.post("/phone/verify")
-@limiter.limit("30/hour")
-async def verify_phone_code(
-    request: Request,
-    body: VerifyPhoneCodeRequest,
-    customer: CurrentCustomerDep,
-    use_case: VerifyPhoneCodeDep,
-) -> PhoneVerifiedResponse:
-    updated = await use_case.execute(
-        VerifyPhoneCodeCommand(customer_id=customer.id, code=body.code)
-    )
-    return PhoneVerifiedResponse(
-        phone_verified=updated.phone_verified, phone_verified_at=updated.phone_verified_at
-    )
 
 
 @router.patch("/me/password")

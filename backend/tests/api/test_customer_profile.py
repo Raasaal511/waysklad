@@ -136,46 +136,19 @@ async def test_profile_returns_extended_fields(client, customer_headers):
     assert body["stats"]["shops_count"] == 0
 
 
-async def test_changing_phone_resets_verification(client, customer_headers, make_uow, random_phone):
-    """A4: подтверждён был старый номер — новый подтверждать заново."""
-    from datetime import datetime, timezone
-
-    headers, _ = await customer_headers()
-    profile = (await client.get("/api/auth/customer/me", headers=headers)).json()
-
-    async with make_uow() as uow:
-        customer = await uow.customers.get(profile["id"])
-        customer.mark_phone_verified(datetime.now(timezone.utc))
-        await uow.customers.save(customer)
-        await uow.commit()
-
-    assert (await client.get("/api/auth/customer/me", headers=headers)).json()["phone_verified"]
-
-    new_phone = random_phone()
-    updated = await client.put(
-        "/api/auth/customer/me", headers=headers, json={"name": "Имя", "phone": new_phone}
-    )
-    assert updated.status_code == 200, updated.text
-    assert updated.json()["phone"] == new_phone
-    assert updated.json()["phone_verified"] is False
-
-    # имя без телефона — подтверждение не трогаем
-    async with make_uow() as uow:
-        customer = await uow.customers.get(profile["id"])
-        customer.mark_phone_verified(datetime.now(timezone.utc))
-        await uow.customers.save(customer)
-        await uow.commit()
-    same = await client.put("/api/auth/customer/me", headers=headers, json={"name": "Другое"})
-    assert same.status_code == 200, same.text
-    assert same.json()["phone_verified"] is True
-
-
-async def test_changing_phone_rejects_occupied(client, customer_headers):
-    headers_a, _ = await customer_headers()
-    _, phone_b = await customer_headers()
+async def test_phone_cannot_be_changed_by_hand(client, customer_headers, random_phone):
+    """Номер приходит из контакта Telegram при входе. Пока его можно было
+    вписать руками, в заявку магазину попадал любой чужой или выдуманный
+    номер — а код подтверждения всё равно уходил в Telegram покупателя."""
+    headers, phone = await customer_headers()
 
     response = await client.put(
-        "/api/auth/customer/me", headers=headers_a, json={"name": "Имя", "phone": phone_b}
+        "/api/auth/customer/me", headers=headers, json={"name": "Имя", "phone": random_phone()}
     )
-    assert response.status_code == 400, response.text
-    assert response.json()["detail"] == "Этот телефон уже занят другим аккаунтом"
+    assert response.status_code == 422, response.text
+
+    # имя меняется, номер остаётся прежним
+    renamed = await client.put("/api/auth/customer/me", headers=headers, json={"name": "Другое"})
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["name"] == "Другое"
+    assert renamed.json()["phone"] == phone

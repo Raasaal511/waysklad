@@ -11,6 +11,7 @@ from app.application.customers.confirm_login_link import (
     ConfirmCustomerLoginLinkCommand,
     ConfirmCustomerLoginLinkUseCase,
 )
+from app.domain.common.exceptions import DomainError
 from app.domain.common.phone import Phone
 from app.domain.customers.entities import Customer
 
@@ -18,10 +19,25 @@ REGISTER_URL = "/api/auth/customer/register"
 LOGIN_URL = "/api/auth/customer/login"
 
 
-async def confirm_in_bot(make_uow, token: str, chat_id: str = "1001") -> None:
-    """Подтверждение номера ботом — то, что делает handlers/start.py."""
+async def confirm_in_bot(
+    make_uow, token: str, chat_id: str = "1001", *, phone: str | None = None
+) -> None:
+    """Подтверждение номера ботом — то, что делает handlers/start.py после
+    нажатия «Поделиться номером». phone — номер контакта Telegram; по умолчанию
+    берётся из самой ссылки, то есть «покупатель поделился своим номером»."""
+    uow = make_uow()
+    if phone is None:
+        async with uow:
+            link = await uow.customer_login_links.get_by_token(token)
+            phone = str(link.phone)
     await ConfirmCustomerLoginLinkUseCase(make_uow()).execute(
-        ConfirmCustomerLoginLinkCommand(token=token, telegram_chat_id=chat_id)
+        ConfirmCustomerLoginLinkCommand(
+            token=token,
+            telegram_chat_id=chat_id,
+            contact_phone=phone.lstrip("+"),
+            contact_user_id=chat_id,
+            sender_user_id=chat_id,
+        )
     )
 
 
@@ -283,3 +299,83 @@ async def test_logout_all(client, make_uow, random_phone):
 
     # токен, которым вызвали выход, тоже отозван
     assert (await client.get("/api/auth/customer/me", headers=headers)).status_code == 401
+
+
+async def test_registration_rejects_foreign_phone(client, make_uow, random_phone):
+    """Номер в форме пишется руками. Подтверждает его только контакт Telegram:
+    на чужой или выдуманный номер аккаунт не заводится (раньше код уходил в
+    Telegram самого покупателя и «подтверждал» любую строку)."""
+    foreign_phone = random_phone()
+    response = await client.post(
+        REGISTER_URL,
+        json={
+            "username": "chuzhoy01",
+            "phone": foreign_phone,
+            "password": "parol-12345",
+            "password_confirm": "parol-12345",
+            "personal_data_consent": True,
+        },
+    )
+    assert response.status_code == 201, response.text
+    token = response.json()["token"]
+
+    # в боте поделились СВОИМ номером — он не совпадает с указанным в форме
+    with pytest.raises(DomainError, match="не совпадает"):
+        await confirm_in_bot(make_uow, token, phone=random_phone())
+
+    # аккаунта нет, войти нельзя
+    async with make_uow() as uow:
+        assert await uow.customers.get_by_phone(foreign_phone) is None
+    login = await client.post(
+        LOGIN_URL, json={"login": "chuzhoy01", "password": "parol-12345"}
+    )
+    assert login.status_code in (400, 401)
+
+    # свой номер — регистрация проходит
+    await confirm_in_bot(make_uow, token)
+    assert (
+        await client.post(LOGIN_URL, json={"login": "chuzhoy01", "password": "parol-12345"})
+    ).status_code == 200
+
+
+async def test_forwarded_contact_is_rejected(client, make_uow, random_phone):
+    """Пересланный чужой контакт с нужным номером — тоже не подтверждение."""
+    phone = random_phone()
+    token = (
+        await client.post(
+            REGISTER_URL,
+            json={
+                "username": "peresyl01",
+                "phone": phone,
+                "password": "parol-12345",
+                "password_confirm": "parol-12345",
+                "personal_data_consent": True,
+            },
+        )
+    ).json()["token"]
+
+    with pytest.raises(DomainError, match="чужой контакт"):
+        await ConfirmCustomerLoginLinkUseCase(make_uow()).execute(
+            ConfirmCustomerLoginLinkCommand(
+                token=token,
+                telegram_chat_id="2002",
+                contact_phone=phone.lstrip("+"),
+                contact_user_id="9999",  # контакт другого человека
+                sender_user_id="2002",
+            )
+        )
+
+
+async def test_login_marks_phone_verified(client, make_uow, random_phone):
+    """Вход через контакт Telegram и есть подтверждение номера — отдельный код
+    в профиле больше не нужен."""
+    phone = random_phone()
+    token = (
+        await client.post("/api/auth/customer/login-link", json={"phone": phone})
+    ).json()["token"]
+    await confirm_in_bot(make_uow, token)
+
+    async with make_uow() as uow:
+        customer = await uow.customers.get_by_phone(phone)
+    assert customer is not None
+    assert customer.phone_verified is True
