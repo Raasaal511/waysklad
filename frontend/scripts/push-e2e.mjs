@@ -21,8 +21,10 @@ import { chromium } from 'playwright'
 import { execSync } from 'node:child_process'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BASE = process.env.PUSH_E2E_BASE_URL ?? 'http://localhost:4173'
 const OUT = process.env.PUSH_E2E_OUT ?? path.resolve('..', 'docs', 'screens', 'web-push')
 const results = []
@@ -47,18 +49,25 @@ async function api(pathname, { token, method = 'GET', body } = {}) {
 
 async function registerOwner() {
   const phone = `+7928${String(Date.now()).slice(-7)}`
-  const { status, json } = await api('/auth/register', {
+  const form = {
+    shop_name: 'Push проверка',
+    owner_name: 'Ахмед',
+    phone,
+    password: 'secret123',
+    personal_data_consent: true,
+  }
+  const start = await api('/auth/register', { method: 'POST', body: form })
+  if (start.status !== 201) throw new Error(`register ${start.status}: ${JSON.stringify(start.json)}`)
+  // Шаг бота (кнопку «Поделиться номером» скрипт нажать не может) — тем же
+  // use case, что и бот: см. PUSH_E2E_CONTACT_CMD, по умолчанию contact.sh рядом.
+  const contact = process.env.PUSH_E2E_CONTACT_CMD ?? path.join(__dirname, 'push-e2e-contact.sh')
+  const code = execSync(`${contact} ${start.json.token} ${phone}`).toString().trim()
+  const done = await api('/auth/register/confirm', {
     method: 'POST',
-    body: {
-      shop_name: 'Push проверка',
-      owner_name: 'Ахмед',
-      phone,
-      password: 'secret123',
-      personal_data_consent: true,
-    },
+    body: { token: start.json.token, code },
   })
-  if (status !== 201) throw new Error(`register ${status}: ${JSON.stringify(json)}`)
-  return json
+  if (done.status !== 201) throw new Error(`confirm ${done.status}: ${JSON.stringify(done.json)}`)
+  return done.json
 }
 
 /** Уведомления, которые сейчас показаны service worker'ом. */
