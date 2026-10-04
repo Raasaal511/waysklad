@@ -90,6 +90,16 @@ export function updateCustomerProfile(input: { name: string }) {
   return api.put<CustomerShort>('/auth/customer/me', input, { headers: customerAuthHeader() })
 }
 
+/** Смена номера: аккаунт не меняется, пока владелец нового номера не
+ *  подтвердит его контактом в Telegram-боте по этой ссылке. */
+export function requestCustomerPhoneChange(newPhone: string) {
+  return api.post<{ token: string; telegram_deep_link: string }>(
+    '/auth/customer/me/phone-change',
+    { new_phone: newPhone },
+    { headers: customerAuthHeader() },
+  )
+}
+
 export function changeCustomerPassword(input: { new_password: string; current_password?: string }) {
   return api.patch<{ access_token: string }>(
     '/auth/customer/me/password',

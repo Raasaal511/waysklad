@@ -594,3 +594,73 @@
   min-width: 0;
   flex: 1;
 }
+
+/* Тот же вид, что и кнопка «Открыть Telegram» на входе (CustomerAuthPage):
+   покупатель уже проходил этот шаг при регистрации — пусть узнаёт его. */
+.telegramButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.telegramButton:hover {
+  transform: translateY(-1px);
+  opacity: 0.94;
+}
+
+.linkButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: opacity 0.15s ease;
+}
+
+.linkButton:hover {
+  opacity: 0.75;
+}
+
+.verifyNoticeAction {
+  display: block;
+  margin-top: 10px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.verifyNoticeAction:hover {
+  transform: translateY(-1px);
+  opacity: 0.94;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .telegramButton,
+  .linkButton,
+  .verifyNoticeAction {
+    transition: none;
+  }
+
+  .telegramButton:hover,
+  .verifyNoticeAction:hover {
+    transform: none;
+  }
+}

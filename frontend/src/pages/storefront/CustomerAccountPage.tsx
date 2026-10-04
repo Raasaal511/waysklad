@@ -19,6 +19,7 @@ import {
   listMyStorefrontRequests,
   loadCustomerToken,
   logoutCustomerEverywhere,
+  requestCustomerPhoneChange,
   saveCustomerToken,
   updateCustomerProfile,
   type CustomerChatSummary,
@@ -153,6 +154,11 @@ export function CustomerAccountPage() {
   const [saving, setSaving] = useState(false)
 
 
+  const [phoneOpen, setPhoneOpen] = useState(false)
+  const [newPhone, setNewPhone] = useState('')
+  const [phoneError, setPhoneError] = useState<string | null>(null)
+  const [phoneLink, setPhoneLink] = useState<string | null>(null)
+
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -201,6 +207,29 @@ export function CustomerAccountPage() {
       cancelled = true
     }
   }, [token])
+
+  // пока покупатель подтверждает номер в боте, ждём результат: отдельного
+  // статус-эндпоинта у смены нет — новый номер виден в самом профиле
+  useEffect(() => {
+    if (!phoneLink) return
+    let cancelled = false
+    const id = window.setInterval(async () => {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const fresh = await getCustomerProfile()
+        if (cancelled || fresh.phone === profile?.phone) return
+        setProfile(fresh)
+        closePhoneModal()
+      } catch {
+        // связь пропала — следующая попытка через интервал
+      }
+    }, 2000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phoneLink, profile?.phone])
 
   const unreadCount = useMemo(() => countUnreadCustomerChats(chats), [chats])
 
@@ -277,6 +306,24 @@ export function CustomerAccountPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  async function submitPhoneChange(e: FormEvent) {
+    e.preventDefault()
+    setPhoneError(null)
+    try {
+      const result = await requestCustomerPhoneChange(newPhone.trim())
+      setPhoneLink(result.telegram_deep_link)
+    } catch (err) {
+      setPhoneError(err instanceof ApiError ? err.message : 'Не удалось начать смену номера')
+    }
+  }
+
+  function closePhoneModal() {
+    setPhoneOpen(false)
+    setPhoneLink(null)
+    setNewPhone('')
+    setPhoneError(null)
   }
 
   async function submitPassword(e: FormEvent) {
@@ -393,9 +440,17 @@ export function CustomerAccountPage() {
             </div>
 
             {!profile.phone_verified && (
-              <p className={styles.verifyNotice}>
-                Номер подтвердится сам при следующем входе через Telegram — отдельный код не нужен.
-              </p>
+              <div className={styles.verifyNotice}>
+                <strong>Подтвердите номер телефона.</strong> По нему магазин связывается
+                с вами по заказу — без подтверждения продавец может не дозвониться.
+                <button
+                  type="button"
+                  className={styles.verifyNoticeAction}
+                  onClick={() => setPhoneOpen(true)}
+                >
+                  Подтвердить через Telegram
+                </button>
+              </div>
             )}
 
             {editing && (
@@ -410,7 +465,14 @@ export function CustomerAccountPage() {
                   />
                 </label>
                 <p className={styles.muted}>
-                  Телефон {profile.phone} — из вашего Telegram, поэтому его нельзя изменить здесь.
+                  Телефон {profile.phone} — из вашего Telegram.{' '}
+                  <button
+                    type="button"
+                    className={styles.linkButton}
+                    onClick={() => setPhoneOpen(true)}
+                  >
+                    Изменить номер
+                  </button>
                 </p>
                 {editError && <p className={styles.error}>{editError}</p>}
                 <Button type="submit" disabled={saving}>
@@ -596,6 +658,45 @@ export function CustomerAccountPage() {
             </ul>
           )}
         </section>
+      )}
+
+      {phoneOpen && (
+        <Modal title="Смена номера" onClose={closePhoneModal}>
+          {phoneLink ? (
+            <div className={styles.modalBody}>
+              <p className={styles.muted}>
+                Откройте бота и нажмите «Поделиться номером». Сделать это нужно
+                из того Telegram, на который оформлен <strong>{newPhone}</strong> —
+                так мы убедимся, что номер ваш.
+              </p>
+              <a
+                className={styles.telegramButton}
+                href={phoneLink}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Открыть Telegram
+              </a>
+              <p className={styles.muted}>Ждём подтверждения…</p>
+            </div>
+          ) : (
+            <form className={styles.modalBody} onSubmit={submitPhoneChange}>
+              <label className={styles.field}>
+                Новый номер
+                <input
+                  type="tel"
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  placeholder="+7 999 123-45-67"
+                  required
+                  autoComplete="tel"
+                />
+              </label>
+              {phoneError && <p className={styles.error}>{phoneError}</p>}
+              <Button type="submit">Продолжить в Telegram</Button>
+            </form>
+          )}
+        </Modal>
       )}
 
       {passwordOpen && (
