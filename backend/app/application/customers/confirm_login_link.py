@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from app.domain.common.exceptions import DomainError
+from app.domain.common.phone import ContactCheck
 from app.domain.common.uow import IUnitOfWork
 from app.domain.customers.entities import Customer
 
@@ -38,9 +39,12 @@ class ConfirmCustomerLoginLinkUseCase:
                 raise DomainError("Ссылка входа устарела — запросите новую")
             if link.is_confirmed:
                 raise DomainError("Ссылка входа уже использована")
-            if cmd.contact_user_id != cmd.sender_user_id:
+            check = link.check_contact(
+                cmd.contact_phone, cmd.contact_user_id, cmd.sender_user_id
+            )
+            if check is ContactCheck.NOT_OWN:
                 raise DomainError("Это чужой контакт — нажмите кнопку «Поделиться номером»")
-            if not link.matches_contact(cmd.contact_phone):
+            if check is ContactCheck.PHONE_MISMATCH:
                 raise DomainError(
                     "Номер этого Telegram не совпадает с указанным на сайте — "
                     "исправьте номер в форме или войдите с того Telegram, на который он оформлен"

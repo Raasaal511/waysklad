@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from app.domain.common.exceptions import DomainError
-from app.domain.common.phone import Phone
+from app.domain.common.phone import ContactCheck, Phone, check_telegram_contact
 
 LOGIN_LINK_TTL = timedelta(minutes=10)
 
@@ -132,18 +132,12 @@ class CustomerLoginLink:
     def is_registration(self) -> bool:
         return bool(self.password_hash)
 
-    def matches_contact(self, contact_phone: str) -> bool:
-        """Совпадает ли номер из формы с номером аккаунта Telegram.
-
-        Telegram отдаёт номер без «+», в международном формате. Сверка нужна,
-        потому что номер в форме покупатель пишет руками: без неё код уходил
-        в его же чат, но подтверждал произвольную строку, и магазин получал
-        заявку с номером, по которому не дозвониться."""
-        digits = "".join(ch for ch in contact_phone if ch.isdigit())
-        try:
-            return Phone("+" + digits) == self.phone
-        except DomainError:
-            return False
+    def check_contact(
+        self, contact_phone: str, contact_user_id: str, sender_user_id: str
+    ) -> ContactCheck:
+        """Та же проверка, что у владельца, — одна на проект (см.
+        check_telegram_contact): контакт свой и номер совпал с формой."""
+        return check_telegram_contact(self.phone, contact_phone, contact_user_id, sender_user_id)
 
     @property
     def is_expired(self) -> bool:

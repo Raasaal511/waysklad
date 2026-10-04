@@ -14,7 +14,8 @@ from enum import StrEnum
 from typing import Protocol
 
 from app.domain.common.exceptions import DomainError, TooManyAttemptsError
-from app.domain.common.phone import Phone
+# ContactCheck реэкспортируется: его импортируют из этого модуля бот и use case
+from app.domain.common.phone import ContactCheck, Phone, check_telegram_contact
 
 # Сколько живёт ссылка на бота: успеть открыть Telegram, найти кнопку, вернуться.
 LINK_TTL = timedelta(minutes=30)
@@ -34,14 +35,6 @@ class VerificationPurpose(StrEnum):
     SIGNUP = "signup"
     # уже зарегистрированный владелец привязывает Telegram из кабинета
     LINK = "link"
-
-
-class ContactCheck(StrEnum):
-    """Почему бот не принял контакт — у каждого случая свой текст в чате."""
-
-    OK = "ok"
-    NOT_OWN = "not_own"  # переслан чужой контакт
-    PHONE_MISMATCH = "phone_mismatch"
 
 
 @dataclass(frozen=True)
@@ -113,17 +106,7 @@ class TelegramVerification:
             raise DomainError("Ссылка устарела — начните заново")
 
     def check_contact(self, contact_phone: str, contact_user_id: str, sender_user_id: str) -> ContactCheck:
-        """Свой ли это контакт и тот ли номер, что указан на сайте.
-
-        Telegram даёт номер без «+», в международном формате — приводим к E.164."""
-        if contact_user_id != sender_user_id:
-            return ContactCheck.NOT_OWN
-        digits = "".join(ch for ch in contact_phone if ch.isdigit())
-        try:
-            phone = Phone("+" + digits)
-        except DomainError:
-            return ContactCheck.PHONE_MISMATCH
-        return ContactCheck.OK if phone == self.phone else ContactCheck.PHONE_MISMATCH
+        return check_telegram_contact(self.phone, contact_phone, contact_user_id, sender_user_id)
 
     def issue_code(
         self, code_hash: str, now: datetime, telegram_user_id: str, telegram_chat_id: str, username: str
