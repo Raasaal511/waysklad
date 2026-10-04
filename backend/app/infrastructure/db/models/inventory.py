@@ -80,7 +80,8 @@ class StockDocumentLineModel(Base, TenantMixin):
     __tablename__ = "stock_document_lines"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    document_id: Mapped[int] = mapped_column(ForeignKey("stock_documents.id", ondelete="CASCADE"))
+    # index: строки всегда читаются пачкой по своему документу
+    document_id: Mapped[int] = mapped_column(ForeignKey("stock_documents.id", ondelete="CASCADE"), index=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
     variant_id: Mapped[int | None] = mapped_column(ForeignKey("product_variants.id"))
     quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3))

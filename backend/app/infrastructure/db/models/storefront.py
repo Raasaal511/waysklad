@@ -60,8 +60,9 @@ class StorefrontRequestLineModel(Base, TenantMixin):
     __tablename__ = "storefront_request_lines"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # index: строки всегда читаются пачкой по своей заявке
     request_id: Mapped[int] = mapped_column(
-        ForeignKey("storefront_requests.id", ondelete="CASCADE")
+        ForeignKey("storefront_requests.id", ondelete="CASCADE"), index=True
     )
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
     variant_id: Mapped[int | None] = mapped_column(ForeignKey("product_variants.id"))
