@@ -49,8 +49,11 @@ class RequestCustomerPhoneChangeUseCase:
 
         async with self._uow as uow:
             customer = await uow.customers.get(cmd.customer_id)
-            if customer.phone == new_phone:
-                raise DomainError("Это ваш текущий номер")
+            # тот же номер разрешаем, если он ещё не подтверждён: у старых
+            # аккаунтов это единственный способ подтвердить свой телефон,
+            # и баннер в профиле ведёт именно сюда
+            if customer.phone == new_phone and customer.phone_verified:
+                raise DomainError("Это ваш текущий номер, он уже подтверждён")
 
             # номер уникален в БД: без этой проверки упали бы с ошибкой
             # целостности уже после подтверждения, когда менять поздно

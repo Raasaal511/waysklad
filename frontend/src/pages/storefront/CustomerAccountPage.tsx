@@ -319,6 +319,15 @@ export function CustomerAccountPage() {
     }
   }
 
+  function openPhoneModal() {
+    // неподтверждённому номеру подставляем текущий: чаще всего он верный,
+    // и подтвердить его надо без набора заново
+    setNewPhone(profile && !profile.phone_verified ? profile.phone : '')
+    setPhoneError(null)
+    setPhoneLink(null)
+    setPhoneOpen(true)
+  }
+
   function closePhoneModal() {
     setPhoneOpen(false)
     setPhoneLink(null)
@@ -446,7 +455,7 @@ export function CustomerAccountPage() {
                 <button
                   type="button"
                   className={styles.verifyNoticeAction}
-                  onClick={() => setPhoneOpen(true)}
+                  onClick={openPhoneModal}
                 >
                   Подтвердить через Telegram
                 </button>
@@ -469,7 +478,7 @@ export function CustomerAccountPage() {
                   <button
                     type="button"
                     className={styles.linkButton}
-                    onClick={() => setPhoneOpen(true)}
+                    onClick={openPhoneModal}
                   >
                     Изменить номер
                   </button>
@@ -661,7 +670,10 @@ export function CustomerAccountPage() {
       )}
 
       {phoneOpen && (
-        <Modal title="Смена номера" onClose={closePhoneModal}>
+        <Modal
+          title={profile?.phone_verified ? 'Смена номера' : 'Подтверждение номера'}
+          onClose={closePhoneModal}
+        >
           {phoneLink ? (
             <div className={styles.modalBody}>
               <p className={styles.muted}>
@@ -682,7 +694,7 @@ export function CustomerAccountPage() {
           ) : (
             <form className={styles.modalBody} onSubmit={submitPhoneChange}>
               <label className={styles.field}>
-                Новый номер
+                {profile?.phone_verified ? 'Новый номер' : 'Ваш номер'}
                 <input
                   type="tel"
                   value={newPhone}
@@ -692,6 +704,11 @@ export function CustomerAccountPage() {
                   autoComplete="tel"
                 />
               </label>
+              {!profile?.phone_verified && (
+                <p className={styles.muted}>
+                  Оставьте текущий номер, если он верный — подтвердим именно его.
+                </p>
+              )}
               {phoneError && <p className={styles.error}>{phoneError}</p>}
               <Button type="submit">Продолжить в Telegram</Button>
             </form>

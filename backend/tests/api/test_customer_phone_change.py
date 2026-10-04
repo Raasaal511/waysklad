@@ -127,14 +127,52 @@ async def test_phone_change_rejects_number_of_another_account(
     assert profile.json()["phone"] == old_phone
 
 
-async def test_phone_change_rejects_current_number(client, customer_headers):
+async def test_phone_change_rejects_current_number_when_verified(
+    client, customer_headers, make_uow, random_phone
+):
     headers, old_phone = await customer_headers()
+    new_phone = random_phone()
+    # подтверждаем номер, чтобы повторное подтверждение стало бессмысленным
+    response = await client.post(
+        "/api/auth/customer/me/phone-change", headers=headers, json={"new_phone": new_phone}
+    )
+    async with make_uow() as uow:
+        await ConfirmCustomerPhoneChangeUseCase(uow).execute(
+            ConfirmCustomerPhoneChangeCommand(
+                token=response.json()["token"], **_contact(new_phone)
+            )
+        )
 
     response = await client.post(
-        "/api/auth/customer/me/phone-change", headers=headers, json={"new_phone": old_phone}
+        "/api/auth/customer/me/phone-change", headers=headers, json={"new_phone": new_phone}
     )
     assert response.status_code == 400, response.text
-    assert "текущий номер" in response.text
+    assert "уже подтверждён" in response.text
+
+
+async def test_unverified_customer_can_confirm_own_number(
+    client, customer_headers, make_uow
+):
+    """Старый аккаунт с phone_verified=false подтверждает свой же номер —
+    это то, куда ведёт баннер в профиле."""
+    headers, phone = await customer_headers()
+    assert (await client.get("/api/auth/customer/me", headers=headers)).json()[
+        "phone_verified"
+    ] is False
+
+    response = await client.post(
+        "/api/auth/customer/me/phone-change", headers=headers, json={"new_phone": phone}
+    )
+    assert response.status_code == 200, response.text
+
+    async with make_uow() as uow:
+        await ConfirmCustomerPhoneChangeUseCase(uow).execute(
+            ConfirmCustomerPhoneChangeCommand(token=response.json()["token"], **_contact(phone))
+        )
+
+    profile = (await client.get("/api/auth/customer/me", headers=headers)).json()
+    assert profile["phone"] == phone
+    assert profile["phone_verified"] is True
 
 
 async def test_phone_change_token_is_single_use(
