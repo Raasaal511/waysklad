@@ -17,6 +17,7 @@ from app.infrastructure.db.repositories.counterparties import (
 )
 from app.infrastructure.db.repositories.customers import (
     SqlAlchemyCustomerLoginLinkRepository,
+    SqlAlchemyCustomerPhoneChangeRepository,
     SqlAlchemyCustomerRepository,
     SqlAlchemyPhoneVerificationCodeRepository,
 )
@@ -82,6 +83,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.suppliers = SqlAlchemySupplierRepository(self)
         self.customers = SqlAlchemyCustomerRepository(self)
         self.customer_login_links = SqlAlchemyCustomerLoginLinkRepository(self)
+        self.customer_phone_changes = SqlAlchemyCustomerPhoneChangeRepository(self)
         self.customer_phone_codes = SqlAlchemyPhoneVerificationCodeRepository(self)
         self.stock = SqlAlchemyStockRepository(self)
         self.stock_documents = SqlAlchemyStockDocumentRepository(self)

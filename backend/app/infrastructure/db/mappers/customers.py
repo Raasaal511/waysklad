@@ -1,8 +1,14 @@
 from app.domain.common.phone import Phone
-from app.domain.customers.entities import Customer, CustomerLoginLink, PhoneVerificationCode
+from app.domain.customers.entities import (
+    Customer,
+    CustomerLoginLink,
+    CustomerPhoneChange,
+    PhoneVerificationCode,
+)
 from app.infrastructure.db.models.customers import (
     CustomerLoginLinkModel,
     CustomerModel,
+    CustomerPhoneChangeModel,
     CustomerPhoneCodeModel,
 )
 
@@ -62,6 +68,28 @@ class CustomerLoginLinkMapper:
             confirmed_at=model.confirmed_at,
             username=model.username,
             password_hash=model.password_hash,
+        )
+
+
+class CustomerPhoneChangeMapper:
+    @staticmethod
+    def to_orm(change: CustomerPhoneChange) -> CustomerPhoneChangeModel:
+        return CustomerPhoneChangeModel(
+            token=change.token,
+            customer_id=change.customer_id,
+            new_phone=str(change.new_phone),
+            created_at=change.created_at,
+            confirmed_at=change.confirmed_at,
+        )
+
+    @staticmethod
+    def to_entity(model: CustomerPhoneChangeModel) -> CustomerPhoneChange:
+        return CustomerPhoneChange(
+            token=model.token,
+            customer_id=model.customer_id,
+            new_phone=Phone(model.new_phone),
+            created_at=model.created_at,
+            confirmed_at=model.confirmed_at,
         )
 
 

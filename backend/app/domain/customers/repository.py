@@ -1,7 +1,12 @@
 from datetime import datetime
 from typing import Protocol
 
-from app.domain.customers.entities import Customer, CustomerLoginLink, PhoneVerificationCode
+from app.domain.customers.entities import (
+    Customer,
+    CustomerLoginLink,
+    CustomerPhoneChange,
+    PhoneVerificationCode,
+)
 
 
 class ICustomerRepository(Protocol):
@@ -30,6 +35,12 @@ class ICustomerLoginLinkRepository(Protocol):
         неподтверждённые (протухшие черновики входа), и уже подтверждённые
         (своё дело сделали, дальше не нужны). Возвращает число удалённых."""
         ...
+
+
+class ICustomerPhoneChangeRepository(Protocol):
+    async def add(self, change: CustomerPhoneChange) -> CustomerPhoneChange: ...
+    async def get_by_token(self, token: str) -> CustomerPhoneChange | None: ...
+    async def save(self, change: CustomerPhoneChange) -> CustomerPhoneChange: ...
 
 
 class IPhoneVerificationCodeRepository(Protocol):
