@@ -440,19 +440,42 @@
   flex-shrink: 0;
 }
 
+/* Без прокрутки вбок: overflow обрезал выпадающий список «Найти товар»
+   (он позиционирован абсолютно внутри ряда), а третье поле уезжало за край. */
 .saleFiltersScroll {
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
   padding: 8px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+}
+
+/* Телефон: два поиска рядом, сортировка (и склад) — второй строкой. */
+@media (max-width: 599px) {
+  .saleFiltersScroll {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .saleFiltersScroll > *,
+  .saleFiltersScroll input.saleClientSearch:not([type='checkbox']):not([type='radio']) {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+  }
+
+  /* одна сортировка во второй строке — на всю ширину, а не «Сначала нов…» */
+  .saleFiltersScroll > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  /* триггер Select — класс из Layout.module.css, здесь его имя не достать */
+  .saleSortField > * {
+    width: 100%;
+  }
 }
 
 .saleFiltersScroll > .saleSortField {
@@ -661,13 +684,38 @@ input.saleClientSearch:not([type='checkbox']):not([type='radio']) {
   text-align: right;
 }
 
+/* Телефон: сетка 1fr|1fr растягивала бейдж оплаты на полстроки, время висело
+   под ним, пустая ячейка клиента занимала место. Две строки: сумма и время,
+   ниже — оплата, склад, клиент компактно. */
 @media (max-width: 640px) {
   .saleHistoryRow {
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    /* у <button> глобально по центру — бейдж оплаты вставал посередине */
+    justify-content: flex-start;
+    gap: 6px 10px;
+  }
+
+  /* 60% от строки: время помещается рядом, оплата — уже нет и уходит вниз */
+  .saleHistoryTotal {
+    flex: 1 0 60%;
+    order: 0;
   }
 
   .saleHistoryTime {
-    text-align: left;
+    order: 1;
+    margin-left: auto;
+  }
+
+  .saleHistoryRow > :not(.saleHistoryTotal):not(.saleHistoryTime) {
+    order: 2;
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .saleHistoryDetail:empty {
+    display: none;
   }
 }
 
@@ -780,6 +828,16 @@ input.saleSearchInput:not([type='checkbox']):not([type='radio']):focus {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+}
+
+/* Телефон: плитки товаров и так карточки — рамка панели вокруг них давала
+   «карточку в карточке» и съедала ширину под названия. */
+@media (max-width: 599px) {
+  .saleResultsPanel {
+    padding: 0;
+    background: transparent;
+    border: none;
+  }
 }
 
 .saleResultsHeader {

@@ -98,7 +98,7 @@ export function StockPage() {
               <span className={layoutStyles.statValue}>{warehouses.length}</span>
             </div>
             <div className={layoutStyles.stat}>
-              <span className={layoutStyles.statLabel}>Позиций на остатке</span>
+              <span className={layoutStyles.statLabel}>Позиций</span>
               <span className={layoutStyles.statValue}>{totalPositions}</span>
             </div>
             <div className={layoutStyles.stat}>

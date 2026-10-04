@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
     )
     from app.domain.debts.repository import IDebtRepository
     from app.domain.feedback.repository import IFeedbackRepository
+    from app.domain.identity.telegram_verification import ITelegramVerificationRepository
     from app.domain.identity.repository import (
         ITenantRepository,
         IUserRepository,
@@ -26,6 +28,7 @@ if TYPE_CHECKING:
     )
     from app.domain.inventory.repository import IStockDocumentRepository, IStockRepository
     from app.domain.marketplace.repository import IMarketplaceProductRepository
+    from app.domain.notifications.push import IPushSubscriptionRepository
     from app.domain.notifications.repository import INotificationRepository
     from app.domain.orders.repository import IOrderRepository
     from app.domain.platform.repository import IPlatformBannerRepository, IPlatformCategoryRepository
@@ -78,12 +81,14 @@ class IUnitOfWork(ABC):
     review_votes: IReviewVoteRepository
     tasks: ITaskRepository
     notifications: INotificationRepository
+    push_subscriptions: IPushSubscriptionRepository
     audit: IAuditRepository
     analytics: IAnalyticsRepository
     marketplace_products: IMarketplaceProductRepository
     platform_categories: IPlatformCategoryRepository
     platform_banners: IPlatformBannerRepository
     feedback: IFeedbackRepository
+    telegram_verifications: ITelegramVerificationRepository
 
     async def __aenter__(self) -> IUnitOfWork:
         return self
@@ -97,3 +102,16 @@ class IUnitOfWork(ABC):
 
     @abstractmethod
     async def rollback(self) -> None: ...
+
+    @abstractmethod
+    def after_commit(self, action: Callable[[], Awaitable[None]]) -> None:
+        """Выполнить после успешного commit() в фоне, вне транзакции: внешние
+        вызовы (push на телефон) не держат блокировки строк, не задерживают
+        ответ и не уходят, если операция откатилась."""
+        ...
+
+    @abstractmethod
+    def fork(self) -> IUnitOfWork:
+        """Новый UoW того же магазина и той же БД — для фоновой работы после
+        commit, когда исходная сессия уже закрыта."""
+        ...

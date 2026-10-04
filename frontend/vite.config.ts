@@ -8,6 +8,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
+        // Обработчик push и касания уведомления — отдельным файлом из public/,
+        // чтобы не переводить весь SW на injectManifest ради двух событий.
+        importScripts: ['push-sw.js'],
         // NetworkFirst для read-эндпоинтов — экран продажи открывается даже офлайн,
         // хоть и с последними закэшированными товарами/остатками. Не кэшируем мутации.
         runtimeCaching: [
@@ -28,7 +31,7 @@ export default defineConfig({
         name: 'WaySklad',
         short_name: 'WaySklad',
         description: 'Товарный учёт, продажи и долги для малого бизнеса',
-        theme_color: '#1f5c3f',
+        theme_color: '#1d6a46',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',

@@ -363,6 +363,7 @@ export function OrdersPage() {
             return (
               <div
                 key={status}
+                data-empty={columnOrders.length === 0 || undefined}
                 className={[kanban.column, dragOverStatus === status ? kanban.columnOver : null]
                   .filter(Boolean)
                   .join(' ')}

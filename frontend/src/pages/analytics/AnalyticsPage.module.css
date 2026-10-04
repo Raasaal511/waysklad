@@ -289,3 +289,44 @@
 .marginCell {
   display: flex;
 }
+
+/* Телефон: таблицы аналитики прокручивались вбок, и правые колонки («Ср. чек»,
+   «Доля») никто не видел — обрезанный край не читается как прокрутка. Оставляем
+   название и два главных числа; полная таблица — на компьютере. Колонки задаются
+   инлайном, поэтому !important. */
+@media (max-width: 599px) {
+  .compactTable {
+    grid-template-columns: minmax(0, 1fr) auto auto !important;
+  }
+
+  .compactTable > div > span:nth-child(n + 4),
+  .compactTable > div > * > span:nth-child(n + 4) {
+    display: none;
+  }
+}
+
+/* Телефон: пять-шесть показателей по карточке на строку — полтора экрана
+   прокрутки до графика. Две колонки, иконка (украшение) уходит, нечётная
+   последняя карточка — во всю ширину. */
+@media (max-width: 599px) {
+  .heroGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .heroCard {
+    padding: 12px 14px;
+  }
+
+  .heroCard:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .heroIcon {
+    display: none;
+  }
+
+  .heroLabel {
+    white-space: normal;
+  }
+}

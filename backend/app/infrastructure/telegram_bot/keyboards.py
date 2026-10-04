@@ -61,6 +61,19 @@ def phone_request_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
+def owner_contact_keyboard() -> ReplyKeyboardMarkup:
+    # не one_time: если номер не совпал, кнопка нужна снова, а не прятать её
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="📱 Поделиться номером", request_contact=True)]],
+        resize_keyboard=True,
+        input_field_placeholder="Нажмите «Поделиться номером»",
+    )
+
+
+def back_to_site_keyboard(url: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Вернуться на сайт", url=url)]])
+
+
 def remove_keyboard() -> ReplyKeyboardRemove:
     return ReplyKeyboardRemove()
 

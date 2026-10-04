@@ -300,7 +300,8 @@ export function getSimilarProducts(slug: string, productId: number, scope: Simil
 export function createStorefrontRequest(
   slug: string,
   input: {
-    customer_name: string
+    /** Не передаём — сервер возьмёт имя из профиля покупателя (иначе логин, телефон). */
+    customer_name?: string
     note?: string
     items: { product_id: number; quantity: string; variant_id?: number | null }[]
   },

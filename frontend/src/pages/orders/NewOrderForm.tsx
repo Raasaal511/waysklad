@@ -200,16 +200,17 @@ export function NewOrderForm({
   return (
     <form className={layoutStyles.form} onSubmit={handleSubmit}>
       <div className={layoutStyles.row}>
-        <label className={layoutStyles.field} style={{ flex: 1 }}>
+        <label className={layoutStyles.field} style={{ flex: 1, minWidth: 0 }}>
           Клиент
           <Select
             value={clientId != null ? String(clientId) : ''}
             onChange={(v) => setClientId(Number(v))}
             options={clients.map((c) => ({ value: String(c.id), label: c.name }))}
+            placeholder={clients.length ? 'Выберите клиента' : 'Клиентов пока нет'}
           />
         </label>
         {warehouses.length > 1 && (
-          <label className={layoutStyles.field} style={{ flex: 1 }}>
+          <label className={layoutStyles.field} style={{ flex: 1, minWidth: 0 }}>
             Склад
             <Select
               value={warehouseId != null ? String(warehouseId) : ''}
@@ -218,7 +219,7 @@ export function NewOrderForm({
             />
           </label>
         )}
-        <label className={layoutStyles.field} style={{ flex: 1 }}>
+        <label className={layoutStyles.field} style={{ flex: 1, minWidth: 0 }}>
           Источник
           <Select
             value={source}
@@ -436,11 +437,11 @@ export function NewOrderForm({
       )}
 
       <div className={layoutStyles.row}>
-        <label className={layoutStyles.field} style={{ flex: 1 }}>
+        <label className={layoutStyles.field} style={{ flex: 1, minWidth: 0 }}>
           Дата готовности
           <DateInput required value={dueDate} onChange={setDueDate} />
         </label>
-        <label className={layoutStyles.field} style={{ flex: 1 }}>
+        <label className={layoutStyles.field} style={{ flex: 1, minWidth: 0 }}>
           Предоплата
           <input
             type="text"

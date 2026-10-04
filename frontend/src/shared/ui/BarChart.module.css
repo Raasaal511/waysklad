@@ -136,14 +136,15 @@
   opacity: 0.75;
 }
 
+/* Подпись по своей ширине, по центру столбца: при 12 месяцах на телефоне
+   столбец ~22px, и «янв» резалось в «я…», хотя подписан только каждый
+   второй столбец и место у соседей свободно. */
 .axisLabel,
 .axisLabelActive {
-  max-width: 100%;
+  align-self: center;
   text-align: center;
   font-size: 12px;
   color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

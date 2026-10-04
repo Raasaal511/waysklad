@@ -316,3 +316,63 @@
     animation: none;
   }
 }
+
+/* Только что проведённая продажа: подтверждение и кнопка «Новая продажа» —
+   без возврата к списку и поиска кнопки «Продать». */
+.sold {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 12px 12px 16px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  animation: sold-in 0.3s ease both;
+}
+
+.soldText {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.soldText svg {
+  flex-shrink: 0;
+}
+
+.soldNext {
+  flex-shrink: 0;
+  min-height: 44px;
+}
+
+@keyframes sold-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sold {
+    animation: none;
+  }
+}
+
+@media (max-width: 599px) {
+  .sold {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .soldNext {
+    min-height: 48px;
+    font-size: 16px;
+  }
+}

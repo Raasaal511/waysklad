@@ -34,6 +34,8 @@ import { useOfflineSync } from '../shared/offline/useOfflineSync'
 import { useFeature } from '../shared/lib/useFeature'
 import { useKeyboardOpen } from '../shared/lib/useKeyboardOpen'
 import type { Role } from '../entities/auth/api'
+import { TelegramBanner } from './TelegramBanner'
+import { syncPushSubscription } from '../entities/notification/push'
 import styles from './AppLayout.module.css'
 
 interface NavItem {
@@ -433,6 +435,13 @@ export function AppLayout() {
   /** История для «назад» закрывает шторку только если её открыл пользователь (не онбординг). */
   const moreHistoryPushed = useRef(false)
   const { pendingCount, notice, dismissNotice } = useOfflineSync()
+  const userId = user?.id
+
+  // Уведомления на телефон: подтвердить серверу подписку этого браузера (после
+  // смены пароля или адреса подписки она иначе перестала бы получать push).
+  useEffect(() => {
+    if (userId !== undefined) void syncPushSubscription(userId)
+  }, [userId])
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 599px)')
@@ -661,6 +670,7 @@ export function AppLayout() {
             .filter(Boolean)
             .join(' ')}
         >
+          <TelegramBanner />
           <Outlet />
         </main>
 

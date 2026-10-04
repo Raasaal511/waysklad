@@ -7,6 +7,7 @@ from io import BytesIO
 from PIL import Image
 
 from app.application.storefront.get_profile import _orders_count_label
+from tests.conftest import register_via_bot
 
 
 def _test_logo_bytes() -> bytes:
@@ -574,8 +575,8 @@ async def test_storefront_request_no_min_order_total_not_enforced_via_api(client
 
 async def test_storefront_profile_tenant_isolation_via_api(client, owner_headers, random_phone):
     """Профиль одного магазина не должен утекать данные другого."""
-    other_response = await client.post(
-        "/api/auth/register",
+    other_response = await register_via_bot(
+        client,
         json={
             "shop_name": "Другой магазин",
             "owner_name": "Другой владелец",

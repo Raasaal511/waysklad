@@ -72,6 +72,8 @@ class UserMapper:
             role=user.role,
             is_active=user.is_active,
             personal_data_consent_at=user.personal_data_consent_at,
+            telegram_user_id=user.telegram_user_id,
+            telegram_verified_at=user.telegram_verified_at,
         )
 
     @staticmethod
@@ -87,6 +89,8 @@ class UserMapper:
             token_version=model.token_version,
             last_login_at=model.last_login_at,
             personal_data_consent_at=model.personal_data_consent_at,
+            telegram_user_id=model.telegram_user_id,
+            telegram_verified_at=model.telegram_verified_at,
         )
 
 

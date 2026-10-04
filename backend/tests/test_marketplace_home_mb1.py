@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from app.domain.catalog.entities import Category
 from app.domain.platform.category_synonyms import match_platform_slug
+from tests.conftest import register_via_bot
 
 
 async def _admin_headers(client) -> dict:
@@ -18,8 +19,8 @@ async def _admin_headers(client) -> dict:
 
 
 async def _register_shop(client, random_phone, shop_name: str, storefront_enabled: bool = True):
-    response = await client.post(
-        "/api/auth/register",
+    response = await register_via_bot(
+        client,
         json={
             "shop_name": shop_name,
             "owner_name": "Продавец",
@@ -398,8 +399,8 @@ async def test_marketplace_cities_excludes_shops_without_storefront(client, rand
 
 
 async def test_admin_verify_unverify_tenant(client, random_phone):
-    register = await client.post(
-        "/api/auth/register",
+    register = await register_via_bot(
+        client,
         json={
             "shop_name": "Магазин для проверки",
             "owner_name": "Владелец",

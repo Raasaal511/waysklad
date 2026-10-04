@@ -1,17 +1,27 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Response, WebSocket, WebSocketDisconnect
+
+from app.application.notifications.push_subscriptions import SubscribePushCommand
 
 from app.presentation.deps import (
     ActorDep,
     ListNotificationsDep,
     MarkAllNotificationsReadDep,
     MarkNotificationReadDep,
+    PushSenderDep,
+    SendTestPushDep,
     SessionFactoryDep,
+    SubscribePushDep,
+    UnsubscribePushDep,
 )
 from app.presentation.deps.auth import get_current_user_ws
 from app.presentation.notifications.schemas import (
     MarkAllReadResponse,
     NotificationListResponse,
     NotificationResponse,
+    PushKeyResponse,
+    PushSubscriptionRequest,
+    PushTestResponse,
+    PushEndpointRequest,
 )
 from app.infrastructure.notifications.ws_broadcast import broadcaster, user_channel
 
@@ -56,3 +66,36 @@ async def mark_read(
 @router.post("/read-all")
 async def mark_all_read(actor: ActorDep, use_case: MarkAllNotificationsReadDep) -> MarkAllReadResponse:
     return MarkAllReadResponse(marked=await use_case.execute(actor))
+
+
+@router.get("/push/key")
+async def push_key(actor: ActorDep, sender: PushSenderDep) -> PushKeyResponse:
+    """Публичный ключ VAPID для pushManager.subscribe(); null — push выключен."""
+    return PushKeyResponse(public_key=sender.public_key)
+
+
+@router.put("/push/subscription", status_code=204)
+async def push_subscribe(
+    body: PushSubscriptionRequest, actor: ActorDep, use_case: SubscribePushDep
+) -> Response:
+    await use_case.execute(
+        actor,
+        SubscribePushCommand(endpoint=body.endpoint, p256dh=body.keys.p256dh, auth=body.keys.auth),
+    )
+    return Response(status_code=204)
+
+
+@router.post("/push/unsubscribe", status_code=204)
+async def push_unsubscribe(
+    body: PushEndpointRequest, actor: ActorDep, use_case: UnsubscribePushDep
+) -> Response:
+    # 204 и когда подписки не было: устройство уже в нужном состоянии
+    await use_case.execute(actor, body.endpoint)
+    return Response(status_code=204)
+
+
+@router.post("/push/test")
+async def push_test(
+    body: PushEndpointRequest, actor: ActorDep, use_case: SendTestPushDep
+) -> PushTestResponse:
+    return PushTestResponse(delivered=await use_case.execute(actor, body.endpoint))

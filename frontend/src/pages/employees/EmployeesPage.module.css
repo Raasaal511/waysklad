@@ -36,8 +36,11 @@
   outline-offset: 1px;
 }
 
+/* Карточку владельца нельзя открыть (она disabled), но это не «заблокирован»:
+   глобальный button:disabled делал её полупрозрачной, как отключённого сотрудника. */
 .employeeCard:disabled {
   cursor: default;
+  opacity: 1;
 }
 
 .employeeCardInactive {
@@ -108,4 +111,26 @@
 .emptyStateIcon {
   color: var(--text-muted);
   opacity: 0.6;
+}
+
+.statOf {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.limitNote {
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: var(--warning);
+}
+
+/* «Задать новый пароль» — ссылка, а не кнопка: редкое действие, не главное в форме */
+.resetPassword {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
 }

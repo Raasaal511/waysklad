@@ -2,8 +2,11 @@
    .select-trigger, .select-trigger-value, .select-trigger-placeholder
    общие с Select.tsx — вынесены в Layout.module.css. */
 
-.date-input-trigger {
+/* Иконка слева, дата сразу за ней. space-between от Select уносил текст к
+   правому краю — «Выберите дату» висела отдельно от календаря. */
+.date-input-trigger.date-input-trigger {
   gap: 8px;
+  justify-content: flex-start;
 }
 
 .date-input-icon {

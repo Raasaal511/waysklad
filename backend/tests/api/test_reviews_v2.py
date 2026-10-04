@@ -8,6 +8,7 @@ from io import BytesIO
 from PIL import Image
 
 from tests.api.test_reviews import _setup_accepted_request
+from tests.conftest import register_via_bot
 
 
 def _test_photo_bytes(size: tuple[int, int] = (400, 300)) -> bytes:
@@ -631,8 +632,8 @@ async def test_vote_isolated_across_shops(client, owner_headers, random_phone, c
     assert response.status_code == 200, response.text
 
     # второй, независимый магазин
-    response = await client.post(
-        "/api/auth/register",
+    response = await register_via_bot(
+        client,
         json={
             "shop_name": "Другой магазин",
             "owner_name": "Другой",

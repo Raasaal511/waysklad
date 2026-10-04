@@ -1,0 +1,207 @@
+/* Форма движения товара (приёмка, списание, перемещение, инвентаризация) — shared.tsx MovementForm */
+
+/* Компьютер: список плиток прокручивается внутри панели, выбранное видно рядом. */
+.tiles {
+  max-height: 480px;
+  min-height: 220px;
+  overflow-y: auto;
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scroll-margin-top: 80px;
+}
+
+.linesHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.linesHead h3 {
+  margin: 0;
+}
+
+/* Выбранная позиция — карточка, а не строка таблицы: на телефоне в таблице
+   поле цены сжималось до «₽», а количество — до невидимой полоски. */
+.line {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 12px 12px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  animation: line-in 0.2s ease both;
+}
+
+.lineHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lineName {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 15px;
+}
+
+.lineName strong {
+  overflow-wrap: anywhere;
+}
+
+.deltaPlus {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.deltaMinus {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.remove {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+  margin: -6px -4px 0 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.remove:hover {
+  background: var(--danger-bg, var(--bg-muted));
+  color: var(--danger);
+}
+
+.lineFields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 20px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.qtyField {
+  flex-shrink: 0;
+}
+
+.costField {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.costInput {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.costInput input {
+  flex: 1;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.warning {
+  margin: 0;
+  font-size: 13px;
+  color: var(--danger);
+}
+
+.submitBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* «N позиций» нужна только на телефоне, где выбранное ниже длинного списка */
+.count {
+  display: none;
+}
+
+.submit {
+  min-height: 44px;
+}
+
+@keyframes line-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line {
+    animation: none;
+  }
+}
+
+@media (max-width: 899px) {
+  /* Телефон: без прокрутки внутри прокрутки и без карточки вокруг плиток */
+  .tiles {
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .results {
+    padding: 0;
+    background: transparent;
+    border: none;
+  }
+
+  .submitBar {
+    position: sticky;
+    /* --app-nav-clearance уже включает меню, «Продать» и безопасную зону */
+    bottom: var(--app-nav-clearance, 75px);
+    z-index: 20;
+    margin: 0 -16px;
+    padding: 10px 16px;
+    background: color-mix(in srgb, var(--bg) 94%, transparent);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--border);
+  }
+
+  .count {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    min-height: 44px;
+    padding: 0 4px;
+    background: transparent;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .count:disabled {
+    color: var(--text-muted);
+    opacity: 1;
+  }
+
+  .submit {
+    flex: 1;
+  }
+}

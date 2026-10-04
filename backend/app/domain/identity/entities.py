@@ -3,6 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 
+from app.domain.common.exceptions import DomainError
 from app.domain.common.phone import Phone
 
 
@@ -114,3 +115,22 @@ class User:
     # согласие на обработку телефона при регистрации (152-ФЗ); NULL у старых
     # аккаунтов — их не блокируем
     personal_data_consent_at: datetime | None = None
+    # Telegram, подтверждённый ботом (контакт + код): владелец зарегистрирован
+    # через бота или привязал его из кабинета. None — не привязан.
+    telegram_user_id: str | None = None
+    telegram_verified_at: datetime | None = None
+
+
+# Сотрудников (без владельца, только включённые) в одном магазине — не больше.
+# Малый магазин — это 1–5 человек; 10 с запасом, а больше — уже не наш клиент
+# и повод поговорить, а не тихо разрастаться.
+MAX_EMPLOYEES = 10
+
+
+def ensure_employee_slot(users: list[User]) -> None:
+    active = sum(1 for u in users if u.role is not Role.OWNER and u.is_active)
+    if active >= MAX_EMPLOYEES:
+        raise DomainError(
+            f"В магазине уже {MAX_EMPLOYEES} сотрудников — это максимум. "
+            "Отключите кого-то из них, чтобы добавить нового."
+        )

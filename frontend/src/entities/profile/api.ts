@@ -1,5 +1,5 @@
 import { api } from '../../shared/api/client'
-import type { Role, TokenResponse, User } from '../auth/api'
+import type { Role, TelegramStart, TokenResponse, User } from '../auth/api'
 
 export function listEmployees() {
   return api.get<User[]>('/auth/employees')
@@ -17,7 +17,14 @@ export function createEmployee(input: {
 
 export function updateEmployee(
   employeeId: number,
-  input: { name: string; role: Role; is_active: boolean; warehouse_ids?: number[] | null },
+  input: {
+    name: string
+    role: Role
+    is_active: boolean
+    warehouse_ids?: number[] | null
+    /** новый пароль — только когда владелец его меняет */
+    password?: string
+  },
 ) {
   return api.patch<User>(`/auth/employees/${employeeId}`, input)
 }
@@ -45,8 +52,13 @@ export interface Tenant {
   policy_returns: string
 }
 
-export function connectTelegram(chatId: string) {
-  return api.post<Tenant>('/auth/telegram', { chat_id: chatId })
+/** Владелец, зарегистрированный до бота, подключает Telegram из профиля. */
+export function startTelegramLink() {
+  return api.post<TelegramStart>('/auth/telegram/link')
+}
+
+export function confirmTelegramLink(token: string, code: string) {
+  return api.post<Tenant>('/auth/telegram/link/confirm', { token, code })
 }
 
 export function getShop() {

@@ -103,8 +103,22 @@ async def get_actor(
     return Actor(id=user.id, role=user.role, warehouse_ids=warehouse_ids)
 
 
+async def get_optional_actor(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    factory: SessionFactoryDep,
+) -> Actor | None:
+    """Актор, если запрос пришёл со входом, иначе None. Для шагов подтверждения
+    номера: регистрация идёт до входа (актора нет), а привязка Telegram — из
+    кабинета, и там ссылка должна принадлежать именно этому владельцу."""
+    if credentials is None:
+        return None
+    user = await _resolve_current_user(credentials.credentials, factory)
+    return await get_actor(user, factory)
+
+
 CurrentUserDep = Annotated[CurrentUser, Depends(get_current_user)]
 ActorDep = Annotated[Actor, Depends(get_actor)]
+OptionalActorDep = Annotated[Actor | None, Depends(get_optional_actor)]
 
 
 def require_permission(permission: Permission) -> Depends:

@@ -1,0 +1,29 @@
+/* Карточка «Уведомления на телефоне» — PushCard.tsx; основа — AppInstallCard.module.css */
+
+.nowrap {
+  white-space: nowrap;
+}
+
+/* Итог включения (пробное ушло / не дошло) — мягко появляется, а не выскакивает. */
+.note {
+  font-size: 14px;
+  line-height: 1.4;
+  animation: push-note-in 0.25s ease;
+}
+
+@keyframes push-note-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note {
+    animation: none;
+  }
+}

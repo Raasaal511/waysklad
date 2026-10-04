@@ -29,33 +29,7 @@ from app.domain.common.exceptions import (
 from app.domain.common.money import Money
 from app.domain.identity.entities import Role, Warehouse
 from app.domain.identity.permissions import Actor
-from app.application.auth.connect_telegram import (
-    ConnectTelegramCommand,
-    ConnectTelegramUseCase,
-)
 from app.domain.sales.payment import PaymentMethod
-
-
-async def test_connect_telegram_owner_only(make_uow, registered_shop, hasher):
-    tenant_id, _, owner = registered_shop
-
-    tenant = await ConnectTelegramUseCase(make_uow(tenant_id)).execute(
-        owner, ConnectTelegramCommand(chat_id="98765")
-    )
-    assert tenant.owner_telegram_chat_id == "98765"
-
-    async with make_uow(tenant_id) as uow:
-        stored = await uow.tenants.get(tenant_id)
-    assert stored.owner_telegram_chat_id == "98765"
-
-    manager = await CreateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
-        owner, CreateEmployeeCommand(name="Управляющий", phone="+79280009911",
-                                      password="secret123", role=Role.MANAGER)
-    )
-    with pytest.raises(AccessDeniedError):
-        await ConnectTelegramUseCase(make_uow(tenant_id)).execute(
-            Actor(id=manager.id, role=manager.role), ConnectTelegramCommand(chat_id="11111")
-        )
 
 
 async def test_create_employee_auto_assigns_single_warehouse(
@@ -249,7 +223,7 @@ async def test_update_employee_changes_role_and_warehouses(
         ),
     )
 
-    updated = await UpdateEmployeeUseCase(make_uow(tenant_id)).execute(
+    updated = await UpdateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
         owner,
         UpdateEmployeeCommand(
             user_id=seller.id, name="Зара Х.", role=Role.SELLER, is_active=True,
@@ -276,7 +250,7 @@ async def test_update_employee_rejects_role_escalation_by_manager(
     manager_actor = Actor(id=manager.id, role=manager.role)
 
     with pytest.raises(AccessDeniedError):
-        await UpdateEmployeeUseCase(make_uow(tenant_id)).execute(
+        await UpdateEmployeeUseCase(make_uow(tenant_id), hasher).execute(
             manager_actor,
             UpdateEmployeeCommand(
                 user_id=seller.id, name="Зара", role=Role.MANAGER, is_active=True,

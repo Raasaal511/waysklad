@@ -1,0 +1,416 @@
+/* Корзина и оформление заказа — StorefrontCartPage.tsx.
+   Сетка и типографика — docs/PUBLIC_UI_GUIDE.md. */
+
+.page {
+  padding-bottom: 48px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.title {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.count {
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+/* Компьютер: список слева, заказ справа и не уезжает при прокрутке. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 24px;
+  align-items: start;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 16px;
+  background: var(--bg);
+  border-radius: 16px;
+  animation: cart-in 0.25s ease both;
+}
+
+.photo {
+  display: block;
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.itemBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.itemHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+/* корзина «прижата» к углу: зона касания 40px, но без лишнего отступа справа */
+.itemHead .remove {
+  margin: -8px -8px 0 0;
+  flex-shrink: 0;
+}
+
+.itemName {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+  text-decoration: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.itemMeta {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.itemFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.lineTotal {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.remove {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.remove:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.remove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.summary {
+  position: sticky;
+  top: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  padding: 24px;
+  background: var(--bg);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 16px;
+}
+
+.summaryTotal {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hint {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.hint svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.whoIcon {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.whoText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.whoText strong {
+  font-size: 16px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linkButton,
+.noteToggle {
+  border: none;
+  background: transparent;
+  padding: 8px 0;
+  min-height: 44px;
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.noteToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+}
+
+.linkButton:focus-visible,
+.noteToggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.nameEdit {
+  display: flex;
+  gap: 8px;
+}
+
+.nameEdit input,
+.noteField textarea {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 16px;
+}
+
+.noteField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-muted);
+  animation: cart-in 0.2s ease both;
+}
+
+.noteField textarea {
+  resize: vertical;
+}
+
+.error {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.submitBar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.submitTotal {
+  display: none;
+}
+
+.submit {
+  width: 100%;
+  min-height: 48px;
+  font-size: 16px;
+}
+
+/* Тёмная тема: карточки отделяются рамкой (в светлой — фоном), как у ProductCard. */
+:root[data-theme='dark'] .item,
+:root[data-theme='dark'] .card {
+  border: 1px solid var(--border);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .item,
+  :root:not([data-theme='light']) .card {
+    border: 1px solid var(--border);
+  }
+}
+
+@keyframes cart-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .summary {
+    position: static;
+  }
+}
+
+/* Телефон: кнопка «Оформить» всегда под пальцем — панель над нижним меню,
+   с суммой рядом, как на странице товара (MobileDock). */
+@media (max-width: 767px) {
+  .title {
+    font-size: 24px;
+  }
+
+  .item {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .lineTotal {
+    font-size: 16px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .summary {
+    padding-bottom: 80px;
+  }
+
+  .submitBar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--public-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+    z-index: 40;
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 16px;
+    background: color-mix(in srgb, var(--bg) 94%, transparent);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--border);
+    animation: cart-up 0.2s ease;
+  }
+
+  .submitTotal {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .submitTotal strong {
+    font-size: 18px;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .submit {
+    flex: 1;
+    min-height: 44px;
+  }
+}
+
+@keyframes cart-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item,
+  .noteField,
+  .submitBar {
+    animation: none;
+  }
+}

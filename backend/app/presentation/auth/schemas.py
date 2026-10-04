@@ -1,9 +1,9 @@
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
 from app.application.auth.change_password import ChangePasswordCommand
-from app.application.auth.connect_telegram import ConnectTelegramCommand
 from app.application.auth.create_employee import CreateEmployeeCommand
 from app.application.auth.login import LoginCommand
 from app.application.auth.register_shop import RegisterShopCommand
@@ -56,11 +56,13 @@ class UpdateEmployeeRequest(BaseModel):
     role: Role
     is_active: bool = True
     warehouse_ids: list[int] | None = None
+    # новый пароль сотрудника — только если владелец его меняет
+    password: str | None = Field(None, min_length=6, max_length=100)
 
     def to_command(self, user_id: int) -> UpdateEmployeeCommand:
         return UpdateEmployeeCommand(
             user_id=user_id, name=self.name, role=self.role, is_active=self.is_active,
-            warehouse_ids=self.warehouse_ids,
+            warehouse_ids=self.warehouse_ids, password=self.password,
         )
 
 
@@ -71,12 +73,15 @@ class UserResponse(BaseModel):
     role: Role
     is_active: bool = True
     warehouse_ids: list[int] = Field(default_factory=list)
+    # Telegram подтверждён ботом (регистрация или привязка из кабинета)
+    telegram_verified: bool = False
 
     @classmethod
     def from_entity(cls, user: User, warehouse_ids: list[int] | None = None) -> "UserResponse":
         return cls(
             id=user.id, name=user.name, phone=str(user.phone), role=user.role,
             is_active=user.is_active, warehouse_ids=warehouse_ids or [],
+            telegram_verified=user.telegram_verified_at is not None,
         )
 
 
@@ -87,11 +92,29 @@ class TokenResponse(BaseModel):
     shop_slug: str | None = None  # публичный URL витрины; заполнен только при регистрации
 
 
-class ConnectTelegramRequest(BaseModel):
-    chat_id: str = Field(min_length=1, max_length=32)
+class TelegramVerificationStartResponse(BaseModel):
+    """Шаг «подтвердите в Telegram»: ссылка на бота и до когда она живёт."""
 
-    def to_command(self) -> ConnectTelegramCommand:
-        return ConnectTelegramCommand(chat_id=self.chat_id)
+    token: str
+    telegram_link: str
+    expires_at: datetime
+
+
+class TelegramVerificationStatusResponse(BaseModel):
+    contact_confirmed: bool
+    completed: bool
+    expired: bool
+    expires_at: datetime
+    code_sent_at: datetime | None
+
+
+class TelegramCodeRequest(BaseModel):
+    token: str = Field(min_length=10, max_length=64)
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+class TelegramTokenRequest(BaseModel):
+    token: str = Field(min_length=10, max_length=64)
 
 
 class TenantResponse(BaseModel):

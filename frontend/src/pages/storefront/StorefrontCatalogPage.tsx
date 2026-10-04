@@ -220,6 +220,8 @@ export function StorefrontCatalogPage() {
       photo: product.photo,
       quantity: String(initialOrderQty(product.min_order_qty, product.order_step_qty)),
       variant_id: null,
+      min_order_qty: product.min_order_qty,
+      order_step_qty: product.order_step_qty,
     })
   }
 
@@ -339,9 +341,13 @@ export function StorefrontCatalogPage() {
           />
         ) : (
           <>
-            <p className={styles.resultMeta}>
-              Показано {products.length} из {catalog?.total ?? products.length}
-            </p>
+            {/* «Найдено N» уже есть над фильтрами — второй счётчик нужен, только пока
+                показаны не все (подгрузка при прокрутке) */}
+            {catalog != null && products.length < catalog.total && (
+              <p className={styles.resultMeta}>
+                Показано {products.length} из {catalog.total}
+              </p>
+            )}
             <ProductGrid
               items={products}
               getHref={(item) => `/store/${slug}/products/${item.id}`}

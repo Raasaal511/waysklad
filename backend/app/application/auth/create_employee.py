@@ -7,7 +7,7 @@ from app.domain.audit.entities import AuditEntry
 from app.domain.common.exceptions import AccessDeniedError, DomainError
 from app.domain.common.phone import Phone
 from app.domain.common.uow import IUnitOfWork
-from app.domain.identity.entities import Role, User
+from app.domain.identity.entities import ensure_employee_slot, Role, User
 from app.domain.identity.permissions import Actor, Permission, require
 from app.domain.identity.ports import IPasswordHasher
 
@@ -42,6 +42,7 @@ class CreateEmployeeUseCase:
         async with self._uow as uow:
             if await uow.users.get_by_phone(str(phone)) is not None:
                 raise DomainError("Этот телефон уже зарегистрирован")
+            ensure_employee_slot(await uow.users.list_by_tenant())
             warehouse_ids = await resolve_warehouse_ids(uow, cmd.role, cmd.warehouse_ids)
             employee = await uow.users.add(
                 User(

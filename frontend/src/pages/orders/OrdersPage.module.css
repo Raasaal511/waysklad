@@ -129,6 +129,26 @@
   flex-shrink: 0;
 }
 
+/* Телефон: четыре вида не помещались в строку, и «Календарь» уезжал за край —
+   прокрутку вбок никто не замечает. Ровная сетка: иконка над подписью. */
+@media (max-width: 599px) {
+  .viewSwitcher {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  .viewSwitcher > button {
+    flex-direction: column;
+    gap: 2px;
+    min-height: 52px;
+    padding: 6px 2px;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+}
+
 /* Календарь */
 
 .viewCalendar {
@@ -421,4 +441,30 @@ button.cartQtyStep:hover:not(:disabled) {
   font-size: 12px;
   color: var(--danger);
   white-space: nowrap;
+}
+
+/* Телефон: пояснение «Заказ → Выдача» — два шага рядом мелким текстом, без
+   иконок-украшений: раньше оно занимало полэкрана до первого закрытия. */
+@media (max-width: 599px) {
+  .ordersIntro {
+    padding: 12px 40px 12px 14px;
+  }
+
+  .ordersIntroFlow {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .ordersIntroStep {
+    min-width: 0;
+    align-items: flex-start;
+  }
+
+  .ordersIntroIcon,
+  .ordersIntroArrow {
+    display: none;
+  }
 }

@@ -58,6 +58,18 @@ jobs:
         working-directory: backend
         run: pip install -r requirements.txt
 
+      # Тестовой БД не нужна надёжность записи на диск: без fsync и ожидания
+      # записи WAL при коммите прогон быстрее примерно на четверть. У service-
+      # контейнера нельзя задать аргументы запуска, поэтому через ALTER SYSTEM —
+      # все три параметра применяются перечиткой конфига, без рестарта
+      - name: Tune PostgreSQL for tests
+        run: >-
+          psql postgresql://postgres:postgres@localhost:5432/postgres
+          -c "ALTER SYSTEM SET fsync = off"
+          -c "ALTER SYSTEM SET synchronous_commit = off"
+          -c "ALTER SYSTEM SET full_page_writes = off"
+          -c "SELECT pg_reload_conf()"
+
       - name: Run tests
         working-directory: backend
         # -n auto считает физические ядра: на раннере с 2 vCPU это одно ядро

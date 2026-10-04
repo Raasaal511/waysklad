@@ -214,6 +214,7 @@ export function IssueDebtForm({
                 value={clientId != null ? String(clientId) : ''}
                 onChange={(v) => setClientId(Number(v))}
                 options={clients.map((c) => ({ value: String(c.id), label: c.name }))}
+                placeholder={clients.length ? 'Выберите клиента' : 'Клиентов пока нет — добавьте'}
               />
               <QuickNewClientForm
                 open={showNewClientForm}
@@ -238,6 +239,7 @@ export function IssueDebtForm({
               value={supplierId != null ? String(supplierId) : ''}
               onChange={(v) => setSupplierId(Number(v))}
               options={suppliers.map((s) => ({ value: String(s.id), label: s.name }))}
+              placeholder={suppliers.length ? 'Выберите поставщика' : 'Поставщиков пока нет'}
             />
           </label>
         )}

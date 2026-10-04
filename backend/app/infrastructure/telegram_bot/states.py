@@ -13,3 +13,11 @@ class StorefrontFlow(StatesGroup):
     entering_phone = State()
     entering_name = State()
     confirming = State()
+
+
+class OwnerVerificationFlow(StatesGroup):
+    """Регистрация владельца / привязка Telegram: /start reg_<token> или
+    link_<token> → ждём контакт кнопкой → код для сайта. Токен — в данных
+    состояния, чтобы контакт относился к той ссылке, по которой пришли."""
+
+    waiting_contact = State()

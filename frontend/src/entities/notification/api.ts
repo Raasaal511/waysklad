@@ -46,3 +46,27 @@ export function markNotificationRead(id: number) {
 export function markAllNotificationsRead() {
   return api.post<{ marked: number }>('/notifications/read-all')
 }
+
+/** Публичный ключ VAPID; null — уведомления на телефон на сервере не настроены. */
+export function getPushKey() {
+  return api.get<{ public_key: string | null }>('/notifications/push/key')
+}
+
+/** Тело — ровно PushSubscription.toJSON() браузера. Повторный вызов обновляет подписку. */
+export function savePushSubscription(subscription: PushSubscriptionJSON) {
+  return api.put<void>('/notifications/push/subscription', subscription)
+}
+
+/** token — при выходе из кабинета: сессия к этому моменту уже стирается из storage. */
+export function deletePushSubscription(endpoint: string, token?: string) {
+  return api.post<void>(
+    '/notifications/push/unsubscribe',
+    { endpoint },
+    token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+  )
+}
+
+/** Пробное уведомление на это устройство — сразу после включения. */
+export function sendTestPush(endpoint: string) {
+  return api.post<{ delivered: boolean }>('/notifications/push/test', { endpoint })
+}

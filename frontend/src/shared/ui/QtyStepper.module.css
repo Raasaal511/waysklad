@@ -1,0 +1,90 @@
+/* Степпер количества — QtyStepper.tsx: витрина (товар, корзина) и кабинет (движение товара). */
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* 36px, а не 32: под большой палец, жалоба «слишком маленькие кнопки» */
+.stepBtn {
+  width: 36px;
+  height: 36px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 999px;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition:
+    transform 0.1s ease,
+    opacity 0.15s ease,
+    background 0.15s ease;
+}
+
+.stepBtn svg {
+  flex-shrink: 0;
+}
+
+.stepBtn:hover:not(:disabled) {
+  transform: scale(1.06);
+}
+
+.stepBtn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.stepBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.stepBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.stepPlus {
+  background: var(--accent);
+  color: #fff;
+}
+
+.stepMinus {
+  background: var(--bg-muted);
+  color: var(--text);
+}
+
+/* Глобальное input:not([type=checkbox]):not([type=radio]) в index.css сильнее
+   одного класса — повтор класса поднимает специфичность. */
+input.stepValue.stepValue {
+  width: 40px;
+  height: 36px;
+  min-width: 28px;
+  text-align: center;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  padding: 0;
+}
+
+input.stepValue.stepValue:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stepBtn {
+    transition: none;
+  }
+}

@@ -2,6 +2,7 @@
 (scope=shop и scope=marketplace)."""
 
 from tests.test_admin import _admin_headers
+from tests.conftest import register_via_bot
 
 
 async def _add_category(client, headers, name: str, parent_id: int | None = None) -> int:
@@ -63,8 +64,8 @@ async def _sell(client, headers, warehouse_id, product_id, price="500", qty="1")
 
 
 async def _register_shop(client, random_phone, shop_name: str, storefront_enabled: bool = True):
-    response = await client.post(
-        "/api/auth/register",
+    response = await register_via_bot(
+        client,
         json={
             "shop_name": shop_name,
             "owner_name": "Продавец",

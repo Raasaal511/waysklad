@@ -23,33 +23,6 @@
   }
 }
 
-.telegramSteps {
-  gap: 10px;
-  background: var(--bg-muted);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-}
-
-.telegramStep {
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 14px;
-}
-
-.telegramStepNumber {
-  flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .summarySchedule {
   gap: 8px;
   padding-top: 12px;
@@ -154,5 +127,44 @@
   .storefrontCardHighlighted {
     animation: none;
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+}
+
+/* Вкладки профиля: на телефоне «Подключения» уезжала за край — делим ширину поровну. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 599px) {
+  .tabs {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .tabs > button {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-inline: 8px;
+    font-size: 13px;
+  }
+}
+
+/* «Сменить пароль», «Выйти везде» — в одну строку: сжимается текст слева,
+   а не кнопка (на телефоне она складывалась в два слова столбиком). */
+.accountAction {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.telegramAction {
+  align-self: flex-start;
+  min-height: 44px;
+}
+
+@media (max-width: 599px) {
+  .telegramAction {
+    align-self: stretch;
   }
 }
