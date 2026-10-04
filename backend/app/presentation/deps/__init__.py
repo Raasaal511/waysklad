@@ -156,6 +156,7 @@ from app.presentation.deps.use_cases import (  # noqa: F401
     LogoutAllCustomerDep,
     SendCustomerChatMessageDep,
     RequestCustomerLoginLinkDep,
+    RequestCustomerPhoneChangeDep,
     ReturnSaleDep,
     SearchClientsDep,
     SearchProductsDep,

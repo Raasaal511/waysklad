@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from app.application.customers.get_login_status import CustomerLoginStatusResult
 from app.application.customers.get_profile import CustomerProfileResult
 from app.application.customers.login_with_password import LoginCustomerResult
+from app.application.customers.change_phone import RequestCustomerPhoneChangeResult
 from app.application.customers.request_login_link import RequestCustomerLoginLinkResult
 from app.application.customers.register_with_password import RegisterCustomerResult
 from app.application.customers.update_profile import UpdateCustomerProfileCommand
@@ -25,6 +26,24 @@ class RequestCustomerLoginLinkResponse(BaseModel):
     def from_result(
         cls, result: RequestCustomerLoginLinkResult
     ) -> "RequestCustomerLoginLinkResponse":
+        return cls(token=result.token, telegram_deep_link=result.telegram_deep_link)
+
+
+class RequestCustomerPhoneChangeRequest(BaseModel):
+    new_phone: str
+
+
+class RequestCustomerPhoneChangeResponse(BaseModel):
+    """Та же пара полей, что и у ссылки входа: фронт одинаково ведёт
+    покупателя в бота и ждёт возвращения."""
+
+    token: str
+    telegram_deep_link: str
+
+    @classmethod
+    def from_result(
+        cls, result: RequestCustomerPhoneChangeResult
+    ) -> "RequestCustomerPhoneChangeResponse":
         return cls(token=result.token, telegram_deep_link=result.telegram_deep_link)
 
 

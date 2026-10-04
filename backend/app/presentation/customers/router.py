@@ -4,6 +4,7 @@ from app.application.customers.get_login_status import GetCustomerLoginStatusCom
 from app.application.customers.login_with_password import LoginCustomerCommand
 from app.application.customers.register_with_password import RegisterCustomerCommand
 from app.application.customers.change_password import ChangeCustomerPasswordCommand
+from app.application.customers.change_phone import RequestCustomerPhoneChangeCommand
 from app.application.customers.request_login_link import RequestCustomerLoginLinkCommand
 from app.infrastructure.rate_limit import limiter
 from app.presentation.customers.schemas import (
@@ -21,6 +22,8 @@ from app.presentation.customers.schemas import (
     RegisterCustomerResponse,
     RequestCustomerLoginLinkRequest,
     RequestCustomerLoginLinkResponse,
+    RequestCustomerPhoneChangeRequest,
+    RequestCustomerPhoneChangeResponse,
     UpdateCustomerProfileRequest,
 )
 from app.presentation.deps import (
@@ -34,6 +37,7 @@ from app.presentation.deps import (
     LogoutAllCustomerDep,
     GetCustomerProfileDep,
     RequestCustomerLoginLinkDep,
+    RequestCustomerPhoneChangeDep,
     UpdateCustomerProfileDep,
 )
 from app.presentation.deps.customer_auth import CurrentCustomerDep
@@ -106,6 +110,24 @@ async def update_customer_profile(
 ) -> CustomerResponse:
     updated = await use_case.execute(body.to_command(customer.id))
     return CustomerResponse.from_entity(updated)
+
+
+@router.post("/me/phone-change")
+@limiter.limit("10/hour")
+async def request_customer_phone_change(
+    request: Request,
+    body: RequestCustomerPhoneChangeRequest,
+    customer: CurrentCustomerDep,
+    use_case: RequestCustomerPhoneChangeDep,
+) -> RequestCustomerPhoneChangeResponse:
+    """Номер здесь ещё не меняется: ссылку подтверждает владелец нового
+    номера в Telegram-боте (см. ConfirmCustomerPhoneChangeUseCase)."""
+    result = await use_case.execute(
+        RequestCustomerPhoneChangeCommand(
+            customer_id=customer.id, new_phone=body.new_phone
+        )
+    )
+    return RequestCustomerPhoneChangeResponse.from_result(result)
 
 
 @router.patch("/me/password")

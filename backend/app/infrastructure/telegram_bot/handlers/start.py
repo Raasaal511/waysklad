@@ -11,13 +11,18 @@ from app.application.storefront.get_catalog import GetStorefrontCatalogCommand, 
 from app.domain.common.exceptions import DomainError
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
 from app.infrastructure.telegram_bot.formatting import catalog_page_text
-from app.infrastructure.telegram_bot.handlers import customer_login, owner_verification
+from app.infrastructure.telegram_bot.handlers import (
+    customer_login,
+    customer_phone_change,
+    owner_verification,
+)
 from app.infrastructure.telegram_bot.keyboards import catalog_keyboard
 from app.infrastructure.telegram_bot.states import StorefrontFlow
 
 router = Router(name="start")
 
 _LOGIN_LINK_PREFIX = customer_login.LOGIN_LINK_PREFIX
+_PHONE_CHANGE_PREFIX = customer_phone_change.PHONE_CHANGE_PREFIX
 
 
 @router.message(CommandStart())
@@ -29,6 +34,11 @@ async def start(message: Message, command: CommandObject, state: FSMContext, ses
                 message, state, arg[len(prefix):], session_factory
             )
             return
+    if arg.startswith(_PHONE_CHANGE_PREFIX):
+        await customer_phone_change.start_phone_change(
+            arg[len(_PHONE_CHANGE_PREFIX):], message, state
+        )
+        return
     if arg.startswith(_LOGIN_LINK_PREFIX):
         token = arg[len(_LOGIN_LINK_PREFIX):]
         await customer_login.ask_contact(token, message, state)

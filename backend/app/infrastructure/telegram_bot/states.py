@@ -23,6 +23,14 @@ class CustomerLoginFlow(StatesGroup):
     waiting_contact = State()
 
 
+class CustomerPhoneChangeFlow(StatesGroup):
+    """Смена номера: /start chphone_<token> → ждём контакт кнопкой.
+    Отдельно от CustomerLoginFlow — там вход, здесь смена у вошедшего, и
+    сверяется контакт с новым номером, а не с номером аккаунта."""
+
+    waiting_contact = State()
+
+
 class OwnerVerificationFlow(StatesGroup):
     """Регистрация владельца / привязка Telegram: /start reg_<token> или
     link_<token> → ждём контакт кнопкой → код для сайта. Токен — в данных

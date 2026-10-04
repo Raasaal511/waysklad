@@ -15,6 +15,9 @@ from app.application.customers.confirm_login_link import (
 )
 from app.domain.common.exceptions import DomainError
 from app.infrastructure.db.uow import SqlAlchemyUnitOfWork
+from app.infrastructure.telegram_bot.handlers.contact_prompt import (
+    ask_contact as prompt_for_contact,
+)
 from app.infrastructure.telegram_bot.keyboards import owner_contact_keyboard, remove_keyboard
 from app.infrastructure.telegram_bot.states import CustomerLoginFlow
 
@@ -24,16 +27,15 @@ LOGIN_LINK_PREFIX = "login_"
 
 
 async def ask_contact(token: str, message: Message, state: FSMContext) -> None:
-    """Просим номер кнопкой: вписать его руками в Telegram нельзя, значит
-    подтверждение нельзя подделать (см. ConfirmCustomerLoginLinkUseCase)."""
-    await state.clear()
-    await state.set_state(CustomerLoginFlow.waiting_contact)
-    await state.update_data(login_token=token)
-    await message.answer(
+    await prompt_for_contact(
+        message,
+        state,
+        CustomerLoginFlow.waiting_contact,
+        "login_token",
+        token,
         "Остался один шаг: нажмите кнопку «📱 Поделиться номером» внизу — "
         "Telegram передаст номер вашего аккаунта, и вход на сайте будет готов.\n\n"
         "Номер нужен магазину, чтобы связаться с вами по заказу.",
-        reply_markup=owner_contact_keyboard(),
     )
 
 

@@ -55,6 +55,7 @@ from app.application.customers.my_chats import (
 )
 from app.infrastructure.config import settings
 from app.infrastructure.notifications.code_senders import build_code_sender
+from app.application.customers.change_phone import RequestCustomerPhoneChangeUseCase
 from app.application.customers.request_login_link import RequestCustomerLoginLinkUseCase
 from app.application.customers.update_profile import UpdateCustomerProfileUseCase
 from app.application.debts.create_installment import CreateInstallmentUseCase
@@ -239,6 +240,10 @@ get_start_link = _with_uow(StartLinkUseCase)
 
 def get_request_customer_login_link(uow: PublicUowDep) -> RequestCustomerLoginLinkUseCase:
     return RequestCustomerLoginLinkUseCase(uow)
+
+
+def get_request_customer_phone_change(uow: PublicUowDep) -> RequestCustomerPhoneChangeUseCase:
+    return RequestCustomerPhoneChangeUseCase(uow)
 
 
 def get_register_customer(uow: PublicUowDep) -> RegisterCustomerUseCase:
@@ -603,6 +608,9 @@ StartLinkDep = Annotated[StartLinkUseCase, Depends(get_start_link)]
 CompleteLinkDep = Annotated[CompleteLinkUseCase, Depends(get_complete_link)]
 RequestCustomerLoginLinkDep = Annotated[
     RequestCustomerLoginLinkUseCase, Depends(get_request_customer_login_link)
+]
+RequestCustomerPhoneChangeDep = Annotated[
+    RequestCustomerPhoneChangeUseCase, Depends(get_request_customer_phone_change)
 ]
 RegisterCustomerDep = Annotated[RegisterCustomerUseCase, Depends(get_register_customer)]
 ChangeCustomerPasswordDep = Annotated[
