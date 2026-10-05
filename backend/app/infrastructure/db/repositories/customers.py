@@ -3,20 +3,28 @@ from datetime import datetime
 from sqlalchemy import delete, func, select, update
 
 from app.domain.common.exceptions import NotFoundError
-from app.domain.customers.entities import Customer, CustomerLoginLink, PhoneVerificationCode
+from app.domain.customers.entities import (
+    Customer,
+    CustomerLoginLink,
+    CustomerPhoneChange,
+    PhoneVerificationCode,
+)
 from app.domain.customers.repository import (
     ICustomerLoginLinkRepository,
+    ICustomerPhoneChangeRepository,
     ICustomerRepository,
     IPhoneVerificationCodeRepository,
 )
 from app.infrastructure.db.mappers.customers import (
     CustomerLoginLinkMapper,
     CustomerMapper,
+    CustomerPhoneChangeMapper,
     PhoneVerificationCodeMapper,
 )
 from app.infrastructure.db.models.customers import (
     CustomerLoginLinkModel,
     CustomerModel,
+    CustomerPhoneChangeModel,
     CustomerPhoneCodeModel,
 )
 from app.infrastructure.db.repositories.base import SqlAlchemyRepository
@@ -131,6 +139,35 @@ class SqlAlchemyCustomerLoginLinkRepository(SqlAlchemyRepository, ICustomerLogin
             delete(CustomerLoginLinkModel).where(CustomerLoginLinkModel.created_at < cutoff)
         )
         return result.rowcount or 0
+
+
+class SqlAlchemyCustomerPhoneChangeRepository(SqlAlchemyRepository, ICustomerPhoneChangeRepository):
+    async def add(self, change: CustomerPhoneChange) -> CustomerPhoneChange:
+        self._session.add(CustomerPhoneChangeMapper.to_orm(change))
+        await self._session.flush()
+        return change
+
+    async def get_by_token(self, token: str) -> CustomerPhoneChange | None:
+        model = (
+            await self._session.execute(
+                select(CustomerPhoneChangeModel).where(CustomerPhoneChangeModel.token == token)
+            )
+        ).scalar_one_or_none()
+        return CustomerPhoneChangeMapper.to_entity(model) if model else None
+
+    async def save(self, change: CustomerPhoneChange) -> CustomerPhoneChange:
+        model = (
+            await self._session.execute(
+                select(CustomerPhoneChangeModel).where(
+                    CustomerPhoneChangeModel.token == change.token
+                )
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            raise NotFoundError(f"Заявка на смену номера {change.token} не найдена")
+        model.confirmed_at = change.confirmed_at
+        await self._session.flush()
+        return change
 
 
 class SqlAlchemyPhoneVerificationCodeRepository(

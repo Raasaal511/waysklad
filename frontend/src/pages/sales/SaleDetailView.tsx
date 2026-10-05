@@ -521,7 +521,7 @@ export function SaleDetailView({
 
       {client && (
         <div className={styles.saleDetailClientCard}>
-          <Link to={`/clients?highlight=${client.id}`} className={styles.saleDetailClientLink}>
+          <Link to={`/clients/${client.id}`} className={styles.saleDetailClientLink}>
             <IconUsers size={16} stroke={1.8} />
             <span className={styles.saleDetailClientName}>{client.name}</span>
           </Link>
@@ -540,7 +540,7 @@ export function SaleDetailView({
           {clientDebt && clientDebt.is_closed && (
             <span className="badge accent">Долг погашен</span>
           )}
-          <Link to={`/clients?highlight=${client.id}`} className={styles.saleDetailClientArrowLink}>
+          <Link to={`/clients/${client.id}`} className={styles.saleDetailClientArrowLink}>
             <IconChevronRight size={16} stroke={1.8} className={styles.saleDetailClientArrow} />
           </Link>
         </div>

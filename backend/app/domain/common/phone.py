@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import StrEnum
 
 import phonenumbers
 
@@ -31,3 +32,39 @@ class Phone:
 
     def __str__(self) -> str:
         return self.value
+
+
+class ContactCheck(StrEnum):
+    """Почему бот не принял контакт — у каждого случая свой текст в чате."""
+
+    OK = "ok"
+    NOT_OWN = "not_own"  # переслан чужой контакт
+    PHONE_MISMATCH = "phone_mismatch"
+
+
+def check_telegram_contact(
+    expected: Phone, contact_phone: str, contact_user_id: str, sender_user_id: str
+) -> ContactCheck:
+    """Свой ли это контакт и тот ли номер, которого мы ждём.
+
+    Единая проверка для всех сценариев подтверждения через бота: вход и
+    регистрация покупателя, смена номера, регистрация и привязка владельца.
+    Раньше жила в двух копиях (CustomerLoginLink и TelegramVerification), и
+    в одной из них не хватало проверки на пересланный контакт.
+
+    Два условия, и оба обязательны:
+    - контакт прислан своим аккаунтом, а не переслан чужой: иначе номер
+      подтверждал бы кто угодно, у кого есть контакт жертвы;
+    - номер совпал с ожидаемым: номер в форме пишется руками, без сверки
+      можно было бы оформить аккаунт на чужой телефон.
+
+    Telegram отдаёт номер без «+», в международном формате.
+    """
+    if contact_user_id != sender_user_id:
+        return ContactCheck.NOT_OWN
+    digits = "".join(ch for ch in contact_phone if ch.isdigit())
+    try:
+        phone = Phone("+" + digits)
+    except DomainError:
+        return ContactCheck.PHONE_MISMATCH
+    return ContactCheck.OK if phone == expected else ContactCheck.PHONE_MISMATCH

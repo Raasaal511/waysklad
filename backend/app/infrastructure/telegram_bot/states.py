@@ -15,6 +15,22 @@ class StorefrontFlow(StatesGroup):
     confirming = State()
 
 
+class CustomerLoginFlow(StatesGroup):
+    """Вход и регистрация покупателя: /start login_<token> → ждём контакт
+    кнопкой. Номер в форме пишется руками, поэтому подтверждает его только
+    контакт самого Telegram."""
+
+    waiting_contact = State()
+
+
+class CustomerPhoneChangeFlow(StatesGroup):
+    """Смена номера: /start chphone_<token> → ждём контакт кнопкой.
+    Отдельно от CustomerLoginFlow — там вход, здесь смена у вошедшего, и
+    сверяется контакт с новым номером, а не с номером аккаунта."""
+
+    waiting_contact = State()
+
+
 class OwnerVerificationFlow(StatesGroup):
     """Регистрация владельца / привязка Telegram: /start reg_<token> или
     link_<token> → ждём контакт кнопкой → код для сайта. Токен — в данных

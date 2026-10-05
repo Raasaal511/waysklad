@@ -554,13 +554,23 @@ tbody tr:not(:last-child) {
   cursor: default;
 }
 
+/* Итоги оформлены как чек: отдельная «бумажка» с пунктирным отрывом сверху.
+   Раньше это был безымянный столбик цифр у правого края — глаз не отличал
+   его от строк товаров. Продавец сверяет сумму с кассой и с тем, что назвал
+   покупателю, поэтому блок должен читаться как итоговый документ. */
 .sale-detail-totals {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
+  gap: 6px;
   align-self: flex-end;
-  min-width: 180px;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+  /* пунктир сверху — линия отрыва чека */
+  border-top: 2px dashed var(--border);
 }
 
 .sale-detail-totals-row {
@@ -572,12 +582,17 @@ tbody tr:not(:last-child) {
   color: var(--text-muted);
 }
 
+/* цифры в колонку: разряды под разрядами, как в кассовом чеке */
+.sale-detail-totals-row > span:last-child {
+  font-variant-numeric: tabular-nums;
+}
+
 .sale-detail-totals-row-sum {
-  margin-top: 4px;
-  padding-top: 6px;
+  margin-top: 2px;
+  padding-top: 8px;
   border-top: 1px solid var(--border);
-  font-weight: 600;
-  font-size: 15px;
+  font-weight: 700;
+  font-size: 17px;
   color: var(--text);
 }
 

@@ -19,10 +19,9 @@ import {
   listMyStorefrontRequests,
   loadCustomerToken,
   logoutCustomerEverywhere,
-  requestCustomerPhoneCode,
+  requestCustomerPhoneChange,
   saveCustomerToken,
   updateCustomerProfile,
-  verifyCustomerPhoneCode,
   type CustomerChatSummary,
   type CustomerProfile,
   type MyRequest,
@@ -34,7 +33,6 @@ import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { Button } from '../../shared/ui/Button'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { Modal } from '../../shared/ui/Modal'
-import { PhoneInput } from '../../shared/ui/PhoneInput'
 import { loadLastStoreSlug } from '../../shared/lib/lastStore'
 import { notifyCustomerAuthChanged } from './customerAuthEvents'
 import { RequestSummary } from './RequestSummary'
@@ -152,16 +150,14 @@ export function CustomerAccountPage() {
 
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
-  const [editPhone, setEditPhone] = useState('')
   const [editError, setEditError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const [verifyOpen, setVerifyOpen] = useState(false)
-  const [verifyStep, setVerifyStep] = useState<'send' | 'bot' | 'code'>('send')
-  const [verifyCode, setVerifyCode] = useState('')
-  const [verifyError, setVerifyError] = useState<string | null>(null)
-  const [botLink, setBotLink] = useState('')
-  const [retryAfter, setRetryAfter] = useState(0)
+
+  const [phoneOpen, setPhoneOpen] = useState(false)
+  const [newPhone, setNewPhone] = useState('')
+  const [phoneError, setPhoneError] = useState<string | null>(null)
+  const [phoneLink, setPhoneLink] = useState<string | null>(null)
 
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
@@ -193,7 +189,6 @@ export function CustomerAccountPage() {
         setOrders(reqs.items)
         setChats(chatList)
         setEditName(me.name)
-        setEditPhone(me.phone)
       } catch (err) {
         if (cancelled) return
         if (err instanceof ApiError && err.status === 401) {
@@ -213,11 +208,28 @@ export function CustomerAccountPage() {
     }
   }, [token])
 
+  // пока покупатель подтверждает номер в боте, ждём результат: отдельного
+  // статус-эндпоинта у смены нет — новый номер виден в самом профиле
   useEffect(() => {
-    if (retryAfter <= 0) return
-    const t = setTimeout(() => setRetryAfter((s) => s - 1), 1000)
-    return () => clearTimeout(t)
-  }, [retryAfter])
+    if (!phoneLink) return
+    let cancelled = false
+    const id = window.setInterval(async () => {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const fresh = await getCustomerProfile()
+        if (cancelled || fresh.phone === profile?.phone) return
+        setProfile(fresh)
+        closePhoneModal()
+      } catch {
+        // связь пропала — следующая попытка через интервал
+      }
+    }, 2000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phoneLink, profile?.phone])
 
   const unreadCount = useMemo(() => countUnreadCustomerChats(chats), [chats])
 
@@ -276,11 +288,7 @@ export function CustomerAccountPage() {
     setEditError(null)
     setSaving(true)
     try {
-      const phoneChanged = editPhone.trim() !== (profile?.phone ?? '')
-      const updated = await updateCustomerProfile({
-        name: editName.trim(),
-        phone: phoneChanged ? editPhone.trim() : undefined,
-      })
+      const updated = await updateCustomerProfile({ name: editName.trim() })
       setProfile((p) =>
         p
           ? {
@@ -300,42 +308,31 @@ export function CustomerAccountPage() {
     }
   }
 
-  async function sendCode() {
-    setVerifyError(null)
+  async function submitPhoneChange(e: FormEvent) {
+    e.preventDefault()
+    setPhoneError(null)
     try {
-      const res = await requestCustomerPhoneCode()
-      setRetryAfter(res.retry_after)
-      if (res.telegram_deep_link) {
-        setBotLink(res.telegram_deep_link)
-        setVerifyStep('bot')
-      } else {
-        setVerifyStep('code')
-      }
+      const result = await requestCustomerPhoneChange(newPhone.trim())
+      setPhoneLink(result.telegram_deep_link)
     } catch (err) {
-      setVerifyError(err instanceof ApiError ? err.message : 'Не удалось отправить код')
+      setPhoneError(err instanceof ApiError ? err.message : 'Не удалось начать смену номера')
     }
   }
 
-  async function submitCode(e: FormEvent) {
-    e.preventDefault()
-    setVerifyError(null)
-    try {
-      const res = await verifyCustomerPhoneCode(verifyCode.trim())
-      setProfile((p) =>
-        p
-          ? {
-              ...p,
-              phone_verified: res.phone_verified,
-              phone_verified_at: res.phone_verified_at,
-            }
-          : p,
-      )
-      setVerifyOpen(false)
-      setVerifyCode('')
-      setVerifyStep('send')
-    } catch (err) {
-      setVerifyError(err instanceof ApiError ? err.message : 'Неверный код')
-    }
+  function openPhoneModal() {
+    // неподтверждённому номеру подставляем текущий: чаще всего он верный,
+    // и подтвердить его надо без набора заново
+    setNewPhone(profile && !profile.phone_verified ? profile.phone : '')
+    setPhoneError(null)
+    setPhoneLink(null)
+    setPhoneOpen(true)
+  }
+
+  function closePhoneModal() {
+    setPhoneOpen(false)
+    setPhoneLink(null)
+    setNewPhone('')
+    setPhoneError(null)
   }
 
   async function submitPassword(e: FormEvent) {
@@ -453,17 +450,15 @@ export function CustomerAccountPage() {
 
             {!profile.phone_verified && (
               <div className={styles.verifyNotice}>
-                <span>Подтвердите телефон — магазин увидит, что номер настоящий.</span>
-                <Button
+                <strong>Подтвердите номер телефона.</strong> По нему магазин связывается
+                с вами по заказу — без подтверждения продавец может не дозвониться.
+                <button
                   type="button"
-                  onClick={() => {
-                    setVerifyOpen(true)
-                    setVerifyStep('send')
-                    setVerifyError(null)
-                  }}
+                  className={styles.verifyNoticeAction}
+                  onClick={openPhoneModal}
                 >
-                  Подтвердить
-                </Button>
+                  Подтвердить через Telegram
+                </button>
               </div>
             )}
 
@@ -478,15 +473,16 @@ export function CustomerAccountPage() {
                     maxLength={200}
                   />
                 </label>
-                <label className={styles.field}>
-                  Телефон
-                  <PhoneInput value={editPhone} onChange={setEditPhone} />
-                </label>
-                {editPhone.trim() !== profile.phone && (
-                  <p className={styles.warn}>
-                    При смене телефона подтверждение сбросится — номер нужно будет подтвердить снова.
-                  </p>
-                )}
+                <p className={styles.muted}>
+                  Телефон {profile.phone} — из вашего Telegram.{' '}
+                  <button
+                    type="button"
+                    className={styles.linkButton}
+                    onClick={openPhoneModal}
+                  >
+                    Изменить номер
+                  </button>
+                </p>
                 {editError && <p className={styles.error}>{editError}</p>}
                 <Button type="submit" disabled={saving}>
                   {saving ? 'Сохранение…' : 'Сохранить'}
@@ -673,64 +669,48 @@ export function CustomerAccountPage() {
         </section>
       )}
 
-      {verifyOpen && (
-        <Modal title="Подтверждение телефона" onClose={() => setVerifyOpen(false)}>
-          {verifyStep === 'send' && (
+      {phoneOpen && (
+        <Modal
+          title={profile?.phone_verified ? 'Смена номера' : 'Подтверждение номера'}
+          onClose={closePhoneModal}
+        >
+          {phoneLink ? (
             <div className={styles.modalBody}>
               <p className={styles.muted}>
-                Отправим код в Telegram. Можно ввести его здесь или командой{' '}
-                <code>/confirm 123456</code> в боте.
+                Откройте бота и нажмите «Поделиться номером». Сделать это нужно
+                из того Telegram, на который оформлен <strong>{newPhone}</strong> —
+                так мы убедимся, что номер ваш.
               </p>
-              {verifyError && <p className={styles.error}>{verifyError}</p>}
-              <Button type="button" onClick={sendCode}>
-                Отправить код
-              </Button>
+              <a
+                className={styles.telegramButton}
+                href={phoneLink}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Открыть Telegram
+              </a>
+              <p className={styles.muted}>Ждём подтверждения…</p>
             </div>
-          )}
-          {verifyStep === 'bot' && (
-            <div className={styles.modalBody}>
-              <p>
-                Откройте бота и нажмите «Старт» — после этого запросите код снова. Позже код можно
-                подтвердить командой <code>/confirm</code>.
-              </p>
-              {botLink && (
-                <a href={botLink} target="_blank" rel="noreferrer" className={styles.textLink}>
-                  Открыть бота
-                </a>
-              )}
-              {verifyError && <p className={styles.error}>{verifyError}</p>}
-              <Button type="button" onClick={sendCode} disabled={retryAfter > 0}>
-                {retryAfter > 0 ? `Повторить через ${retryAfter} с` : 'Код отправлен? Запросить снова'}
-              </Button>
-            </div>
-          )}
-          {verifyStep === 'code' && (
-            <form className={styles.modalBody} onSubmit={submitCode}>
+          ) : (
+            <form className={styles.modalBody} onSubmit={submitPhoneChange}>
               <label className={styles.field}>
-                Код из Telegram
+                {profile?.phone_verified ? 'Новый номер' : 'Ваш номер'}
                 <input
-                  value={verifyCode}
-                  onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="000000"
+                  type="tel"
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  placeholder="+7 999 123-45-67"
                   required
-                  minLength={6}
+                  autoComplete="tel"
                 />
               </label>
-              <p className={styles.muted}>
-                Или отправьте боту: <code>/confirm {verifyCode || '123456'}</code>
-              </p>
-              {verifyError && <p className={styles.error}>{verifyError}</p>}
-              <Button type="submit">Подтвердить</Button>
-              <button
-                type="button"
-                className={styles.textBtn}
-                disabled={retryAfter > 0}
-                onClick={sendCode}
-              >
-                {retryAfter > 0 ? `Отправить повторно через ${retryAfter} с` : 'Отправить код ещё раз'}
-              </button>
+              {!profile?.phone_verified && (
+                <p className={styles.muted}>
+                  Оставьте текущий номер, если он верный — подтвердим именно его.
+                </p>
+              )}
+              {phoneError && <p className={styles.error}>{phoneError}</p>}
+              <Button type="submit">Продолжить в Telegram</Button>
             </form>
           )}
         </Modal>

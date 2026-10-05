@@ -85,22 +85,17 @@ export function getCustomerProfile() {
   return api.get<CustomerProfile>('/auth/customer/me', { headers: customerAuthHeader() })
 }
 
-export function updateCustomerProfile(input: { name: string; phone?: string | null }) {
+/** Только имя: телефон приходит из контакта Telegram при входе. */
+export function updateCustomerProfile(input: { name: string }) {
   return api.put<CustomerShort>('/auth/customer/me', input, { headers: customerAuthHeader() })
 }
 
-export function requestCustomerPhoneCode() {
-  return api.post<{
-    sent_via: 'telegram' | 'console'
-    retry_after: number
-    telegram_deep_link: string
-  }>('/auth/customer/phone/request-code', {}, { headers: customerAuthHeader() })
-}
-
-export function verifyCustomerPhoneCode(code: string) {
-  return api.post<{ phone_verified: boolean; phone_verified_at: string | null }>(
-    '/auth/customer/phone/verify',
-    { code },
+/** Смена номера: аккаунт не меняется, пока владелец нового номера не
+ *  подтвердит его контактом в Telegram-боте по этой ссылке. */
+export function requestCustomerPhoneChange(newPhone: string) {
+  return api.post<{ token: string; telegram_deep_link: string }>(
+    '/auth/customer/me/phone-change',
+    { new_phone: newPhone },
     { headers: customerAuthHeader() },
   )
 }

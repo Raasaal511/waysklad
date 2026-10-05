@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from app.domain.common.exceptions import DomainError
-from app.domain.common.phone import Phone
+from app.domain.common.phone import ContactCheck, Phone, check_telegram_contact
 
 LOGIN_LINK_TTL = timedelta(minutes=10)
 
@@ -82,15 +82,6 @@ class Customer:
         self.phone_verified = True
         self.phone_verified_at = at
 
-    def change_phone(self, phone: Phone) -> None:
-        """Смена номера сбрасывает подтверждение: подтверждён был старый
-        номер, новый ещё никто не проверял."""
-        if str(phone) == str(self.phone):
-            return
-        self.phone = phone
-        self.phone_verified = False
-        self.phone_verified_at = None
-
     def update_name(self, name: str) -> None:
         name = name.strip()
         if not name:
@@ -141,6 +132,13 @@ class CustomerLoginLink:
     def is_registration(self) -> bool:
         return bool(self.password_hash)
 
+    def check_contact(
+        self, contact_phone: str, contact_user_id: str, sender_user_id: str
+    ) -> ContactCheck:
+        """Та же проверка, что у владельца, — одна на проект (см.
+        check_telegram_contact): контакт свой и номер совпал с формой."""
+        return check_telegram_contact(self.phone, contact_phone, contact_user_id, sender_user_id)
+
     @property
     def is_expired(self) -> bool:
         return datetime.now(timezone.utc) > self.created_at + LOGIN_LINK_TTL
@@ -151,6 +149,60 @@ class CustomerLoginLink:
 
     def confirm(self, customer_id: int) -> None:
         self.customer_id = customer_id
+        self.confirmed_at = datetime.now(timezone.utc)
+
+
+@dataclass
+class CustomerPhoneChange:
+    """Смена номера у вошедшего покупателя: подтверждает тот, кто владеет
+    НОВЫМ номером.
+
+    Отдельная сущность, а не флаг в CustomerLoginLink: там вход в аккаунт,
+    здесь изменение уже существующего. Общее у них только правило сверки
+    контакта — оно вынесено в check_telegram_contact.
+
+    Сверяем именно с новым номером: подтверди мы старый, аккаунт можно было
+    бы перевести на чужой телефон, имея доступ лишь к прежнему."""
+
+    token: str
+    customer_id: int
+    new_phone: Phone
+    created_at: datetime
+    confirmed_at: datetime | None = None
+
+    @classmethod
+    def create(cls, customer_id: int, new_phone: Phone) -> "CustomerPhoneChange":
+        return cls(
+            token=secrets.token_urlsafe(24),
+            customer_id=customer_id,
+            new_phone=new_phone,
+            created_at=datetime.now(timezone.utc),
+        )
+
+    def check_contact(
+        self, contact_phone: str, contact_user_id: str, sender_user_id: str
+    ) -> ContactCheck:
+        return check_telegram_contact(
+            self.new_phone, contact_phone, contact_user_id, sender_user_id
+        )
+
+    @property
+    def is_expired(self) -> bool:
+        return datetime.now(timezone.utc) > self.created_at + LOGIN_LINK_TTL
+
+    @property
+    def is_confirmed(self) -> bool:
+        return self.confirmed_at is not None
+
+    def ensure_usable(self) -> None:
+        """Общая проверка перед подтверждением — чтобы три одинаковых if не
+        расползлись по use case и боту."""
+        if self.is_confirmed:
+            raise DomainError("Эта ссылка смены номера уже использована")
+        if self.is_expired:
+            raise DomainError("Ссылка смены номера устарела — начните заново")
+
+    def confirm(self) -> None:
         self.confirmed_at = datetime.now(timezone.utc)
 
 

@@ -45,6 +45,21 @@ class CustomerLoginLinkModel(Base):
     password_hash: Mapped[str] = mapped_column(String(128), default="", server_default="")
 
 
+class CustomerPhoneChangeModel(Base):
+    """Заявка на смену номера. Короткоживущая, как и ссылка входа, поэтому
+    без TimestampMixin: created_at здесь смысловое поле домена."""
+
+    __tablename__ = "customer_phone_changes"
+
+    token: Mapped[str] = mapped_column(String(64), primary_key=True)
+    customer_id: Mapped[int] = mapped_column(
+        ForeignKey("customers.id", ondelete="CASCADE"), index=True
+    )
+    new_phone: Mapped[str] = mapped_column(String(20))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class CustomerPhoneCodeModel(Base):
     """Код подтверждения телефона. created_at здесь смысловое поле (по нему
     считается лимит «не больше N в час»), поэтому без TimestampMixin — как и

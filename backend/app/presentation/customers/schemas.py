@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field
 from app.application.customers.get_login_status import CustomerLoginStatusResult
 from app.application.customers.get_profile import CustomerProfileResult
 from app.application.customers.login_with_password import LoginCustomerResult
+from app.application.customers.change_phone import RequestCustomerPhoneChangeResult
 from app.application.customers.request_login_link import RequestCustomerLoginLinkResult
-from app.application.customers.request_phone_code import RequestPhoneCodeResult
 from app.application.customers.register_with_password import RegisterCustomerResult
 from app.application.customers.update_profile import UpdateCustomerProfileCommand
 from app.application.customers.my_chats import CustomerChatSummary
@@ -26,6 +26,24 @@ class RequestCustomerLoginLinkResponse(BaseModel):
     def from_result(
         cls, result: RequestCustomerLoginLinkResult
     ) -> "RequestCustomerLoginLinkResponse":
+        return cls(token=result.token, telegram_deep_link=result.telegram_deep_link)
+
+
+class RequestCustomerPhoneChangeRequest(BaseModel):
+    new_phone: str
+
+
+class RequestCustomerPhoneChangeResponse(BaseModel):
+    """Та же пара полей, что и у ссылки входа: фронт одинаково ведёт
+    покупателя в бота и ждёт возвращения."""
+
+    token: str
+    telegram_deep_link: str
+
+    @classmethod
+    def from_result(
+        cls, result: RequestCustomerPhoneChangeResult
+    ) -> "RequestCustomerPhoneChangeResponse":
         return cls(token=result.token, telegram_deep_link=result.telegram_deep_link)
 
 
@@ -79,18 +97,14 @@ class CustomerProfileResponse(BaseModel):
         )
 
 class UpdateCustomerProfileRequest(BaseModel):
-    """phone необязателен: не передан — номер не трогаем. Смена номера
-    сбрасывает phone_verified (подтверждён был старый номер)."""
+    """Только имя: телефон приходит из контакта Telegram и руками не меняется."""
 
     name: str = Field(min_length=1, max_length=200)
-    phone: str | None = None
 
     model_config = {"extra": "forbid"}
 
     def to_command(self, customer_id: int) -> UpdateCustomerProfileCommand:
-        return UpdateCustomerProfileCommand(
-            customer_id=customer_id, name=self.name, phone=self.phone
-        )
+        return UpdateCustomerProfileCommand(customer_id=customer_id, name=self.name)
 
 
 class CustomerResponse(BaseModel):
@@ -156,32 +170,6 @@ class CustomerAuthResponse(BaseModel):
             access_token=result.access_token,
             customer=CustomerResponse.from_entity(result.customer),
         )
-
-
-class RequestPhoneCodeResponse(BaseModel):
-    """telegram_deep_link непуст, когда код слать некуда: покупателю сначала
-    нужно открыть бота и нажать «Старт»."""
-
-    sent_via: str
-    retry_after: int
-    telegram_deep_link: str = ""
-
-    @classmethod
-    def from_result(cls, result: RequestPhoneCodeResult) -> "RequestPhoneCodeResponse":
-        return cls(
-            sent_via=result.sent_via,
-            retry_after=result.retry_after,
-            telegram_deep_link=result.telegram_deep_link,
-        )
-
-
-class VerifyPhoneCodeRequest(BaseModel):
-    code: str = Field(min_length=1, max_length=12)
-
-
-class PhoneVerifiedResponse(BaseModel):
-    phone_verified: bool
-    phone_verified_at: datetime | None
 
 
 class ChangeCustomerPasswordRequest(BaseModel):

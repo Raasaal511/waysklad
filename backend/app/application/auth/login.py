@@ -27,6 +27,15 @@ class LoginUseCase:
 
         async with self._uow as uow:
             user = await uow.users.get_by_phone(str(phone))
+            pending = None if user else await uow.telegram_verifications.latest_pending_signup(str(phone))
+
+        if pending is not None and pending.signup is not None and self._hasher.verify(
+            cmd.password, pending.signup.password_hash
+        ):
+            raise AccessDeniedError(
+                "Регистрация не завершена: подтвердите номер в Telegram-боте "
+                "или зарегистрируйтесь заново"
+            )
 
         if (
             user is None

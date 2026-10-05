@@ -56,7 +56,7 @@ class SqlAlchemyTaskRepository(SqlAlchemyRepository, ITaskRepository):
             TaskModel.due_date.nulls_last(), TaskModel.id
         )
         rows = (await self._session.execute(stmt)).all()
-        return [await self._to_entity(*row) for row in rows]
+        return await self._rows_to_entities(rows)
 
     async def list_completed(
         self, participant_id: int | None = None, limit: int = 50, offset: int = 0
@@ -76,14 +76,14 @@ class SqlAlchemyTaskRepository(SqlAlchemyRepository, ITaskRepository):
             TaskModel.completed_at.desc()
         ).limit(limit).offset(offset)
         rows = (await self._session.execute(stmt)).all()
-        return [await self._to_entity(*row) for row in rows], total
+        return await self._rows_to_entities(rows), total
 
     async def list_by_client(self, client_id: int) -> list[Task]:
         stmt = self._select_with_names().where(
             TaskModel.tenant_id == self._tenant, TaskModel.client_id == client_id
         ).order_by(TaskModel.due_date.nulls_last(), TaskModel.id)
         rows = (await self._session.execute(stmt)).all()
-        return [await self._to_entity(*row) for row in rows]
+        return await self._rows_to_entities(rows)
 
     def _select_with_names(self):
         return (
@@ -101,6 +101,22 @@ class SqlAlchemyTaskRepository(SqlAlchemyRepository, ITaskRepository):
                 TaskModel.created_by_id == participant_id,
             )
         )
+
+    async def _rows_to_entities(self, rows) -> list[Task]:
+        """Единицы измерения — одним запросом на весь список, а не на каждую
+        задачу: _to_entity годится для одной строки, но в списке из 50 задач
+        с товаром давал 100 запросов вместо двух."""
+        product_ids = {m.product_id for m, _, _ in rows if m.product_id is not None}
+        units = await self._product_unit_by_id(product_ids)
+        return [
+            TaskMapper.to_entity(
+                model,
+                units.get(model.product_id) if model.product_id is not None else None,
+                assigned_user_name,
+                created_by_name,
+            )
+            for model, assigned_user_name, created_by_name in rows
+        ]
 
     async def _to_entity(self, model: TaskModel, assigned_user_name, created_by_name) -> Task:
         unit = None
