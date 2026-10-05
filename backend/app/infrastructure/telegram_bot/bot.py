@@ -17,11 +17,14 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.exceptions import TelegramNetworkError
 
 from app.infrastructure.config import settings
 from app.infrastructure.db.session import SessionLocal
 from app.infrastructure.telegram_bot.handlers import router
 from app.infrastructure.telegram_bot.storage import PostgresStorage
+
+_logger = logging.getLogger(__name__)
 
 
 async def _run() -> None:
@@ -37,8 +40,24 @@ async def _run() -> None:
     dispatcher = Dispatcher(storage=PostgresStorage(SessionLocal), session_factory=SessionLocal)
     dispatcher.include_router(router)
 
-    await bot.delete_webhook(drop_pending_updates=True)  # страховка от 409, если где-то остался webhook
+    await _delete_webhook(bot)
     await dispatcher.start_polling(bot)
+
+
+async def _delete_webhook(bot: Bot) -> None:
+    """Страховка от 409, если где-то остался webhook. Накопившиеся апдейты не
+    выбрасываем: это контакты и /start, отправленные, пока бот лежал, — иначе
+    человек «поделился номером», а магазин так и не создан. Telegram недоступен
+    — ждём и пробуем снова, а не падаем: падение = рестарт контейнера по кругу."""
+    delay = 1.0
+    while True:
+        try:
+            await bot.delete_webhook(drop_pending_updates=False)
+            return
+        except TelegramNetworkError:
+            _logger.warning("Telegram недоступен, повтор через %.0f с", delay)
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, 60.0)
 
 
 def main() -> None:
