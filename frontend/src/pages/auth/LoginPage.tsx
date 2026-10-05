@@ -119,6 +119,10 @@ export function LoginPage() {
       const next = { start, shopName, ownerName, phone }
       saveSignup(next)
       setSignup(next)
+      // на телефоне Telegram почти всегда здесь же — открываем бота сразу, без
+      // лишнего касания. Та же вкладка: новую браузер заблокирует после await.
+      // На компьютере оставляем экран: Telegram может быть на другом устройстве
+      if (window.matchMedia('(pointer: coarse)').matches) window.location.href = start.telegram_link
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось зарегистрировать магазин')
     } finally {
