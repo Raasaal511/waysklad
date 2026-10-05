@@ -93,3 +93,18 @@ class SqlAlchemyTelegramVerificationRepository(ITelegramVerificationRepository):
             )
         ).scalar_one_or_none()
         return _to_entity(model) if model else None
+
+    async def latest_pending_signup(self, phone: str) -> TelegramVerification | None:
+        model = (
+            await self._session.execute(
+                select(TelegramVerificationModel)
+                .where(
+                    TelegramVerificationModel.phone == phone,
+                    TelegramVerificationModel.purpose == VerificationPurpose.SIGNUP.value,
+                    TelegramVerificationModel.completed_at.is_(None),
+                )
+                .order_by(TelegramVerificationModel.created_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        return _to_entity(model) if model else None

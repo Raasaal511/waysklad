@@ -362,3 +362,18 @@ async def test_signup_status_stays_public(client, random_phone):
     assert (
         await client.post("/api/auth/telegram/verification/resend", json={"token": token})
     ).status_code == 204
+
+
+async def test_login_before_bot_confirm_says_signup_unfinished(client, random_phone):
+    """Форму заполнил, в боте номер не подтвердил — не «неверный пароль», а что делать."""
+    phone = random_phone()
+    assert (await client.post("/api/auth/register", json=_form(phone))).status_code == 201
+
+    response = await client.post("/api/auth/login", json={"phone": phone, "password": "secret123"})
+    assert response.status_code == 403
+    assert "Регистрация не завершена" in response.json()["detail"]
+
+    # чужой пароль — общая фраза: по номеру нельзя узнать, что кто-то регистрируется
+    response = await client.post("/api/auth/login", json={"phone": phone, "password": "wrong-pass"})
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Неверный телефон или пароль"
