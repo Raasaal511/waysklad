@@ -104,9 +104,12 @@ async def owner_contact(message: Message, state: FSMContext, session_factory) ->
     await state.clear()
     await message.answer("Номер подтверждён ✅", reply_markup=remove_keyboard())
     site = settings.public_base_url.rstrip("/")
+    # кнопка часто открывает сайт в новой вкладке или браузере Telegram, где шага
+    # регистрации нет — токен в ссылке возвращает человека к вводу кода, а не на вход
+    back = f"{site}/login?signup={token}" if result.purpose is VerificationPurpose.SIGNUP else site
     await message.answer(
         code_message(result.code or ""),
-        reply_markup=back_to_site_keyboard(site) if site.startswith("https://") else None,
+        reply_markup=back_to_site_keyboard(back) if site.startswith("https://") else None,
     )
 
 

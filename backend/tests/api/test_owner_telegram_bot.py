@@ -9,6 +9,7 @@ from aiogram.fsm.storage.base import StorageKey
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ReplyKeyboardMarkup, ReplyKeyboardRemove
 
+from app.infrastructure.config import settings
 from app.infrastructure.telegram_bot.handlers.owner_verification import (
     owner_contact,
     owner_waiting_contact,
@@ -110,3 +111,17 @@ async def test_bot_rejects_unknown_link(client):
     await start_owner_verification(message, _state(), "no-such-token-123", client.session_factory)
     assert "не найдена" in message.answers[0][0]
     assert isinstance(message.answers[0][1], ReplyKeyboardRemove)
+
+
+async def test_back_to_site_returns_to_signup_code(client, random_phone, monkeypatch):
+    """«Вернуться на сайт» открывается в новой вкладке — без токена там был бы вход."""
+    monkeypatch.setattr(settings, "public_base_url", "https://shop.example")
+    phone = random_phone()
+    token = await _start(client, phone)
+    state = _state()
+    await start_owner_verification(FakeMessage(), state, token, client.session_factory)
+
+    ok = FakeMessage(contact=FakeContact(phone.lstrip("+")))
+    await owner_contact(ok, state, client.session_factory)
+    button = ok.answers[1][1].inline_keyboard[0][0]
+    assert button.url == f"https://shop.example/login?signup={token}"

@@ -42,6 +42,14 @@ function saveSignup(value: SavedSignup | null) {
   }
 }
 
+/** Кнопка «Вернуться на сайт» в боте несёт токен регистрации: её открывают в
+ *  новой вкладке или браузере Telegram, где sessionStorage пуст, — без токена
+ *  человек попал бы на вход, хотя ему осталось ввести код. */
+function fromLink(token: string | null, saved: SavedSignup | null): SavedSignup | null {
+  if (!token || saved?.start.token === token) return saved
+  return { start: { token, telegram_link: '', expires_at: '' }, shopName: '', ownerName: '', phone: '' }
+}
+
 export function LoginPage() {
   const auth = useAuth()
   const navigate = useNavigate()
@@ -50,7 +58,7 @@ export function LoginPage() {
   // ThemeProvider уже применил на <html> сохранённые mode/accent (или дефолт light/green,
   // если на устройстве ещё никто не входил) — здесь просто читаем то же значение для логотипа
   const { mode: themeMode } = useTheme()
-  const [saved] = useState(loadSignup)
+  const [saved] = useState(() => fromLink(searchParams.get('signup'), loadSignup()))
   const [mode, setMode] = useState<Mode>(saved ? 'register' : 'login')
   const [signup, setSignup] = useState<SavedSignup | null>(saved)
 
@@ -129,6 +137,7 @@ export function LoginPage() {
 
   function handleRestartSignup() {
     saveSignup(null)
+    navigate('/login', { replace: true })
     setSignup(null)
     setMode('register')
     setError(null)
@@ -156,7 +165,7 @@ export function LoginPage() {
             onConfirm={handleConfirmSignup}
             onRestart={handleRestartSignup}
             restartLabel="Изменить данные регистрации"
-            lead={`Магазин «${signup.shopName}» появится сразу после подтверждения. В этот же Telegram будут приходить новые заявки и вечерняя сводка.`}
+            lead={`${signup.shopName ? `Магазин «${signup.shopName}»` : 'Магазин'} появится сразу после подтверждения. В этот же Telegram будут приходить новые заявки и вечерняя сводка.`}
           />
         ) : (
           <>

@@ -160,6 +160,7 @@ class ContactResult:
     # выдан только при ContactCheck.OK — бот отправляет его сообщением
     code: str | None = None
     masked_phone: str = ""
+    purpose: VerificationPurpose = VerificationPurpose.SIGNUP
 
 
 class AcceptContactUseCase:
@@ -173,12 +174,12 @@ class AcceptContactUseCase:
             v.ensure_active(_now())
             check = v.check_contact(cmd.contact_phone, cmd.contact_user_id, cmd.sender_user_id)
             if check is not ContactCheck.OK:
-                return ContactResult(check=check, masked_phone=mask_phone(v.phone))
+                return ContactResult(check=check, masked_phone=mask_phone(v.phone), purpose=v.purpose)
             code = generate_code()
             v.issue_code(self._hasher.hash(code), _now(), cmd.sender_user_id, cmd.chat_id, cmd.username)
             await uow.telegram_verifications.save(v)
             await uow.commit()
-            return ContactResult(check=check, code=code, masked_phone=mask_phone(v.phone))
+            return ContactResult(check=check, code=code, masked_phone=mask_phone(v.phone), purpose=v.purpose)
 
 
 # --- сайт: статус, код ------------------------------------------------------
