@@ -1,3 +1,10 @@
+# Хостинг режет адрес, который DNS отдаёт для api.telegram.org (149.154.166.110),
+# соседний адрес того же API отвечает. Без этого бот, сводки и коды молчат.
+# Проверка с сервера: curl --resolve api.telegram.org:443:<ip> https://api.telegram.org/
+# Перестанет отвечать — подобрать другой адрес Telegram или поднять прокси.
+x-telegram-hosts: &telegram_hosts
+  - "api.telegram.org:149.154.167.220"
+
 services:
   db:
     image: postgres:16-alpine
@@ -54,6 +61,7 @@ services:
     # I/O-bound запросов в одном воркере); 2, а не 1, чтобы один долгий
     # запрос (например к БД) не блокировал вообще все остальные.
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips=*
+    extra_hosts: *telegram_hosts
     volumes:
       - uploads_data:/app/uploads
       # Метаданные от внешних скриптов (deploy/backup.sh, certbot-хук) для
@@ -137,6 +145,7 @@ services:
       NOTIFICATIONS_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
       CACHE_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
     command: python -m app.infrastructure.scheduler
+    extra_hosts: *telegram_hosts
     volumes:
       - uploads_data:/app/uploads
     restart: unless-stopped
@@ -154,6 +163,7 @@ services:
       NOTIFICATIONS_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
       CACHE_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
     command: python -m app.infrastructure.telegram_bot.bot
+    extra_hosts: *telegram_hosts
     restart: unless-stopped
     depends_on:
       db:
