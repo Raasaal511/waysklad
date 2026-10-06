@@ -501,7 +501,9 @@ export function AppLayout() {
     }
     const target = onboardingStep?.target
     if (!target) return
-    if (more.some((item) => item.to === target)) {
+    // от 900px нижнего меню нет — цель уже видна в сайдбаре, шторка лишь закрыла бы экран
+    const bottomNav = window.matchMedia('(max-width: 899px)').matches
+    if (bottomNav && more.some((item) => item.to === target)) {
       setMoreOpen(true)
     } else if (!moreHistoryPushed.current) {
       setMoreOpen(false)
