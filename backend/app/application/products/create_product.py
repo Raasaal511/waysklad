@@ -4,7 +4,13 @@ from decimal import Decimal
 from app.application.inventory.common import require_warehouse_access
 from app.domain.audit.entities import AuditEntry
 from app.domain.catalog.barcode import Barcode
-from app.domain.catalog.entities import Product, ProductVariant
+from app.domain.catalog.entities import (
+    PRODUCT_KIND,
+    PRODUCT_KINDS,
+    SERVICE_KIND,
+    Product,
+    ProductVariant,
+)
 from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
 from app.domain.common.money import Money
@@ -22,6 +28,7 @@ class VariantInput:
     barcode: str | None = None
     price: Decimal | None = None
     name: str = ""
+    addon: bool = False
 
 
 @dataclass(frozen=True)
@@ -43,6 +50,7 @@ class CreateProductCommand:
     variants: list[VariantInput] = field(default_factory=list)
     initial_stock_warehouse_id: int | None = None
     initial_stock_quantity: Decimal | None = None
+    kind: str = PRODUCT_KIND
 
 
 class CreateProductUseCase:
@@ -84,6 +92,12 @@ class CreateProductUseCase:
             if cmd.compare_at_price is not None and cmd.compare_at_price <= cmd.retail_price:
                 raise DomainError("Старая цена должна быть больше текущей")
 
+            if cmd.kind not in PRODUCT_KINDS:
+                raise DomainError(f"Неизвестный вид позиции: {cmd.kind}")
+            is_service = cmd.kind == SERVICE_KIND
+            if is_service and has_initial_stock:
+                raise DomainError("У услуги не бывает остатка на складе")
+
             # фото загружается отдельным вызовом уже после создания товара (нет
             # поля photo в этой команде) — значит на этом шаге его точно нет,
             # и включать показ на витрине сразу нельзя (см. UpdateProductUseCase)
@@ -94,7 +108,9 @@ class CreateProductUseCase:
                 id=None,
                 name=cmd.name,
                 unit=unit,
-                purchase_price=Money.of(cmd.purchase_price),
+                # у услуги закупочной цены нет: «цена указывается только ту
+                # сумму», вся выручка идёт в прибыль
+                purchase_price=Money.of(Decimal("0") if is_service else cmd.purchase_price),
                 retail_price=Money.of(cmd.retail_price),
                 compare_at_price=Money.of(cmd.compare_at_price)
                 if cmd.compare_at_price is not None
@@ -102,7 +118,7 @@ class CreateProductUseCase:
                 sku=cmd.sku,
                 barcode=Barcode(cmd.barcode) if cmd.barcode else None,
                 category_id=cmd.category_id,
-                min_stock=cmd.min_stock,
+                min_stock=Decimal("0") if is_service else cmd.min_stock,  # нечему заканчиваться
                 description=cmd.description,
                 warranty_text=cmd.warranty_text,
                 show_on_storefront=cmd.show_on_storefront,
@@ -116,9 +132,13 @@ class CreateProductUseCase:
                         barcode=Barcode(v.barcode) if v.barcode else None,
                         price=Money.of(v.price) if v.price is not None else None,
                         name=v.name,
+                        # доп — только у услуги: у товара варианты
+                        # взаимоисключающие (размер S или M)
+                        addon=v.addon and is_service,
                     )
                     for v in cmd.variants
                 ],
+                kind=cmd.kind,
             )
             await uow.products.add(product)
             await uow.audit.add(

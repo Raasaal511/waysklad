@@ -86,6 +86,11 @@ class ReturnSaleUseCase:
 
             for line in return_lines:
                 sale_line = lines_by_id[line.sale_line_id]
+                product = await uow.products.get(sale_line.product_id)
+                if product.is_service:
+                    # услуга на склад не возвращается — иначе возврат создал бы
+                    # остаток из воздуха. Деньги клиенту возвращаются как обычно
+                    continue
                 await uow.stock.change(
                     sale_line.product_id, sale.warehouse_id, line.quantity.value,
                     sale_line.variant_id,

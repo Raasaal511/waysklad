@@ -66,9 +66,13 @@ class CreateSaleUseCase:
 
             lines = []
             names = {}
+            # услуги склада не касаются: их строки не участвуют в списании
+            service_product_ids: set[int] = set()
             for item in cmd.items:
                 product = await uow.products.get(item.product_id)
                 names[product.id] = product.name
+                if product.is_service:
+                    service_product_ids.add(product.id)
                 lines.append(
                     SaleLine(
                         product_id=item.product_id,
@@ -98,6 +102,10 @@ class CreateSaleUseCase:
                 raise DomainError("Для продажи в долг нужно указать срок «Долг до»")
 
             for line in sale.lines:
+                if line.product_id in service_product_ids:
+                    # у услуги нет остатка: «нет в наличии» для неё — это
+                    # неактивная услуга (is_active), а не нулевой склад
+                    continue
                 new_quantity = await uow.stock.change(
                     line.product_id, sale.warehouse_id, -line.quantity.value, line.variant_id
                 )

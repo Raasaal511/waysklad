@@ -66,6 +66,7 @@ class VariantCreateRequest(BaseModel):
     barcode: str | None = None
     price: Decimal | None = None
     name: str = Field("", max_length=100)
+    addon: bool = False  # доп к услуге: складывается, а не выбирается один из
 
 
 class VariantUpdateRequest(BaseModel):
@@ -76,6 +77,7 @@ class VariantUpdateRequest(BaseModel):
     photo: str = ""
     price: Decimal | None = None
     name: str = Field("", max_length=100)
+    addon: bool = False
 
 
 class ProductCreateRequest(BaseModel):
@@ -96,9 +98,11 @@ class ProductCreateRequest(BaseModel):
     variants: list[VariantCreateRequest] = []
     initial_stock_warehouse_id: int | None = None
     initial_stock_quantity: Decimal | None = None
+    kind: Literal["product", "service"] = "product"
 
     def to_command(self) -> CreateProductCommand:
         return CreateProductCommand(
+            kind=self.kind,
             name=self.name,
             unit_code=self.unit_code,
             purchase_price=self.purchase_price,
@@ -115,7 +119,8 @@ class ProductCreateRequest(BaseModel):
             storefront_step_qty=self.storefront_step_qty,
             variants=[
                 VariantInput(
-                    size=v.size, color=v.color, barcode=v.barcode, price=v.price, name=v.name
+                    size=v.size, color=v.color, barcode=v.barcode, price=v.price,
+                    name=v.name, addon=v.addon,
                 )
                 for v in self.variants
             ],
@@ -141,6 +146,10 @@ class ProductUpdateRequest(BaseModel):
     storefront_min_qty: Decimal | None = None
     storefront_step_qty: Decimal | None = None
     variants: list[VariantUpdateRequest] = []
+    # kind здесь нет сознательно: превращение товара в услугу оставило бы
+    # остаток на складе без владельца (услуга его не видит и не списывает),
+    # а обратно — услугу с нулевым остатком, которую нельзя продать. Нужен
+    # другой вид — заводится новая позиция
 
     def to_command(self, product_id: int) -> UpdateProductCommand:
         return UpdateProductCommand(
@@ -163,7 +172,7 @@ class ProductUpdateRequest(BaseModel):
             variants=[
                 UpdateVariantInput(
                     id=v.id, size=v.size, color=v.color, barcode=v.barcode,
-                    photo=v.photo, price=v.price, name=v.name,
+                    photo=v.photo, price=v.price, name=v.name, addon=v.addon,
                 )
                 for v in self.variants
             ],
@@ -406,6 +415,7 @@ class VariantResponse(BaseModel):
     photo: str
     price: Decimal | None
     name: str
+    addon: bool
 
 
 class ProductResponse(BaseModel):
@@ -427,6 +437,7 @@ class ProductResponse(BaseModel):
     show_on_storefront: bool
     storefront_min_qty: Decimal | None
     storefront_step_qty: Decimal | None
+    kind: str
     variants: list[VariantResponse]
 
     @classmethod
@@ -452,6 +463,7 @@ class ProductResponse(BaseModel):
             show_on_storefront=product.show_on_storefront,
             storefront_min_qty=product.storefront_min_qty,
             storefront_step_qty=product.storefront_step_qty,
+            kind=product.kind,
             variants=[
                 VariantResponse(
                     id=v.id,
@@ -461,6 +473,7 @@ class ProductResponse(BaseModel):
                     photo=v.photo,
                     price=v.price.amount if v.price else None,
                     name=v.name,
+                    addon=v.addon,
                 )
                 for v in product.variants
             ],

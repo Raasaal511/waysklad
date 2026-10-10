@@ -22,6 +22,7 @@ class UpdateVariantInput:
     # None — цена не переопределена, берётся retail_price товара
     price: Decimal | None = None
     name: str = ""
+    addon: bool = False
 
 
 @dataclass(frozen=True)
@@ -93,11 +94,15 @@ class UpdateProductUseCase:
             ):
                 raise DomainError("Старая цена должна быть больше текущей")
 
+            # вид позиции не меняется после создания: товар с остатком нельзя
+            # превратить в услугу, не оставив остаток без владельца
+            is_service = existing_product.is_service
+
             product = Product(
                 id=cmd.product_id,
                 name=cmd.name,
                 unit=unit,
-                purchase_price=Money.of(cmd.purchase_price),
+                purchase_price=Money.of(Decimal("0") if is_service else cmd.purchase_price),
                 retail_price=Money.of(cmd.retail_price),
                 compare_at_price=Money.of(cmd.compare_at_price)
                 if cmd.compare_at_price is not None
@@ -105,7 +110,7 @@ class UpdateProductUseCase:
                 sku=cmd.sku,
                 barcode=Barcode(cmd.barcode) if cmd.barcode else None,
                 category_id=cmd.category_id,
-                min_stock=cmd.min_stock,
+                min_stock=Decimal("0") if is_service else cmd.min_stock,
                 photo=cmd.photo,
                 description=cmd.description,
                 warranty_text=cmd.warranty_text,
@@ -121,9 +126,11 @@ class UpdateProductUseCase:
                         photo=v.photo,
                         price=Money.of(v.price) if v.price is not None else None,
                         name=v.name,
+                        addon=v.addon and is_service,
                     )
                     for v in cmd.variants
                 ],
+                kind=existing_product.kind,
             )
             await uow.products.save(product)
             await uow.audit.add(

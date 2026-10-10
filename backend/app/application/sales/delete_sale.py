@@ -43,6 +43,9 @@ class DeleteSaleUseCase:
                 returned = already_returned.get(line.id, Decimal("0"))
                 remaining = line.quantity.value - returned
                 if remaining > 0:
+                    product = await uow.products.get(line.product_id)
+                    if product.is_service:
+                        continue  # услуга остатка не имеет, возвращать нечего
                     await uow.stock.change(
                         line.product_id, sale.warehouse_id, remaining, line.variant_id
                     )

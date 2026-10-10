@@ -89,6 +89,9 @@ class IssueOrderUseCase:
                 raise DomainError("Для продажи в долг нужно указать срок «Долг до»")
 
             for line in order.lines:
+                product = await uow.products.get(line.product_id)
+                if product.is_service:
+                    continue  # услуга не резервируется и не списывается
                 await uow.stock.reserve(
                     line.product_id, order.warehouse_id, -line.quantity.value, line.variant_id
                 )
@@ -100,7 +103,6 @@ class IssueOrderUseCase:
                     # момент — отрицательный итог здесь означает, что остаток
                     # уменьшили мимо резерва (например, инвентаризацией) уже
                     # после того, как заказ был зарезервирован
-                    product = await uow.products.get(line.product_id)
                     raise DomainError(
                         f"Недостаточно остатка «{product.name}» для выдачи — "
                         "проверьте остаток на складе"
