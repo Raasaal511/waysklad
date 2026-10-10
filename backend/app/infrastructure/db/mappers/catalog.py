@@ -53,6 +53,7 @@ class ProductVariantMapper:
             photo=variant.photo,
             price=variant.price.amount if variant.price else None,
             name=variant.name,
+            addon=variant.addon,
         )
 
     @staticmethod
@@ -65,6 +66,7 @@ class ProductVariantMapper:
             photo=model.photo,
             price=Money(model.price) if model.price is not None else None,
             name=model.name,
+            addon=model.addon,
         )
 
 
@@ -91,6 +93,7 @@ class ProductMapper:
             show_on_storefront=product.show_on_storefront,
             storefront_min_qty=product.storefront_min_qty,
             storefront_step_qty=product.storefront_step_qty,
+            kind=product.kind,
             variants=[ProductVariantMapper.to_orm(v, tenant_id) for v in product.variants],
         )
 
@@ -117,5 +120,6 @@ class ProductMapper:
             show_on_storefront=model.show_on_storefront,
             storefront_min_qty=model.storefront_min_qty,
             storefront_step_qty=model.storefront_step_qty,
+            kind=model.kind,
             variants=[ProductVariantMapper.to_entity(v) for v in model.variants],
         )

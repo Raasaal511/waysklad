@@ -7,6 +7,11 @@ from app.domain.common.quantity import UNITS, Unit
 
 _LOW_STOCK_FALLBACK_THRESHOLD = Decimal("3")  # min_stock не задан (=0) — считаем "мало" на глаз
 
+# вид позиции каталога: обычный товар со складом или услуга без склада
+PRODUCT_KIND = "product"
+SERVICE_KIND = "service"
+PRODUCT_KINDS = (PRODUCT_KIND, SERVICE_KIND)
+
 
 def stock_level(quantity: Decimal, min_stock: Decimal) -> str:
     """"out" | "low" | "in" — для публичной витрины (промпт B1 п.2), где точный
@@ -59,6 +64,10 @@ class ProductVariant:
     # своё название варианта («Aurum») — если пусто, витрина строит display_name
     # из size/color (см. StorefrontProductVariantResponse.display_name)
     name: str = ""
+    # доп к услуге («балансировка +500 ₽»): складывается с ценой услуги,
+    # выбирается чекбоксами. Обычный вариант товара — наоборот,
+    # взаимоисключающий выбор (размер S или M), поэтому нужен флаг
+    addon: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -69,6 +78,7 @@ class ProductVariant:
             "photo": self.photo,
             "price": str(self.price.amount) if self.price else None,
             "name": self.name,
+            "addon": self.addon,
         }
 
     @classmethod
@@ -81,6 +91,7 @@ class ProductVariant:
             photo=d.get("photo", ""),
             price=Money.of(d["price"]) if d.get("price") else None,
             name=d.get("name", ""),  # старые записи кеша — без поля, см. промпт B1 п.5
+            addon=d.get("addon", False),
         )
 
 
@@ -109,7 +120,18 @@ class Product:
     # None у обоих значит «без ограничения» (текущее поведение)
     storefront_min_qty: Decimal | None = None
     storefront_step_qty: Decimal | None = None
+    # «товар» или «услуга». Услуга — не отдельная сущность, а вид товара:
+    # иначе пришлось бы удваивать продажу, корзину, заказ с витрины, возврат
+    # и аналитику. Для пользователя они разные (своя вкладка, своя форма),
+    # в коде отличие ровно одно — услуга не трогает склад (is_service).
+    kind: str = PRODUCT_KIND
     variants: list[ProductVariant] = field(default_factory=list)
+
+    @property
+    def is_service(self) -> bool:
+        """Услуга не списывает и не показывает остаток: продать её можно
+        всегда, пока она активна («временно не оказывается» — is_active)."""
+        return self.kind == SERVICE_KIND
 
     @property
     def margin(self) -> Money:
@@ -161,6 +183,7 @@ class Product:
             "storefront_step_qty": str(self.storefront_step_qty)
             if self.storefront_step_qty is not None
             else None,
+            "kind": self.kind,
             "variants": [v.to_dict() for v in self.variants],
         }
 
@@ -190,5 +213,7 @@ class Product:
             storefront_step_qty=Decimal(d["storefront_step_qty"])
             if d["storefront_step_qty"] is not None
             else None,
+            # записи кеша, созданные до появления услуг, поля не имеют
+            kind=d.get("kind", PRODUCT_KIND),
             variants=[ProductVariant.from_dict(v) for v in d["variants"]],
         )

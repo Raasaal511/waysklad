@@ -90,6 +90,8 @@ class ProductModel(Base, TenantMixin, TimestampMixin):
     warranty_text: Mapped[str] = mapped_column(Text, default="")
     storefront_photos: Mapped[list[str]] = mapped_column(JSON, default=list)
     is_active: Mapped[bool] = mapped_column(default=True)
+    # 'product' | 'service' — услуга не трогает склад, см. Product.is_service
+    kind: Mapped[str] = mapped_column(String(10), default="product", server_default="product")
     show_on_storefront: Mapped[bool] = mapped_column(default=False)
     storefront_min_qty: Mapped[Decimal | None] = mapped_column(Numeric(14, 3))
     storefront_step_qty: Mapped[Decimal | None] = mapped_column(Numeric(14, 3))
@@ -114,3 +116,5 @@ class ProductVariantModel(Base, TenantMixin):
     # NULL — цена не переопределена, берётся retail_price товара
     price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     name: Mapped[str] = mapped_column(String(100), default="")
+    # доп к услуге (складывается), а не взаимоисключающий вариант товара
+    addon: Mapped[bool] = mapped_column(default=False, server_default="false")
