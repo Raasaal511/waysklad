@@ -181,6 +181,63 @@ async def test_variant_price_and_photo_via_api(client, owner_headers):
     assert response.status_code == 400  # несуществующий вариант
 
 
+async def test_variant_photo_survives_product_update_via_api(client, owner_headers):
+    """Загруженное фото варианта не должно теряться при обычном сохранении
+    товара. VariantUpdateRequest.photo имеет дефолт "", поэтому клиент обязан
+    вернуть фото обратно в PUT — форма товара так и делает. Тест фиксирует оба
+    случая: фото вернули (остаётся) и прислали пустым (снимается осознанно)."""
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={
+                "name": "Футболка",
+                "purchase_price": "100",
+                "retail_price": "300",
+                "variants": [{"size": "M", "color": "синий"}],
+            },
+        )
+    ).json()
+    product_id = product["id"]
+    variant_id = product["variants"][0]["id"]
+
+    product = (
+        await client.post(
+            f"/api/products/{product_id}/variants/{variant_id}/photo",
+            headers=owner_headers,
+            files={"file": ("photo.jpg", _test_photo_bytes(), "image/jpeg")},
+        )
+    ).json()
+    photo = product["variants"][0]["photo"]
+    assert photo.startswith("/uploads/")
+
+    # клиент возвращает photo вместе с остальными полями варианта
+    response = await client.put(
+        f"/api/products/{product_id}",
+        headers=owner_headers,
+        json={
+            **product,
+            "name": "Футболка хлопок",
+            "variants": [{"id": variant_id, "size": "M", "color": "синий", "photo": photo}],
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["variants"][0]["photo"] == photo
+
+    # photo не прислали — фото снимается (так работает «убрать фото» в форме)
+    response = await client.put(
+        f"/api/products/{product_id}",
+        headers=owner_headers,
+        json={
+            **product,
+            "name": "Футболка хлопок",
+            "variants": [{"id": variant_id, "size": "M", "color": "синий"}],
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["variants"][0]["photo"] == ""
+
+
 async def test_variant_name_and_warranty_text_via_api(client, owner_headers):
     """Промпт B1 п.1, п.4 — название варианта и гарантия принимаются/отдаются
     в API владельца точно так же, как остальные поля товара/варианта."""

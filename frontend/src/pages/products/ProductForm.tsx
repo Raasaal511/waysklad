@@ -13,6 +13,7 @@ import {
   createUnit,
   createCategory,
   setProductPhoto,
+  setVariantPhoto,
   generateBarcode,
   addStorefrontPhoto,
   setStorefrontPhotos,
@@ -224,8 +225,22 @@ export function ProductForm({
   const [createdProduct, setCreatedProduct] = useState<Product | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const [variants, setVariants] = useState<VariantInput[]>(
-    product?.variants.map((v) => ({ id: v.id, size: v.size, color: v.color, barcode: v.barcode, name: v.name })) ?? [],
+    product?.variants.map((v) => ({
+      id: v.id,
+      size: v.size,
+      color: v.color,
+      barcode: v.barcode,
+      name: v.name,
+      // photo обязательно возвращать в PUT: VariantUpdateRequest.photo имеет
+      // дефолт "", и без этого поля сохранение товара стёрло бы уже
+      // загруженное фото варианта
+      photo: v.photo,
+    })) ?? [],
   )
+  // выбранные, но ещё не отправленные файлы фото вариантов: ключ — индекс в
+  // variants. Грузятся после сохранения товара, когда у варианта есть id
+  const [variantPhotoFiles, setVariantPhotoFiles] = useState<Record<number, File>>({})
+  const [variantPhotoPreviews, setVariantPhotoPreviews] = useState<Record<number, string>>({})
   const [initialStockWarehouseId, setInitialStockWarehouseId] = useState<number | null>(
     warehouses[0]?.id ?? null,
   )
@@ -364,6 +379,44 @@ export function ProductForm({
 
   function removeVariant(index: number) {
     setVariants((v) => v.filter((_, i) => i !== index))
+    // ключи в variantPhotoFiles — индексы в variants, поэтому после удаления
+    // строки все последующие сдвигаются на единицу: без пересборки файл
+    // достался бы соседнему варианту
+    const shiftKeys = <T,>(map: Record<number, T>): Record<number, T> =>
+      Object.fromEntries(
+        Object.entries(map)
+          .map(([key, value]) => [Number(key), value] as const)
+          .filter(([key]) => key !== index)
+          .map(([key, value]) => [key > index ? key - 1 : key, value]),
+      )
+    setVariantPhotoFiles(shiftKeys)
+    setVariantPhotoPreviews(shiftKeys)
+  }
+
+  function applyVariantPhotoFile(index: number, file: File | null) {
+    if (!file) return
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      setError('Неподдерживаемый формат файла. Загрузите изображение JPG, PNG, WEBP или GIF.')
+      return
+    }
+    setError(null)
+    setVariantPhotoFiles((prev) => ({ ...prev, [index]: file }))
+    setVariantPhotoPreviews((prev) => ({ ...prev, [index]: URL.createObjectURL(file) }))
+  }
+
+  function removeVariantPhoto(index: number) {
+    setVariantPhotoFiles((prev) => {
+      const next = { ...prev }
+      delete next[index]
+      return next
+    })
+    setVariantPhotoPreviews((prev) => {
+      const next = { ...prev }
+      delete next[index]
+      return next
+    })
+    // пустая строка в photo — сигнал бэкенду убрать уже сохранённое фото
+    updateVariant(index, { photo: '' })
   }
 
   async function handleCreateCategory(query: string) {
@@ -442,6 +495,29 @@ export function ProductForm({
     }
     if (photoFile) {
       saved = await setProductPhoto(saved.id, photoFile)
+    }
+    // фото вариантов — только после сохранения товара: до него у новых
+    // вариантов нет id. Порядок saved.variants совпадает с порядком
+    // отправленного списка (бэкенд пересобирает варианты из него)
+    const pendingVariantPhotos = Object.entries(variantPhotoFiles)
+    if (pendingVariantPhotos.length > 0) {
+      for (const [key, file] of pendingVariantPhotos) {
+        const variant = saved.variants[Number(key)]
+        if (!variant) continue
+        saved = await setVariantPhoto(saved.id, variant.id, file)
+      }
+      setVariantPhotoFiles({})
+      setVariantPhotoPreviews({})
+      setVariants(
+        saved.variants.map((v) => ({
+          id: v.id,
+          size: v.size,
+          color: v.color,
+          barcode: v.barcode,
+          name: v.name,
+          photo: v.photo,
+        })),
+      )
     }
     return saved
   }
@@ -954,13 +1030,46 @@ export function ProductForm({
           ) : (
             <div className={styles.variantList}>
               <div className={`${styles.variantRow} ${styles.variantRowHeader}`}>
+                <span>Фото</span>
                 <span>Название</span>
                 <span>Размер</span>
                 <span>Цвет</span>
                 <span />
               </div>
-              {variants.map((v, i) => (
+              {variants.map((v, i) => {
+                const preview = variantPhotoPreviews[i] ?? v.photo ?? ''
+                return (
                 <div key={i} className={styles.variantRow}>
+                  <div className={styles.variantPhoto}>
+                    <label className={styles.variantPhotoPick}>
+                      <input
+                        type="file"
+                        accept={ALLOWED_PHOTO_TYPES.join(',')}
+                        className={styles.variantPhotoInput}
+                        onChange={(e) => applyVariantPhotoFile(i, e.target.files?.[0] ?? null)}
+                      />
+                      {preview ? (
+                        <img src={preview} alt="" className={styles.variantPhotoImg} />
+                      ) : (
+                        <span className={styles.variantPhotoEmpty} aria-hidden="true">
+                          <IconPhoto size={16} stroke={1.8} />
+                        </span>
+                      )}
+                      <span className="sr-only">
+                        {preview ? 'Заменить фото варианта' : 'Добавить фото варианта'}
+                      </span>
+                    </label>
+                    {preview && (
+                      <button
+                        type="button"
+                        className={styles.variantPhotoRemove}
+                        onClick={() => removeVariantPhoto(i)}
+                        aria-label="Убрать фото варианта"
+                      >
+                        <IconX size={11} stroke={2.4} />
+                      </button>
+                    )}
+                  </div>
                   <input
                     value={v.name ?? ''}
                     onChange={(e) => updateVariant(i, { name: e.target.value })}
@@ -977,7 +1086,8 @@ export function ProductForm({
                     <IconTrash size={16} stroke={1.8} />
                   </IconButton>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </section>

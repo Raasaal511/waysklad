@@ -416,10 +416,94 @@
 
 .variantRow {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr auto;
+  grid-template-columns: 44px 1.2fr 1fr 1fr auto;
   gap: 10px;
   align-items: center;
   min-width: 0;
+}
+
+/* Фото варианта: квадрат 44×44 — одна картинка на вариант (цвет/размер
+   видно сразу, без открытия товара). Файл грузится после сохранения
+   товара, когда у варианта появился id. */
+.variantPhoto {
+  position: relative;
+  width: 44px;
+  height: 44px;
+}
+
+.variantPhotoPick {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-muted);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.variantPhotoPick:hover {
+  border-color: var(--accent);
+  transform: scale(1.04);
+}
+
+.variantPhotoPick:focus-within {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* перебивает .variantRow input — скрытый выбор файла не должен выглядеть
+   как текстовое поле строки варианта */
+.variantRow input.variantPhotoInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0 !important;
+  border: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.variantPhotoImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.variantPhotoEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-muted);
+}
+
+.variantPhotoRemove {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.variantPhotoRemove:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  transform: scale(1.1);
 }
 
 .variantRow input {
@@ -444,6 +528,33 @@
   padding: 0 4px;
   font-size: 12px;
   color: var(--text-muted);
+}
+
+/* На телефоне пять колонок не помещаются: фото остаётся слева, поля
+   складываются в столбик рядом с ним, кнопка удаления — справа. */
+@media (max-width: 599px) {
+  .variantRow {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px;
+  }
+
+  .variantRow input {
+    grid-column: 2;
+  }
+
+  .variantPhoto {
+    grid-row: span 3;
+  }
+
+  .variantRow > :last-child {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .variantRowHeader {
+    display: none;
+  }
 }
 
 .saveBar {

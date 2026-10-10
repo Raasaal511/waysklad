@@ -375,3 +375,28 @@
   border-radius: 10px;
   border: 1px solid var(--border);
 }
+
+/* Миниатюра варианта в таблице — видно, что фото загружено,
+   без перехода в форму редактирования. */
+.variantThumb,
+.variantThumbEmpty {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.variantThumb {
+  object-fit: cover;
+  display: block;
+  transition: transform 0.15s ease;
+}
+
+.variantThumb:hover {
+  transform: scale(1.12);
+}
+
+.variantThumbEmpty {
+  display: block;
+  background: var(--bg-muted);
+}

@@ -56,7 +56,7 @@ const PRODUCT_HISTORY_ACTION_ICONS: Record<string, TablerIcon> = {
 }
 
 const STOCK_COLUMNS = '2fr 1fr 16px'
-const VARIANT_COLUMNS = '1fr 1fr 1.4fr'
+const VARIANT_COLUMNS = '40px 1fr 1fr 1.4fr'
 
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -387,7 +387,8 @@ export function ProductDetailPage() {
               <h3 className={styles.sectionTitle}>Варианты</h3>
               <div className={layoutStyles.dataTable}>
                 <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: VARIANT_COLUMNS }}>
-                  <span>Размер</span>
+                  <span />
+                  <span>Название / размер</span>
                   <span>Цвет</span>
                   <span>Штрихкод</span>
                 </div>
@@ -403,7 +404,12 @@ export function ProductDetailPage() {
                         } as CSSProperties
                       }
                     >
-                      <span>{v.size || '—'}</span>
+                      {v.photo ? (
+                        <img src={v.photo} alt="" className={styles.variantThumb} />
+                      ) : (
+                        <span className={styles.variantThumbEmpty} aria-hidden="true" />
+                      )}
+                      <span>{v.name || v.size || '—'}</span>
                       <span>{v.color || '—'}</span>
                       <span className={layoutStyles.textMuted}>{v.barcode || '—'}</span>
                     </div>

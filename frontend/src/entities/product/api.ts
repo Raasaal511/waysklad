@@ -6,6 +6,8 @@ export interface Variant {
   color: string
   barcode: string | null
   name: string
+  /** Одно фото варианта — пустая строка, если не загружено. */
+  photo: string
 }
 
 export interface VariantInput {
@@ -14,6 +16,7 @@ export interface VariantInput {
   color: string
   barcode?: string | null
   name?: string
+  photo?: string
 }
 
 export interface Product {
@@ -227,6 +230,14 @@ export function setProductPhoto(productId: number, file: File) {
   const form = new FormData()
   form.append('file', file)
   return api.postForm<Product>(`/products/${productId}/photo`, form)
+}
+
+/** Одно фото варианта (размер/цвет) — загружается после сохранения товара,
+ *  когда у варианта уже есть id. */
+export function setVariantPhoto(productId: number, variantId: number, file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return api.postForm<Product>(`/products/${productId}/variants/${variantId}/photo`, form)
 }
 
 export function generateProductDescription(productId: number) {
