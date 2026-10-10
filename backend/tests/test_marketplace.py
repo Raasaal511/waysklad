@@ -170,12 +170,15 @@ async def test_marketplace_hidden_warehouse_marks_product_out_of_stock(client, r
     headers, slug, _visible_wh = await _register_shop(client, random_phone, "Магазин со складами")
 
     hidden_wh_response = await client.post(
-        "/api/inventory/warehouses", headers=headers, json={"name": "Скрытый склад"}
+        "/api/inventory/warehouses",
+        headers=headers,
+        json={"name": "Скрытый склад", "show_on_storefront": False},
     )
     assert hidden_wh_response.status_code == 201, hidden_wh_response.text
     hidden_wh_id = hidden_wh_response.json()["id"]
-    # show_on_storefront=False — дефолт при создании (см. Warehouse.show_on_storefront),
-    # явно передавать его в POST бессмысленно: WarehouseCreateRequest такого поля не принимает
+    # скрываем явно: склад создаётся видимым витрине по умолчанию
+    # (см. CreateWarehouseCommand). Видимый склад магазина тут тоже есть,
+    # поэтому запас «считать по всем» не включается
 
     product = await _add_product(client, headers, hidden_wh_id, "Товар на скрытом складе", "100")
 

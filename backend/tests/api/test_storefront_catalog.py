@@ -177,14 +177,24 @@ async def test_storefront_catalog_filtered_by_warehouse_via_api(client, owner_he
 
 
 async def test_storefront_warehouse_hidden_from_catalog_via_api(client, owner_headers):
-    """Склад скрыт от витрины отдельно от товара (show_on_storefront владельца) —
-    товар, есть только на скрытом складе, не должен считаться «в наличии» публично,
-    и сам склад не должен попадать в список для выбора."""
+    """Склад скрыт от витрины отдельно от товара (show_on_storefront владельца).
+
+    Скрытый склад не попадает в список складов для выбора. Но пока он
+    единственный и скрыт, остаток по нему всё равно считается наличием:
+    иначе магазин целиком показывается пустым при живом остатке (баг на проде
+    10.10.2026, см. visible_warehouses.py). Скрытие одного склада из
+    нескольких проверяется в тесте ниже."""
     slug = "magazin-berkat"
     await client.patch(
         "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
     )
-    # склад 1 остаётся скрытым от витрины (дефолт show_on_storefront=False)
+    # склад заводится видимым (дефолт), владелец скрывает его вручную
+    response = await client.put(
+        "/api/inventory/warehouses/1",
+        headers=owner_headers,
+        json={"name": "Основной склад", "show_on_storefront": False},
+    )
+    assert response.status_code == 200, response.text
     product = (
         await client.post(
             "/api/products",
@@ -215,7 +225,9 @@ async def test_storefront_warehouse_hidden_from_catalog_via_api(client, owner_he
     body = response.json()
     assert body["warehouses"] == []  # ни один склад не показан на витрине
     listed = next(p for p in body["products"] if p["id"] == product["id"])
-    assert listed["in_stock"] is False  # остаток на скрытом складе не считается наличием
+    # единственный склад скрыт — витрина считает остаток по всем складам,
+    # чтобы магазин не выглядел пустым при живом остатке
+    assert listed["in_stock"] is True
 
     # владелец включает витрину именно для этого склада
     response = await client.put(
@@ -609,3 +621,57 @@ async def test_storefront_catalog_min_rating_filter_via_api(client, owner_header
     assert high_rated["id"] in ids
     assert low_rated["id"] in ids
     assert no_reviews["id"] not in ids
+
+
+async def test_storefront_hidden_warehouse_among_several_via_api(client, owner_headers):
+    """Запас «считать по всем» включается, только когда не выбрано ни одного
+    склада. Как только владелец отметил хотя бы один, скрытый склад снова
+    перестаёт давать наличие — иначе функция скрытия склада была бы потеряна."""
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
+    )
+    # склад 1 — видимый витрине, склад 2 — намеренно скрытый (резервный)
+    await client.put(
+        "/api/inventory/warehouses/1",
+        headers=owner_headers,
+        json={"name": "Основной склад", "show_on_storefront": True},
+    )
+    hidden_warehouse = (
+        await client.post(
+            "/api/inventory/warehouses",
+            headers=owner_headers,
+            json={"name": "Резервный склад", "show_on_storefront": False},
+        )
+    ).json()
+
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Товар только в резерве", "purchase_price": "50", "retail_price": "100"},
+        )
+    ).json()
+    product = (
+        await client.put(
+            f"/api/products/{product['id']}",
+            headers=owner_headers,
+            json={**product, "photo": "https://example.com/test.jpg", "show_on_storefront": True},
+        )
+    ).json()
+    response = await client.post(
+        "/api/inventory/receive",
+        headers=owner_headers,
+        json={
+            "warehouse_id": hidden_warehouse["id"],
+            "lines": [{"product_id": product["id"], "quantity": "5", "cost": "50"}],
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    response = await client.get(f"/api/storefront/{slug}")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [w["id"] for w in body["warehouses"]] == [1]  # резервный склад покупателю не виден
+    listed = next(p for p in body["products"] if p["id"] == product["id"])
+    assert listed["in_stock"] is False  # остаток лежит только на скрытом складе

@@ -3,6 +3,9 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 
+from app.application.storefront.visible_warehouses import (
+    visible_warehouse_ids as compute_visible_warehouse_ids,
+)
 from app.domain.catalog.entities import Category, Product, stock_level
 from app.domain.common.cache import ICache
 from app.domain.common.exceptions import NotFoundError
@@ -168,7 +171,7 @@ class GetStorefrontProductUseCase:
             if not product.show_on_storefront:
                 return None
             all_warehouses = await uow.warehouses.list()
-            visible_warehouse_ids = {w.id for w in all_warehouses if w.show_on_storefront}
+            visible_warehouse_ids = compute_visible_warehouse_ids(all_warehouses)
             stock_items = await uow.stock.list_all()
             sold_counts = await uow.analytics.sold_count_by_products([product.id])
             ratings = await uow.reviews.rating_by_products([product.id])

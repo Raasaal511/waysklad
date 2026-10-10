@@ -2,6 +2,9 @@ import re
 from dataclasses import dataclass
 from decimal import Decimal
 
+from app.application.storefront.visible_warehouses import (
+    visible_warehouse_ids as compute_visible_warehouse_ids,
+)
 from app.domain.catalog.entities import Product
 from app.domain.common.cache import ICache
 from app.domain.common.exceptions import NotFoundError
@@ -179,9 +182,9 @@ class GetSimilarProductsUseCase:
             parent_category_id = category.parent_id if category is not None else None
 
             if cmd.scope == "shop":
-                warehouse_ids = [
-                    w.id for w in await uow.warehouses.list() if w.show_on_storefront
-                ]
+                warehouse_ids = sorted(
+                    compute_visible_warehouse_ids(await uow.warehouses.list())
+                )
                 similar = await uow.products.list_similar_in_shop(
                     product_id=product.id,
                     category_id=product.category_id,

@@ -3,6 +3,9 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from app.application.marketplace.hit_products import get_hit_product_ids
+from app.application.storefront.visible_warehouses import (
+    visible_warehouse_ids as compute_visible_warehouse_ids,
+)
 from app.domain.catalog.entities import Product
 from app.domain.common.cache import ICache
 from app.domain.common.exceptions import NotFoundError
@@ -102,7 +105,7 @@ class GetMarketplaceProductUseCase:
                 return None
             if not product.show_on_storefront:
                 return None
-            visible_warehouse_ids = {w.id for w in await uow.warehouses.list() if w.show_on_storefront}
+            visible_warehouse_ids = compute_visible_warehouse_ids(await uow.warehouses.list())
             stock_items = await uow.stock.list_all()
             sold_counts = await uow.analytics.sold_count_by_products([product.id])
             ratings = await uow.reviews.rating_by_products([product.id])

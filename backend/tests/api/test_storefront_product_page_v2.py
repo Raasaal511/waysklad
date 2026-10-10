@@ -253,14 +253,24 @@ async def test_stock_qty_null_or_number_by_shop_setting_via_api(client, owner_he
 
 async def test_hidden_warehouse_stock_not_visible_publicly_via_api(client, owner_headers):
     """Остаток на скрытом от витрины складе не должен ни попадать в
-    публичный stock_qty, ни делать товар «в наличии»."""
+    публичный stock_qty, ни делать товар «в наличии».
+
+    Складов два: видимый (дефолт) и скрытый. Второй нужен, чтобы остался
+    хотя бы один видимый — иначе витрина считает остаток по всем складам,
+    чтобы магазин не выглядел пустым (см. visible_warehouses.py)."""
     slug = "magazin-berkat"
     await client.patch(
         "/api/auth/shop",
         headers=owner_headers,
         json={"name": "Магазин Беркат", "storefront_enabled": True, "storefront_show_stock_qty": True},
     )
-    # склад 1 остаётся скрытым от витрины (дефолт show_on_storefront=False)
+    hidden_warehouse_id = (
+        await client.post(
+            "/api/inventory/warehouses",
+            headers=owner_headers,
+            json={"name": "Резервный склад", "show_on_storefront": False},
+        )
+    ).json()["id"]
     product = (
         await client.post(
             "/api/products",
@@ -278,7 +288,10 @@ async def test_hidden_warehouse_stock_not_visible_publicly_via_api(client, owner
     response = await client.post(
         "/api/inventory/receive",
         headers=owner_headers,
-        json={"warehouse_id": 1, "lines": [{"product_id": product["id"], "quantity": "20", "cost": "10"}]},
+        json={
+            "warehouse_id": hidden_warehouse_id,
+            "lines": [{"product_id": product["id"], "quantity": "20", "cost": "10"}],
+        },
     )
     assert response.status_code == 201, response.text
 

@@ -4,6 +4,9 @@ from decimal import Decimal
 
 from app.application.storefront.reservation import reserve_request_stock
 from app.application.tasks.notify import notify_user
+from app.application.storefront.visible_warehouses import (
+    visible_warehouse_ids as compute_visible_warehouse_ids,
+)
 from app.domain.catalog.entities import Product
 from app.domain.common.exceptions import DomainError
 from app.domain.common.money import format_rub
@@ -166,9 +169,9 @@ class CreateStorefrontRequestUseCase:
             )
             request.validate()
 
-            visible_warehouse_ids = {
-                w.id for w in await uow.warehouses.list() if w.show_on_storefront
-            }
+            visible_warehouse_ids = compute_visible_warehouse_ids(
+                await uow.warehouses.list()
+            )
             request.insufficient_stock_at_request = not await reserve_request_stock(
                 uow, request.lines, visible_warehouse_ids
             )

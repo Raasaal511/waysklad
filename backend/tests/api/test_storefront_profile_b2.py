@@ -208,7 +208,13 @@ async def test_storefront_profile_hidden_warehouse_not_in_addresses_via_api(clie
     await client.patch(
         "/api/auth/shop", headers=owner_headers, json={"name": "Магазин Беркат", "storefront_enabled": True}
     )
-    # склад 1 остаётся скрытым (show_on_storefront по умолчанию False)
+    # склад заводится видимым (дефолт) — скрываем его явно
+    response = await client.put(
+        "/api/inventory/warehouses/1",
+        headers=owner_headers,
+        json={"name": "Основной склад", "show_on_storefront": False},
+    )
+    assert response.status_code == 200, response.text
 
     response = await client.get(f"/api/storefront/{slug}/profile")
     assert response.status_code == 200, response.text

@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
+from app.application.storefront.visible_warehouses import (
+    visible_warehouse_ids as compute_visible_warehouse_ids,
+)
 from app.domain.catalog.entities import Category, Product
 from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
@@ -141,7 +144,7 @@ class GetStorefrontCatalogUseCase:
 
         async with SqlAlchemyUnitOfWork(tenant.id, session_factory=self._session_factory) as uow:
             all_warehouses = await uow.warehouses.list()
-            visible_warehouse_ids = {w.id for w in all_warehouses if w.show_on_storefront}
+            visible_warehouse_ids = compute_visible_warehouse_ids(all_warehouses)
 
             warehouse_id = cmd.warehouse_id
             if warehouse_id is not None and warehouse_id not in visible_warehouse_ids:

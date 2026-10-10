@@ -1,5 +1,8 @@
 from decimal import Decimal
 
+from app.application.storefront.visible_warehouses import (
+    visible_warehouse_ids as compute_visible_warehouse_ids,
+)
 from app.domain.common.uow import IUnitOfWork
 from app.domain.storefront.entities import StorefrontRequest
 
@@ -45,7 +48,7 @@ async def release_request_reservation(uow: IUnitOfWork, request: StorefrontReque
     поэтому release пробует снять по каждой строке с каждого видимого склада,
     пока не наберёт полное количество строки (get_reserved подсказывает, где
     реально что-то ещё зарезервировано)."""
-    visible_warehouse_ids = sorted(w.id for w in await uow.warehouses.list() if w.show_on_storefront)
+    visible_warehouse_ids = sorted(compute_visible_warehouse_ids(await uow.warehouses.list()))
     for line in request.lines:
         remaining = line.quantity
         for warehouse_id in visible_warehouse_ids:

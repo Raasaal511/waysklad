@@ -18,6 +18,11 @@ class CreateWarehouseCommand:
     address: str = ""
     # id сотрудников (manager/seller/storekeeper), назначаемых на этот склад
     assigned_user_ids: list[int] = field(default_factory=list)
+    # по умолчанию склад виден витрине: иначе его остатки не попадают в
+    # in_stock_product_ids (get_catalog.py) и все товары магазина показываются
+    # как «нет в наличии», хотя остаток есть. Скрытый склад — редкий случай,
+    # он выключается осознанно в карточке склада.
+    show_on_storefront: bool = True
 
 
 class CreateWarehouseUseCase:
@@ -43,6 +48,7 @@ class CreateWarehouseUseCase:
                     name=cmd.name,
                     address=cmd.address,
                     assigned_user_ids=cmd.assigned_user_ids,
+                    show_on_storefront=cmd.show_on_storefront,
                 )
             )
             await uow.audit.add(

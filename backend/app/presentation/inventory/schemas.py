@@ -87,10 +87,15 @@ class WarehouseCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     address: str = ""
     assigned_user_ids: list[int] = Field(default_factory=list)
+    # по умолчанию склад виден витрине — см. CreateWarehouseCommand
+    show_on_storefront: bool = True
 
     def to_command(self) -> CreateWarehouseCommand:
         return CreateWarehouseCommand(
-            name=self.name, address=self.address, assigned_user_ids=self.assigned_user_ids
+            name=self.name,
+            address=self.address,
+            assigned_user_ids=self.assigned_user_ids,
+            show_on_storefront=self.show_on_storefront,
         )
 
 
