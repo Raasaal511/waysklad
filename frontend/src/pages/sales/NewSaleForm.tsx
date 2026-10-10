@@ -146,6 +146,9 @@ export function NewSaleForm({
       warehouseId,
       limit: PRODUCTS_PAGE_SIZE,
       offset: 0,
+      // услуга добавляется в чек тем же поиском, что товар: отдельной
+      // «корзины услуг» нет, шина и шиномонтаж — две строки одного чека
+      kind: 'all',
     })
       .then(({ items, total }) => {
         if (request !== productsRequestRef.current) return
@@ -171,6 +174,7 @@ export function NewSaleForm({
       warehouseId,
       limit: PRODUCTS_PAGE_SIZE,
       offset: products.length,
+      kind: 'all',
     })
       .then(({ items, total }) => {
         // фильтры сменились, пока грузилась страница, — она от другого списка
@@ -329,7 +333,10 @@ export function NewSaleForm({
 
   function addToCart(product: Product) {
     const available = stockFor(product.id)
-    const max = available !== null ? Number(available) : null
+    // у услуги остатка нет, и предел количества не применяется: иначе её
+    // нельзя было бы добавить в чек (остаток «0» читался бы как «кончилось»)
+    const max =
+      product.kind === 'service' ? null : available !== null ? Number(available) : null
     const fractional = isFractional(product.unit_code)
     const clamp = (value: number) => (fractional ? value : Math.floor(value))
     let blocked = false
@@ -460,6 +467,7 @@ export function NewSaleForm({
       return
     }
     const overStockLine = cart.find((l) => {
+      if (l.product.kind === 'service') return false  // у услуги остатка нет
       const available = stockFor(l.product.id)
       return available !== null && Number(l.quantity || 0) > Number(available)
     })
@@ -711,7 +719,8 @@ export function NewSaleForm({
                       <span className={layoutStyles.productTilePriceLabel}>Цена за {unitName(p.unit_code)}:</span>
                       <span className={layoutStyles.productTilePrice}>{formatMoney(p.retail_price)} ₽</span>
                     </span>
-                    {qty !== null && (
+                    {/* у услуги остатка нет — «0 шт» было бы враньём */}
+                    {qty !== null && p.kind !== 'service' && (
                       <span
                         className={[
                           layoutStyles.productTileStock,
@@ -797,7 +806,8 @@ export function NewSaleForm({
           <div className={styles.cartList}>
             {cart.map((line) => {
               const lineTotal = centsToMoney(lineTotalCents(line.quantity, line.price))
-              const available = stockFor(line.product.id)
+              const isServiceLine = line.product.kind === 'service'
+              const available = isServiceLine ? null : stockFor(line.product.id)
               const availableNum = available !== null ? Number(available) : null
               const overStock = availableNum !== null && Number(line.quantity || 0) > availableNum
               return (

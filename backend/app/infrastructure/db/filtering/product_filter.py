@@ -22,18 +22,25 @@ _POPULAR_WINDOW_DAYS = 30
 
 def _stock_expr(warehouse_id: int | None = None, warehouse_ids: list[int] | None = None):
     """Суммарный остаток товара — по конкретному складу, по списку складов
-    (например, только видимые на витрине) либо по всем сразу."""
+    (например, только видимые на витрине) либо по всем сразу.
+
+    У услуги остатка нет, и настоящий ноль выбрасывал бы её из фильтра
+    «только в наличии» — то есть из поиска в форме продажи и из витрины.
+    Поэтому для услуг выражение отдаёт 1: продать её можно всегда, пока
+    она активна.
+    """
     conditions = [StockItemModel.product_id == ProductModel.id]
     if warehouse_id is not None:
         conditions.append(StockItemModel.warehouse_id == warehouse_id)
     elif warehouse_ids is not None:
         conditions.append(StockItemModel.warehouse_id.in_(warehouse_ids))
-    return (
+    quantity = (
         select(func.coalesce(func.sum(StockItemModel.quantity), 0))
         .where(*conditions)
         .correlate(ProductModel)
         .scalar_subquery()
     )
+    return case((ProductModel.kind == "service", 1), else_=quantity)
 
 
 def _rating_expr():

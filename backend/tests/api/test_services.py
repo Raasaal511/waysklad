@@ -261,6 +261,20 @@ async def test_products_list_separates_kinds_via_api(client, owner_headers):
     assert product["id"] in ids and service["id"] in ids
 
 
+async def test_service_passes_in_stock_filter_via_api(client, owner_headers):
+    """Фильтр «только в наличии» не должен выбрасывать услуги: иначе их не
+    найти в форме продажи, где он включён по умолчанию при выборе склада."""
+    service = await _create_service(client, owner_headers, name="Диагностика")
+
+    response = await client.get(
+        "/api/products",
+        headers=owner_headers,
+        params={"kind": "all", "in_stock_only": "true", "warehouse_id": 1},
+    )
+    assert response.status_code == 200, response.text
+    assert service["id"] in [p["id"] for p in response.json()]
+
+
 async def test_product_kind_cannot_change_via_api(client, owner_headers):
     """Вид позиции не меняется после создания: товар с остатком нельзя
     превратить в услугу, не оставив остаток без владельца."""
