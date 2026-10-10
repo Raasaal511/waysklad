@@ -19,6 +19,7 @@ import { useScrollRestore } from '../../shared/lib/useScrollRestore'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { ErrorState } from '../../shared/ui/ErrorState'
 import { ShopHeader, ShopHeaderSkeleton } from './ShopHeader'
+import { OwnerStorefrontBar } from './OwnerStorefrontBar'
 import { FilterBar, type FilterBarValue } from './filters/FilterBar'
 import { addToCart } from './cart'
 import { ProductGrid } from './ProductGrid'
@@ -289,6 +290,7 @@ export function StorefrontCatalogPage() {
 
   return (
     <div className={styles.shell}>
+      <OwnerStorefrontBar slug={slug} />
       {loading && !profile ? <ShopHeaderSkeleton /> : profile ? <ShopHeader profile={profile} /> : null}
 
       {requestToken && (

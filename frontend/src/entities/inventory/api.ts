@@ -74,6 +74,8 @@ export function createWarehouse(input: {
   name: string
   address?: string
   assigned_user_ids?: number[]
+  /** По умолчанию на бэкенде true — склад сразу виден витрине. */
+  show_on_storefront?: boolean
 }) {
   return api.post<Warehouse>('/inventory/warehouses', input)
 }

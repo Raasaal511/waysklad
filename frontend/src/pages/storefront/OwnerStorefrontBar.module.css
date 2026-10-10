@@ -1,0 +1,99 @@
+/* OwnerStorefrontBar — полоска «это ваша витрина» с возвратом в кабинет.
+   Видна только владельцу магазина, покупатель её никогда не встретит. */
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  animation: ownerBarIn 0.22s ease-out;
+}
+
+@keyframes ownerBarIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    animation: none;
+  }
+}
+
+.label {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.action:hover {
+  background: var(--bg-muted);
+  border-color: var(--text-muted);
+}
+
+.action:active {
+  transform: scale(0.97);
+}
+
+.actionPrimary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.actionPrimary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+@media (max-width: 599px) {
+  .bar {
+    padding: 10px 12px;
+  }
+
+  .label {
+    font-size: 13px;
+    flex: 1 1 100%;
+  }
+
+  .actions {
+    width: 100%;
+  }
+
+  .action {
+    flex: 1;
+    justify-content: center;
+  }
+}

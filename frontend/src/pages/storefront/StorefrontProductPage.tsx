@@ -11,6 +11,7 @@ import {
 } from './product/useProductPageData'
 import type { ReviewPhotoRef } from '../../entities/review/api'
 import { ProductLayout } from './product/ProductLayout'
+import { OwnerStorefrontBar } from './OwnerStorefrontBar'
 import { Breadcrumbs } from '../../shared/ui/Breadcrumbs'
 import { ProductHeader } from './product/ProductHeader'
 import { ProductGallery } from './product/ProductGallery'
@@ -319,6 +320,7 @@ export function StorefrontProductPage() {
   return (
     <div className={`${styles.page}${dockVisible ? ` ${styles.pageWithDock}` : ''}`}>
       <div className={styles.container}>
+        <OwnerStorefrontBar slug={slug} />
         <div className={shellStyles.crumbRow}>
           <Breadcrumbs items={buildProductBreadcrumbs(slug, product.category, product.name)} />
           <button
