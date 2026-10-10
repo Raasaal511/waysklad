@@ -4,6 +4,7 @@ import {
   listProducts,
   exportProducts,
   type Product,
+  type ProductKind,
   type ExportFormat,
 } from '../../entities/product/api'
 import { useCatalog } from '../../app/CatalogContext'
@@ -60,6 +61,11 @@ async function downloadExport(format: ExportFormat) {
 
 const PAGE_SIZE = 50
 
+const KIND_TABS: { value: ProductKind; label: string }[] = [
+  { value: 'product', label: 'Товары' },
+  { value: 'service', label: 'Услуги' },
+]
+
 type SortMode =
   | 'name'
   | 'price_asc'
@@ -101,10 +107,14 @@ export function ProductsPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // ?query= — переход из поиска в шапке/сайдбаре (GlobalSearch): список сразу
   // открывается отфильтрованным, без второго ввода того же запроса
+  // вкладка «Товары» / «Услуги». В адресе, чтобы ссылка на услуги
+  // открывалась сразу на нужной вкладке и работала кнопка «назад»
+  const kind: ProductKind = searchParams.get('kind') === 'service' ? 'service' : 'product'
+  const isServices = kind === 'service'
   const [query, setQuery] = useState(() => searchParams.get('query') ?? '')
   const [debouncedQuery, setDebouncedQuery] = useState(query)
   const [categoryId, setCategoryId] = useState<number | 'all'>('all')
@@ -155,6 +165,7 @@ export function ProductsPage() {
         sort: sortMode,
         inStockOnly,
         warehouseId: warehouseId === 'all' ? null : warehouseId,
+        kind,
       })
       if (request !== requestRef.current) return
       setProducts(items)
@@ -179,6 +190,7 @@ export function ProductsPage() {
         sort: sortMode,
         inStockOnly,
         warehouseId: warehouseId === 'all' ? null : warehouseId,
+        kind,
       })
       if (request !== requestRef.current) return // фильтры сменились — страница от другого списка
       setProducts((prev) => [...prev, ...items])
@@ -193,7 +205,7 @@ export function ProductsPage() {
   useEffect(() => {
     loadProducts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQuery, categoryId, sortMode, inStockOnly, warehouseId])
+  }, [debouncedQuery, categoryId, sortMode, inStockOnly, warehouseId, kind])
 
   useEffect(() => {
     ensureCategories().catch(() => {})
@@ -227,7 +239,7 @@ export function ProductsPage() {
   return (
     <div className={layoutStyles.stack}>
       <div className={layoutStyles.sectionTitle}>
-        <h2>Товары</h2>
+        <h2>{isServices ? 'Услуги' : 'Товары'}</h2>
         <div className={layoutStyles.pageTitleActions}>
           <div className={layoutStyles.pageTitleActionsDesktop}>
             <DropdownMenu
@@ -258,8 +270,8 @@ export function ProductsPage() {
                     onSelect: () => setImportFormat(format),
                   }))}
                 />
-                <Button onClick={() => navigate('/products/new')}>
-                  <IconPlus size={16} stroke={1.8} /> Товар
+                <Button onClick={() => navigate(isServices ? '/products/new?kind=service' : '/products/new')}>
+                  <IconPlus size={16} stroke={1.8} /> {isServices ? 'Услуга' : 'Товар'}
                 </Button>
               </>
             )}
@@ -291,8 +303,8 @@ export function ProductsPage() {
               <IconButton
                 variant="accent"
                 size="lg"
-                aria-label="Добавить товар"
-                onClick={() => navigate('/products/new')}
+                aria-label={isServices ? 'Добавить услугу' : 'Добавить товар'}
+                onClick={() => navigate(isServices ? '/products/new?kind=service' : '/products/new')}
               >
                 <IconPlus size={20} stroke={2} />
               </IconButton>
@@ -301,6 +313,27 @@ export function ProductsPage() {
         </div>
       </div>
       {exportError && <p className={layoutStyles.error}>{exportError}</p>}
+
+      <div className={styles.kindTabs} role="tablist" aria-label="Товары и услуги">
+        {KIND_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            role="tab"
+            aria-selected={kind === tab.value}
+            className={`${styles.kindTab} ${kind === tab.value ? styles.kindTabActive : ''}`}
+            onClick={() => {
+              const next = new URLSearchParams(searchParams)
+              // товар — вид по умолчанию, в адресе его не держим
+              if (tab.value === 'product') next.delete('kind')
+              else next.set('kind', tab.value)
+              setSearchParams(next, { replace: true })
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
       <div className={styles.saleSearchPanel}>
         <div className={styles.saleSearchRow}>
@@ -370,16 +403,26 @@ export function ProductsPage() {
           illustration="empty-shelf"
           title={
             debouncedQuery || activeFilterCount > 0
-              ? 'Товаров не найдено'
-              : 'Добавьте первый товар'
+              ? isServices
+                ? 'Услуг не найдено'
+                : 'Товаров не найдено'
+              : isServices
+                ? 'Добавьте первую услугу'
+                : 'Добавьте первый товар'
           }
           description={
             debouncedQuery || activeFilterCount > 0
-              ? 'Измените поиск или сбросьте фильтры — или добавьте новый товар.'
-              : 'Без товара нельзя оформить продажу и пройти тур.'
+              ? `Измените поиск или сбросьте фильтры — или добавьте ${isServices ? 'новую услугу' : 'новый товар'}.`
+              : isServices
+                ? 'Услуга продаётся без склада: ремонт, доставка, установка.'
+                : 'Без товара нельзя оформить продажу и пройти тур.'
           }
-          actionLabel={canManage ? 'Добавить товар' : undefined}
-          onAction={canManage ? () => navigate('/products/new') : undefined}
+          actionLabel={canManage ? (isServices ? 'Добавить услугу' : 'Добавить товар') : undefined}
+          onAction={
+            canManage
+              ? () => navigate(isServices ? '/products/new?kind=service' : '/products/new')
+              : undefined
+          }
         />
       ) : (
         <>
@@ -407,13 +450,25 @@ export function ProductsPage() {
                     }
                   }}
                 >
-                  <ProductPhoto src={p.photo} />
+                  {p.kind === 'service' && !p.photo ? (
+                    // без фото у услуги — первая буква названия, как просил
+                    // владелец: плашка «нет фото» в списке услуг выглядит мусором
+                    <span className={styles.serviceInitial} aria-hidden="true">
+                      {p.name.trim().slice(0, 1).toUpperCase()}
+                    </span>
+                  ) : (
+                    <ProductPhoto src={p.photo} />
+                  )}
                   <div className={layoutStyles.productTileBody}>
                     <span className={layoutStyles.productTileName}>{p.name}</span>
                     <span className={layoutStyles.productTileMeta}>
                       <span className={layoutStyles.productTilePriceLabel}>Цена за {unitName(p.unit_code)}:</span>
                       <span className={layoutStyles.productTilePrice}>{formatMoney(p.retail_price)} ₽</span>
                     </span>
+                    {p.kind === 'service' ? (
+                      // у услуги остатка нет — показывать «0 шт» было бы враньём
+                      <span className={styles.serviceHint}>Без склада</span>
+                    ) : (
                     <span
                       className={`${layoutStyles.productTileStock} ${out ? layoutStyles.productTileStockOut : layoutStyles.productTileStockIn}`}
                     >
@@ -432,6 +487,7 @@ export function ProductsPage() {
                         {low && <StockWarningIcon />}
                       </span>
                     </span>
+                    )}
                   </div>
                 </div>
               )

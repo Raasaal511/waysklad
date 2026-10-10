@@ -21,6 +21,7 @@ import {
   type Unit,
   type Category,
   type VariantInput,
+  type ProductKind,
 } from '../../entities/product/api'
 import { createWarehouse, type Warehouse } from '../../entities/inventory/api'
 import { ApiError } from '../../shared/api/client'
@@ -188,6 +189,7 @@ export function ProductForm({
   onSavingChange,
   onDone,
   submitLabel,
+  kind,
 }: {
   product: Product | null
   categories: Category[]
@@ -199,13 +201,20 @@ export function ProductForm({
   onSavingChange?: (saving: boolean) => void
   onDone: (updated?: Product) => void
   submitLabel?: string
+  /** Вид позиции при создании; при редактировании берётся из товара,
+   *  потому что после создания он не меняется. */
+  kind?: ProductKind
 }) {
+  // услуга не трогает склад: ни закупочной цены, ни остатка, ни прихода
+  const isService = (product?.kind ?? kind ?? 'product') === 'service'
   const [name, setName] = useState(product?.name ?? '')
   const [sku, setSku] = useState(product?.sku || (product ? '' : generateSku('')))
   const [barcode, setBarcode] = useState(product?.barcode ?? '')
   const [generatingBarcode, setGeneratingBarcode] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
-  const [unitCode, setUnitCode] = useState(product?.unit_code ?? 'pcs')
+  const [unitCode, setUnitCode] = useState(
+    product?.unit_code ?? (kind === 'service' ? 'service' : 'pcs'),
+  )
   const isFractional = (code: string) => units.find((u) => u.code === code)?.fractional ?? false
   const clampToUnit = (value: string, code: string) => {
     if (value === '' || isFractional(code)) return value
@@ -233,8 +242,10 @@ export function ProductForm({
       name: v.name,
       // photo обязательно возвращать в PUT: VariantUpdateRequest.photo имеет
       // дефолт "", и без этого поля сохранение товара стёрло бы уже
-      // загруженное фото варианта
+      // загруженное фото варианта. То же касается price и addon
       photo: v.photo,
+      addon: v.addon,
+      price: v.price,
     })) ?? [],
   )
   // выбранные, но ещё не отправленные файлы фото вариантов: ключ — индекс в
@@ -370,7 +381,7 @@ export function ProductForm({
   }
 
   function addVariant() {
-    setVariants((v) => [...v, { size: '', color: '', name: '' }])
+    setVariants((v) => [...v, { size: '', color: '', name: '', addon: isService }])
   }
 
   function updateVariant(index: number, patch: Partial<VariantInput>) {
@@ -488,8 +499,11 @@ export function ProductForm({
     } else {
       saved = await createProduct({
         ...payload,
-        initial_stock_warehouse_id: initialStockQuantity ? initialStockWarehouseId : null,
-        initial_stock_quantity: initialStockQuantity || null,
+        kind: isService ? 'service' : 'product',
+        // приход возможен только у товара — у услуги остатка нет
+        initial_stock_warehouse_id:
+          !isService && initialStockQuantity ? initialStockWarehouseId : null,
+        initial_stock_quantity: isService ? null : initialStockQuantity || null,
       })
       setCreatedProduct(saved)
     }
@@ -516,6 +530,8 @@ export function ProductForm({
           barcode: v.barcode,
           name: v.name,
           photo: v.photo,
+          addon: v.addon,
+          price: v.price,
         })),
       )
     }
@@ -754,6 +770,8 @@ export function ProductForm({
           className={`${detail.metrics} ${detail.reveal}`}
           style={{ '--reveal-delay': '60ms' } as CSSProperties}
         >
+          {/* у услуги нет закупочной цены и маржи: вся сумма — прибыль */}
+          {!isService && (
           <label className={detail.metric}>
             <span className={detail.metricIcon}>
               <IconCoin size={18} stroke={1.8} />
@@ -773,7 +791,9 @@ export function ProductForm({
               <span>Закупка, ₽</span>
             </span>
           </label>
+          )}
 
+          {!isService && (
           <div className={detail.metric}>
             <span className={detail.metricIcon}>
               <IconCheck size={18} stroke={1.8} />
@@ -783,7 +803,10 @@ export function ProductForm({
               <span>Маржа</span>
             </div>
           </div>
+          )}
 
+          {/* порог «заканчивается» — только у товара, услуге нечему кончаться */}
+          {!isService && (
           <label className={detail.metric}>
             <span className={`${detail.metricIcon} ${detail.metricIconWarn}`}>
               <IconAlertTriangle size={18} stroke={1.8} />
@@ -811,8 +834,9 @@ export function ProductForm({
               </span>
             </span>
           </label>
+          )}
 
-          {!product && (
+          {!product && !isService && (
             <label className={detail.metric}>
               <span className={detail.metricIcon}>
                 <IconPackage size={18} stroke={1.8} />
@@ -1001,7 +1025,7 @@ export function ProductForm({
         </section>
         )}
 
-        {!product && (
+        {!product && !isService && (
           <section className={`${detail.section} ${detail.reveal}`} style={{ '--reveal-delay': '100ms' } as CSSProperties}>
             <h3 className={detail.sectionTitle}>Склад для начального остатка</h3>
             <div className={styles.sectionControl}>
@@ -1020,26 +1044,38 @@ export function ProductForm({
 
         <section className={`${detail.section} ${detail.reveal}`} style={{ '--reveal-delay': '160ms' } as CSSProperties}>
           <div className={styles.sectionHead}>
-            <h3 className={detail.sectionTitle}>Варианты</h3>
+            <h3 className={detail.sectionTitle}>{isService ? 'Допы' : 'Варианты'}</h3>
             <Button type="button" variant="secondary" onClick={addVariant}>
               <IconPlus size={14} stroke={1.8} /> Добавить
             </Button>
           </div>
           {variants.length === 0 ? (
-            <p className={layoutStyles.textMuted}>Размер / цвет — по желанию</p>
+            <p className={layoutStyles.textMuted}>
+              {isService
+                ? 'То, что клиент добавляет к услуге: «Балансировка +500 ₽»'
+                : 'Размер / цвет — по желанию'}
+            </p>
           ) : (
             <div className={styles.variantList}>
-              <div className={`${styles.variantRow} ${styles.variantRowHeader}`}>
+              <div
+                className={`${styles.variantRow} ${styles.variantRowHeader} ${isService ? styles.addonRow : ''}`}
+              >
                 <span>Фото</span>
                 <span>Название</span>
-                <span>Размер</span>
-                <span>Цвет</span>
+                {isService ? (
+                  <span>Доплата, ₽</span>
+                ) : (
+                  <>
+                    <span>Размер</span>
+                    <span>Цвет</span>
+                  </>
+                )}
                 <span />
               </div>
               {variants.map((v, i) => {
                 const preview = variantPhotoPreviews[i] ?? v.photo ?? ''
                 return (
-                <div key={i} className={styles.variantRow}>
+                <div key={i} className={`${styles.variantRow} ${isService ? styles.addonRow : ''}`}>
                   <div className={styles.variantPhoto}>
                     <label className={styles.variantPhotoPick}>
                       <input
@@ -1073,10 +1109,26 @@ export function ProductForm({
                   <input
                     value={v.name ?? ''}
                     onChange={(e) => updateVariant(i, { name: e.target.value })}
-                    placeholder="например, Aurum. Если пусто — цвет · размер"
+                    placeholder={
+                      isService ? 'например, Балансировка' : 'например, Aurum. Если пусто — цвет · размер'
+                    }
                   />
-                  <input value={v.size} onChange={(e) => updateVariant(i, { size: e.target.value })} placeholder="Размер" />
-                  <input value={v.color} onChange={(e) => updateVariant(i, { color: e.target.value })} placeholder="Цвет" />
+                  {isService ? (
+                    <input
+                      value={v.price ?? ''}
+                      inputMode="decimal"
+                      onChange={(e) => {
+                        const normalized = normalizeDecimalInput(e.target.value)
+                        if (normalized !== null) updateVariant(i, { price: normalized })
+                      }}
+                      placeholder="500"
+                    />
+                  ) : (
+                    <>
+                      <input value={v.size} onChange={(e) => updateVariant(i, { size: e.target.value })} placeholder="Размер" />
+                      <input value={v.color} onChange={(e) => updateVariant(i, { color: e.target.value })} placeholder="Цвет" />
+                    </>
+                  )}
                   <IconButton
                     type="button"
                     variant="danger"

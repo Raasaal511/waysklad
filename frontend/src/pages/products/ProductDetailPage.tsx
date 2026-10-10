@@ -80,6 +80,9 @@ export function ProductDetailPage() {
   } = useCatalog()
 
   const [product, setProduct] = useState<Product | null>(null)
+  // возврат на ту вкладку, с которой пришли: услуга живёт в своём списке
+  const isService = product?.kind === 'service'
+  const listHref = isService ? '/products?kind=service' : '/products'
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -151,7 +154,7 @@ export function ProductDetailPage() {
     try {
       await deleteProduct(product.id)
       refresh(['products', 'stock']).catch(() => {})
-      navigate('/products', { replace: true })
+      navigate(listHref, { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось удалить товар')
       throw err
@@ -163,8 +166,8 @@ export function ProductDetailPage() {
   if (!loading && !product) {
     return (
       <div className={layoutStyles.stack}>
-        <Link to="/products" className={layoutStyles.backLink}>
-          <IconChevronLeft size={16} stroke={1.8} /> Все товары
+        <Link to={listHref} className={layoutStyles.backLink}>
+          <IconChevronLeft size={16} stroke={1.8} /> {isService ? 'Все услуги' : 'Все товары'}
         </Link>
         <p className={layoutStyles.error}>{error ?? 'Товар не найден'}</p>
       </div>
@@ -173,8 +176,8 @@ export function ProductDetailPage() {
 
   return (
     <div className={layoutStyles.stack}>
-      <Link to="/products" className={layoutStyles.backLink}>
-        <IconChevronLeft size={16} stroke={1.8} /> Все товары
+      <Link to={listHref} className={layoutStyles.backLink}>
+        <IconChevronLeft size={16} stroke={1.8} /> {isService ? 'Все услуги' : 'Все товары'}
       </Link>
 
       {loading || !product ? (
@@ -258,6 +261,9 @@ export function ProductDetailPage() {
             </div>
           </section>
 
+          {/* метрики целиком про склад и закупку — у услуги нет ни того,
+              ни другого, поэтому для неё блок не показывается */}
+          {!isService && (
           <section
             className={`${styles.metrics} ${styles.reveal}`}
             style={{ '--reveal-delay': '60ms' } as CSSProperties}
@@ -332,7 +338,9 @@ export function ProductDetailPage() {
               </div>
             </div>
           </section>
+          )}
 
+          {!isService && (
           <section className={`${styles.section} ${styles.reveal}`} style={{ '--reveal-delay': '110ms' } as CSSProperties}>
             <h3 className={styles.sectionTitle}>Остатки по складам</h3>
             {stockByWarehouse.length === 0 ? (
@@ -381,16 +389,17 @@ export function ProductDetailPage() {
               </div>
             )}
           </section>
+          )}
 
           {product.variants.length > 0 && (
             <section className={`${styles.section} ${styles.reveal}`} style={{ '--reveal-delay': '150ms' } as CSSProperties}>
-              <h3 className={styles.sectionTitle}>Варианты</h3>
+              <h3 className={styles.sectionTitle}>{isService ? 'Допы' : 'Варианты'}</h3>
               <div className={layoutStyles.dataTable}>
                 <div className={layoutStyles.dataTableHead} style={{ gridTemplateColumns: VARIANT_COLUMNS }}>
                   <span />
-                  <span>Название / размер</span>
-                  <span>Цвет</span>
-                  <span>Штрихкод</span>
+                  <span>Название{isService ? '' : ' / размер'}</span>
+                  <span>{isService ? 'Доплата' : 'Цвет'}</span>
+                  <span>{isService ? '' : 'Штрихкод'}</span>
                 </div>
                 <div className={layoutStyles.dataTableBody}>
                   {product.variants.map((v, i) => (
@@ -410,8 +419,16 @@ export function ProductDetailPage() {
                         <span className={styles.variantThumbEmpty} aria-hidden="true" />
                       )}
                       <span>{v.name || v.size || '—'}</span>
-                      <span>{v.color || '—'}</span>
-                      <span className={layoutStyles.textMuted}>{v.barcode || '—'}</span>
+                      <span>
+                        {isService
+                          ? v.price
+                            ? `+${formatMoney(v.price)} ₽`
+                            : '—'
+                          : v.color || '—'}
+                      </span>
+                      <span className={layoutStyles.textMuted}>
+                        {isService ? '' : v.barcode || '—'}
+                      </span>
                     </div>
                   ))}
                 </div>

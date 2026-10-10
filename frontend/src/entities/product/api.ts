@@ -1,5 +1,9 @@
 import { api } from '../../shared/api/client'
 
+/** Вид позиции каталога. Услуга — это товар, который не трогает склад:
+ *  отдельной сущности нет, иначе удвоилась бы вся цепочка продажи. */
+export type ProductKind = 'product' | 'service'
+
 export interface Variant {
   id: number
   size: string
@@ -8,6 +12,12 @@ export interface Variant {
   name: string
   /** Одно фото варианта — пустая строка, если не загружено. */
   photo: string
+  /** Доп к услуге: складывается с ценой, выбирается чекбоксом.
+   *  У товара варианты взаимоисключающие, поэтому всегда false. */
+  addon: boolean
+  /** null — цена не переопределена, берётся цена товара. У допа к услуге
+   *  это сама доплата. */
+  price: string | null
 }
 
 export interface VariantInput {
@@ -17,6 +27,10 @@ export interface VariantInput {
   barcode?: string | null
   name?: string
   photo?: string
+  addon?: boolean
+  /** Своя цена: у варианта товара заменяет цену товара, у допа к услуге —
+   *  это сама доплата («+500 ₽»). */
+  price?: string | null
 }
 
 export interface Product {
@@ -37,6 +51,7 @@ export interface Product {
   show_on_storefront: boolean
   storefront_min_qty: string | null
   storefront_step_qty: string | null
+  kind: ProductKind
   variants: Variant[]
 }
 
@@ -140,6 +155,8 @@ interface ProductInput {
   variants?: VariantInput[]
   initial_stock_warehouse_id?: number | null
   initial_stock_quantity?: string | null
+  /** Только при создании: вид позиции после создания не меняется. */
+  kind?: ProductKind
 }
 
 export function listCategories() {
@@ -158,6 +175,8 @@ export interface ListProductsParams {
   sort?: 'name' | 'price_asc' | 'price_desc' | 'margin_desc' | 'created_desc' | 'created_asc' | 'stock_desc'
   inStockOnly?: boolean
   warehouseId?: number | null
+  /** Вкладка: товары (по умолчанию на бэкенде), услуги или всё сразу. */
+  kind?: ProductKind | 'all'
 }
 
 export async function listProducts(params: ListProductsParams = {}) {
@@ -169,6 +188,7 @@ export async function listProducts(params: ListProductsParams = {}) {
   if (params.sort) search.set('sort', params.sort)
   if (params.inStockOnly) search.set('in_stock_only', 'true')
   if (params.warehouseId != null) search.set('warehouse_id', String(params.warehouseId))
+  if (params.kind) search.set('kind', params.kind)
   const qs = search.toString()
   const { data, total } = await api.getWithTotal<Product[]>(`/products${qs ? `?${qs}` : ''}`)
   return { items: data, total }
