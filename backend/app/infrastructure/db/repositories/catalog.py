@@ -297,6 +297,22 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
         ).all()
         return {category_id: count for category_id, count in rows}
 
+    async def count_storefront_by_kind(self) -> dict[str, int]:
+        """Сколько товаров и сколько услуг на витрине — вкладка «Услуги»
+        показывается покупателю, только когда услуги действительно есть."""
+        rows = (
+            await self._session.execute(
+                select(ProductModel.kind, func.count())
+                .where(
+                    ProductModel.tenant_id == self._tenant,
+                    ProductModel.is_active.is_(True),
+                    ProductModel.show_on_storefront.is_(True),
+                )
+                .group_by(ProductModel.kind)
+            )
+        ).all()
+        return {kind: count for kind, count in rows}
+
     async def list_storefront_variant_options(self) -> tuple[list[str], list[str]]:
         base_filters = (
             ProductModel.tenant_id == self._tenant,

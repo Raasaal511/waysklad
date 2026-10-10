@@ -114,6 +114,9 @@ class ProductFilterFactory(BaseQueryFilterFactory[ProductModel]):
             "barcode": FieldSpec(ProductModel.barcode, TEXT_OPS),
             "search_text": FieldSpec(_search_text_expr(), frozenset({Operator.ILIKE})),
             "category_id": FieldSpec(ProductModel.category_id, NUMERIC_OPS),
+            # 'product' | 'service' — вкладки «Товары» и «Услуги» в кабинете
+            # и на витрине фильтруют по нему
+            "kind": FieldSpec(ProductModel.kind, TEXT_OPS),
             "retail_price": FieldSpec(ProductModel.retail_price, NUMERIC_OPS),
             "purchase_price": FieldSpec(ProductModel.purchase_price, NUMERIC_OPS),
             "margin": FieldSpec(ProductModel.retail_price - ProductModel.purchase_price, NUMERIC_OPS),

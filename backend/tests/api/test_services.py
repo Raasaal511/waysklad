@@ -196,6 +196,71 @@ async def test_product_variant_is_never_addon_via_api(client, owner_headers):
     assert product["variants"][0]["addon"] is False
 
 
+async def test_service_on_storefront_is_always_in_stock_via_api(client, owner_headers):
+    """На витрине услуга «в наличии» всегда: склада у неё нет, а «временно
+    не оказывается» — это снятая активность, и тогда её на витрине нет."""
+    slug = "magazin-berkat"
+    await client.patch(
+        "/api/auth/shop",
+        headers=owner_headers,
+        json={"name": "Магазин Беркат", "storefront_enabled": True},
+    )
+    service = await _create_service(client, owner_headers, name="Выезд мастера")
+    response = await client.put(
+        f"/api/products/{service['id']}",
+        headers=owner_headers,
+        json={**service, "photo": "https://example.com/s.jpg", "show_on_storefront": True},
+    )
+    assert response.status_code == 200, response.text
+
+    response = await client.get(f"/api/storefront/{slug}")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    listed = next(p for p in body["products"] if p["id"] == service["id"])
+    assert listed["kind"] == "service"
+    assert listed["in_stock"] is True  # остатка нет, но услуга доступна
+    assert body["services_count"] == 1
+
+    # вкладка «Услуги» отдаёт только услуги, вкладка «Товары» — только товары
+    response = await client.get(f"/api/storefront/{slug}", params={"kind": "service"})
+    assert [p["id"] for p in response.json()["products"]] == [service["id"]]
+    response = await client.get(f"/api/storefront/{slug}", params={"kind": "product"})
+    assert service["id"] not in [p["id"] for p in response.json()["products"]]
+
+    # на карточке услуги тоже нет «нет в наличии»
+    response = await client.get(f"/api/storefront/{slug}/products/{service['id']}")
+    assert response.status_code == 200, response.text
+    detail = response.json()["product"]
+    assert detail["stock_level"] == "in"
+    assert detail["stock_qty"] is None
+
+
+async def test_products_list_separates_kinds_via_api(client, owner_headers):
+    """Вкладки кабинета: по умолчанию список отдаёт только товары — иначе
+    услуги подмешались бы в существующий список и в форму продажи."""
+    product = (
+        await client.post(
+            "/api/products",
+            headers=owner_headers,
+            json={"name": "Масло", "purchase_price": "200", "retail_price": "500"},
+        )
+    ).json()
+    service = await _create_service(client, owner_headers, name="Замена масла")
+
+    response = await client.get("/api/products", headers=owner_headers)
+    ids = [p["id"] for p in response.json()]
+    assert product["id"] in ids and service["id"] not in ids
+
+    response = await client.get("/api/products", headers=owner_headers, params={"kind": "service"})
+    ids = [p["id"] for p in response.json()]
+    assert ids == [service["id"]]
+
+    # "all" — для поиска в форме продажи, где услуга добавляется тем же поиском
+    response = await client.get("/api/products", headers=owner_headers, params={"kind": "all"})
+    ids = [p["id"] for p in response.json()]
+    assert product["id"] in ids and service["id"] in ids
+
+
 async def test_product_kind_cannot_change_via_api(client, owner_headers):
     """Вид позиции не меняется после создания: товар с остатком нельзя
     превратить в услугу, не оставив остаток без владельца."""

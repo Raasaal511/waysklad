@@ -58,6 +58,11 @@ class IProductRepository(Protocol):
         для навигации на публичной витрине («Одежда (12)»). Ключ None — товары
         без категории."""
         ...
+    async def count_storefront_by_kind(self) -> dict[str, int]:
+        """Сколько товаров и услуг на витрине — вкладка «Услуги» показывается
+        покупателю, только когда услуги действительно есть. Ключи — 'product'
+        и 'service'; вид без позиций в словаре отсутствует."""
+        ...
     async def list_storefront_variant_options(self) -> tuple[list[str], list[str]]:
         """Уникальные непустые size/color среди вариантов товаров, видимых на
         витрине (show_on_storefront=True) — для построения фильтра «Размер»/

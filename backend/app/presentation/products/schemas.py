@@ -43,6 +43,9 @@ class ProductsFilterParams(BaseModel):
     sort: str = "name"
     in_stock_only: bool = False
     warehouse_id: int | None = None
+    # вкладка «Товары» или «Услуги»; "all" — обе сразу (поиск в форме продажи,
+    # где услуга добавляется в чек тем же поиском, что товар)
+    kind: Literal["product", "service", "all"] = "product"
 
     model_config = {"extra": "forbid"}
 
@@ -53,6 +56,8 @@ class ProductsFilterParams(BaseModel):
             "order_by": _ORDER_BY_ALIASES.get(self.sort, self.sort),
             "category_id": self.category_id,
         }
+        if self.kind != "all":
+            raw["kind"] = self.kind
         if self.query.strip():
             raw["search_text__ilike"] = self.query.strip()
         if self.in_stock_only:

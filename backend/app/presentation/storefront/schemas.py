@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -48,6 +49,8 @@ class StorefrontCatalogParams(BaseModel):
     variant_size: str | None = None
     variant_color: str | None = None
     min_rating: int | None = Field(None, ge=1, le=5)
+    # вкладка витрины; "all" — всё вместе, как было до появления услуг
+    kind: Literal["product", "service", "all"] = "all"
 
     model_config = {"extra": "forbid"}
 
@@ -67,6 +70,7 @@ class StorefrontCatalogParams(BaseModel):
             variant_size=self.variant_size,
             variant_color=self.variant_color,
             min_rating=self.min_rating,
+            kind=self.kind,
         )
 
 
@@ -109,6 +113,7 @@ class StorefrontProductResponse(BaseModel):
     sold_count: Decimal
     average_rating: float
     reviews_count: int
+    kind: str  # 'product' | 'service' — у услуги карточка без «в наличии»
 
     @classmethod
     def from_entity(
@@ -126,7 +131,10 @@ class StorefrontProductResponse(BaseModel):
             discount_percent=product.discount_percent,
             photo=product.photo,
             category_id=product.category_id,
-            in_stock=in_stock,
+            kind=product.kind,
+            # услуга «в наличии» всегда: склада у неё нет, а «временно не
+            # оказывается» — это снятая активность, и тогда её на витрине нет
+            in_stock=True if product.is_service else in_stock,
             min_order_qty=product.storefront_min_qty,
             order_step_qty=product.storefront_step_qty,
             sold_count=sold_count,
@@ -150,6 +158,10 @@ class StorefrontCatalogResponse(BaseModel):
     available_colors: list[str]
     total: int
     min_order_total: Decimal | None
+    # сколько на витрине товаров и сколько услуг — вкладки показываются,
+    # только когда услуги есть
+    products_count: int
+    services_count: int
 
     @classmethod
     def from_result(cls, result: StorefrontCatalogResult) -> "StorefrontCatalogResponse":
@@ -173,6 +185,8 @@ class StorefrontCatalogResponse(BaseModel):
             available_colors=result.available_colors,
             total=result.total,
             min_order_total=result.min_order_total,
+            products_count=result.kind_counts.get("product", 0),
+            services_count=result.kind_counts.get("service", 0),
         )
 
 
@@ -198,6 +212,9 @@ class StorefrontProductVariantResponse(BaseModel):
     in_stock: bool
     stock_level: str
     stock_qty: str | None  # заполнен только если у магазина включена настройка витрины
+    # доп к услуге: выбирается чекбоксом и складывается с ценой, в отличие
+    # от варианта товара (размер S *или* M)
+    addon: bool
 
     @classmethod
     def from_entity(
@@ -214,9 +231,13 @@ class StorefrontProductVariantResponse(BaseModel):
             price=variant.price.amount if variant.price else None,
             name=variant.name,
             display_name=_variant_display_name(variant, index),
-            in_stock=resolved_stock.in_stock,
-            stock_level=resolved_stock.stock_level,
-            stock_qty=str(resolved_stock.quantity) if show_stock_qty else None,
+            addon=variant.addon,
+            # у допа остатка нет — он всегда доступен вместе со своей услугой
+            in_stock=True if variant.addon else resolved_stock.in_stock,
+            stock_level="in" if variant.addon else resolved_stock.stock_level,
+            stock_qty=None
+            if variant.addon
+            else (str(resolved_stock.quantity) if show_stock_qty else None),
         )
 
 
@@ -288,7 +309,7 @@ class StorefrontProductDetailResponse(StorefrontProductResponse):
         Публичная карточка одной витрины (GetStorefrontProductUseCase) всегда
         идёт через from_result() — с честными stock_level/stock_qty/category."""
         base = StorefrontProductResponse.from_entity(product, in_stock, sold_count, rating)
-        fallback_level = "in" if in_stock else "out"
+        fallback_level = "in" if base.in_stock else "out"  # у услуги in_stock всегда True
         return cls(
             **base.model_dump(),
             sku=product.sku,
@@ -333,8 +354,12 @@ class StorefrontProductDetailResponse(StorefrontProductResponse):
                 )
                 for index, v in enumerate(product.variants, start=1)
             ],
-            stock_level=result.stock_level,
-            stock_qty=str(result.stock_qty) if result.stock_qty is not None else None,
+            # у услуги склада нет: показывать «нет в наличии» и остаток «0»
+            # на её карточке неверно — она доступна, пока активна
+            stock_level="in" if product.is_service else result.stock_level,
+            stock_qty=None
+            if product.is_service
+            else (str(result.stock_qty) if result.stock_qty is not None else None),
             category=StorefrontProductCategoryResponse.from_entity(
                 result.category.category, result.category.parent
             )

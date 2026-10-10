@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 from app.application.storefront.visible_warehouses import (
@@ -43,6 +43,10 @@ class GetStorefrontCatalogCommand:
     variant_size: str | None = None
     variant_color: str | None = None
     min_rating: int | None = None  # 1..5 — «от N звёзд», товар без отзывов не проходит
+    # вкладка витрины: "product" | "service" | "all". По умолчанию "all" —
+    # магазин без услуг так и остаётся одним списком, вкладки показываются
+    # покупателю, только когда услуги действительно есть
+    kind: str = "all"
 
 
 @dataclass(frozen=True)
@@ -64,6 +68,9 @@ class StorefrontCatalogResult:
     rating_by_product_id: dict[int, ProductRatingAggregate]  # только видимые отзывы
     total: int
     min_order_total: Decimal | None = None  # Tenant.storefront_min_order_total (промпт B2 п.4)
+    # сколько на витрине товаров и сколько услуг: вкладки показываются
+    # покупателю, только когда услуги есть
+    kind_counts: dict[str, int] = field(default_factory=dict)
 
     def to_json(self) -> dict:
         return {
@@ -86,6 +93,7 @@ class StorefrontCatalogResult:
             },
             "total": self.total,
             "min_order_total": str(self.min_order_total) if self.min_order_total is not None else None,
+            "kind_counts": dict(self.kind_counts),
         }
 
     @classmethod
@@ -115,6 +123,8 @@ class StorefrontCatalogResult:
             },
             total=d["total"],
             min_order_total=Decimal(d["min_order_total"]) if d.get("min_order_total") is not None else None,
+            # записи кеша, созданные до появления услуг, поля не имеют
+            kind_counts=d.get("kind_counts", {}),
         )
 
 
@@ -165,6 +175,8 @@ class GetStorefrontCatalogUseCase:
             }
             if cmd.query.strip():
                 raw_params["search_text__ilike"] = cmd.query.strip()
+            if cmd.kind in ("product", "service"):
+                raw_params["kind"] = cmd.kind
             if cmd.min_price is not None:
                 raw_params["retail_price__gte"] = cmd.min_price
             if cmd.max_price is not None:
@@ -184,6 +196,7 @@ class GetStorefrontCatalogUseCase:
             )
             all_categories = await uow.categories.list()
             counts = await uow.products.count_storefront_by_category()
+            kind_counts = await uow.products.count_storefront_by_kind()
             available_sizes, available_colors = await uow.products.list_storefront_variant_options()
             stock_items = await uow.stock.list_all()
             sold_counts = await uow.analytics.sold_count_by_products([p.id for p in products])
@@ -213,6 +226,7 @@ class GetStorefrontCatalogUseCase:
             rating_by_product_id=rating_by_product_id,
             total=total,
             min_order_total=tenant.storefront_min_order_total,
+            kind_counts=kind_counts,
         )
 
     execute = cached_use_case(
