@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { IconCopy, IconShare, IconBrandWhatsapp, IconBrandTelegram, IconLink } from '@tabler/icons-react'
+import { IconClock, IconCopy, IconShare, IconBrandWhatsapp, IconBrandTelegram, IconLink } from '@tabler/icons-react'
 import type { StorefrontProductDetail } from '../../../entities/storefront/api'
 import { StarRating } from '../../../shared/ui/StarRating'
 import { formatMoney, formatPriceOrRequest, formatQuantity, plural } from '../../../shared/lib/format'
+import { formatDuration, serviceUnitPhrase } from '../../../shared/lib/service'
 import { priceRange } from './productUtils'
 import styles from './ProductPage.module.css'
 
@@ -72,7 +73,17 @@ export function ProductHeader({ product, selectedPrice }: ProductHeaderProps) {
       ? `${product.reviews_count} ${plural(product.reviews_count, ['отзыв', 'отзыва', 'отзывов'])}`
       : 'Нет отзывов'
 
-  const priceNode = range.sameForAll ? (
+  const isService = product.kind === 'service'
+  const duration = isService ? formatDuration(product.duration_minutes) : ''
+
+  // у услуги цены «вариантов» — это доплаты за допы, а не альтернативные
+  // цены: «от» по ним дало бы «от 300 ₽» при услуге за 1500
+  const priceNode = isService ? (
+    <p className={styles.headerPrice}>
+      {formatPriceOrRequest(product.retail_price)}
+      <span className={styles.headerPriceUnit}>{serviceUnitPhrase(product.unit_label || 'услуга')}</span>
+    </p>
+  ) : range.sameForAll ? (
     <p className={styles.headerPrice}>
       {formatPriceOrRequest(selectedPrice ?? product.retail_price)}
       <span className={styles.headerPriceUnit}>за {product.unit_label || 'шт'}</span>
@@ -89,6 +100,14 @@ export function ProductHeader({ product, selectedPrice }: ProductHeaderProps) {
       {priceNode}
       <h1 className={styles.headerTitle}>{product.name}</h1>
       <div className={styles.headerMeta}>
+        {duration && (
+          <>
+            <span className={styles.headerMetaDuration}>
+              <IconClock size={16} stroke={1.8} /> {duration}
+            </span>
+            <span className={styles.headerMetaSep}>·</span>
+          </>
+        )}
         {product.reviews_count > 0 && (
           <span className={styles.headerMetaStars}>
             <StarRating value={product.average_rating} size={16} />

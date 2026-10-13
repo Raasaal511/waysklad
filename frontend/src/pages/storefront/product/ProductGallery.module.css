@@ -257,3 +257,28 @@
     transition: none;
   }
 }
+
+.stage > .stageLetter {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+  font-size: 140px;
+}
+
+/* у товара без фото на телефоне галерею прячем, а букву услуги — нет:
+   это её «лицо»; только ниже, чтобы цена и допы были на первом экране */
+@media (max-width: 767px) {
+  .wrap.wrapService {
+    display: block;
+  }
+
+  .wrapService .stage {
+    aspect-ratio: 16 / 9;
+    border-radius: 0;
+  }
+
+  .stage > .stageLetter {
+    font-size: 88px;
+  }
+}

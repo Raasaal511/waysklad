@@ -18,6 +18,7 @@ import { setPageMeta, resetPageMeta } from '../../shared/lib/pageMeta'
 import { useScrollRestore } from '../../shared/lib/useScrollRestore'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { ErrorState } from '../../shared/ui/ErrorState'
+import { PillTabs } from '../../shared/ui/PillTabs'
 import { ShopHeader, ShopHeaderSkeleton } from './ShopHeader'
 import { OwnerStorefrontBar } from './OwnerStorefrontBar'
 import { FilterBar, type FilterBarValue } from './filters/FilterBar'
@@ -33,6 +34,8 @@ const SORT_OPTIONS: { value: StorefrontSort; label: string }[] = [
   { value: 'price_desc', label: 'Сначала дороже' },
   { value: 'created_desc', label: 'Новинки' },
 ]
+
+const KIND_TABS = ['all', 'product', 'service'] as const
 
 export function StorefrontCatalogPage() {
   const { slug = '' } = useParams<{ slug: string }>()
@@ -53,6 +56,10 @@ export function StorefrontCatalogPage() {
     minRating: searchParams.get('min_rating') ? Number(searchParams.get('min_rating')) : null,
   }
   const query = searchParams.get('q') ?? ''
+  // вкладка «Товары» / «Услуги»; "all" — всё вместе, как было до услуг
+  const kindParam = searchParams.get('kind')
+  const kind: 'product' | 'service' | 'all' =
+    kindParam === 'service' ? 'service' : kindParam === 'product' ? 'product' : 'all'
 
   const [profile, setProfile] = useState<StorefrontShopProfile | null>(() =>
     peekCachedStorefrontShopProfile(slug),
@@ -107,6 +114,7 @@ export function StorefrontCatalogPage() {
           variantSize: filters.variantSize || undefined,
           variantColor: filters.variantColor || undefined,
           minRating: filters.minRating || undefined,
+          kind,
           limit: PAGE_SIZE,
           offset: 0,
         }
@@ -142,6 +150,7 @@ export function StorefrontCatalogPage() {
     filters.variantSize,
     filters.variantColor,
     filters.minRating,
+    kind,
   ])
 
   useEffect(() => {
@@ -241,6 +250,7 @@ export function StorefrontCatalogPage() {
         variantSize: filters.variantSize || undefined,
         variantColor: filters.variantColor || undefined,
         minRating: filters.minRating || undefined,
+        kind,
         limit: PAGE_SIZE,
         offset: products.length,
       })
@@ -301,6 +311,22 @@ export function StorefrontCatalogPage() {
         </div>
       )}
 
+      {/* вкладки — только когда есть и то и другое: у магазина без услуг
+          лишний переключатель был бы шумом */}
+      {catalog != null && catalog.products_count > 0 && catalog.services_count > 0 && (
+        <PillTabs
+          className={styles.kindTabs}
+          value={kind}
+          options={KIND_TABS}
+          labels={{
+            all: 'Всё',
+            product: `Товары · ${catalog.products_count}`,
+            service: `Услуги · ${catalog.services_count}`,
+          }}
+          onChange={(v) => patchParams({ kind: v === 'all' ? null : v, category_id: null })}
+        />
+      )}
+
       {!shopEmpty && (
         <div className={styles.header}>
           <FilterBar
@@ -310,9 +336,15 @@ export function StorefrontCatalogPage() {
             value={filters}
             onChange={applyFilters}
             onClear={clearAllFilters}
-            availableSizes={catalog?.available_sizes ?? []}
-            availableColors={catalog?.available_colors ?? []}
-            categories={(catalog?.categories ?? []).map((c) => ({ id: c.id, name: c.name, count: c.product_count }))}
+            // размеры, цвета и категории — товарные: на вкладке услуг они
+            // ничего не отбирают, а счётчики «Обувь 4» путают
+            availableSizes={kind === 'service' ? [] : catalog?.available_sizes ?? []}
+            availableColors={kind === 'service' ? [] : catalog?.available_colors ?? []}
+            categories={
+              kind === 'service'
+                ? []
+                : (catalog?.categories ?? []).map((c) => ({ id: c.id, name: c.name, count: c.product_count }))
+            }
             categoriesLoading={loading}
             activeCategoryId={categoryId}
             onCategoryChange={(id) => patchParams({ category_id: id != null ? String(id) : null })}

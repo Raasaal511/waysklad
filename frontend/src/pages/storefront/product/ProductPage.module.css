@@ -347,3 +347,12 @@
     animation: none;
   }
 }
+
+/* у услуги — сколько займёт, первым в строке под названием */
+.headerMetaDuration {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text);
+  font-weight: 500;
+}

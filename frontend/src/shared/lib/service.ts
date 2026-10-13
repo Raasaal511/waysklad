@@ -17,3 +17,16 @@ export const SERVICE_UNIT_LABELS: Record<string, string> = {
 }
 
 export const SERVICE_UNITS = Object.keys(SERVICE_UNIT_LABELS)
+
+// витрина знает единицу по названию («услуга»), а не по коду
+const PHRASE_BY_NAME: Record<string, string> = {
+  услуга: 'за услугу',
+  час: 'за час',
+  выезд: 'за выезд',
+  день: 'за день',
+}
+
+/** «за услугу» вместо «за услуга»; незнакомая единица — как есть. */
+export function serviceUnitPhrase(unitName: string): string {
+  return PHRASE_BY_NAME[unitName.trim().toLowerCase()] ?? `за ${unitName}`
+}

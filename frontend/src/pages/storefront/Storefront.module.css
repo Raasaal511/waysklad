@@ -97,6 +97,14 @@
   padding-bottom: 8px;
 }
 
+/* «Всё / Товары / Услуги» над фильтрами */
+.kindTabs {
+  margin-top: 16px;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .resultMeta {
   display: flex;
   align-items: baseline;

@@ -442,3 +442,25 @@
   border-radius: 8px;
   background: var(--bg-muted);
 }
+
+/* услуга без фото: буква названия на весь квадрат вместо серой заглушки */
+.photo > .servicePhoto {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  font-size: 64px;
+}
+
+.duration {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 767px) {
+  .photo > .servicePhoto {
+    font-size: 44px;
+  }
+}

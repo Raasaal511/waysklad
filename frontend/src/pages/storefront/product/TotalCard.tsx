@@ -12,6 +12,8 @@ interface TotalCardProps {
   total: number
   linesCount: number
   totalQty: number
+  /** Своя подпись под итогом (у услуги — «Услуга + 2 допа» вместо «3 товара»). */
+  countLabel?: string
   inStock: boolean
   added: boolean
   onAdd: () => void
@@ -30,6 +32,7 @@ export function TotalCard({
   total,
   linesCount,
   totalQty,
+  countLabel,
   inStock,
   added,
   onAdd,
@@ -61,7 +64,7 @@ export function TotalCard({
       <p className={styles.totalValue}>{hasSelection ? `${formatMoney(total.toFixed(2))} ₽` : '—'}</p>
       {hasSelection && (
         <p className={styles.totalCount}>
-          {totalQty} {plural(totalQty, ['товар', 'товара', 'товаров'])}
+          {countLabel ?? `${totalQty} ${plural(totalQty, ['товар', 'товара', 'товаров'])}`}
         </p>
       )}
 

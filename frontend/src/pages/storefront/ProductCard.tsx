@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { IconHeart, IconHeartFilled, IconPlus, IconShieldCheck } from '@tabler/icons-react'
+import { IconClock, IconHeart, IconHeartFilled, IconPlus, IconShieldCheck } from '@tabler/icons-react'
 import { formatMoney, formatPriceOrRequest, formatQuantity } from '../../shared/lib/format'
+import { formatDuration } from '../../shared/lib/service'
 import { ProductPhoto } from '../../shared/ui/ProductPhoto'
+import { ServicePhoto } from '../../shared/ui/ServicePhoto'
 import styles from './ProductCard.module.css'
 
 export interface ProductCardItem {
@@ -22,6 +24,9 @@ export interface ProductCardItem {
   shop_slug?: string
   shop_name?: string
   shop_is_verified?: boolean
+  /** Услуга: без фото — буква названия, под названием — сколько займёт. */
+  kind?: 'product' | 'service'
+  duration_minutes?: number
 }
 
 interface ProductCardProps {
@@ -52,6 +57,8 @@ export function ProductCard({ item, href, showShop, favorite, onToggleFavorite, 
     addedTimer.current = setTimeout(() => setJustAdded(false), 600)
   }
 
+  const isService = item.kind === 'service'
+  const duration = isService ? formatDuration(item.duration_minutes ?? 0) : ''
   const hasRating = (item.reviews_count ?? 0) > 0
   const hasSold = Number(item.sold_count ?? 0) > 0
   const hasOldPrice = item.old_price != null && Number(item.old_price) > Number(item.retail_price)
@@ -72,7 +79,11 @@ export function ProductCard({ item, href, showShop, favorite, onToggleFavorite, 
       <div className={styles.photo} data-dim={!item.in_stock || undefined}>
         {/* CSS растягивает фото/плейсхолдер на 100% контейнера (aspect-ratio 1/1) —
             size здесь влияет только на размер иконки-заглушки, не на сам контейнер. */}
-        <ProductPhoto src={item.photo} size={96} />
+        {isService && !item.photo ? (
+          <ServicePhoto src="" name={item.name} className={styles.servicePhoto} />
+        ) : (
+          <ProductPhoto src={item.photo} size={96} />
+        )}
         {shownBadges.length > 0 && (
           <div className={styles.badges}>
             {shownBadges.map((b) => (
@@ -105,6 +116,12 @@ export function ProductCard({ item, href, showShop, favorite, onToggleFavorite, 
             {item.name}
           </Link>
         </h3>
+
+        {duration && (
+          <span className={styles.duration}>
+            <IconClock size={14} stroke={1.8} /> {duration}
+          </span>
+        )}
 
         {/* Низ всегда одной высоты: рейтинг слева, «+» справа — карточки в сетке ровные,
             даже если у одной есть рейтинг и старая цена, а у соседней нет. */}

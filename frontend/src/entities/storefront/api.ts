@@ -21,6 +21,10 @@ export interface StorefrontProduct {
   order_step_qty: string | null
   average_rating: number
   reviews_count: number
+  /** Услуга — без склада и без «нет в наличии». */
+  kind: 'product' | 'service'
+  /** У услуги — сколько займёт в минутах, 0 — не указано. */
+  duration_minutes: number
 }
 
 export interface StorefrontVariant {
@@ -34,6 +38,8 @@ export interface StorefrontVariant {
   in_stock: boolean
   stock_level: StockLevel
   stock_qty: string | null
+  /** Доп к услуге: складывается с ценой, а не выбирается один из списка. */
+  addon: boolean
 }
 
 export interface StorefrontProductCategory {
@@ -87,6 +93,10 @@ export interface StorefrontCatalog {
   available_colors: string[]
   total: number
   min_order_total: string | null
+  /** Сколько на витрине товаров и сколько услуг: вкладки показываются
+   *  покупателю, только когда услуги действительно есть. */
+  products_count: number
+  services_count: number
 }
 
 export interface StorefrontProductPage {
@@ -218,6 +228,8 @@ export interface CatalogParams {
   variantColor?: string
   /** «от N звёзд» — backend уже поддерживает (StorefrontCatalogParams.min_rating), 1..5. */
   minRating?: number | null
+  /** Вкладка витрины; по умолчанию всё вместе. */
+  kind?: 'product' | 'service' | 'all'
 }
 
 function catalogQuery(params: CatalogParams) {
@@ -234,6 +246,7 @@ function catalogQuery(params: CatalogParams) {
   if (params.variantSize) search.set('variant_size', params.variantSize)
   if (params.variantColor) search.set('variant_color', params.variantColor)
   if (params.minRating != null) search.set('min_rating', String(params.minRating))
+  if (params.kind && params.kind !== 'all') search.set('kind', params.kind)
   const qs = search.toString()
   return qs ? `?${qs}` : ''
 }

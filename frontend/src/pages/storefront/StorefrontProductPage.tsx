@@ -19,6 +19,7 @@ import { BuyerPhotos } from './product/BuyerPhotos'
 import { VariantList, variantListSectionTitle } from './product/VariantList'
 import { MinOrderProgress } from './product/MinOrderProgress'
 import { TotalCard } from './product/TotalCard'
+import { AddonList } from './product/AddonList'
 import { ConditionsCard } from './product/ConditionsCard'
 import { ShopCard } from './product/ShopCard'
 import { FaqLinks } from './product/FaqLinks'
@@ -59,6 +60,11 @@ export function StorefrontProductPage() {
   const resetSelection = useCallback(
     (p: StorefrontProductDetail) => {
       clear()
+      // услуга выбрана сразу, одна; допы покупатель отмечает сам
+      if (p.kind === 'service') {
+        setQty('base', 1)
+        return
+      }
       if (p.variants.length > 1) return
       const single = p.variants[0]
       if (single ? !single.in_stock : !p.in_stock) return
@@ -219,6 +225,14 @@ export function StorefrontProductPage() {
   }
 
   const isFavorite = favorites.includes(product.id)
+  const isService = product.kind === 'service'
+  const addons = isService ? product.variants.filter((v) => v.addon) : []
+  const pickedAddons = addons.filter((a) => selection.has(a.id)).length
+  const serviceCountLabel = isService
+    ? pickedAddons > 0
+      ? `Услуга + ${pickedAddons} ${plural(pickedAddons, ['доп', 'допа', 'допов'])}`
+      : 'Услуга'
+    : undefined
   const highlightedVariant = product.variants.find((v) => String(v.id) === highlightVariantId)
   const previewVariant =
     highlightedVariant ??
@@ -313,7 +327,13 @@ export function StorefrontProductPage() {
     setCartItems(loadCart(slug))
     resetSelection(product)
     setAdded(true)
-    setToast(`Добавлено: ${count} ${plural(count, ['товар', 'товара', 'товаров'])}`)
+    setToast(
+      isService
+        ? count > 1
+          ? `Услуга и ${count - 1} ${plural(count - 1, ['доп', 'допа', 'допов'])} в корзине`
+          : 'Услуга в корзине'
+        : `Добавлено: ${count} ${plural(count, ['товар', 'товара', 'товаров'])}`,
+    )
     setTimeout(() => setAdded(false), 1600)
   }
 
@@ -338,6 +358,7 @@ export function StorefrontProductPage() {
             <ProductGallery
               photos={galleryForVariant(product, previewVariant)}
               productName={product.name}
+              isService={product.kind === 'service'}
               activeIndex={activePhoto}
               onActiveIndexChange={setActivePhoto}
             />
@@ -347,16 +368,29 @@ export function StorefrontProductPage() {
               <div className={styles.card}>
                 <ProductHeader product={product} selectedPrice={previewPrice} />
               </div>
-              <div className={styles.card}>
-                <h2 className={styles.blockTitle}>{variantListSectionTitle(product.variants.length)}</h2>
-                <VariantList
-                  product={product}
-                  selection={selection}
-                  onQtyChange={setQty}
-                  onShowToast={setToast}
-                  flashKey={flashVariantKey}
-                />
-              </div>
+              {isService ? (
+                addons.length > 0 && (
+                  <div className={styles.card}>
+                    <h2 className={styles.blockTitle}>Допы</h2>
+                    <AddonList
+                      addons={addons}
+                      selection={selection}
+                      onToggle={(id, picked) => setQty(id, picked ? 1 : 0)}
+                    />
+                  </div>
+                )
+              ) : (
+                <div className={styles.card}>
+                  <h2 className={styles.blockTitle}>{variantListSectionTitle(product.variants.length)}</h2>
+                  <VariantList
+                    product={product}
+                    selection={selection}
+                    onQtyChange={setQty}
+                    onShowToast={setToast}
+                    flashKey={flashVariantKey}
+                  />
+                </div>
+              )}
             </>
           }
           aside={
@@ -372,6 +406,7 @@ export function StorefrontProductPage() {
                 total={selectionTotal}
                 linesCount={linesCount}
                 totalQty={totalQty}
+                countLabel={serviceCountLabel}
                 inStock={product.in_stock}
                 added={added}
                 onAdd={handleAdd}

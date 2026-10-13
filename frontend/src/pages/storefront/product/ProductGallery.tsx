@@ -8,6 +8,7 @@ import {
   IconPhoto,
 } from '@tabler/icons-react'
 import { Lightbox } from '../../../shared/ui/Lightbox'
+import { ServicePhoto } from '../../../shared/ui/ServicePhoto'
 import styles from './ProductGallery.module.css'
 
 const VISIBLE_THUMBS = 7
@@ -18,10 +19,19 @@ interface ProductGalleryProps {
   activeIndex: number
   onActiveIndexChange: (index: number) => void
   onShare?: () => void
+  /** Услуга без фото: вместо «Нет фото» — буква названия, как в карточке. */
+  isService?: boolean
 }
 
 /** Галерея карточки товара: лента миниатюр слева + большое фото (десктоп), свайп-лента (мобильный). */
-export function ProductGallery({ photos, productName, activeIndex, onActiveIndexChange, onShare }: ProductGalleryProps) {
+export function ProductGallery({
+  photos,
+  productName,
+  activeIndex,
+  onActiveIndexChange,
+  onShare,
+  isService,
+}: ProductGalleryProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [thumbScroll, setThumbScroll] = useState(0)
   const mobileScrollerRef = useRef<HTMLDivElement>(null)
@@ -58,12 +68,16 @@ export function ProductGallery({ photos, productName, activeIndex, onActiveIndex
 
   if (photos.length === 0) {
     return (
-      <div className={styles.wrap}>
+      <div className={isService ? `${styles.wrap} ${styles.wrapService}` : styles.wrap}>
         <div className={styles.stage}>
+          {isService ? (
+            <ServicePhoto src="" name={productName} className={styles.stageLetter} />
+          ) : (
           <div className={styles.stageEmpty}>
             <IconPhoto size={40} stroke={1.5} />
             <span>Нет фото</span>
           </div>
+          )}
         </div>
       </div>
     )
