@@ -54,29 +54,6 @@
   background: color-mix(in srgb, var(--text) 6%, var(--bg-muted));
 }
 
-/* подсказка горячей клавиши: видна, пока поле пустое и без фокуса */
-.hotkey {
-  display: grid;
-  place-items: center;
-  flex: none;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  transition: opacity 0.15s ease;
-}
-
-.field:focus-within .hotkey {
-  opacity: 0;
-}
-
 .field:focus-within {
   border-color: var(--accent);
   background: var(--bg);
@@ -307,9 +284,3 @@
   }
 }
 
-/* на сенсорных экранах клавиатурной подсказке не место */
-@media (hover: none), (max-width: 899px) {
-  .hotkey {
-    display: none;
-  }
-}

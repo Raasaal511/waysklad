@@ -222,11 +222,6 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
           role="combobox"
           aria-controls="global-search-results"
         />
-        {!query && !compact && (
-          <kbd className={styles.hotkey} aria-hidden="true">
-            /
-          </kbd>
-        )}
         {(query || compact) && (
           <button
             type="button"
