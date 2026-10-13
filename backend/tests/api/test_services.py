@@ -367,3 +367,12 @@ async def test_service_goes_to_storefront_without_photo_via_api(client, owner_he
     поэтому показ без фото разрешён (товару — по-прежнему нет)."""
     service = await _create_service(client, owner_headers, show_on_storefront=True)
     assert service["show_on_storefront"] is True
+
+
+async def test_products_export_skips_services_via_api(client, owner_headers):
+    """Экспорт «Товаров» не выгружает услуги: импорт про вид позиции не
+    знает, и услуга при обратной загрузке стала бы товаром со складом."""
+    await _create_service(client, owner_headers, name="Услуга-невидимка")
+    response = await client.get("/api/products/export.csv", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    assert "Услуга-невидимка" not in response.content.decode("utf-8-sig")
