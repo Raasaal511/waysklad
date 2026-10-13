@@ -11,6 +11,7 @@ export type IllustrationName =
   | 'empty-clients'
   | 'empty-reviews'
   | 'empty-sales'
+  | 'empty-services'
   | 'empty-shelf'
   | 'empty-stock'
   | 'error-403-blocked'
@@ -27,6 +28,7 @@ export const ILLUSTRATION_SIZES: Record<IllustrationName, { w: number; h: number
   'empty-clients': { w: 240, h: 131 },
   'empty-reviews': { w: 240, h: 236 },
   'empty-sales': { w: 240, h: 173 },
+  'empty-services': { w: 228, h: 240 },
   'empty-shelf': { w: 169, h: 200 },
   'empty-stock': { w: 240, h: 150 },
   'error-403-blocked': { w: 240, h: 224 },
@@ -40,6 +42,7 @@ const WEBP_NAMES = new Set<IllustrationName>([
   'empty-clients',
   'empty-reviews',
   'empty-sales',
+  'empty-services',
   'empty-stock',
   'error-403-blocked',
   'error-404-not-found',

@@ -75,6 +75,7 @@ export function ServicesPage() {
 
       {isEmptyShop ? (
         <EmptyState
+          illustration="empty-services"
           title="Пока нет услуг"
           description="Шиномонтаж, доставка, установка — всё, что вы делаете руками. Услуга продаётся в том же чеке, что товар, и не трогает склад."
           actionLabel={canManage ? 'Добавить услугу' : undefined}
