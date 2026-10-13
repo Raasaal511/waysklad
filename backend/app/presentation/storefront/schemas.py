@@ -114,6 +114,8 @@ class StorefrontProductResponse(BaseModel):
     average_rating: float
     reviews_count: int
     kind: str  # 'product' | 'service' — у услуги карточка без «в наличии»
+    # у услуги — примерная длительность в минутах, 0 — не указана; у товара 0
+    duration_minutes: int = 0
 
     @classmethod
     def from_entity(
@@ -132,6 +134,7 @@ class StorefrontProductResponse(BaseModel):
             photo=product.photo,
             category_id=product.category_id,
             kind=product.kind,
+            duration_minutes=product.service.duration_minutes if product.service else 0,
             # услуга «в наличии» всегда: склада у неё нет, а «временно не
             # оказывается» — это снятая активность, и тогда её на витрине нет
             in_stock=True if product.is_service else in_stock,

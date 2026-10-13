@@ -205,7 +205,9 @@ async def test_service_on_storefront_is_always_in_stock_via_api(client, owner_he
         headers=owner_headers,
         json={"name": "Магазин Беркат", "storefront_enabled": True},
     )
-    service = await _create_service(client, owner_headers, name="Выезд мастера")
+    service = await _create_service(
+        client, owner_headers, name="Выезд мастера", duration_minutes=90
+    )
     response = await client.put(
         f"/api/products/{service['id']}",
         headers=owner_headers,
@@ -233,6 +235,9 @@ async def test_service_on_storefront_is_always_in_stock_via_api(client, owner_he
     detail = response.json()["product"]
     assert detail["stock_level"] == "in"
     assert detail["stock_qty"] is None
+    # покупателю видно, сколько займёт
+    assert listed["duration_minutes"] == 90
+    assert detail["duration_minutes"] == 90
 
 
 async def test_products_list_separates_kinds_via_api(client, owner_headers):

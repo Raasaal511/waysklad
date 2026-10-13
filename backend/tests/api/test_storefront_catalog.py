@@ -101,6 +101,7 @@ async def test_storefront_catalog_via_api(client, owner_headers):
         "min_order_qty", "order_step_qty", "sold_count",
         "average_rating", "reviews_count", "old_price", "discount_percent",
         "kind",  # товар или услуга — у услуги карточка без «в наличии»
+        "duration_minutes",  # у услуги — сколько займёт; у товара 0
     }
 
     response = await client.get(f"/api/storefront/{slug}", params={"query": "Скрытый"})
