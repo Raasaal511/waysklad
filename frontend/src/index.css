@@ -184,7 +184,10 @@ p {
   color: var(--text-muted);
 }
 
-input:not([type='checkbox']):not([type='radio']),
+/* :where() обнуляет вес :not() — иначе базовая рамка перебивала стили
+   страниц (.search input { border: 0 }) и внутри обёртки с иконкой
+   рисовалось «поле в поле». Теперь любой класс страницы главнее базы. */
+input:where(:not([type='checkbox']):not([type='radio'])),
 select {
   font: inherit;
   color: var(--text);
@@ -198,12 +201,12 @@ select {
   padding-right: 28px;
 }
 
-input:not([type='checkbox']):not([type='radio']):focus,
+input:where(:not([type='checkbox']):not([type='radio'])):focus,
 select:focus {
   outline: none;
 }
 
-input:not([type='checkbox']):not([type='radio']):focus-visible,
+input:where(:not([type='checkbox']):not([type='radio'])):focus-visible,
 select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;

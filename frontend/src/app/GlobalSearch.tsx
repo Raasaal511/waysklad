@@ -58,6 +58,25 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
     if (!compact) setExpanded(true)
   }, [compact])
 
+  // «/» или Ctrl/⌘+K — сразу в поиск, не дотягиваясь до мыши (продавец
+  // у кассы ищет товар десятки раз за смену). В полях ввода «/» не ловим
+  useEffect(() => {
+    if (compact) return
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null
+      const typing =
+        target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '')
+      const isSlash = e.key === '/' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey
+      const isCmdK = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'
+      if (!isSlash && !isCmdK) return
+      e.preventDefault()
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [compact])
+
   const trimmed = query.trim()
 
   useEffect(() => {
@@ -192,13 +211,22 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Поиск по названию, артикулу, штрихкоду…"
-          aria-label="Поиск товаров"
+          // длинное «по названию, артикулу, штрихкоду» в узком сайдбаре
+          // обрезалось — ищет всё равно по всем трём, подсказка в title
+          placeholder="Найти товар"
+          title="По названию, артикулу или штрихкоду"
+          aria-label="Поиск товаров по названию, артикулу или штрихкоду"
+          enterKeyHint="search"
           aria-expanded={showDropdown}
           aria-autocomplete="list"
           role="combobox"
           aria-controls="global-search-results"
         />
+        {!query && !compact && (
+          <kbd className={styles.hotkey} aria-hidden="true">
+            /
+          </kbd>
+        )}
         {(query || compact) && (
           <button
             type="button"
