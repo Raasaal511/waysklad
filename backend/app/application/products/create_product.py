@@ -115,7 +115,8 @@ class CreateProductUseCase:
             # фото загружается отдельным вызовом уже после создания товара (нет
             # поля photo в этой команде) — значит на этом шаге его точно нет,
             # и включать показ на витрине сразу нельзя (см. UpdateProductUseCase)
-            if cmd.show_on_storefront:
+            # (услуге фото не обязательно — см. UpdateProductUseCase)
+            if cmd.show_on_storefront and not is_service:
                 raise DomainError("Добавьте фото товара, прежде чем показывать его на витрине")
 
             product = Product(

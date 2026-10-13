@@ -355,3 +355,10 @@ async def test_addon_flag_changes_on_update_via_api(client, owner_headers):
     )
     assert response.status_code == 200, response.text
     assert response.json()["variants"][0]["addon"] is False
+
+
+async def test_service_goes_to_storefront_without_photo_via_api(client, owner_headers):
+    """Услугу часто нечем снять — на витрине у неё буква вместо фото,
+    поэтому показ без фото разрешён (товару — по-прежнему нет)."""
+    service = await _create_service(client, owner_headers, show_on_storefront=True)
+    assert service["show_on_storefront"] is True
