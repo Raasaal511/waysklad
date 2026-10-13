@@ -6,6 +6,8 @@ export interface CartLine {
   product: Product
   quantity: string
   price: string
+  /** Отмеченные допы услуги (id вариантов) — их цена уже в price. */
+  addonIds?: number[]
 }
 
 export interface SaleDraft {

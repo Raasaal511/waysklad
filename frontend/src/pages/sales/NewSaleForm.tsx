@@ -16,6 +16,7 @@ import {
   type Sale,
 } from '../../entities/sale/api'
 import {
+  IconCheck,
   IconPlus,
   IconMinus,
   IconX,
@@ -405,6 +406,28 @@ export function NewSaleForm({
       }),
     )
     if (blocked) notifyMaxReached(productId)
+  }
+
+  // доп к услуге: цена строки сдвигается на цену допа. Сдвиг, а не пересчёт
+  // от базы — если кассир уже поправил цену вручную, правка сохраняется
+  function toggleAddon(productId: number, addonId: number) {
+    setCart((prev) =>
+      prev.map((l) => {
+        if (l.product.id !== productId) return l
+        const addon = l.product.variants.find((v) => v.id === addonId)
+        if (!addon) return l
+        const picked = l.addonIds?.includes(addonId) ?? false
+        const delta = Math.round(Number(addon.price ?? 0) * 100) * (picked ? -1 : 1)
+        const cents = Math.max(0, Math.round(Number(l.price || 0) * 100) + delta)
+        return {
+          ...l,
+          price: (cents / 100).toFixed(2),
+          addonIds: picked
+            ? (l.addonIds ?? []).filter((id) => id !== addonId)
+            : [...(l.addonIds ?? []), addonId],
+        }
+      }),
+    )
   }
 
   function removeLine(productId: number) {
@@ -818,6 +841,27 @@ export function NewSaleForm({
                       {availableNum !== null && (
                         <div className={styles.cartTableStock}>
                           Остаток: {formatQuantity(availableNum)} {unitName(line.product.unit_code)}
+                        </div>
+                      )}
+                      {isServiceLine && line.product.variants.some((v) => v.addon) && (
+                        <div className={styles.cartAddons} role="group" aria-label="Допы">
+                          {line.product.variants
+                            .filter((v) => v.addon)
+                            .map((addon) => {
+                              const picked = line.addonIds?.includes(addon.id) ?? false
+                              return (
+                                <button
+                                  key={addon.id}
+                                  type="button"
+                                  aria-pressed={picked}
+                                  className={picked ? styles.cartAddonOn : styles.cartAddon}
+                                  onClick={() => toggleAddon(line.product.id, addon.id)}
+                                >
+                                  {picked ? <IconCheck size={13} stroke={2.6} /> : <IconPlus size={13} stroke={2.2} />}
+                                  {addon.name} · {formatMoney(addon.price ?? '0')} ₽
+                                </button>
+                              )
+                            })}
                         </div>
                       )}
                     </div>

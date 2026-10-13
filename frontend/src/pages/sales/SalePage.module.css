@@ -1225,3 +1225,46 @@ input.saleSearchInput:not([type='checkbox']):not([type='radio']):focus {
 .saleSavedToastClose:hover {
   opacity: 1;
 }
+
+/* допы услуги под строкой чека: нажал — цена строки выросла на доп */
+.cartAddons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cartAddon,
+.cartAddonOn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.cartAddon:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.cartAddonOn {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.cartAddon:active,
+.cartAddonOn:active {
+  transform: scale(0.96);
+}
