@@ -294,3 +294,64 @@ async def test_product_kind_cannot_change_via_api(client, owner_headers):
     )
     assert response.status_code == 200, response.text
     assert response.json()["kind"] == "product"  # kind из запроса игнорируется
+
+
+async def test_service_duration_and_performer_via_api(client, owner_headers):
+    """Длительность и исполнитель — поля только услуги (таблица services):
+    создаются, правятся и снимаются тем же PUT, что и остальная карточка."""
+    response = await client.get("/api/auth/employees", headers=owner_headers)
+    assert response.status_code == 200, response.text
+    owner_id = response.json()[0]["id"]
+
+    service = await _create_service(
+        client, owner_headers, duration_minutes=90, performer_id=owner_id
+    )
+    assert service["duration_minutes"] == 90
+    assert service["performer_id"] == owner_id
+
+    response = await client.put(
+        f"/api/products/{service['id']}",
+        headers=owner_headers,
+        json={"name": service["name"], "unit_code": "service", "retail_price": "500",
+              "duration_minutes": 40},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["duration_minutes"] == 40
+    assert response.json()["performer_id"] is None
+
+    # у товара полей услуги нет, что бы ни прислали
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Шина", "retail_price": "5000", "duration_minutes": 30},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["duration_minutes"] == 0
+
+
+async def test_service_rejects_foreign_performer_via_api(client, owner_headers):
+    """Исполнитель — только сотрудник своего магазина."""
+    response = await client.post(
+        "/api/products",
+        headers=owner_headers,
+        json={"name": "Покраска", "kind": "service", "unit_code": "service",
+              "retail_price": "100", "performer_id": 999999},
+    )
+    assert response.status_code == 404, response.text
+
+
+async def test_addon_flag_changes_on_update_via_api(client, owner_headers):
+    """Раньше save() не переносил addon у существующего варианта —
+    снять или поставить «доп» правкой было нельзя."""
+    service = await _create_service(
+        client, owner_headers, variants=[{"name": "Балансировка", "price": "500", "addon": True}]
+    )
+    variant = service["variants"][0]
+    response = await client.put(
+        f"/api/products/{service['id']}",
+        headers=owner_headers,
+        json={"name": service["name"], "unit_code": "service", "retail_price": "500",
+              "variants": [{**variant, "addon": False}]},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["variants"][0]["addon"] is False

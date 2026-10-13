@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from app.application.products.create_product import build_service_details
 from app.domain.audit.entities import AuditEntry
 from app.domain.catalog.barcode import Barcode
 from app.domain.catalog.entities import Product, ProductVariant
@@ -44,6 +45,9 @@ class UpdateProductCommand:
     storefront_min_qty: Decimal | None = None
     storefront_step_qty: Decimal | None = None
     variants: list[UpdateVariantInput] = field(default_factory=list)
+    # только у услуги — см. ServiceDetails
+    duration_minutes: int = 0
+    performer_id: int | None = None
 
 
 class UpdateProductUseCase:
@@ -131,6 +135,9 @@ class UpdateProductUseCase:
                     for v in cmd.variants
                 ],
                 kind=existing_product.kind,
+                service=await build_service_details(uow, cmd.duration_minutes, cmd.performer_id)
+                if is_service
+                else None,
             )
             await uow.products.save(product)
             await uow.audit.add(

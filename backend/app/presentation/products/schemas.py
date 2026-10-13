@@ -104,10 +104,15 @@ class ProductCreateRequest(BaseModel):
     initial_stock_warehouse_id: int | None = None
     initial_stock_quantity: Decimal | None = None
     kind: Literal["product", "service"] = "product"
+    # только у услуги; у товара игнорируются
+    duration_minutes: int = Field(0, ge=0, le=60 * 24 * 30)
+    performer_id: int | None = None
 
     def to_command(self) -> CreateProductCommand:
         return CreateProductCommand(
             kind=self.kind,
+            duration_minutes=self.duration_minutes,
+            performer_id=self.performer_id,
             name=self.name,
             unit_code=self.unit_code,
             purchase_price=self.purchase_price,
@@ -155,10 +160,14 @@ class ProductUpdateRequest(BaseModel):
     # остаток на складе без владельца (услуга его не видит и не списывает),
     # а обратно — услугу с нулевым остатком, которую нельзя продать. Нужен
     # другой вид — заводится новая позиция
+    duration_minutes: int = Field(0, ge=0, le=60 * 24 * 30)
+    performer_id: int | None = None
 
     def to_command(self, product_id: int) -> UpdateProductCommand:
         return UpdateProductCommand(
             product_id=product_id,
+            duration_minutes=self.duration_minutes,
+            performer_id=self.performer_id,
             name=self.name,
             unit_code=self.unit_code,
             purchase_price=self.purchase_price,
@@ -443,6 +452,9 @@ class ProductResponse(BaseModel):
     storefront_min_qty: Decimal | None
     storefront_step_qty: Decimal | None
     kind: str
+    # у товара — 0 и None
+    duration_minutes: int
+    performer_id: int | None
     variants: list[VariantResponse]
 
     @classmethod
@@ -469,6 +481,8 @@ class ProductResponse(BaseModel):
             storefront_min_qty=product.storefront_min_qty,
             storefront_step_qty=product.storefront_step_qty,
             kind=product.kind,
+            duration_minutes=product.service.duration_minutes if product.service else 0,
+            performer_id=product.service.performer_id if product.service else None,
             variants=[
                 VariantResponse(
                     id=v.id,

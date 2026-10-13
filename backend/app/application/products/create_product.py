@@ -10,6 +10,7 @@ from app.domain.catalog.entities import (
     SERVICE_KIND,
     Product,
     ProductVariant,
+    ServiceDetails,
 )
 from app.domain.common.cache import ICache
 from app.domain.common.exceptions import DomainError
@@ -51,6 +52,19 @@ class CreateProductCommand:
     initial_stock_warehouse_id: int | None = None
     initial_stock_quantity: Decimal | None = None
     kind: str = PRODUCT_KIND
+    # только у услуги — см. ServiceDetails
+    duration_minutes: int = 0
+    performer_id: int | None = None
+
+
+async def build_service_details(
+    uow: IUnitOfWork, duration_minutes: int, performer_id: int | None
+) -> ServiceDetails:
+    if duration_minutes < 0:
+        raise DomainError("Длительность не может быть отрицательной")
+    if performer_id is not None:
+        await uow.users.get(performer_id)  # чужой или несуществующий — NotFoundError
+    return ServiceDetails(duration_minutes=duration_minutes, performer_id=performer_id)
 
 
 class CreateProductUseCase:
@@ -139,6 +153,9 @@ class CreateProductUseCase:
                     for v in cmd.variants
                 ],
                 kind=cmd.kind,
+                service=await build_service_details(uow, cmd.duration_minutes, cmd.performer_id)
+                if is_service
+                else None,
             )
             await uow.products.add(product)
             await uow.audit.add(
