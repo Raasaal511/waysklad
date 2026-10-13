@@ -96,6 +96,45 @@ class ProductVariant:
 
 
 @dataclass
+class ServiceDetails:
+    """То, что есть только у услуги и чего не бывает у товара.
+
+    Хранится отдельно от Product (таблица services, 1:1): услуга продаётся
+    в том же чеке, что товар, поэтому сама позиция остаётся в products —
+    иначе строка чека получила бы вторую ссылку, а продажа, возврат,
+    аналитика и офлайн-очередь — развилку в каждом месте.
+    """
+
+    # примерная длительность в минутах; 0 — не указана, клиенту не показываем
+    duration_minutes: int = 0
+    # сотрудник, который оказывает услугу; None — не закреплена ни за кем
+    performer_id: int | None = None
+
+    @property
+    def duration_label(self) -> str:
+        """«40 мин», «1 ч», «1 ч 30 мин» — пусто, если длительность не задана."""
+        if self.duration_minutes <= 0:
+            return ""
+        hours, minutes = divmod(self.duration_minutes, 60)
+        if not hours:
+            return f"{minutes} мин"
+        return f"{hours} ч" if not minutes else f"{hours} ч {minutes} мин"
+
+    def to_dict(self) -> dict:
+        return {
+            "duration_minutes": self.duration_minutes,
+            "performer_id": self.performer_id,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "ServiceDetails":
+        return cls(
+            duration_minutes=d.get("duration_minutes", 0),
+            performer_id=d.get("performer_id"),
+        )
+
+
+@dataclass
 class Product:
     id: int | None
     name: str
@@ -125,6 +164,8 @@ class Product:
     # и аналитику. Для пользователя они разные (своя вкладка, своя форма),
     # в коде отличие ровно одно — услуга не трогает склад (is_service).
     kind: str = PRODUCT_KIND
+    # заполнено только у услуги (kind='service') — см. ServiceDetails
+    service: ServiceDetails | None = None
     variants: list[ProductVariant] = field(default_factory=list)
 
     @property
@@ -184,6 +225,7 @@ class Product:
             if self.storefront_step_qty is not None
             else None,
             "kind": self.kind,
+            "service": self.service.to_dict() if self.service is not None else None,
             "variants": [v.to_dict() for v in self.variants],
         }
 
@@ -213,7 +255,8 @@ class Product:
             storefront_step_qty=Decimal(d["storefront_step_qty"])
             if d["storefront_step_qty"] is not None
             else None,
-            # записи кеша, созданные до появления услуг, поля не имеют
+            # записи кеша, созданные до появления услуг, полей не имеют
             kind=d.get("kind", PRODUCT_KIND),
+            service=ServiceDetails.from_dict(d["service"]) if d.get("service") else None,
             variants=[ProductVariant.from_dict(v) for v in d["variants"]],
         )

@@ -99,6 +99,10 @@ class ProductModel(Base, TenantMixin, TimestampMixin):
     variants: Mapped[list["ProductVariantModel"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin"
     )
+    # заполнено только у услуги (kind='service'); 1:1 — см. ServiceModel
+    service: Mapped["ServiceModel | None"] = relationship(
+        cascade="all, delete-orphan", lazy="selectin", uselist=False
+    )
 
 
 class ProductVariantModel(Base, TenantMixin):
@@ -118,3 +122,26 @@ class ProductVariantModel(Base, TenantMixin):
     name: Mapped[str] = mapped_column(String(100), default="")
     # доп к услуге (складывается), а не взаимоисключающий вариант товара
     addon: Mapped[bool] = mapped_column(default=False, server_default="false")
+
+
+class ServiceModel(Base, TenantMixin, TimestampMixin):
+    """Поля, которые есть только у услуги.
+
+    Лежит рядом с products (1:1 по product_id), а не вместо него: услуга
+    продаётся в том же чеке, что товар («шина + шиномонтаж» — две строки),
+    и строка чека ссылается на products. Отдельная таблица позиций заставила
+    бы переписать продажу, возврат, прибыль, аналитику и офлайн-очередь —
+    здесь же они не меняются вовсе.
+    """
+
+    __tablename__ = "services"
+    __table_args__ = (UniqueConstraint("tenant_id", "product_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), index=True
+    )
+    # сколько примерно занимает, в минутах; 0 — не указано (клиенту не показываем)
+    duration_minutes: Mapped[int] = mapped_column(default=0, server_default="0")
+    # кто оказывает: сотрудник магазина. NULL — не закреплён ни за кем
+    performer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))

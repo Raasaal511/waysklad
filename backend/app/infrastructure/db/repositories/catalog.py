@@ -16,6 +16,7 @@ from app.infrastructure.db.mappers.catalog import (
     CategoryMapper,
     ProductMapper,
     ProductVariantMapper,
+    ServiceMapper,
     UnitMapper,
 )
 from app.infrastructure.db.models.catalog import (
@@ -140,6 +141,13 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
         model.show_on_storefront = product.show_on_storefront
         model.storefront_min_qty = product.storefront_min_qty
         model.storefront_step_qty = product.storefront_step_qty
+        if product.service is None:
+            model.service = None
+        elif model.service is None:
+            model.service = ServiceMapper.to_orm(product.service, self._tenant)
+        else:
+            model.service.duration_minutes = product.service.duration_minutes
+            model.service.performer_id = product.service.performer_id
         # варианты: существующие обновляются, новые добавляются, убранные удаляются (delete-orphan)
         existing = {v.id: v for v in model.variants}
         updated = []
@@ -152,6 +160,7 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository, IProductRepository):
                 variant_model.photo = variant.photo
                 variant_model.price = variant.price.amount if variant.price else None
                 variant_model.name = variant.name
+                variant_model.addon = variant.addon
                 updated.append(variant_model)
             else:
                 updated.append(ProductVariantMapper.to_orm(variant, self._tenant))

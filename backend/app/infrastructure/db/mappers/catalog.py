@@ -1,11 +1,12 @@
 from app.domain.catalog.barcode import Barcode
-from app.domain.catalog.entities import Category, Product, ProductVariant
+from app.domain.catalog.entities import Category, Product, ProductVariant, ServiceDetails
 from app.domain.common.money import Money
 from app.domain.common.quantity import Unit
 from app.infrastructure.db.models.catalog import (
     CategoryModel,
     ProductModel,
     ProductVariantModel,
+    ServiceModel,
     UnitModel,
 )
 
@@ -95,6 +96,9 @@ class ProductMapper:
             storefront_step_qty=product.storefront_step_qty,
             kind=product.kind,
             variants=[ProductVariantMapper.to_orm(v, tenant_id) for v in product.variants],
+            service=ServiceMapper.to_orm(product.service, tenant_id)
+            if product.service is not None
+            else None,
         )
 
     @staticmethod
@@ -122,4 +126,22 @@ class ProductMapper:
             storefront_step_qty=model.storefront_step_qty,
             kind=model.kind,
             variants=[ProductVariantMapper.to_entity(v) for v in model.variants],
+            service=ServiceMapper.to_entity(model.service) if model.service is not None else None,
+        )
+
+
+class ServiceMapper:
+    @staticmethod
+    def to_orm(service: ServiceDetails, tenant_id: int) -> ServiceModel:
+        return ServiceModel(
+            tenant_id=tenant_id,
+            duration_minutes=service.duration_minutes,
+            performer_id=service.performer_id,
+        )
+
+    @staticmethod
+    def to_entity(model: ServiceModel) -> ServiceDetails:
+        return ServiceDetails(
+            duration_minutes=model.duration_minutes,
+            performer_id=model.performer_id,
         )
