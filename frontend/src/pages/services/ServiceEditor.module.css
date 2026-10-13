@@ -1,20 +1,29 @@
-/* Редактор услуги — в раскладке страницы товара на витрине
-   (pages/storefront/product/ProductPage.module.css): фото / поля / липкий
-   итог справа, карточки без рамки на мягком фоне. Владелец собирает услугу
-   и сразу видит, как она будет выглядеть для клиента. */
+/* Редактор услуги. От страницы товара на витрине — язык карточек (без
+   рамки, радиус 16, мягкий фон) и липкая колонка справа; раскладка же
+   рабочая: слева форма во всю ширину, справа живое превью «так увидит
+   клиент» с кнопками сохранения. */
 
 .page {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  animation: pageIn 0.25s ease both;
+  animation: rise 0.3s ease both;
+}
+
+/* --- шапка --- */
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
 }
 
 .back {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  width: fit-content;
+  width: 100%;
   color: var(--text-muted);
   text-decoration: none;
   font-size: 14px;
@@ -25,44 +34,63 @@
   color: var(--text);
 }
 
+.title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.flash {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 500;
+  animation: flashIn 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+
+/* --- раскладка --- */
+
 .layout {
   display: grid;
   gap: 20px;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr) 340px;
-  grid-template-areas: 'photo info aside';
+  grid-template-columns: minmax(0, 1fr) 360px;
   align-items: start;
 }
 
-.areaPhoto {
-  grid-area: photo;
-  min-width: 0;
-}
-
-.areaInfo {
-  grid-area: info;
-  min-width: 0;
+.main {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.areaAside {
-  grid-area: aside;
   min-width: 0;
-  position: sticky;
-  top: 16px;
 }
 
 .card {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
   padding: 24px;
   border-radius: 16px;
   background: var(--bg);
+  animation: rise 0.35s ease both;
 }
 
-:root[data-theme='dark'] .card {
+.main > .card:nth-child(2) {
+  animation-delay: 0.05s;
+}
+
+.main > .card:nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+:root[data-theme='dark'] .card,
+:root[data-theme='dark'] .preview {
   border: 1px solid var(--border);
 }
 
@@ -81,39 +109,6 @@
   gap: 4px 12px;
 }
 
-/* --- фото --- */
-
-.photoBox {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.photoBox > .photo {
-  border-radius: 16px;
-  font-size: 96px;
-}
-
-.photoActions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.linkBtn {
-  border: 0;
-  padding: 0;
-  background: none;
-  color: var(--text-muted);
-  font: inherit;
-  cursor: pointer;
-  transition: color 0.15s ease;
-}
-
-.linkBtn:hover {
-  color: var(--danger);
-}
-
 .hint,
 .muted {
   margin: 0;
@@ -121,34 +116,173 @@
   color: var(--text-muted);
 }
 
-/* --- поля --- */
+/* --- фото + название --- */
 
-.page input.nameInput {
-  width: 100%;
+.identity {
+  position: relative;
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.drop {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  padding: 0;
   border: 0;
-  border-bottom: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  background: none;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.drop:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 10%);
+}
+
+.drop:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.dropActive {
+  transform: scale(1.04);
+  box-shadow: 0 0 0 3px var(--accent), 0 12px 28px rgb(0 0 0 / 14%);
+}
+
+.drop > .dropPhoto {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  font-size: 48px;
+}
+
+.dropOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgb(0 0 0 / 45%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.drop:hover .dropOverlay,
+.drop:focus-visible .dropOverlay,
+.dropActive .dropOverlay {
+  opacity: 1;
+}
+
+.dropRemove {
+  position: absolute;
+  top: -6px;
+  left: 98px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--ink, #222);
+  color: #fff;
+  cursor: pointer;
+  animation: pop 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.dropRemove:hover {
+  transform: scale(1.1);
+  background: var(--danger);
+}
+
+.identityText {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 6px;
+}
+
+.nameInput {
+  width: 100%;
   padding: 0 0 10px;
+  border: 0;
+  border-bottom: 2px solid var(--border);
+  border-radius: 0;
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 700;
   line-height: 1.25;
-  outline: 0;
-  transition: border-color 0.15s ease;
+  outline: none;
+  transition: border-color 0.2s ease;
 }
 
-.page input.nameInput:focus {
-  border-color: var(--accent);
+.nameInput::placeholder {
+  color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+  font-weight: 600;
 }
+
+.nameInput:focus,
+.nameInput:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.templates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.template {
+  padding: 6px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  animation: rise 0.3s ease both;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.template:hover {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft-weak);
+  color: var(--accent);
+}
+
+.template:active {
+  transform: scale(0.96);
+}
+
+/* --- поля --- */
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-muted);
@@ -167,76 +301,125 @@
   gap: 12px;
 }
 
-.page input.input,
+.input,
 .textarea,
 .priceInput,
-.page input.addonName {
+.addonName {
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 12px;
   background: var(--bg);
   color: var(--text);
   font: inherit;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.page input.input,
-.page input.addonName {
+.input,
+.addonName {
   height: 44px;
   padding: 0 14px;
-  outline: 0;
+  outline: none;
 }
 
 .textarea {
   padding: 12px 14px;
+  min-height: 104px;
   resize: vertical;
-  min-height: 96px;
-  outline: 0;
-}
-
-/* кольцо вместо глобального outline: вес как у input:not():not():focus-visible */
-.page input.input:focus-visible,
-.page input.addonName:focus-visible,
-.priceInput input:not([type='checkbox']):focus-visible {
   outline: none;
 }
 
-.page input.input:focus,
+.input:focus,
 .textarea:focus,
-.page input.addonName:focus,
+.addonName:focus,
 .priceInput:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+  outline: none;
 }
 
 .priceInput {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 44px;
-  padding: 0 14px;
+  height: 48px;
+  padding: 0 16px;
   color: var(--text-muted);
+  cursor: text;
 }
 
-.priceInput input:not([type="checkbox"]) {
-  width: 110px;
+.priceInput input {
+  width: 120px;
   min-width: 0;
+  padding: 0;
   border: 0;
-  outline: 0;
+  outline: none;
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.minutesInput {
-  width: fit-content;
-  animation: pageIn 0.2s ease both;
+/* «за услугу / за час / …» — одна сегментная плашка: выбор из одного */
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--bg-muted);
 }
 
-.minutesInput input:not([type="checkbox"]) {
-  width: 64px;
+.segment,
+.segmentActive {
+  height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.segment:hover {
+  color: var(--text);
+}
+
+.segmentActive {
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
+}
+
+.minutes {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  color: var(--text-muted);
+  font-size: 13px;
+  animation: pop 0.2s ease both;
+}
+
+.minutes input {
+  width: 44px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: right;
 }
 
 /* --- допы --- */
@@ -255,12 +438,17 @@
   grid-template-columns: minmax(0, 1fr) auto 36px;
   gap: 8px;
   align-items: center;
-  animation: pageIn 0.2s ease both;
+  animation: rise 0.22s ease both;
 }
 
-.addonPrice input:not([type="checkbox"]) {
+.addonPrice {
+  height: 44px;
+}
+
+.addonPrice input {
   width: 72px;
   font-size: 16px;
+  font-weight: 600;
 }
 
 .iconBtn {
@@ -281,83 +469,181 @@
   color: var(--danger);
 }
 
+.addRowWrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .addRow {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 6px;
-  height: 44px;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  background: transparent;
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent-soft);
   color: var(--accent);
   font: inherit;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
 
 .addRow:hover {
-  border-color: var(--accent);
-  background: var(--accent-soft-weak);
+  background: color-mix(in srgb, var(--accent) 20%, var(--accent-soft));
 }
 
-/* --- итог --- */
-
-.summary {
-  gap: 16px;
+.addRow:active {
+  transform: scale(0.97);
 }
 
-.summaryHead {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+/* --- колонка справа --- */
 
-.summaryHead > :first-child {
-  flex-shrink: 0;
-  font-size: 24px;
-}
-
-.summaryTitle {
+.aside {
+  position: sticky;
+  top: 16px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 12px;
   min-width: 0;
+  animation: rise 0.35s ease 0.08s both;
 }
 
-.summaryTitle strong {
+.asideLabel {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* карточка как на витрине — но живая: допы кликаются, итог считается */
+.preview {
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--bg);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 7%);
+}
+
+.preview > .previewPhoto {
+  aspect-ratio: 16 / 10;
+  border-radius: 0;
+  font-size: 72px;
+}
+
+.previewBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px 18px;
+}
+
+.previewName {
+  font-size: 18px;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
-.summaryMeta {
+.previewMeta {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 10px;
+  gap: 4px 12px;
+  margin-top: -6px;
   font-size: 13px;
   color: var(--text-muted);
 }
 
-.summaryMeta span {
+.previewMeta span {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.summaryPrice {
+.previewAddons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pick,
+.pickActive {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  animation: rise 0.22s ease both;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.pick:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.pickActive {
+  border-color: var(--accent);
+  background: var(--accent-soft-weak);
+}
+
+.pickBox {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  color: transparent;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.pickActive .pickBox {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+.pickName {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pickPrice {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.previewTotal {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: 6px;
-  padding-top: 16px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
 }
 
-.summaryPrice strong {
+.previewTotal strong {
   font-size: 28px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  transition: color 0.2s ease;
 }
 
 .switchRow {
@@ -365,24 +651,28 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  border-radius: var(--radius);
-  background: var(--bg-muted);
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--bg);
   cursor: pointer;
+}
+
+:root[data-theme='dark'] .switchRow {
+  border: 1px solid var(--border);
 }
 
 .switchRow > span {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .switchRow small {
   font-weight: 400;
 }
 
-.switch {
+input.switch {
   flex-shrink: 0;
   appearance: none;
   position: relative;
@@ -390,12 +680,13 @@
   height: 26px;
   margin: 0;
   border-radius: 999px;
-  background: var(--border);
+  /* var(--border) слишком бледный — выключенный тумблер читался как спиннер */
+  background: color-mix(in srgb, var(--text) 22%, var(--bg));
   cursor: pointer;
   transition: background 0.2s ease;
 }
 
-.switch::after {
+input.switch::after {
   content: '';
   position: absolute;
   top: 3px;
@@ -405,26 +696,95 @@
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
-  transition: transform 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.3, 1.4, 0.5, 1);
 }
 
-.switch:checked {
+input.switch:checked {
   background: var(--accent);
 }
 
-.switch:checked::after {
+input.switch:checked::after {
   transform: translateX(18px);
 }
 
-.switch:focus-visible {
+input.switch:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
+.error {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 14px;
+  animation: shake 0.35s ease both;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .save {
-  width: 100%;
-  height: 48px;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  gap: 8px;
+  height: 52px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.save:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.save:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.save:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.saveDone {
+  opacity: 1 !important;
+  animation: pop 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+}
+
+.saveMore {
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.saveMore:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.kbdHint {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .delete {
@@ -432,6 +792,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+  margin-top: 4px;
   border: 0;
   background: none;
   color: var(--text-muted);
@@ -445,75 +806,170 @@
   color: var(--danger);
 }
 
-@keyframes pageIn {
+/* --- движение --- */
+
+@keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(8px);
   }
 }
 
-/* --- адаптив: как у страницы товара --- */
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
 
-@media (max-width: 1199px) {
+@keyframes flashIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px) scale(0.9);
+  }
+}
+
+@keyframes shake {
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+/* --- адаптив --- */
+
+@media (max-width: 1099px) {
   .layout {
-    grid-template-columns: minmax(0, 1fr) 320px;
-    grid-template-areas:
-      'photo aside'
-      'info aside';
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .photoBox {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
+  /* на узком экране превью уходит вниз, а кнопка — липкой полосой */
+  .aside {
+    position: static;
   }
 
-  .photoBox > .photo {
-    width: 140px;
-    font-size: 56px;
+  .actions {
+    position: sticky;
+    bottom: 84px;
+    z-index: 2;
+    padding: 10px;
+    margin: 0 -10px;
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--bg-muted) 85%, transparent);
+    backdrop-filter: blur(8px);
+  }
+
+  .kbdHint {
+    display: none;
   }
 }
 
 @media (max-width: 767px) {
-  .layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'photo'
-      'info'
-      'aside';
-    gap: 12px;
-  }
-
-  .areaAside {
-    position: static;
+  .title {
+    font-size: 22px;
   }
 
   .card {
     padding: 16px;
+    gap: 18px;
   }
 
-  .photoBox > .photo {
-    width: 96px;
-    font-size: 40px;
+  .identity {
+    grid-template-columns: 84px minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .drop {
+    width: 84px;
+    height: 84px;
+    border-radius: 16px;
+  }
+
+  .drop > .dropPhoto {
+    font-size: 36px;
+  }
+
+  .dropRemove {
+    left: 70px;
   }
 
   .nameInput {
     font-size: 20px;
   }
 
+  .segmented {
+    width: 100%;
+  }
+
+  .segment,
+  .segmentActive {
+    flex: 1;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+
   .addonRow {
-    grid-template-columns: minmax(0, 1fr) auto 36px;
+    grid-template-columns: minmax(0, 1fr) auto 32px;
+    gap: 6px;
+  }
+
+  .addonPrice {
+    padding: 0 10px;
+    gap: 4px;
   }
 
   .addonPrice input {
-    width: 56px;
+    width: 48px;
+  }
+
+  /* на телефоне превью — сама карточка, без большой картинки сверху */
+  .preview > .previewPhoto {
+    aspect-ratio: 3 / 1;
+    font-size: 48px;
+  }
+}
+
+@media (hover: none) {
+  .kbdHint {
+    display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .page,
+  .card,
+  .aside,
   .addonRow,
-  .minutesInput {
+  .template,
+  .pick,
+  .pickActive,
+  .flash,
+  .error,
+  .saveDone,
+  .dropRemove,
+  .minutes {
     animation: none;
+  }
+}
+
+/* index.css на узких экранах ставит input 16px (против зума iOS) с весом
+   input:not():not(). Крупное название и цена должны остаться крупными —
+   поднимаем вес до равного; меньше 16px здесь нет, iOS не зумит */
+@media (max-width: 899px) {
+  .page input.nameInput {
+    font-size: 20px;
+  }
+
+  .priceInput input:not([type='checkbox']) {
+    font-size: 20px;
+  }
+
+  .addonPrice input:not([type='checkbox']) {
+    font-size: 16px;
   }
 }

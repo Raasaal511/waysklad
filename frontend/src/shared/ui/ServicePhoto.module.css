@@ -9,13 +9,46 @@
 }
 
 .letter {
+  --tint: var(--accent);
   display: grid;
   place-items: center;
+  overflow: hidden;
   /* без size — страница задаёт размер буквы своим className */
   font-size: 44px;
   font-weight: 700;
   line-height: 1;
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--tint);
+  /* мягкий градиент того же оттенка: от светлого к чуть насыщенному углу */
+  background:
+    radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--tint) 10%, var(--bg)) 0%, transparent 60%),
+    color-mix(in srgb, var(--tint) 18%, var(--bg));
   user-select: none;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* в тёмной теме тот же оттенок светлее — иначе буква тонет в фоне */
+:root[data-theme='dark'] .letter {
+  color: color-mix(in srgb, var(--tint) 65%, white);
+  background:
+    radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--tint) 30%, var(--bg)) 0%, transparent 60%),
+    color-mix(in srgb, var(--tint) 20%, var(--bg));
+}
+
+/* буква меняется — мягко проявляется новая */
+.glyph {
+  display: block;
+  animation: glyphIn 0.25s ease both;
+}
+
+@keyframes glyphIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glyph {
+    animation: none;
+  }
 }
