@@ -460,6 +460,8 @@ function ProductsTab() {
     setError(null)
     try {
       const next = !product.show_on_storefront
+      // PUT заменяет товар целиком: всё, что не передано, сбросится в дефолт —
+      // поэтому отправляем каждое поле, а не только флаг витрины
       const saved = await updateProduct(product.id, {
         name: product.name,
         unit_code: product.unit_code,
@@ -469,6 +471,10 @@ function ProductsTab() {
         barcode: product.barcode,
         category_id: product.category_id,
         min_stock: product.min_stock,
+        description: product.description,
+        warranty_text: product.warranty_text,
+        storefront_min_qty: product.storefront_min_qty,
+        storefront_step_qty: product.storefront_step_qty,
         show_on_storefront: next,
         photo: product.photo,
         variants: product.variants.map((v) => ({
@@ -477,6 +483,9 @@ function ProductsTab() {
           color: v.color,
           barcode: v.barcode,
           name: v.name,
+          photo: v.photo,
+          price: v.price,
+          addon: v.addon,
         })),
       })
       setProducts((prev) => prev.map((p) => (p.id === saved.id ? saved : p)))
