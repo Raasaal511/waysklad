@@ -52,6 +52,10 @@ export interface Product {
   storefront_min_qty: string | null
   storefront_step_qty: string | null
   kind: ProductKind
+  /** Только у услуги: примерная длительность, 0 — не указана. */
+  duration_minutes: number
+  /** Только у услуги: кто оказывает (id сотрудника). */
+  performer_id: number | null
   variants: Variant[]
 }
 
@@ -157,6 +161,8 @@ interface ProductInput {
   initial_stock_quantity?: string | null
   /** Только при создании: вид позиции после создания не меняется. */
   kind?: ProductKind
+  duration_minutes?: number
+  performer_id?: number | null
 }
 
 export function listCategories() {

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { IconChevronLeft } from '@tabler/icons-react'
 import { useAuth } from '../../app/AuthContext'
 import { useCatalog } from '../../app/CatalogContext'
@@ -10,9 +10,6 @@ export function ProductNewPage() {
   const { user } = useAuth()
   const canManage = user?.role === 'owner' || user?.role === 'manager'
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const isService = searchParams.get('kind') === 'service'
-  const listHref = isService ? '/products?kind=service' : '/products'
   const {
     categories,
     units,
@@ -36,12 +33,11 @@ export function ProductNewPage() {
 
   return (
     <div className={layoutStyles.stack}>
-      <Link to={listHref} className={layoutStyles.backLink}>
-        <IconChevronLeft size={16} stroke={1.8} /> {isService ? 'Все услуги' : 'Все товары'}
+      <Link to="/products" className={layoutStyles.backLink}>
+        <IconChevronLeft size={16} stroke={1.8} /> Все товары
       </Link>
       <ProductForm
         product={null}
-        kind={isService ? 'service' : 'product'}
         categories={categories}
         units={units}
         warehouses={warehouses}
@@ -50,7 +46,7 @@ export function ProductNewPage() {
         onWarehousesChanged={() => refresh(['warehouses'])}
         onDone={(saved) => {
           refresh(['products', 'stock']).catch(() => {})
-          navigate(saved ? `/products/${saved.id}` : listHref, { replace: true })
+          navigate(saved ? `/products/${saved.id}` : '/products', { replace: true })
         }}
       />
     </div>

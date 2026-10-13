@@ -1,0 +1,21 @@
+.photo {
+  display: block;
+  aspect-ratio: 1;
+  width: 100%;
+  border-radius: var(--radius);
+  object-fit: cover;
+  background: var(--bg-muted);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.letter {
+  display: grid;
+  place-items: center;
+  /* без size — страница задаёт размер буквы своим className */
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent);
+  background: var(--accent-soft);
+  user-select: none;
+}

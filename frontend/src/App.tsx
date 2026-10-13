@@ -44,6 +44,12 @@ const ProductNewPage = lazy(() =>
 const ProductEditPage = lazy(() =>
   import('./pages/products/ProductEditPage').then((m) => ({ default: m.ProductEditPage })),
 )
+const ServicesPage = lazy(() =>
+  import('./pages/services/ServicesPage').then((m) => ({ default: m.ServicesPage })),
+)
+const ServiceEditorPage = lazy(() =>
+  import('./pages/services/ServiceEditorPage').then((m) => ({ default: m.ServiceEditorPage })),
+)
 const StockPage = lazy(() => import('./pages/stock/StockPage').then((m) => ({ default: m.StockPage })))
 const WarehouseDetailPage = lazy(() =>
   import('./pages/stock/WarehouseDetailPage').then((m) => ({ default: m.WarehouseDetailPage })),
@@ -252,6 +258,9 @@ export function App() {
                 <Route path="/products/new" element={<ProductNewPage />} />
                 <Route path="/products/:id/edit" element={<ProductEditPage />} />
                 <Route path="/products/:id" element={<ProductDetailPage />} />
+                <Route path="/services" element={<ServicesPage />} />
+                <Route path="/services/new" element={<ServiceEditorPage />} />
+                <Route path="/services/:id" element={<ServiceEditorPage />} />
                 <Route path="/stock" element={<StockPage />} />
                 <Route path="/stock/history" element={<MovementHistoryPage />} />
                 <Route path="/stock/:id/movement/:mode" element={<WarehouseMovementPage />} />

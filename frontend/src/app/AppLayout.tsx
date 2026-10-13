@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import {
   IconShoppingCart,
   IconBox,
+  IconTool,
   IconBuildingWarehouse,
   IconClipboardList,
   IconChecklist,
@@ -51,6 +52,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Продажи', icon: IconShoppingCart, roles: ['owner', 'manager', 'seller'] },
   { to: '/products', label: 'Товары', icon: IconBox },
+  { to: '/services', label: 'Услуги', icon: IconTool },
   { to: '/stock', label: 'Склады', icon: IconBuildingWarehouse },
   {
     to: '/orders', label: 'Заказы', icon: IconClipboardList,
@@ -84,6 +86,7 @@ const MOBILE_NAV_PRIORITY = [
   '/stock',
   '/clients',
   '/storefront',
+  '/services',
   '/tasks',
   '/analytics',
   '/employees',

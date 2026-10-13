@@ -475,6 +475,8 @@ function ProductsTab() {
         warranty_text: product.warranty_text,
         storefront_min_qty: product.storefront_min_qty,
         storefront_step_qty: product.storefront_step_qty,
+        duration_minutes: product.duration_minutes,
+        performer_id: product.performer_id,
         show_on_storefront: next,
         photo: product.photo,
         variants: product.variants.map((v) => ({
