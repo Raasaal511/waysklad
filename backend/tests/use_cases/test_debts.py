@@ -141,6 +141,12 @@ async def test_issue_debt_sends_instant_notification_to_owner(make_uow, register
         )
 
 
+
+def _tenth_of_month_ahead(months: int) -> date:
+    today = date.today()
+    index = today.month - 1 + months
+    return date(today.year + index // 12, index % 12 + 1, 10)
+
 async def test_debt_receipt_message_for_installment(make_uow, registered_shop, warehouse_id, random_phone):
     tenant_id, _, owner = registered_shop
     client = await CreateClientUseCase(make_uow(tenant_id)).execute(
@@ -158,9 +164,11 @@ async def test_debt_receipt_message_for_installment(make_uow, registered_shop, w
         CreateInstallmentCommand(
             debt_id=debt.id,
             schedule=[
-                InstallmentInput(due_date=date(2026, 10, 10), amount=Decimal("11200")),
-                InstallmentInput(due_date=date(2026, 11, 10), amount=Decimal("11200")),
-                InstallmentInput(due_date=date(2026, 12, 10), amount=Decimal("62300")),
+                # 10-е число трёх следующих месяцев: жёсткие даты «протухали» —
+                # график в прошлом домен справедливо отвергает
+                InstallmentInput(due_date=_tenth_of_month_ahead(1), amount=Decimal("11200")),
+                InstallmentInput(due_date=_tenth_of_month_ahead(2), amount=Decimal("11200")),
+                InstallmentInput(due_date=_tenth_of_month_ahead(3), amount=Decimal("62300")),
             ],
         ),
     )
